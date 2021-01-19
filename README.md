@@ -8,7 +8,7 @@ The Main module has 2 part :
 
 1. Qcodes: This has all the vendor level drivers for the instruments. Most instruments have pyVISA implementation, however DLL implementation is supported as well.
 
-2. Timing + HIL : Timing is used accept different instrument objects and perform check on the order of operations. HIL or Hardware Interface Layer, is a wrapper class around each of the different instruments being used. Each instrument has it own wrapper class, which has additional information relevant to that specific instrument. The instrument class wrapper, are supposed to provide a unified template, which can be used to add new devices.
+2. Timing + HAL : Timing is used accept different instrument objects and perform check on the order of operations. HAL or Hardware Abstraction Layer, is a wrapper class around each of the different instruments being used. Each instrument has it own wrapper class, which has additional information relevant to that specific instrument. The instrument class wrapper, are supposed to provide a unified template, which can be used to add new devices.
 
 ## Philosophy :
 

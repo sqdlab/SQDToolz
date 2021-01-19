@@ -18,5 +18,5 @@ setuptools.setup(
     ],
     python_requires='>=3.6',
     keywords='control toolbox, timing',
-    install_requires=['numpy']
+    install_requires=['numpy','qcodes','matplotlib','scipy']
 )

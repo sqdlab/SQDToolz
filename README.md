@@ -1,6 +1,12 @@
-# SQDTOOlz
+# SQDTOOLz
 
 This is a toolbox to control and run a experiments by synchronising AWGs and Digitizers via a Pulser device. This was designed to supersede UQTools, keeping simplicity, scalability and efficiency in check. It is a wrapper over Qcodes and has other key functionality such as timing control, pulse generation and shaping, data + configuration storage and retrieval, which are not present in Qcodes.
+
+## Install instruction:
+
+```
+pip install -e sqdtoolz
+```
 
 ## Basic design overview:
 

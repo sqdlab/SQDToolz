@@ -6,3 +6,5 @@ sqdtoolz.egg-info/SOURCES.txt
 sqdtoolz.egg-info/top_level.txt
 sqdtoolz/__pycache__/__init__.cpython-36.pyc
 sqdtoolz/__pycache__/Experiment.cpython-36.pyc
+ __pycache__/
+ *.pyc

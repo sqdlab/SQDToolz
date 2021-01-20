@@ -79,9 +79,9 @@ class DummyDDG(Instrument):
         for ch_name in ['A', 'B', 'C']:
             cur_channel = DummyDDGchannel(self, ch_name)
             self.add_submodule(ch_name, cur_channel)
-            self._trig_sources[ch_name] = TriggerSource(ch_name, cur_channel)
+            self._trig_sources[ch_name] = Trigger(ch_name, cur_channel)
 
-    def get_trigger_source(self, identifier):
+    def get_trigger_output(self, identifier):
         return self._trig_sources[identifier]
 
     def get_all_trigger_sources(self):

@@ -1,5 +1,5 @@
 
-class TriggerSource:
+class Trigger:
     def __init__(self, name, instr_trig_output_channel):
         self._instrTrig = instr_trig_output_channel
         self._name = name

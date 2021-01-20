@@ -1,5 +1,6 @@
 from numpy import pi
 from qcodes import Instrument, InstrumentChannel, VisaInstrument, validators as vals
+from sqdtoolz.Drivers.TriggerPulse import*
 
 class DG645Channel(InstrumentChannel):
     '''
@@ -22,11 +23,10 @@ class DG645Channel(InstrumentChannel):
                            get_cmd='LOFF?{}'.format(channel),
                            set_cmd='LOFF {},{}'.format(channel, '{:f}'),
                            get_parser=float, vals=vals.Numbers(-2., 2.))
-        self.add_parameter('TrigPolarity', label='Pulse Polarity', 
+        self.add_parameter('trigPolarity', label='Pulse Polarity', 
                            docstring='Polarity of the output. Use with care.',
                            get_cmd='LPOL?{}'.format(channel),
-                           set_cmd='LPOL {},{}'.format(channel, '{:d}'),
-                           val_mapping={'NEG': 0, 'POS': 1})
+                           set_cmd='LPOL {},{}'.format(channel, '{:d}'), get_parser=int)
         self.add_parameter(
             'prescale_factor', label='Prescale Factor', 
             docstring='Channel output is enabled on every nth trigger. '
@@ -44,12 +44,12 @@ class DG645Channel(InstrumentChannel):
                 set_cmd='PHAS {},{}'.format(channel, '{:d}'),
                 get_parser=int, vals=vals.Numbers(0, (1<<16)-1))
             self.add_parameter(
-                'TrigPulseLength', label='Trigger Pulse Duration', unit='s',
+                'trigPulseLength', label='Trigger Pulse Duration', unit='s',
                 get_cmd='DLAY?{}'.format(2*channel+1),
                 set_cmd='DLAY {},{},{}'.format(2*channel+1, 2*channel, '{:g}'),
                 get_parser=self._parse_duration, vals=vals.Numbers(0., 2000.))
             self.add_parameter(
-                'TrigPulseDelay', label='Delay', unit='s',
+                'trigPulseDelay', label='Delay', unit='s',
                 docstring='Reference times of pulse starting times '
                             'other than T0 are unsupported.', 
                 get_cmd='DLAY?{}'.format(2*channel),
@@ -58,7 +58,7 @@ class DG645Channel(InstrumentChannel):
         else:
             #This is for the T0 output
             self.add_parameter(
-                'duration', label='Duration', unit='s',
+                'trigPulseLength', label='Trigger Pulse Duration', unit='s',
                 get_cmd='DLAY?{}'.format(2*channel+1), 
                 get_parser=self._parse_duration)
 
@@ -83,6 +83,26 @@ class DG645Channel(InstrumentChannel):
     def TrigEnable(self):
         return True     #Not implementing any output enable/disable...
 
+    @property
+    def TrigPulseLength(self):
+        return self.trigPulseLength()
+    @TrigPulseLength.setter
+    def TrigPulseLength(self, val):
+        self.trigPulseLength(val)
+        
+    @property
+    def TrigPolarity(self):
+        return self.trigPolarity()
+    @TrigPolarity.setter
+    def TrigPolarity(self, val):
+        self.trigPolarity(val)
+        
+    @property
+    def TrigPulseDelay(self):
+        return self.trigPulseDelay()
+    @TrigPulseDelay.setter
+    def TrigPulseDelay(self, val):
+        self.trigPulseDelay(val)
     
 
 
@@ -151,7 +171,18 @@ class DG645(VisaInstrument):
                            get_cmd='BURP?', get_parser=float,
                            set_cmd='BURP {:.8f}', vals=vals.Numbers(1e-7, 42.9))
         # Output channels
-        for ch_id, ch_name in [(0, 'T0'), (1, 'AB'), (2, 'CD'), (3, 'EF'), (4, 'GH')]:
-            self.add_submodule(ch_name, DG645Channel(self, ch_name, ch_id))
+        self._trig_sources = {}
+        # for ch_id, ch_name in [(0, 'T0'), (1, 'AB'), (2, 'CD'), (3, 'EF'), (4, 'GH')]:
+        for ch_id, ch_name in [(1, 'AB'), (2, 'CD'), (3, 'EF'), (4, 'GH')]:
+            cur_channel = DG645Channel(self, ch_name, ch_id)
+            self.add_submodule(ch_name, cur_channel)
+            self._trig_sources[ch_name] = Trigger(ch_name, cur_channel)
+
         # Show IDN
         self.connect_message()
+
+    def get_trigger_output(self, identifier):
+        return self._trig_sources[identifier]
+
+    def get_all_trigger_sources(self):
+        return [self._trig_sources[x] for x in self._trig_sources]

@@ -4,8 +4,13 @@ class ACQ:
         self._inst_acq = inst_acq
 
     @property
-    def TrigEnable(self):
-        return self._enableGet()
-    @TrigEnable.setter
-    def TrigEnable(self, boolVal):
-        self._enableSet(boolVal)
+    def Repetitions(self):
+        return self._instrTrig.TrigPulseDelay
+    @Repetitions.setter
+    def Repetitions(self, len_seconds):
+        self._instrTrig.TrigPulseDelay = len_seconds
+
+
+
+    # def set_trigger_source(self, trig_obj):
+

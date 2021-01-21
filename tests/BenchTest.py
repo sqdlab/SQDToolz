@@ -26,19 +26,3 @@ ddg_module.get_trigger_output('EF').TrigPolarity = 0
 tc = TimingConfiguration(1e-6, [ddg_module])
 lePlot = tc.plot().show()
 input('press <ENTER> to continue')
-
-
-
-
-
-# ddg_module._instr_ddg.CD.trigPulseLength(float(500e-9))
-# ddg_module._instr_ddg.write_raw('DLAY 5,4,7e-07\n')
-
-
-
-# import visa
-# rm = visa.ResourceManager()
-# rm.list_resources()
-# ('ASRL1::INSTR', 'ASRL2::INSTR', 'GPIB0::14::INSTR')
-# my_instrument = rm.open_resource('GPIB0::14::INSTR')
-# print(my_instrument.query('*IDN?'))

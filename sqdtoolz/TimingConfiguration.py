@@ -1,9 +1,10 @@
-from matplotlib.patches import Rectangle, Path, PathPatch
+import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 
 class TimingConfiguration:
-    def __init__(self, duration, list_DDGs):
+    def __init__(self, duration, list_DDGs, instr_ACQ):
         self._list_DDGs = list_DDGs
+        self._instr_ACQ = instr_ACQ
         self._total_time = duration
 
     @property
@@ -12,6 +13,48 @@ class TimingConfiguration:
     @RepetitionTime.setter
     def RepetitionTime(self, len_seconds):
         self._total_time = len_seconds
+
+    @staticmethod
+    def _add_rectangle(ax, xStart, xEnd, bar_width, yOff):
+        '''
+        Draws a rectangular patch for the timing diagram based on the delay and length values from a trigger object.
+
+        Inputs:
+            - ax     - Axis object to which the rectangle is to be drawn
+            - xStart - Starting value on the x-axis
+            - xEnd   - Ending value on the x-axis
+            - bar_width - Vertical width of the rectangle to be drawn (should be less than 1 if multiple rows are to not intersect their rectangles)
+            - yOff    - Current y-offset
+        '''
+        rect = patches.Rectangle( (xStart,yOff - 0.5*bar_width), xEnd-xStart, bar_width,
+                                facecolor='white', edgecolor='black', hatch = '///')
+        ax.add_patch(rect)
+
+    @staticmethod
+    def _reconcile_edge(trig_pulse_obj, input_trig_pol):
+        '''
+        Gives the starting point of the trigger (for generation or acquisition) given a trigger pulse and an input edge polarity.
+
+        Inputs:
+            - trig_pulse_obj - Trigger object holding the trigger pulse information
+            -  input_trig_pol - Input trigger edge (0 or 1 for negative or positive edge/polarity)
+
+        Returns the delay time in which the trigger activates.
+        '''
+        pulse_polarity = trig_pulse_obj.TrigPolarity
+        if input_trig_pol == 0:
+            if pulse_polarity == 0:
+                return trig_pulse_obj.TrigPulseDelay
+            else:
+                return trig_pulse_obj.TrigPulseDelay + trig_pulse_obj.TrigPulseLength
+        elif input_trig_pol == 1:
+            if pulse_polarity == 0:
+                return trig_pulse_obj.TrigPulseDelay + trig_pulse_obj.TrigPulseLength
+            else:
+                return trig_pulse_obj.TrigPulseDelay
+        else:
+            assert False, "Trigger input polarity must be 0 or 1 for negative or positive edge/polarity."
+
 
     def plot(self):
         '''
@@ -38,9 +81,17 @@ class TimingConfiguration:
 
         fig = plt.figure()
         ax = fig.add_axes((0.25, 0.125, 0.7, 0.78))
-        
         num_channels = 0
         yticklabels = []
+        #Plotting is done from the bottom to the top (i.e. increasing up the y-axis)
+        #Plot the ACQ capture region
+        cur_acq = self._instr_ACQ
+        if (cur_acq):
+            cur_trig_start = self._reconcile_edge(cur_acq.get_trigger_source(), cur_acq.TriggerEdge) * scale_fac
+            cur_len = cur_acq.NumSamples / cur_acq.SampleRate * scale_fac
+            self._add_rectangle(ax, cur_trig_start, cur_trig_start + cur_len, bar_width, num_channels)
+            num_channels += 1
+            yticklabels.append(cur_acq.name)
         #Plot the DDG output pulses
         for cur_ddg in self._list_DDGs:
             cur_channels = cur_ddg.get_all_outputs()

@@ -10,15 +10,27 @@ class DummyACQ(Instrument):
         # #A 10ns output SYNC
         # self.add_submodule('SYNC', SyncTriggerPulse(10e-9, lambda : True, lambda x:x))
 
-        # Output channels added to both the module for snapshots and internal Trigger Sources for the DDG HAL...
-        self._trig_sources = {}
-        for ch_name in ['A', 'B', 'C']:
-            cur_channel = DummyDDGchannel(self, ch_name)
-            self.add_submodule(ch_name, cur_channel)
-            self._trig_sources[ch_name] = Trigger(ch_name, cur_channel)
+        self._num_samples = 10
+        self._sample_rate = 10e9
+        self._trigger_edge = 1
 
-    def get_trigger_output(self, identifier):
-        return self._trig_sources[identifier]
+    @property
+    def NumSamples(self):
+        return self._num_samples
+    @NumSamples.setter
+    def NumSamples(self, num_samples):
+        self._num_samples = num_samples
 
-    def get_all_trigger_sources(self):
-        return [self._trig_sources[x] for x in self._trig_sources]
+    @property
+    def SampleRate(self):
+        return self._sample_rate
+    @SampleRate.setter
+    def SampleRate(self, frequency_hertz):
+        self._sample_rate = frequency_hertz
+
+    @property
+    def TriggerInputEdge(self):
+        return self._trigger_edge
+    @TriggerInputEdge.setter
+    def TriggerInputEdge(self, pol):
+        self._trigger_edge = pol

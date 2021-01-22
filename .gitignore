@@ -6,3 +6,8 @@ sqdtoolz.egg-info/SOURCES.txt
 sqdtoolz.egg-info/top_level.txt
 sqdtoolz/__pycache__/__init__.cpython-36.pyc
 sqdtoolz/__pycache__/Experiment.cpython-36.pyc
+dist/sqdtoolz-0.0.1.dev1-py3-none-any.whl
+.gitignore
+.gitignore
+sqdtoolz.egg-info/not-zip-safe
+dist/sqdtoolz-0.0.1.dev1-py3.9.egg

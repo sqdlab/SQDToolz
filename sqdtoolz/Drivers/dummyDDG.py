@@ -9,7 +9,7 @@ class DummyDDGchannel(InstrumentChannel):
         super().__init__(parent, name)
         self._outputEnable = True
         self._trigpol = 0
-        self._triglen = 0.0
+        self._triglen = 10.0e-9
         self._trigdly = 0.0
 
         self.add_parameter(

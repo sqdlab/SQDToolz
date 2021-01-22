@@ -5,6 +5,7 @@ class TimingConfiguration:
     def __init__(self, duration, list_DDGs, instr_ACQ):
         self._list_DDGs = list_DDGs
         self._instr_ACQ = instr_ACQ
+        self._list_AWGs = []
         self._total_time = duration
 
     @property
@@ -55,6 +56,41 @@ class TimingConfiguration:
         else:
             assert False, "Trigger input polarity must be 0 or 1 for negative or positive edge/polarity."
 
+    def save_config(self):
+        retVal = []
+        #Get the dictionaries for the DDGs
+        for cur_ddg in self._list_DDGs:
+            retVal.append(cur_ddg._get_current_config())
+        #Get the dictionaries and triggers for ACQ
+        if (self._instr_ACQ):
+            cur_acq = self._instr_ACQ
+            retVal.append(cur_acq._get_current_config())
+        return retVal
+
+    def update_config(self, conf):
+        #Load the module parameters
+        trig_relations = []
+        for cur_dict in conf:
+            if cur_dict['type'] == 'DDG':
+                for cur_ddg in self._list_DDGs:
+                    if cur_ddg.name == cur_dict['instrument']:
+                        cur_ddg._set_current_config(cur_dict)
+            elif cur_dict['type'] == 'ACQ':
+                cur_acq = self._instr_ACQ
+                cur_acq._set_current_config(cur_dict)
+                if 'TriggerSource' in cur_dict:
+                    trig_relations.append( (cur_acq, cur_dict['TriggerSource']['TriggerSourceHAL'], cur_dict['TriggerSource']['TriggerSourceID']) )
+        #Settle the triggers
+        possible_trig_sources = self._list_DDGs + self._list_AWGs
+        for cur_trig_rel in trig_relations:
+            cur_src_name = cur_trig_rel[1]
+            cur_src = None
+            for cand_src in possible_trig_sources:
+                if cand_src.name == cur_src_name:
+                    cur_src = cand_src
+                    break
+            assert cur_src != None, "Trigger source could not be found for instrument " + cur_trig_rel[0].name + " sourcing from an unknown module " + cur_src_name
+            cur_trig_rel[0].set_trigger_source(cur_src, cur_trig_rel[2])
 
     def plot(self):
         '''

@@ -31,10 +31,31 @@ class Trigger:
 
     @property
     def TrigEnable(self):
-        return self._instr_ddg.TrigEnable
+        return self._instrTrig.TrigEnable
     @TrigEnable.setter
     def TrigEnable(self, boolVal):
-        self._instr_ddg.TrigEnable = boolVal
+        self._instrTrig.TrigEnable = boolVal
+
+    def _get_current_config(self):
+        return {self.name : {
+            'TrigPulseDelay'  : self.TrigPulseDelay,
+            'TrigPulseLength' : self.TrigPulseLength,
+            'TrigPolarity'  : self.TrigPolarity,
+            'TrigEnable'    : self.TrigEnable
+        }}
+
+    def _set_current_config(self, dict_config):
+        '''
+        Set the trigger parameters from a dictionary. Note that this must be the dictionary value returned by _get_current_config - that is,
+        the dictionary should only have the keys of the parameters to be set (e.g. TrigPulseDelay, TrigPulseLength, TrigPolarity and TrigEnable)
+
+        Input:
+            - dict_config - Dictionary of trigger parameters.
+        '''
+        self.TrigPulseDelay = dict_config['TrigPulseDelay']
+        self.TrigPulseLength = dict_config['TrigPulseLength']
+        self.TrigPolarity = dict_config['TrigPolarity']
+        self.TrigEnable = dict_config['TrigEnable']
 
 
 class SyncTriggerPulse:

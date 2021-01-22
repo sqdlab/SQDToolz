@@ -1,0 +1,6 @@
+instruments:
+  pulser:
+    driver: sqdtoolz.Drivers.DDG_DG645
+    type: DG645
+    address: 'TCPIP::192.168.0.103::INSTR'
+    enable_forced_reconnect: true

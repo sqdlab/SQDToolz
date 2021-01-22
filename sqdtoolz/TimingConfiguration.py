@@ -68,29 +68,41 @@ class TimingConfiguration:
         return retVal
 
     def update_config(self, conf):
+        #
         #Load the module parameters
+        #
         trig_relations = []
         for cur_dict in conf:
+            #Sort through each entry in the list of dictionaries and parse depending on their type (e.g. DDG, ACQ, AWG etc...)
             if cur_dict['type'] == 'DDG':
+                #Find the corresponding DDG in the current list of registered DDG Modules and set its configuration parameters
                 for cur_ddg in self._list_DDGs:
                     if cur_ddg.name == cur_dict['instrument']:
                         cur_ddg._set_current_config(cur_dict)
+                        break
             elif cur_dict['type'] == 'ACQ':
                 cur_acq = self._instr_ACQ
                 cur_acq._set_current_config(cur_dict)
+                #After setting the parameters, write down the current device and its trigger relation (i.e. the source and ID)
                 if 'TriggerSource' in cur_dict:
                     trig_relations.append( (cur_acq, cur_dict['TriggerSource']['TriggerSourceHAL'], cur_dict['TriggerSource']['TriggerSourceID']) )
+            #TODO: Add in AWG support
+        #
         #Settle the triggers
+        #
         possible_trig_sources = self._list_DDGs + self._list_AWGs
         for cur_trig_rel in trig_relations:
+            cur_dest_obj = cur_trig_rel[0]
             cur_src_name = cur_trig_rel[1]
             cur_src = None
+            #For the current trigger relation, find its source by using the HAL module name (i.e. H/W instrument name
             for cand_src in possible_trig_sources:
                 if cand_src.name == cur_src_name:
                     cur_src = cand_src
                     break
-            assert cur_src != None, "Trigger source could not be found for instrument " + cur_trig_rel[0].name + " sourcing from an unknown module " + cur_src_name
-            cur_trig_rel[0].set_trigger_source(cur_src, cur_trig_rel[2])
+            assert cur_src != None, "Trigger source could not be found for instrument " + cur_dest_obj.name + " sourcing from an unknown module " + cur_src_name
+            #Set the trigger source on the destination object (AWGs and ACQ modules have the set_trigger_source function implemented by default) 
+            cur_dest_obj.set_trigger_source(cur_src, cur_trig_rel[2])
 
     def plot(self):
         '''

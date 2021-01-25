@@ -178,8 +178,12 @@ class DG645(VisaInstrument):
             self.add_submodule(ch_name, cur_channel)
             self._trig_sources[ch_name] = Trigger(ch_name, cur_channel)
 
+        self.add_parameter('trigger_rate', label='Trigger Rate', 
+                           get_cmd='TRAT?', get_parser=float,
+                           set_cmd='TRAT {:.8f}')
+        #self.trat_period(1e6)
         # Show IDN
-        self.connect_message()
+        #self.connect_message()
 
     def get_trigger_output(self, identifier):
         return self._trig_sources[identifier]

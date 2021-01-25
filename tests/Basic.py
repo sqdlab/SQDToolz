@@ -41,6 +41,10 @@ ddg_module.get_trigger_output('C').TrigPolarity = 1
 acq_module.set_trigger_source(ddg_module, 'C')
 tc.update_config(configTc)
 
+import json
+with open('data.txt', 'w') as outfile:
+    json.dump(configTc, outfile, indent=4)
+
 lePlot = tc.plot().show()
 input('press <ENTER> to continue')
 

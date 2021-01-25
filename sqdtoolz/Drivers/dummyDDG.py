@@ -2,9 +2,6 @@ from qcodes import Instrument, InstrumentChannel
 from sqdtoolz.Drivers.TriggerPulse import*
 
 class DummyDDGchannel(InstrumentChannel):
-    '''
-    DG645 per-output settings
-    '''
     def __init__(self, parent:Instrument, name:str) -> None:
         super().__init__(parent, name)
         self._outputEnable = True

@@ -42,6 +42,7 @@ class ACQ:
         self._trig_src_module = hal_module
         self._trig_src_id = trig_id
         self._trig_src_obj = hal_module.get_trigger_output(trig_id)
+        assert self._trig_src_obj != None, "The given trigger source is invalid or does not exist."
 
     def get_trigger_source(self):
         '''

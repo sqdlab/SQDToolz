@@ -1,4 +1,5 @@
-from qcodes import Instrument
+from qcodes import Instrument, InstrumentChannel
+import numpy as np
 
 class DummyAWGchannel(InstrumentChannel):
     def __init__(self, parent:Instrument, name:str) -> None:
@@ -18,7 +19,7 @@ class DummyAWGchannel(InstrumentChannel):
             set_cmd=self._set_off)
         self.add_parameter(
             'output', label='Output Enable',
-            get_cmd=lambda : self.__outputEnable,
+            get_cmd=lambda : self._outputEnable,
             set_cmd=self._set_outputEnable)
 
     def _set_amp(self, val):
@@ -68,11 +69,9 @@ class DummyAWG(Instrument):
         self._trigger_edge = 1
 
         # Output channels added to both the module for snapshots and internal Trigger Sources for the DDG HAL...
-        self._trig_sources = {}
-        for ch_name in ['A', 'B', 'C']:
-            cur_channel = DummyDDGchannel(self, ch_name)
+        for ch_name in ['CH1', 'CH2', 'CH3']:
+            cur_channel = DummyAWGchannel(self, ch_name)
             self.add_submodule(ch_name, cur_channel)
-            self._trig_sources[ch_name] = Trigger(ch_name, cur_channel)
 
     @property
     def SampleRate(self):
@@ -88,11 +87,15 @@ class DummyAWG(Instrument):
     def TriggerInputEdge(self, pol):
         self._trigger_edge = pol
 
-    def get_waveform_output(self, identifier):
-        if identifier in self._trig_sources:
-            return self._trig_sources[identifier]
-        else
+    def supports_markers(self, channel_name):
+        return True
+
+    def _get_channel_output(self, identifier):
+        if identifier in self.submodules:
+            return self.submodules[identifier]
+        else:
             return None
 
-    def program_channel(self, chan_id, wfm_data):
+    def program_channel(self, chan_id, wfm_data, mkr_data = np.array([])):
         print(wfm_data)
+        print(mkr_data)

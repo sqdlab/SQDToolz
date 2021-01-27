@@ -1,11 +1,11 @@
+import numpy as np
 
 class AWGOutputChannel:
-    def __init__(self, instr_awg, channel_name, parent_waveform_obj):
+    def __init__(self, instr_awg, channel_name):
         self._instr_awg = instr_awg
         self._channel_name = channel_name
-        self._instr_awg_chan = instr_awg.get_waveform_output(channel_name)
-        assert self._instr_awg_chan != None, "The channel name " + channel_name " does not exist in the AWG instrument " + self._instr_awg.name
-        self._parent = parent_waveform_obj
+        self._instr_awg_chan = instr_awg._get_channel_output(channel_name)
+        assert self._instr_awg_chan != None, "The channel name " + channel_name + " does not exist in the AWG instrument " + self._instr_awg.name
 
     @property
     def Name(self):
@@ -32,13 +32,16 @@ class AWGOutputChannel:
     def Output(self, boolVal):
         self.Output = boolVal
 
+    @property
+    def HasMarkers(self):
+        return False
+
     def _assemble_marker_raw(self):
         return None
 
-class AWGOutputChannelAndMarker(AWGOutputChannel):
-    def __init__(self, instr_awg, channel_name, parent_waveform_obj):
-        super().__init__(instr_awg, channel_name, parent_waveform_obj)
-
+class AWGOutputMarker:
+    def __init__(self, parent_waveform_obj):
+        self._parent = parent_waveform_obj
         #Marker status can be Arbitrary, Segments, None, Trigger
         self._marker_status = 'Arbitrary'
         self._marker_pol = 1
@@ -46,8 +49,6 @@ class AWGOutputChannelAndMarker(AWGOutputChannel):
         self._marker_seg_list = []
         self._marker_trig_delay = 0.0
         self._marker_trig_length = 1e-9
-
-        self._MkrTrigger = Trigger(self._name, self)
         
     def set_markers_to_segments(self, seg_list):
         self._marker_status = 'Segments'
@@ -70,29 +71,33 @@ class AWGOutputChannelAndMarker(AWGOutputChannel):
         self._marker_status = 'None'
 
     @property
+    def HasMarkers(self):
+        return True
+
+    @property
     def TrigPulseDelay(self):
         self._validate_trigger_parameters()
-        return self._instrTrig.TrigPulseDelay
+        return self._marker_trig_delay
     @TrigPulseDelay.setter
     def TrigPulseDelay(self, len_seconds):
-        assert self._marker_status == 'Trigger', "Cannot manipulate the marker waveforms on an AWG channel like a Trigger pulse without being in Trigger mode (i.e. call set_markers_to_trigger)
-        self._instrTrig.TrigPulseDelay = len_seconds
+        assert self._marker_status == 'Trigger', "Cannot manipulate the marker waveforms on an AWG channel like a Trigger pulse without being in Trigger mode (i.e. call set_markers_to_trigger)"
+        self._marker_trig_delay = len_seconds
 
     @property
     def TrigPulseLength(self):
         self._validate_trigger_parameters()
-        return self._instrTrig.TrigPulseLength
+        return self._marker_trig_length
     @TrigPulseLength.setter
     def TrigPulseLength(self, len_seconds):
-        assert self._marker_status == 'Trigger', "Cannot manipulate the marker waveforms on an AWG channel like a Trigger pulse without being in Trigger mode (i.e. call set_markers_to_trigger)
-        self._instrTrig.TrigPulseLength = len_seconds
+        assert self._marker_status == 'Trigger', "Cannot manipulate the marker waveforms on an AWG channel like a Trigger pulse without being in Trigger mode (i.e. call set_markers_to_trigger)"
+        self._marker_trig_length = len_seconds
 
     @property
     def TrigPolarity(self):
         return self._marker_pol
     @TrigPolarity.setter
     def TrigPolarity(self, pol):
-        assert self._marker_status == 'Trigger', "Cannot manipulate the marker waveforms on an AWG channel like a Trigger pulse without being in Trigger mode (i.e. call set_markers_to_trigger)
+        assert self._marker_status == 'Trigger', "Cannot manipulate the marker waveforms on an AWG channel like a Trigger pulse without being in Trigger mode (i.e. call set_markers_to_trigger)"
         self._marker_pol = pol
 
     @property
@@ -100,7 +105,7 @@ class AWGOutputChannelAndMarker(AWGOutputChannel):
         return self._instrTrig.TrigEnable
     @TrigEnable.setter
     def TrigEnable(self, boolVal):
-        assert self._marker_status == 'Trigger', "Cannot manipulate the marker waveforms on an AWG channel like a Trigger pulse without being in Trigger mode (i.e. call set_markers_to_trigger)
+        assert self._marker_status == 'Trigger', "Cannot manipulate the marker waveforms on an AWG channel like a Trigger pulse without being in Trigger mode (i.e. call set_markers_to_trigger)"
         self._instrTrig.TrigEnable = boolVal
 
     def _validate_trigger_parameters(self):
@@ -119,17 +124,17 @@ class AWGOutputChannelAndMarker(AWGOutputChannel):
             #Set the trigger parameters
             if mkr_array[0] == 0:
                 self._marker_pol = 1
-            else
+            else:
                 self._marker_pol = 0
             if len(changes) == 0:
                 self._marker_trig_delay = 0
                 self._marker_trig_length = 0
             elif len(changes) == 1:
-                self._marker_trig_delay = changes[0] * self._sample_rate
+                self._marker_trig_delay = changes[0] * self._parent._sample_rate
                 self._marker_trig_length = self.Duration - self._marker_trig_delay
-            else
-                self._marker_trig_delay = changes[0] * self._sample_rate
-                self._marker_trig_length = changes[1] * self._sample_rate - self._marker_trig_delay
+            else:
+                self._marker_trig_delay = changes[0] * self._parent._sample_rate
+                self._marker_trig_length = changes[1] * self._parent._sample_rate - self._marker_trig_delay
         elif self._marker_status == 'None':
             self._marker_trig_delay = 0
             self._marker_trig_length = 0
@@ -139,9 +144,9 @@ class AWGOutputChannelAndMarker(AWGOutputChannel):
             return np.array([], dtype=np.ubyte)
 
         if self._marker_status == 'Trigger':
-            final_wfm = np.zeros(self.NumPts, dtype=np.ubyte) + 1 - self._marker_pol
-            start_pt = np.round(self._marker_trig_delay * self._sample_rate)
-            end_pt = np.round((self._marker_trig_delay + self._marker_trig_length) * self._sample_rate)
+            final_wfm = np.zeros(int(np.round(self._parent.NumPts)), dtype=np.ubyte) + 1 - self._marker_pol
+            start_pt = int(np.round(self._marker_trig_delay * self._parent._sample_rate))
+            end_pt = int(np.round((self._marker_trig_delay + self._marker_trig_length) * self._parent._sample_rate))
             final_wfm[start_pt:end_pt+1] = self._marker_pol
             return final_wfm
         elif self._marker_status == 'Arbitrary':

@@ -1,4 +1,5 @@
 import numpy as np
+from sqdtoolz.HAL.AWGOutputChannel import*
 
 class WaveformSegment:
     def __init__(self, name):
@@ -8,9 +9,8 @@ class WaveformSegment:
     def Name(self):
         return Name
 
-    @property
     def NumPts(self, fs):
-        return self.get_duration()*fs
+        return self.Duration*fs
 
 class WFS_Constant(WaveformSegment):
     def __init__(self, name, time_len, value=0.0):
@@ -26,7 +26,7 @@ class WFS_Constant(WaveformSegment):
         self._duration = len_seconds
 
     def get_waveform(self, fs):
-        return np.zeros(round(self.NumPts))    
+        return np.zeros(round(self.NumPts(fs)))    
 
 class WFS_Gaussian(WaveformSegment):
     def __init__(self, name, time_len, amplitude, num_sd=1.96):
@@ -47,9 +47,9 @@ class WFS_Gaussian(WaveformSegment):
         return np.exp(-x*x / (2*self._sigma*self._sigma))
 
     def get_waveform(self, fs):
-        n = self.NumPts
+        n = self.NumPts(fs)
         #Generate the sample points on the Gaussian (start and end points are the same)
-        sample_points = np.linspace(-num_sd, num_sd, n)
+        sample_points = np.linspace(-self._num_sd, self._num_sd, int(np.round(n)))
         #Now calculate the Gaussian along the sample points
         sample_points = np.exp(-sample_points*sample_points/2)
         #Now shift the end points such that they are at zero
@@ -61,22 +61,39 @@ class WFS_Gaussian(WaveformSegment):
         return self._amplitude * sample_points
 
 class WaveformAWG:
-    def __init__(self, awg_channel_list, sample_rate, global_factor = 1):
-        self._awg_chan_list = awg_channel_list
+    def __init__(self, awg_channel_tuples, sample_rate, global_factor = 1):
+        #awg_channel_tuples is given as (instr_AWG, channel_name)
+        self._awg_chan_list = []
+        self._awg_mark_list = []
+        #TODO: Check that awg_channel_tuples is a list!
+        for cur_ch_tupl in awg_channel_tuples:
+            assert len(cur_ch_tupl) == 2, "The list awg_channel_tuples must contain tuples of form (instr_AWG, channel_name)."
+            cur_awg, cur_ch_name = cur_ch_tupl
+            self._awg_chan_list.append(AWGOutputChannel(cur_ch_tupl[0], cur_ch_tupl[1]))
+            if cur_awg.supports_markers(cur_ch_name):
+                self._awg_mark_list.append(AWGOutputMarker(self))
+            else:
+                self._awg_mark_list.append(None)
         self._sample_rate = sample_rate
         self._global_factor = global_factor
         self._wfm_segment_list = []
 
-
-
     def add_waveform_segment(self, wfm_segment):
         self._wfm_segment_list.append(wfm_segment)
 
-    def get_trigger_output(self, outputID = None):
+    def get_output_channel(self, outputIndex = 0):
         '''
-        Returns a TriggerSource object.
+        Returns an AWGOutputChannel object.
         '''
-        return self._MkrTrigger
+        assert outputIndex >= 0 and outputIndex < len(self._awg_chan_list), "Channel output index is out of range"
+        return self._awg_chan_list[outputIndex]
+
+    def get_trigger_output(self, outputIndex = 0):
+        '''
+        Returns an AWGOutputMarker object.
+        '''
+        assert outputIndex >= 0 and outputIndex < len(self._awg_chan_list), "Channel output index is out of range"
+        return self._awg_mark_list[outputIndex]
 
     @property
     def Duration(self):
@@ -105,7 +122,7 @@ class WaveformAWG:
         final_wfm = np.array([])
         for cur_wfm_seg in self._wfm_segment_list:
             #TODO: Preallocate - this is a bit inefficient...
-            final_wfm = np.concatenate(final_wfm, cur_wfm_seg.get_waveform())
+            final_wfm = np.concatenate((final_wfm, cur_wfm_seg.get_waveform(self._sample_rate)))
         #Scale the waveform via the global scale-factor...
         final_wfm *= self._global_factor
         return final_wfm
@@ -113,11 +130,8 @@ class WaveformAWG:
     def program_AWG(self):
         #Prepare the waveform
         final_wfm = self._assemble_waveform_raw()
-        for cur_awg_chan in self._awg_chan_list:
-            cur_awg_chan.Parent.program_channel(cur_awg_chan.name, final_wfm)
-
-
-        
-
-
-    
+        for ind, cur_awg_chan in enumerate(self._awg_chan_list):
+            if self._awg_mark_list[ind] != None:
+                cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.name, final_wfm, self._awg_mark_list[ind]._assemble_marker_raw())
+            else:
+                cur_awg_chan.Parent.program_channel(cur_awg_chan.name, final_wfm)

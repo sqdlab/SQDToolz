@@ -1,11 +1,12 @@
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
+import numpy as np
 
 class TimingConfiguration:
-    def __init__(self, duration, list_DDGs, instr_ACQ):
+    def __init__(self, duration, list_DDGs, list_AWGs, instr_ACQ = None):
         self._list_DDGs = list_DDGs
         self._instr_ACQ = instr_ACQ
-        self._list_AWGs = []
+        self._list_AWGs = list_AWGs
         self._total_time = duration
 
     @property
@@ -30,6 +31,41 @@ class TimingConfiguration:
         rect = patches.Rectangle( (xStart,yOff - 0.5*bar_width), xEnd-xStart, bar_width,
                                 facecolor='white', edgecolor='black', hatch = '///')
         ax.add_patch(rect)
+
+    @staticmethod
+    def _add_rectangle_with_plot(ax, xStart, xEnd, bar_width, yOff, yVals):
+        rect = patches.Rectangle( (xStart,yOff - 0.5*bar_width), xEnd-xStart, bar_width,
+                                facecolor='white', edgecolor='black')
+        ax.add_patch(rect)
+        xOccupyFactor = 0.8
+        yOccupyFactor = 0.8
+        x0 = xStart + (1-xOccupyFactor)/2*(xEnd-xStart)
+        x1 = xStart + (1+xOccupyFactor)/2*(xEnd-xStart)
+        xVals = np.linspace(x0, x1, yVals.size)
+        y0 = yOff-0.5*bar_width + (1-yOccupyFactor)/2*bar_width
+        y1 = y0 + yOccupyFactor*bar_width
+        yValsPlot = yVals * (y1-y0) + y0
+        ax.plot(xVals, yValsPlot, 'k')
+
+    @staticmethod
+    def _plot_digital_pulse(ax, vals01, xStart, pts2xVals, bar_width, yOff):
+        xVals = [0]
+        yVals = [vals01[0]]
+        last_val = vals01[0]
+        for ind, cur_yval in enumerate(vals01):
+            if cur_yval != last_val:
+                xVals.append(pts2xVals * ind)
+                xVals.append(pts2xVals * ind)
+                yVals.append(last_val)
+                yVals.append(cur_yval)
+                last_val = cur_yval
+        xVals.append(ind)
+        yVals.append(last_val)
+        #Now scale the pulse appropriately...
+        xVals = np.array(xVals)
+        yVals = np.array(yVals)
+        yVals = yVals*bar_width + yOff - bar_width*0.5
+        ax.plot(xVals, yVals, 'k')
 
     @staticmethod
     def _reconcile_edge(trig_pulse_obj, input_trig_pol):
@@ -140,6 +176,29 @@ class TimingConfiguration:
             self._add_rectangle(ax, cur_trig_start, cur_trig_start + cur_len, bar_width, num_channels)
             num_channels += 1
             yticklabels.append(cur_acq.name)
+        #Plot the AWG output pulses and markers (if any)
+        for cur_awg_wfm in self._list_AWGs[::-1]:
+            #Assemble the marker channels (if any)
+            for ind, cur_mkr_channel in enumerate(cur_awg_wfm.get_trigger_outputs()[::-1]):
+                cur_trig_start = 0 #TODO: Fill this in with trigger source
+                mkrs = cur_mkr_channel._assemble_marker_raw()
+                if mkrs.size > 0:
+                    self._plot_digital_pulse(ax, mkrs, cur_trig_start, scale_fac/cur_awg_wfm._sample_rate, bar_width, num_channels)
+                    num_channels += 1
+                    cur_ch = cur_awg_wfm.get_output_channel(ind)
+                    yticklabels.append(cur_ch._instr_awg.name + ":" + cur_ch._channel_name + "[Mkr]")
+            #Assemble the segments into its constituent channel(s) - e.g. IQ waveforms or other multichannel waveforms
+            #may opt to combine or plot 2 separate channels...
+            wfm_plot_bars = cur_awg_wfm._get_waveform_plot_segments()
+            for cur_output_channel in wfm_plot_bars[::-1]:
+                cur_trig_start = 0 #TODO: Fill this in with trigger source
+                cur_seg_x = cur_trig_start
+                for cur_wfm_dict in cur_output_channel[1]:
+                    cur_dur = cur_wfm_dict['duration']*scale_fac
+                    self._add_rectangle_with_plot(ax, cur_seg_x, cur_seg_x + cur_dur, bar_width, num_channels, cur_wfm_dict['yPoints'])
+                    cur_seg_x += cur_dur
+                num_channels += 1
+                yticklabels.append(cur_output_channel[0])                
         #Plot the DDG output pulses
         for cur_ddg in self._list_DDGs:
             cur_channels = cur_ddg.get_all_outputs()

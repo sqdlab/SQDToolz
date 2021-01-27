@@ -2,6 +2,7 @@ from sqdtoolz.Experiment import Experiment
 from sqdtoolz.HAL.DDG import*
 from sqdtoolz.HAL.ACQ import*
 from sqdtoolz.HAL.AWG import*
+from sqdtoolz.HAL.WaveformSegments import*
 from sqdtoolz.Drivers.dummyDDG import*
 from sqdtoolz.Drivers.dummyACQ import*
 from sqdtoolz.Drivers.dummyAWG import*
@@ -38,22 +39,33 @@ acq_module.TriggerEdge = 0
 acq_module.set_trigger_source(ddg_module, 'B')
 
 awg_wfm = WaveformAWG([(instr_awg, 'CH2')], 1e9)
-awg_wfm.add_waveform_segment(WFS_Gaussian("init", 10e-9, 0.8))
-awg_wfm.add_waveform_segment(WFS_Constant("hold", 20e-9, 0.0))
+awg_wfm.add_waveform_segment(WFS_Gaussian("init", 35e-9, 0.8))
+awg_wfm.add_waveform_segment(WFS_Constant("hold", 25e-9, 0.0))
 awg_wfm.add_waveform_segment(WFS_Constant("read", 50e-9, 0.0))
 awg_wfm.get_output_channel().Amplitude = 1.0
 awg_wfm.get_trigger_output().set_markers_to_trigger()
 awg_wfm.get_trigger_output().TrigPulseDelay = 25e-9
 awg_wfm.get_trigger_output().TrigPulseLength = 30e-9
 awg_wfm.program_AWG()
+#
+awg_wfm2 = WaveformAWG([(instr_awg, 'CH3')], 1e9)
+awg_wfm2.add_waveform_segment(WFS_Gaussian("init", 75e-9, 0.8))
+awg_wfm2.add_waveform_segment(WFS_Constant("hold", 45e-9, 0.0))
+awg_wfm2.add_waveform_segment(WFS_Gaussian("pulse", 75e-9, 0.8))
+awg_wfm2.add_waveform_segment(WFS_Constant("read", 150e-9, 0.0))
+awg_wfm2.get_output_channel().Amplitude = 1.0
+awg_wfm2.get_trigger_output().set_markers_to_segments(["hold"])
+awg_wfm2.program_AWG()
+#
+acq_module.set_trigger_source(awg_wfm, 0)
 
 # awg.set_trigger_source(ddg_module, 'A')
 
-tc = TimingConfiguration(1e-6, [ddg_module], acq_module)
-configTc = tc.save_config()
-ddg_module.get_trigger_output('C').TrigPolarity = 1
-acq_module.set_trigger_source(ddg_module, 'C')
-tc.update_config(configTc)
+tc = TimingConfiguration(1e-6, [ddg_module], [awg_wfm,awg_wfm2], acq_module)
+# configTc = tc.save_config()
+# ddg_module.get_trigger_output('C').TrigPolarity = 1
+# acq_module.set_trigger_source(ddg_module, 'C')
+# tc.update_config(configTc)
 
 # import json
 # with open('data.txt', 'w') as outfile:

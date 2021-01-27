@@ -1,64 +1,6 @@
 import numpy as np
+from scipy import signal
 from sqdtoolz.HAL.AWGOutputChannel import*
-
-class WaveformSegment:
-    def __init__(self, name):
-        self._name = name
-
-    @property
-    def Name(self):
-        return Name
-
-    def NumPts(self, fs):
-        return self.Duration*fs
-
-class WFS_Constant(WaveformSegment):
-    def __init__(self, name, time_len, value=0.0):
-        super().__init__(name)
-        self._duration = time_len
-        self._value = value
-   
-    @property
-    def Duration(self):
-        return self._duration
-    @Duration.setter
-    def Duration(self, len_seconds):
-        self._duration = len_seconds
-
-    def get_waveform(self, fs):
-        return np.zeros(round(self.NumPts(fs)))    
-
-class WFS_Gaussian(WaveformSegment):
-    def __init__(self, name, time_len, amplitude, num_sd=1.96):
-        super().__init__(name)
-        #TODO: Add in a classmethod to use sigma and truncate...
-        self._duration = time_len
-        self._amplitude = amplitude
-        self._num_sd = num_sd
-   
-    @property
-    def Duration(self):
-        return self._duration
-    @Duration.setter
-    def Duration(self, len_seconds):
-        self._duration = len_seconds
-
-    def _gauss(x):
-        return np.exp(-x*x / (2*self._sigma*self._sigma))
-
-    def get_waveform(self, fs):
-        n = self.NumPts(fs)
-        #Generate the sample points on the Gaussian (start and end points are the same)
-        sample_points = np.linspace(-self._num_sd, self._num_sd, int(np.round(n)))
-        #Now calculate the Gaussian along the sample points
-        sample_points = np.exp(-sample_points*sample_points/2)
-        #Now shift the end points such that they are at zero
-        end_points = sample_points[0]
-        sample_points = sample_points - end_points
-        #Now normalise the height such that it is unity once more...
-        sample_points = sample_points / (1-end_points)
-        #Make the height the desired amplitude...
-        return self._amplitude * sample_points
 
 class WaveformAWG:
     def __init__(self, awg_channel_tuples, sample_rate, global_factor = 1):
@@ -88,12 +30,18 @@ class WaveformAWG:
         assert outputIndex >= 0 and outputIndex < len(self._awg_chan_list), "Channel output index is out of range"
         return self._awg_chan_list[outputIndex]
 
+    def get_output_channels(self):
+        return self._awg_chan_list[:]
+
     def get_trigger_output(self, outputIndex = 0):
         '''
         Returns an AWGOutputMarker object.
         '''
         assert outputIndex >= 0 and outputIndex < len(self._awg_chan_list), "Channel output index is out of range"
         return self._awg_mark_list[outputIndex]
+
+    def get_trigger_outputs(self):
+        return self._awg_mark_list[:]
 
     @property
     def Duration(self):
@@ -110,12 +58,12 @@ class WaveformAWG:
         the_seg = None
         cur_ind = 0
         for cur_seg in self._wfm_segment_list:
-            if cur_seg.name == seg_name:
-                the_seg == seg_name
+            if cur_seg.Name == seg_name:
+                the_seg = seg_name
                 break
-            cur_ind += cur_seg.NumPts
+            cur_ind += cur_seg.NumPts(self._sample_rate)
         assert the_seg != None, "Waveform Segment of name " + seg_name + " is not present in the current list of added Waveform Segments."
-        return (cur_ind, cur_ind + cur_seg.NumPts - 1)
+        return (int(cur_ind), int(cur_ind + cur_seg.NumPts(self._sample_rate) - 1))
 
     def _assemble_waveform_raw(self):
         #Concatenate the individual waveform segments
@@ -126,6 +74,27 @@ class WaveformAWG:
         #Scale the waveform via the global scale-factor...
         final_wfm *= self._global_factor
         return final_wfm
+
+    def _get_waveform_plot_segments(self, resolution = 21):
+        ret_list = []
+        for cur_awg_chan in self._awg_chan_list:
+            seg_dicts = []
+            for cur_wfm_seg in self._wfm_segment_list:
+                cur_dict = {}
+                cur_dict['duration'] = cur_wfm_seg.Duration
+                cur_y = cur_wfm_seg.get_waveform(self._sample_rate)
+                #Stretch the plot to occupy the range: [0,1]
+                min_y = np.min(cur_y)
+                if (min_y < 0):
+                    cur_y -= min_y
+                max_y = np.max(cur_y)
+                if (max_y > 0):
+                    cur_y /= max_y      
+                #Downsample the points if necessary to speed up plotting...
+                cur_dict['yPoints'] = signal.resample(cur_y, resolution)
+                seg_dicts.append(cur_dict)
+            ret_list.append((cur_awg_chan._instr_awg.name + ":" + cur_awg_chan._channel_name, seg_dicts))
+        return ret_list
 
     def program_AWG(self):
         #Prepare the waveform

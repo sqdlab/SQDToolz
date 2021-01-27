@@ -32,13 +32,6 @@ class AWGOutputChannel:
     def Output(self, boolVal):
         self.Output = boolVal
 
-    @property
-    def HasMarkers(self):
-        return False
-
-    def _assemble_marker_raw(self):
-        return None
-
 class AWGOutputMarker:
     def __init__(self, parent_waveform_obj):
         self._parent = parent_waveform_obj
@@ -50,13 +43,17 @@ class AWGOutputMarker:
         self._marker_trig_delay = 0.0
         self._marker_trig_length = 1e-9
         
-    def set_markers_to_segments(self, seg_list):
+    def set_markers_to_segments(self, list_seg_names):
         self._marker_status = 'Segments'
         #Check the listed segments actually exist in the current list of WaveformSegment objects
-        for cur_seg in seg_list:
-            #TODO: WRONG! it's a named list!
-            assert cur_seg in self._wfm_segment_list, "WaveformSegment " + cur_seg + " has not been added to this Waveform sequence."
-        self._marker_seg_list = seg_list[:] #Copy over the list
+        for cur_seg_name in list_seg_names:
+            found_seg = None
+            for cur_seg_chk in self._parent._wfm_segment_list:
+                if cur_seg_chk.Name == cur_seg_name:
+                    found_seg = cur_seg_chk
+                    break
+            assert found_seg != None, "WaveformSegment " + found_seg + " has not been added to this Waveform sequence."
+        self._marker_seg_list = list_seg_names[:] #Copy over the list
 
     def set_markers_to_arbitrary(self, arb_mkr_list):
         self._marker_arb_array = arb_mkr_list[:]
@@ -69,10 +66,6 @@ class AWGOutputMarker:
     
     def set_markers_to_none(self):
         self._marker_status = 'None'
-
-    @property
-    def HasMarkers(self):
-        return True
 
     @property
     def TrigPulseDelay(self):
@@ -112,7 +105,6 @@ class AWGOutputMarker:
         #Validation need not occur if in Trigger mode. But the other modes need to be checked if the marker
         #waveform satisfies a proper trigger waveform...
         if self._marker_status == 'Segments' or self._marker_status == 'Arbitrary':
-            assert len(self._marker_seg_list) <= 2, "The marker waveform, in Segment-mode, has too many changing edges () to constitute a valid trigger"
             mkr_array = self._assemble_marker_raw()
             prev_val = mkr_array[0]
             changes = []
@@ -152,7 +144,7 @@ class AWGOutputMarker:
         elif self._marker_status == 'Arbitrary':
             return self._marker_arb_array
         elif self._marker_status == 'Segments':
-            final_wfm = np.zeros(self.NumPts, dtype=np.ubyte) + 1 - self._marker_pol
+            final_wfm = np.zeros(int(np.round(self._parent.NumPts)), dtype=np.ubyte) + 1 - self._marker_pol
             for cur_seg_name in self._marker_seg_list:
                 start_pt, end_pt = self._parent._get_index_points_for_segment(cur_seg_name)
                 final_wfm[start_pt:end_pt] = self._marker_pol

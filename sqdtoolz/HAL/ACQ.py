@@ -3,6 +3,7 @@ class ACQ:
     def __init__(self, instr_acq):
         self._instr_acq = instr_acq
         self._trig_src_module = None
+        self._trig_src_id = None
         self._trig_src_obj = None
         self._name = instr_acq.name
 

@@ -1,6 +1,5 @@
 from numpy import pi
 from qcodes import Instrument, InstrumentChannel, VisaInstrument, validators as vals
-from sqdtoolz.Drivers.TriggerPulse import*
 
 class DG645Channel(InstrumentChannel):
     '''
@@ -173,12 +172,10 @@ class DG645(VisaInstrument):
         # Output channels
         self._trig_sources = {}
         # for ch_id, ch_name in [(0, 'T0'), (1, 'AB'), (2, 'CD'), (3, 'EF'), (4, 'GH')]:
-
-#TODO: MOVE THIS INTO THE HAL AND HAVE IT INITIALISE THERE - STILL ONE TRIGGER OBJECT BUT IT WILL BE SPAWNING A NEW ONE FOR A NEW HAL
         for ch_id, ch_name in [(1, 'AB'), (2, 'CD'), (3, 'EF'), (4, 'GH')]:
             cur_channel = DG645Channel(self, ch_name, ch_id)
             self.add_submodule(ch_name, cur_channel)
-            self._trig_sources[ch_name] = Trigger(ch_name, cur_channel)
+            self._trig_sources[ch_name] = cur_channel
 
         self.add_parameter('trigger_rate', label='Trigger Rate', 
                            get_cmd='TRAT?', get_parser=float,
@@ -191,4 +188,4 @@ class DG645(VisaInstrument):
         return self._trig_sources[identifier]
 
     def get_all_trigger_sources(self):
-        return [self._trig_sources[x] for x in self._trig_sources]
+        return [(x,self._trig_sources[x]) for x in self._trig_sources]

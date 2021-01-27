@@ -1,3 +1,4 @@
+from sqdtoolz.HAL.TriggerPulse import*
 
 class DDG:
     '''
@@ -9,6 +10,12 @@ class DDG:
         '''
         self._instr_ddg = instr_ddg
         self._name = instr_ddg.name
+        #Assemble the Trigger objects
+        instTrigSrcs = self._instr_ddg.get_all_trigger_sources()
+        self._output_trigs = {}
+        for cur_output_src in instTrigSrcs:
+            cur_trig_name = cur_output_src[0]
+            self._output_trigs[cur_trig_name] = Trigger(cur_trig_name, cur_output_src[1])
 
     @property
     def name(self):
@@ -18,10 +25,11 @@ class DDG:
         '''
         Returns a TriggerSource object 
         '''
-        return self._instr_ddg.get_trigger_output(outputID)
+        assert outputID in self._output_trigs, "Trigger output " + str(outputID) + " does not exist in " + self._name
+        return self._output_trigs[outputID]
 
     def get_all_outputs(self):
-        return self._instr_ddg.get_all_trigger_sources()
+        return [self._output_trigs[x] for x in self._output_trigs]
 
     def set_trigger_output_params(self, trigOutputName, trigPulseDelay, trigPulseLength=-1, trigPulsePolarity=1):
         '''

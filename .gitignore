@@ -14,3 +14,4 @@ dist/sqdtoolz-0.0.1.dev1-py3.9.egg
 **/__pycache__/
 *.pyc
 *.cpy
+*.vscode/

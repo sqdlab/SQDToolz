@@ -27,10 +27,10 @@ ddg_module.get_trigger_output('EF').TrigPulseDelay = 250e-9
 ddg_module.get_trigger_output('EF').TrigPolarity = 0
 # awg.set_trigger_source(ddg_module.get_trigger_source('A'))
 
-new_exp.station.load_pulser().burst_period(1e-6)
+new_exp.station.load_pulser().trigger_rate(500e3)
 
 tc = TimingConfiguration(1e-6, [ddg_module], None)
-ddg_module._instr_ddg.burst_period(1e-6)
+# ddg_module._instr_ddg.burst_period(1e-6)
 
 
 #awgs = [awg_agilent0, awg_agilent1, awg_agilent2]
@@ -96,7 +96,10 @@ for awg in awgs[:1]:
     awg.trigger_threshold_A(1.)
     awg.m4.source('Hardware Trigger 1')
 
-awgs[0].create_arb_waveform(np.linspace(-1,1,1024))
+myHandle = awgs[0].create_arb_waveform(np.linspace(-1,1,1024))
+awgs[0].configure_arb_waveform(1, myHandle, 0.5, 0.0)
+myHandle2 = awgs[0].create_arb_waveform(np.sin(np.linspace(-np.pi,np.pi,1024)))
+awgs[0].configure_arb_waveform(2, myHandle2, 0.5, 0.0)
 
 awgs[0].ch1.output(True)
 # awgs[0].run()

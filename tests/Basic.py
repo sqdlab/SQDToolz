@@ -3,6 +3,7 @@ from sqdtoolz.HAL.DDG import*
 from sqdtoolz.HAL.ACQ import*
 from sqdtoolz.Drivers.dummyDDG import*
 from sqdtoolz.Drivers.dummyACQ import*
+from sqdtoolz.Drivers.dummyAWG import*
 from sqdtoolz.TimingConfiguration import*
 
 new_exp = Experiment(instr_config_file = "", save_dir = "", name="test")
@@ -12,6 +13,9 @@ instr_ddg = DummyDDG('ddg')
 new_exp.add_instrument(instr_ddg)
 instr_acq = DummyACQ('acq')
 new_exp.add_instrument(instr_acq)
+instr_awg = DummyAWG('awg')
+new_exp.add_instrument(instr_awg)
+
 
 #Ideally, the length and polarity are set to default values in the drivers via the YAML file - i.e. just set TrigPulseDelay
 ddg_module = DDG(instr_ddg)
@@ -41,9 +45,9 @@ ddg_module.get_trigger_output('C').TrigPolarity = 1
 acq_module.set_trigger_source(ddg_module, 'C')
 tc.update_config(configTc)
 
-import json
-with open('data.txt', 'w') as outfile:
-    json.dump(configTc, outfile, indent=4)
+# import json
+# with open('data.txt', 'w') as outfile:
+#     json.dump(configTc, outfile, indent=4)
 
 lePlot = tc.plot().show()
 input('press <ENTER> to continue')

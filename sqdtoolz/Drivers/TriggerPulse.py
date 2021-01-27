@@ -1,6 +1,15 @@
 
 class Trigger:
     def __init__(self, name, instr_trig_output_channel):
+        '''
+        Initialises a Trigger object that can be used to build triggering relationships between instruments (that is,
+        this object can be used as a trigger source to trigger other instruments).
+
+        Inputs:
+            - name - Name of the trigger (typically that given by the instrument - e.g. 'M1', 'A' etc...)
+            - instr_trig_output_channel - An instrument or module object concerning the trigger output. It can be in fact
+                                          any object that implements all the required properties to be trigger-compatible. 
+        '''
         self._instrTrig = instr_trig_output_channel
         self._name = name
 

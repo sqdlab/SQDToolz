@@ -1,6 +1,8 @@
 import numpy as np
 from scipy import signal
 from sqdtoolz.HAL.AWGOutputChannel import*
+import matplotlib.patches as patches
+import matplotlib.pyplot as plt
 
 class WaveformAWG:
     def __init__(self, awg_channel_tuples, sample_rate, global_factor = 1):
@@ -73,7 +75,7 @@ class WaveformAWG:
             final_wfm = np.concatenate((final_wfm, cur_wfm_seg.get_waveform(self._sample_rate)))
         #Scale the waveform via the global scale-factor...
         final_wfm *= self._global_factor
-        return final_wfm
+        return [final_wfm]*len(self._awg_chan_list)
 
     def _get_waveform_plot_segments(self, resolution = 21):
         ret_list = []
@@ -96,11 +98,122 @@ class WaveformAWG:
             ret_list.append((cur_awg_chan._instr_awg.name + ":" + cur_awg_chan._channel_name, seg_dicts))
         return ret_list
 
+    def plot_waveforms(self):
+        final_wfms = self._assemble_waveform_raw()
+        fig = plt.figure()
+        fig, axs = plt.subplots(len(final_wfms))
+        fig.suptitle('AWG Waveforms')   #TODO: Add a more sensible title...
+        t_vals = np.arange(final_wfms[0].size) / self._sample_rate
+        for ind, cur_wfm in enumerate(final_wfms):
+            axs[ind].plot(t_vals, cur_wfm)
+        return fig
+
     def program_AWG(self):
         #Prepare the waveform
-        final_wfm = self._assemble_waveform_raw()
+        final_wfms = self._assemble_waveform_raw()
         for ind, cur_awg_chan in enumerate(self._awg_chan_list):
             if self._awg_mark_list[ind] != None:
-                cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.name, final_wfm, self._awg_mark_list[ind]._assemble_marker_raw())
+                cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.name, final_wfms[ind], self._awg_mark_list[ind]._assemble_marker_raw())
             else:
-                cur_awg_chan.Parent.program_channel(cur_awg_chan.name, final_wfm)
+                cur_awg_chan.Parent.program_channel(cur_awg_chan.name, final_wfms[ind])
+
+
+class WaveformAWGIQ(WaveformAWG):
+    def __init__(self, awg_channel_tuples, sample_rate, iq_frequency, iq_amplitude = 1.0, global_factor = 1):
+        super().__init__(awg_channel_tuples, sample_rate, global_factor)
+        self._iq_frequency = iq_frequency
+        self._iq_amplitude = iq_amplitude   #Given as the raw output voltage (should usually set the envelopes to unity amplitude in this case)
+        self._iq_phase = 0.0                #Added onto both the cosine and sine terms
+        self._iq_amplitude_factor = 1.0     #Defined as a = Q/I amplitudes and the factor 'a' is multiplied onto the Q-channel waveform 
+        self._iq_phase_offset = 0.0         #Defined as the phase to add to the Q (sine) term
+        self._iq_dc_offsets = (0.0, 0.0)
+        self._iq_reset_phase = True         #If True, the phases of the cosine and sine waves are reset to zero after every waveform segment.
+
+    @property
+    def IQFrequency(self):
+        return self._iq_frequency
+    @IQFrequency.setter
+    def IQFrequency(self, val):
+        self._iq_frequency = val
+
+    @property
+    def IQPhase(self):
+        return self._iq_phase
+    @IQPhase.setter
+    def IQPhase(self, val):
+        self._iq_phase = val
+
+    @property
+    def IQAmplitude(self):
+        return self._iq_amplitude
+    @IQAmplitude.setter
+    def IQAmplitude(self, val):
+        self._iq_amplitude = val
+
+    @property
+    def IQAmplitude(self):
+        return self._iq_amplitude
+    @IQAmplitude.setter
+    def IQAmplitude(self, val):
+        self._iq_amplitude = val
+
+    @property
+    def IQAmplitudeFactor(self):
+        return self._iq_amplitude_factor
+    @IQAmplitudeFactor.setter
+    def IQAmplitudeFactor(self, val):
+        self._iq_amplitude_factor = val
+
+    @property
+    def IQPhaseOffset(self):
+        return self._iq_phase_offset
+    @IQPhaseOffset.setter
+    def IQPhaseOffset(self, val):
+        self._iq_phase_offset = val
+
+    @property
+    def IQdcOffset(self):
+        return self._iq_dc_offsets
+    @IQdcOffset.setter
+    def IQdcOffset(self, val):
+        self._iq_dc_offsets = val
+
+    @property
+    def IQResetPhase(self):
+        return self._iq_reset_phase
+    @IQResetPhase.setter
+    def IQResetPhase(self, boolVal):
+        #TODO: Add type+error checking to all the boolVal, val etc...
+        self._iq_reset_phase = boolVal
+
+    def set_IQ_parameters(self, amp = 1.0, phase = 0.0, dc_offset = (0.0, 0.0), amplitude_factor = 1.0, phase_offset = 0.0):
+        self.IQAmplitude = amp
+        self.IQPhase = phase
+        self.IQdcOffset = dc_offset
+        self.IQAmplitudeFactor = amplitude_factor
+        self.IQPhaseOffset = phase_offset        
+
+    def _assemble_waveform_raw(self):
+        #Concatenate the individual waveform segments
+        final_wfm_I = np.array([])
+        final_wfm_Q = np.array([])
+        x_prev = 0
+        for cur_wfm_seg in self._wfm_segment_list:
+            cur_wfm_seg_data = cur_wfm_seg.get_waveform(self._sample_rate)
+            #Run the modulation
+            t_vals = (np.arange(cur_wfm_seg_data.size) + x_prev) / self._sample_rate
+            i_vals = cur_wfm_seg_data * self.IQAmplitude * np.cos(2 * np.pi * self.IQFrequency * t_vals + self.IQPhase) + self.IQdcOffset[0]
+            q_vals = cur_wfm_seg_data * self.IQAmplitude * self.IQAmplitudeFactor * np.sin(2 * np.pi * self.IQFrequency * t_vals + self.IQPhase + self.IQPhaseOffset) + self.IQdcOffset[1]
+            
+            if self.IQResetPhase:
+                x_prev = 0
+            else:
+                x_prev += cur_wfm_seg_data.size
+
+            #TODO: Preallocate - this is a bit inefficient...
+            final_wfm_I = np.concatenate((final_wfm_I, i_vals))
+            final_wfm_Q = np.concatenate((final_wfm_Q, q_vals))
+        #Scale the waveform via the global scale-factor...
+        final_wfm_I *= self._global_factor
+        final_wfm_Q *= self._global_factor
+        return [final_wfm_I, final_wfm_Q]

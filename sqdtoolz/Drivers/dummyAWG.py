@@ -69,7 +69,7 @@ class DummyAWG(Instrument):
         self._trigger_edge = 1
 
         # Output channels added to both the module for snapshots and internal Trigger Sources for the DDG HAL...
-        for ch_name in ['CH1', 'CH2', 'CH3']:
+        for ch_name in ['CH1', 'CH2', 'CH3', 'CH4']:
             cur_channel = DummyAWGchannel(self, ch_name)
             self.add_submodule(ch_name, cur_channel)
 

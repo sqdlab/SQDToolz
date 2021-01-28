@@ -48,14 +48,17 @@ awg_wfm.get_trigger_output().TrigPulseDelay = 25e-9
 awg_wfm.get_trigger_output().TrigPulseLength = 30e-9
 awg_wfm.program_AWG()
 #
-awg_wfm2 = WaveformAWG([(instr_awg, 'CH3')], 1e9)
-awg_wfm2.add_waveform_segment(WFS_Gaussian("init", 75e-9, 0.8))
-awg_wfm2.add_waveform_segment(WFS_Constant("hold", 45e-9, 0.0))
-awg_wfm2.add_waveform_segment(WFS_Gaussian("pulse", 75e-9, 0.8))
+awg_wfm2 = WaveformAWGIQ([(instr_awg, 'CH3'),(instr_awg, 'CH4')], 1e9, 100e6)
+awg_wfm2.add_waveform_segment(WFS_Gaussian("init", 75e-9, 1.0))
+awg_wfm2.add_waveform_segment(WFS_Constant("hold", 45e-9, 0.5))
+awg_wfm2.add_waveform_segment(WFS_Gaussian("pulse", 75e-9, 1.0))
 awg_wfm2.add_waveform_segment(WFS_Constant("read", 150e-9, 0.0))
-awg_wfm2.get_output_channel().Amplitude = 1.0
-awg_wfm2.get_trigger_output().set_markers_to_segments(["hold"])
+awg_wfm2.get_output_channel(0).Amplitude = 1.0
+awg_wfm2.get_trigger_output(0).set_markers_to_segments(["hold"])
+awg_wfm2.get_trigger_output(1).set_markers_to_none()
 awg_wfm2.program_AWG()
+lePlot = awg_wfm2.plot_waveforms().show()
+input('press <ENTER> to continue')
 #
 acq_module.set_trigger_source(awg_wfm, 0)
 

@@ -25,7 +25,7 @@ class WFS_Constant(WaveformSegmentBase):
         self._duration = len_seconds
 
     def get_waveform(self, fs):
-        return np.zeros(round(self.NumPts(fs)))
+        return np.zeros(round(self.NumPts(fs))) + self._value
 
 class WFS_Gaussian(WaveformSegmentBase):
     def __init__(self, name, time_len, amplitude, num_sd=1.96):

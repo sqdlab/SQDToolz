@@ -200,7 +200,7 @@ class AGN_Channel(InstrumentChannel):
 
     def __init__(self, parent, name, channel) -> None:
         super().__init__(parent, name)
-        # self.parent = parent
+        self._parent = parent
         self.channel = channel
         
         self._dll = self._parent._dll
@@ -274,6 +274,32 @@ class AGN_Channel(InstrumentChannel):
                            val_mapping={'Continuous' : AGN6030A_VAL_OPERATE_CONTINUOUS,
                                         'Burst' : AGN6030A_VAL_OPERATE_BURST},
                            parameter_class=AGN_Parameter)
+
+    @property
+    def Parent(self):
+        return self._parent
+        
+    @property
+    def Amplitude(self):
+        return self.gain() #TODO: CHECK THIS PROPERLY WITH MANUAL!
+    @Amplitude.setter
+    def Amplitude(self, val):
+        self.gain(val)
+        
+    @property
+    def Offset(self):
+        return self.offset()    #TODO: CHECK WITH PROPERLY WITH MANUAL!
+    @Offset.setter
+    def Offset(self, val):
+        self.offset(val)
+        
+    @property
+    def Output(self):
+        return self.output()
+    @Output.setter
+    def Output(self, boolVal):
+        self.output(boolVal)
+        
 
     def add_parameter(self, name, **kwargs):
         kwargs['ch'] = str(self.channel)
@@ -394,6 +420,9 @@ class Agilent_N8241A(Instrument):
         self._dll = windll.LoadLibrary(ivi_dll)
         self._handle = None
         self._address = basestring(address)
+        
+        self._last_handle_wfm1 = None
+        self._last_handle_wfm2 = None
 
         self._init(reset=reset)
         
@@ -1433,3 +1462,33 @@ class Agilent_N8241A(Instrument):
 
     def __del__(self):
         self.close()
+
+    def supports_markers(self, channel_name):
+        return True
+
+    def _get_channel_output(self, identifier):
+        if identifier in self.submodules:
+            return self.submodules[identifier]
+        else:
+            return None
+
+    @property
+    def SampleRate(self):
+        return self.clock_frequency()
+    @SampleRate.setter
+    def SampleRate(self, frequency_hertz):
+        #TODO: this doesn't work - fix it...
+        self.configure_sample_clock(source=0, freq=frequency_hertz)
+
+    def program_channel(self, chan_id, wfm_data, mkr_data = np.array([])):
+        if chan_id == 'ch1':
+            if (self._last_handle_wfm1 != None):
+                self.clear_arb_waveform(self._last_handle_wfm1)
+            self._last_handle_wfm1 = self.create_arb_waveform(wfm_data)
+            self.configure_arb_waveform(1, self._last_handle_wfm1, 0.5, 0.0)
+        elif chan_id == 'ch2':
+            if (self._last_handle_wfm2 != None):
+                self.clear_arb_waveform(self._last_handle_wfm2)
+            self._last_handle_wfm2 = self.create_arb_waveform(wfm_data)
+            self.configure_arb_waveform(2, self._last_handle_wfm2, 0.5, 0.0)
+    

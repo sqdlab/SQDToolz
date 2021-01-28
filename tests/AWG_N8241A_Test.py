@@ -2,12 +2,14 @@ from sqdtoolz.Experiment import Experiment
 from sqdtoolz.HAL.DDG import*
 from sqdtoolz.TimingConfiguration import*
 from sqdtoolz.Drivers.Agilent_N8241A import*
+from sqdtoolz.HAL.AWG import*
+from sqdtoolz.HAL.WaveformSegments import*
 import numpy as np
 
 new_exp = Experiment(instr_config_file = "tests\\BenchTest.yaml", save_dir = "", name="test")
 
 awg_agilent1 = Agilent_N8241A('awg_agilent1', ivi_dll=r'C:\Program Files\IVI Foundation\IVI\Bin\AGN6030A.dll', 
-                                    address='TCPIP::192.168.0.103::INSTR', reset=True) 
+                                    address='TCPIP::192.168.0.100::INSTR', reset=True) 
 
 
 #Can be done in YAML
@@ -29,14 +31,12 @@ ddg_module.get_trigger_output('EF').TrigPolarity = 0
 
 new_exp.station.load_pulser().trigger_rate(500e3)
 
-tc = TimingConfiguration(1e-6, [ddg_module], None)
+
+
+
 # ddg_module._instr_ddg.burst_period(1e-6)
 
-
-#awgs = [awg_agilent0, awg_agilent1, awg_agilent2]
 awgs = [awg_agilent1]
-#awgs = [awg_agilent2, awg_agilent3, awg_agilent1]
-
 # reset
 for awg in reversed(awgs):
     #print('resetting {0:s}'.format(awg.get_name()))
@@ -44,7 +44,6 @@ for awg in reversed(awgs):
         awg.reset()
     except Exception as e:
         print(e)
-
 # awgs clocking and syncronization
 for awg in awgs[:1]:
     # use external 10MHz ref clock
@@ -95,11 +94,32 @@ for awg in awgs:
 for awg in awgs[:1]:
     awg.trigger_threshold_A(1.)
     awg.m4.source('Hardware Trigger 1')
-
-myHandle = awgs[0].create_arb_waveform(np.linspace(-1,1,1024))
-awgs[0].configure_arb_waveform(1, myHandle, 0.5, 0.0)
-myHandle2 = awgs[0].create_arb_waveform(np.sin(np.linspace(-np.pi,np.pi,1024)))
-awgs[0].configure_arb_waveform(2, myHandle2, 0.5, 0.0)
-
-awgs[0].ch1.output(True)
+# awgs[0].ch1.output(True)
 # awgs[0].run()
+
+
+# myHandle = awgs[0].create_arb_waveform(np.linspace(-1,1,1024))
+# awgs[0].configure_arb_waveform(1, myHandle, 0.5, 0.0)
+# myHandle2 = awgs[0].create_arb_waveform(np.sin(np.linspace(-np.pi,np.pi,1024)))
+# awgs[0].configure_arb_waveform(2, myHandle2, 0.5, 0.0)
+
+# awg_wfm = WaveformAWG([(awg_agilent1, 'ch1')], 1e9)
+# awg_wfm.add_waveform_segment(WFS_Gaussian("init", 256e-9, 0.8))
+# awg_wfm.add_waveform_segment(WFS_Constant("hold", 256e-9, 0.0))
+# awg_wfm.add_waveform_segment(WFS_Constant("read", 512e-9, 0.0))
+# awg_wfm.get_trigger_output().set_markers_to_none()
+# awg_wfm.program_AWG()
+
+awg_wfm2 = WaveformAWGIQ([(awg_agilent1, 'ch1'),(awg_agilent1, 'ch2')], 1e9, 100e6)
+awg_wfm2.add_waveform_segment(WFS_Gaussian("init", 256e-9, 1.0))
+awg_wfm2.add_waveform_segment(WFS_Constant("hold", 256e-9, 0.5))
+awg_wfm2.add_waveform_segment(WFS_Gaussian("pulse", 256e-9, 1.0))
+awg_wfm2.add_waveform_segment(WFS_Constant("read", 256e-9, 0.0))
+# awg_wfm2.get_output_channel(0).Amplitude = 1.0
+# awg_wfm2.get_trigger_output(0).set_markers_to_segments(["hold"])
+awg_wfm2.get_trigger_output(0).set_markers_to_none()
+awg_wfm2.get_trigger_output(1).set_markers_to_none()
+awg_wfm2.program_AWG()
+# lePlot = awg_wfm2.plot_waveforms().show()
+
+tc = TimingConfiguration(1.2e-6, [ddg_module], [awg_wfm2], None)

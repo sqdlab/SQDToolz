@@ -112,10 +112,11 @@ class WaveformAWG:
         #Prepare the waveform
         final_wfms = self._assemble_waveform_raw()
         for ind, cur_awg_chan in enumerate(self._awg_chan_list):
+            cur_awg_chan._instr_awg.SampleRate = self._sample_rate
             if self._awg_mark_list[ind] != None:
-                cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.name, final_wfms[ind], self._awg_mark_list[ind]._assemble_marker_raw())
+                cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.short_name, final_wfms[ind], self._awg_mark_list[ind]._assemble_marker_raw())
             else:
-                cur_awg_chan.Parent.program_channel(cur_awg_chan.name, final_wfms[ind])
+                cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.short_name, final_wfms[ind])
 
 
 class WaveformAWGIQ(WaveformAWG):

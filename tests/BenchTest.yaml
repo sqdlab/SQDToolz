@@ -2,5 +2,11 @@ instruments:
   pulser:
     driver: sqdtoolz.Drivers.DDG_DG645
     type: DG645
-    address: 'TCPIP::192.168.0.102::INSTR'
+    address: 'TCPIP::192.168.1.120::INSTR'
     enable_forced_reconnect: true
+  fpgaACQ:
+    driver: sqdtoolz.Drivers.ACQ_ETH_FPGA
+    type: ETHFPGA
+    init:
+      uri: 'R:/EQUS-SQDLab/DataAnalysis/Notebooks/qcodes/FPGA_Rack1_URI.txt'
+  

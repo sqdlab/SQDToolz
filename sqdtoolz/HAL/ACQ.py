@@ -32,6 +32,9 @@ class ACQ:
     def TriggerEdge(self, pol):
         self._instr_acq.TriggerInputEdge = pol
 
+    def get_data(self):
+        return self._instr_acq.get_data()
+
     def set_trigger_source(self, hal_module, trig_id):
         '''
         Sets the trigger source.
@@ -71,3 +74,5 @@ class ACQ:
         self.NumSamples = dict_config['NumSamples']
         self.SampleRate = dict_config['SampleRate']
         self.TriggerEdge = dict_config['TriggerEdge']
+
+    

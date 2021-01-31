@@ -140,6 +140,17 @@ class TimingConfiguration:
             #Set the trigger source on the destination object (AWGs and ACQ modules have the set_trigger_source function implemented by default) 
             cur_dest_obj.set_trigger_source(cur_src, cur_trig_rel[2])
 
+    def prepare_instruments(self):
+        #TODO: Write rest of this with error checking
+        for cur_awg in self._list_AWGs:
+            #TODO: Write concurrence/change checks to better optimise AwG...
+            cur_awg.program_AWG()
+
+    def get_data(self):
+        #TODO: Pack the data appropriately if using multiple ACQ objects (coordinating their starts/finishes perhaps?)
+        cur_acq = self._instr_ACQ
+        return cur_acq.get_data()
+
     def plot(self):
         '''
         Generate a representation of the timing configuration with matplotlib.

@@ -8,7 +8,7 @@ from sqdtoolz.Drivers.dummyACQ import*
 from sqdtoolz.Drivers.dummyAWG import*
 from sqdtoolz.TimingConfiguration import*
 
-new_exp = Experiment(instr_config_file = "", save_dir = "", name="test")
+new_exp = Experiment(instr_config_file = "", save_dir = "save_dir\\", name="test")
 
 #Can be done in YAML
 instr_ddg = DummyDDG('ddg')
@@ -57,24 +57,25 @@ awg_wfm2.get_output_channel(0).Amplitude = 1.0
 awg_wfm2.get_trigger_output(0).set_markers_to_segments(["hold"])
 awg_wfm2.get_trigger_output(1).set_markers_to_none()
 awg_wfm2.program_AWG()
-lePlot = awg_wfm2.plot_waveforms().show()
-input('press <ENTER> to continue')
+# lePlot = awg_wfm2.plot_waveforms().show()
+# input('press <ENTER> to continue')
 #
-acq_module.set_trigger_source(awg_wfm, 0)
+# acq_module.set_trigger_source(awg_wfm, 0)
 
 # awg.set_trigger_source(ddg_module, 'A')
 
 tc = TimingConfiguration(1e-6, [ddg_module], [awg_wfm,awg_wfm2], acq_module)
-# configTc = tc.save_config()
-# ddg_module.get_trigger_output('C').TrigPolarity = 1
-# acq_module.set_trigger_source(ddg_module, 'C')
-# tc.update_config(configTc)
+configTc = tc.save_config()
+ddg_module.get_trigger_output('C').TrigPolarity = 1
+acq_module.set_trigger_source(ddg_module, 'C')
+tc.update_config(configTc)
 
-# import json
-# with open('data.txt', 'w') as outfile:
-#     json.dump(configTc, outfile, indent=4)
 
 lePlot = tc.plot().show()
+input('press <ENTER> to continue')
+
+leData = new_exp.run(tc)
+
 input('press <ENTER> to continue')
 
 

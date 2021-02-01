@@ -12,8 +12,10 @@ class Experiment:
             self.station = qc.Station()
         else:
             self.station = qc.Station(config_file=instr_config_file)
+        #TODO: Add initialiser for load last file in save_dir thing...
 
-        self._save_dir = save_dir
+        #Convert Windows backslashes into forward slashes (should be compatible with MAC/Linux then...)
+        self._save_dir = save_dir.replace('\\','//')
         self._name = name
 
         #List of digital delay generators
@@ -26,9 +28,9 @@ class Experiment:
     def add_instrument(self, instrObj):
         self.station.add_component(instrObj)
 
-    def run (self, timing_config, sweep_vars=[]):
+    def run(self, timing_config, sweep_vars=[]):
         #Get time-stamp
-        folder_time_stamp = datetime.now().strftime("%Y-%m-%d\\%H%M%S-" + self._name + "\\")
+        folder_time_stamp = datetime.now().strftime("%Y-%m-%d/%H%M%S-" + self._name + "/")
         #Create the nested directory structure if it does not exist...
         cur_exp_path = self._save_dir + folder_time_stamp
         Path(cur_exp_path).mkdir(parents=True, exist_ok=True)
@@ -46,8 +48,9 @@ class Experiment:
         with open(cur_exp_path + 'timing_configuration.txt', 'w') as outfile:
             json.dump(timing_config.save_config(), outfile, indent=4)
         with open(cur_exp_path + 'instrument_configuration.txt', 'w') as outfile:
-            json.dump(self.station.snapshot_base(), outfile, indent=4)        
+            json.dump(self.station.snapshot_base(), outfile, indent=4)
 
         return data
 
 
+#new_exp.run(tc, [(vFlux, [0,1,2,3]), (vPower, [0,1,2,3])])

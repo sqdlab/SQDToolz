@@ -8,7 +8,7 @@ from sqdtoolz.Drivers.dummyACQ import*
 from sqdtoolz.Drivers.dummyAWG import*
 from sqdtoolz.TimingConfiguration import*
 
-new_exp = Experiment(instr_config_file = "", save_dir = "save_dir\\", name="test")
+new_exp = Experiment(instr_config_file = "", save_dir = "C:\\Users\\uqppakk1\\Desktop\\WorkUQ\\sqdtoolz\\save_dir\\", name="test")
 
 #Can be done in YAML
 instr_ddg = DummyDDG('ddg')
@@ -71,8 +71,8 @@ acq_module.set_trigger_source(ddg_module, 'C')
 tc.update_config(configTc)
 
 
-lePlot = tc.plot().show()
-input('press <ENTER> to continue')
+# lePlot = tc.plot().show()
+# input('press <ENTER> to continue')
 
 leData = new_exp.run(tc)
 

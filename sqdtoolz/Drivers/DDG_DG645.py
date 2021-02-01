@@ -180,7 +180,7 @@ class DG645(VisaInstrument):
         self.add_parameter('trigger_rate', label='Trigger Rate', 
                            get_cmd='TRAT?', get_parser=float,
                            set_cmd='TRAT {:.8f}')
-        #self.trat_period(1e6)
+        self.trigger_rate(5e6)
         # Show IDN
         #self.connect_message()
 

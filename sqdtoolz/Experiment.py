@@ -43,12 +43,12 @@ class Experiment:
         #TODO: think about different data-piece sizes: https://stackoverflow.com/questions/3386259/how-to-make-a-multidimension-numpy-array-with-a-varying-row-size
 
         #Save data
-        with open(cur_exp_path + 'data.txt', 'w') as outfile:
-            json.dump(data.tolist(), outfile, indent=4)
-        with open(cur_exp_path + 'timing_configuration.txt', 'w') as outfile:
-            json.dump(timing_config.save_config(), outfile, indent=4)
-        with open(cur_exp_path + 'instrument_configuration.txt', 'w') as outfile:
-            json.dump(self.station.snapshot_base(), outfile, indent=4)
+        # with open(cur_exp_path + 'data.txt', 'w') as outfile:
+        #     json.dump(data.tolist(), outfile, indent=4)
+        # with open(cur_exp_path + 'timing_configuration.txt', 'w') as outfile:
+        #     json.dump(timing_config.save_config(), outfile, indent=4)
+        # with open(cur_exp_path + 'instrument_configuration.txt', 'w') as outfile:
+        #     json.dump(self.station.snapshot_base(), outfile, indent=4)
 
         return data
 

@@ -23,13 +23,15 @@ ddg_module.get_trigger_output('EF').TrigPolarity = 0
 
 
 acq_module = ACQ(new_exp.station.load_fpgaACQ())
-acq_module.NumSamples = 500
+acq_module.NumSamples = 50
+acq_module.NumSegments = 1
 # acq_module.SampleRate = 1e9
 # acq_module.TriggerEdge = 0
-acq_module.set_trigger_source(ddg_module, 'EF')
+acq_module.set_trigger_source(ddg_module, 'AB')
 
 # awg.set_trigger_source(ddg_module.get_trigger_source('A'))
 
 tc = TimingConfiguration(1e-6, [ddg_module], [], acq_module)
-lePlot = tc.plot().show()
+# lePlot = tc.plot().show()
+leData = new_exp.run(tc)
 input('press <ENTER> to continue')

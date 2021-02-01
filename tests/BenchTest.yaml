@@ -9,4 +9,51 @@ instruments:
     type: ETHFPGA
     init:
       uri: 'R:/EQUS-SQDLab/DataAnalysis/Notebooks/qcodes/FPGA_Rack1_URI.txt'
-  
+      app_name: 'TVMODEV02'
+    parameters:
+      mem_hold:
+        initial_value: false
+      trigger_src_shot:
+        initial_value: 'UserPin1'
+      trigger_src_ddc:
+        initial_value: 'UserPin1'
+      trigger_src_seq_start:
+        initial_value: 'UserPin4'
+      trigger_acq_delay:
+        initial_value: 10.0
+      trigger_pulse_delay:
+        initial_value: 10.0
+      ddc_adc1:
+        initial_value: 'ADC1'
+      ddc_adc2:
+        initial_value: 'ADC2'
+      ddc_if1:
+        initial_value: '25MHz'
+      ddc_if2:
+        initial_value: '25MHz'
+      math_f1:
+        initial_value: '1(a*b)'
+      math_f2:
+        initial_value: '1(a*b)'
+      math_a1:
+        initial_value: 'I1 + iQ1'
+      math_a2:
+        initial_value: 'I2 + iQ2'
+      math_b1:
+        initial_value: '1*'
+      math_b2:
+        initial_value: '1*'
+      fir_engine:
+        initial_value: 'boxcar'
+      fir_integration:
+        initial_value: 'none'
+      fir_post_filtering:
+        initial_value: false
+      tv_decimation:
+        initial_value: 4
+      tv_averages:
+        initial_value: 1024
+      tv_use_seq_start:
+        initial_value: false
+      tv_two_channel_mode:
+        initial_value: false

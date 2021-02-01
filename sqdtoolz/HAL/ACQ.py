@@ -19,6 +19,13 @@ class ACQ:
         self._instr_acq.NumSamples = num_samples
 
     @property
+    def NumSegments(self):
+        return self._instr_acq.NumSegments
+    @NumSegments.setter
+    def NumSegments(self, num_segs):
+        self._instr_acq.NumSegments = num_segs\
+
+    @property
     def SampleRate(self):
         return self._instr_acq.SampleRate
     @SampleRate.setter

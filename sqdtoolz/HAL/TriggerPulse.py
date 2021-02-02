@@ -1,6 +1,13 @@
 
-class Trigger:
-    def __init__(self, name, instr_trig_output_channel):
+class TriggerType:
+    def __init__(self):
+        pass
+
+    def get_trigger_times(self, input_trig_pol=1):
+        assert False, "The class implementing a TriggerType must implement the get_trigger_times function."
+
+class Trigger(TriggerType):
+    def __init__(self, parent, name, instr_trig_output_channel):
         '''
         Initialises a Trigger object that can be used to build triggering relationships between instruments (that is,
         this object can be used as a trigger source to trigger other instruments).
@@ -12,6 +19,7 @@ class Trigger:
         '''
         self._instrTrig = instr_trig_output_channel
         self._name = name
+        self._parent = parent
 
     @property
     def name(self):
@@ -45,6 +53,28 @@ class Trigger:
     def TrigEnable(self, boolVal):
         self._instrTrig.TrigEnable = boolVal
 
+    def _get_instr_trig_src(self):
+        '''
+        Used by TimingConfiguration to backtrack through all interdependent trigger sources (i.e. traversing up the tree)
+        '''
+        return self._parent.get_trigger_source()
+    def _get_instr_input_trig_edge(self):
+        return self._parent.InputTriggerEdge    #Parent implementing this should have a preferred edge
+
+    def get_trigger_times(self, input_trig_pol=1):
+        if input_trig_pol == 0:
+            if self.TrigPolarity == 0:
+                return [self.TrigPulseDelay]
+            else:
+                return [self.TrigPulseDelay + self.TrigPulseLength]
+        elif input_trig_pol == 1:
+            if self.TrigPolarity == 0:
+                return [self.TrigPulseDelay + self.TrigPulseLength]
+            else:
+                return [self.TrigPulseDelay]
+        else:
+            assert False, "Trigger polarity must be 0 or 1 for negative or positive edge/polarity."
+
     def _get_current_config(self):
         return {self.name : {
             'TrigPulseDelay'  : self.TrigPulseDelay,
@@ -66,6 +96,11 @@ class Trigger:
         self.TrigPolarity = dict_config['TrigPolarity']
         self.TrigEnable = dict_config['TrigEnable']
 
+class TriggerSource:
+    def __init__(self, trig_src_module, trig_src_id):
+        self._trig_src_module = None
+        self._trig_src_id = None
+        self._trig_src_obj = None
 
 class SyncTriggerPulse:
     def __init__(self, trig_len, enableGet, enableSet, trig_pol = 1, trigOutputDelay = 0.0):

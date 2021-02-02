@@ -49,48 +49,23 @@ class TimingConfiguration:
 
     @staticmethod
     def _plot_digital_pulse(ax, vals01, xStart, pts2xVals, bar_width, yOff):
-        xVals = [0]
+        xVals = [xStart]
         yVals = [vals01[0]]
         last_val = vals01[0]
         for ind, cur_yval in enumerate(vals01):
             if cur_yval != last_val:
-                xVals.append(pts2xVals * ind)
-                xVals.append(pts2xVals * ind)
+                xVals.append(pts2xVals * ind + xStart)
+                xVals.append(pts2xVals * ind + xStart)
                 yVals.append(last_val)
                 yVals.append(cur_yval)
                 last_val = cur_yval
-        xVals.append(ind)
+        xVals.append(pts2xVals * ind + xStart)
         yVals.append(last_val)
         #Now scale the pulse appropriately...
         xVals = np.array(xVals)
         yVals = np.array(yVals)
         yVals = yVals*bar_width + yOff - bar_width*0.5
         ax.plot(xVals, yVals, 'k')
-
-    @staticmethod
-    def _reconcile_edge(trig_pulse_obj, input_trig_pol):
-        '''
-        Gives the starting point of the trigger (for generation or acquisition) given a trigger pulse and an input edge polarity.
-
-        Inputs:
-            - trig_pulse_obj - Trigger object holding the trigger pulse information
-            -  input_trig_pol - Input trigger edge (0 or 1 for negative or positive edge/polarity)
-
-        Returns the delay time in which the trigger activates.
-        '''
-        pulse_polarity = trig_pulse_obj.TrigPolarity
-        if input_trig_pol == 0:
-            if pulse_polarity == 0:
-                return trig_pulse_obj.TrigPulseDelay
-            else:
-                return trig_pulse_obj.TrigPulseDelay + trig_pulse_obj.TrigPulseLength
-        elif input_trig_pol == 1:
-            if pulse_polarity == 0:
-                return trig_pulse_obj.TrigPulseDelay + trig_pulse_obj.TrigPulseLength
-            else:
-                return trig_pulse_obj.TrigPulseDelay
-        else:
-            assert False, "Trigger input polarity must be 0 or 1 for negative or positive edge/polarity."
 
     def save_config(self):
         retVal = []
@@ -138,7 +113,7 @@ class TimingConfiguration:
                     break
             assert cur_src != None, "Trigger source could not be found for instrument " + cur_dest_obj.name + " sourcing from an unknown module " + cur_src_name
             #Set the trigger source on the destination object (AWGs and ACQ modules have the set_trigger_source function implemented by default) 
-            cur_dest_obj.set_trigger_source(cur_src, cur_trig_rel[2])
+            cur_dest_obj.set_trigger_source(cur_src.get_trigger_output(cur_trig_rel[2]))
 
     def prepare_instruments(self):
         #TODO: Write rest of this with error checking
@@ -150,6 +125,31 @@ class TimingConfiguration:
         #TODO: Pack the data appropriately if using multiple ACQ objects (coordinating their starts/finishes perhaps?)
         cur_acq = self._instr_ACQ
         return cur_acq.get_data()
+
+    @staticmethod
+    def _get_trigger_edges(trig_object):
+        #Collect the list/chain of trigger dependencies
+        trig_list = [trig_object]
+        cur_trig = trig_object._get_instr_trig_src()
+        #By not inserting the first one, the times intrinsically start from t=0
+        while(cur_trig != None):
+            assert not cur_trig in trig_list, "There is a cyclic dependency on the trigger sources."
+            trig_list += [cur_trig]            
+            cur_trig = cur_trig._get_instr_trig_src()
+        #Now spawn the tree of trigger times
+        #TODO: Add error-checking to ensure the times do not overlap...
+        all_times = np.array([])
+        for cur_trig in trig_list[::-1]:    #Start from the top of the tree...
+            cur_times = cur_trig.get_trigger_times(cur_trig._get_instr_input_trig_edge())
+            cur_times = np.array(cur_times)
+            if (len(all_times) == 0):
+                all_times = cur_times
+            else:
+                new_list = []
+                for cur_time in all_times:
+                    new_list += [cur_times + cur_time]  #Translate the current trigger edges by the previous trigger edges
+                all_times = np.concatenate(new_list)
+        return all_times
 
     def plot(self):
         '''
@@ -182,32 +182,49 @@ class TimingConfiguration:
         #Plot the ACQ capture region
         cur_acq = self._instr_ACQ
         if (cur_acq):
-            cur_trig_start = self._reconcile_edge(cur_acq.get_trigger_source(), cur_acq.TriggerEdge) * scale_fac
-            cur_len = cur_acq.NumSamples / cur_acq.SampleRate * scale_fac
-            self._add_rectangle(ax, cur_trig_start, cur_trig_start + cur_len, bar_width, num_channels)
+            trig_times = self._get_trigger_edges(cur_acq.get_trigger_source())
+            for ind, cur_trig in enumerate(trig_times):
+                cur_trig_start = cur_trig * scale_fac
+                cur_len = cur_acq._get_acq_window_len(ind) * scale_fac
+                self._add_rectangle(ax, cur_trig_start, cur_trig_start + cur_len, bar_width, num_channels)
             num_channels += 1
             yticklabels.append(cur_acq.name)
         #Plot the AWG output pulses and markers (if any)
         for cur_awg_wfm in self._list_AWGs[::-1]:
             #Assemble the marker channels (if any)
-            for ind, cur_mkr_channel in enumerate(cur_awg_wfm.get_trigger_outputs()[::-1]):
-                cur_trig_start = 0 #TODO: Fill this in with trigger source
+            for cur_mkr_channel in cur_awg_wfm.get_trigger_outputs()[::-1]:
+                cur_ch_index = cur_mkr_channel._ch_index
                 mkrs = cur_mkr_channel._assemble_marker_raw()
                 if mkrs.size > 0:
-                    self._plot_digital_pulse(ax, mkrs, cur_trig_start, scale_fac/cur_awg_wfm._sample_rate, bar_width, num_channels)
+                    cur_trig_src = cur_awg_wfm.get_trigger_source(cur_ch_index) #TODO: There is code-duplication with below; optimise/pre-calculate...
+                    if (cur_trig_src == None):
+                        trig_times = [0]
+                    else:
+                        trig_times = self._get_trigger_edges(cur_awg_wfm.get_trigger_source(cur_ch_index))
+                    for ind, cur_trig in enumerate(trig_times):
+                        cur_trig_start = cur_trig * scale_fac #TODO: Fill this in with trigger source
+                        self._plot_digital_pulse(ax, mkrs, cur_trig_start, scale_fac/cur_awg_wfm._sample_rate, bar_width, num_channels)
                     num_channels += 1
-                    cur_ch = cur_awg_wfm.get_output_channel(ind)
+                    cur_ch = cur_awg_wfm.get_output_channel(cur_ch_index)
                     yticklabels.append(cur_ch._instr_awg.name + ":" + cur_ch._channel_name + "[Mkr]")
             #Assemble the segments into its constituent channel(s) - e.g. IQ waveforms or other multichannel waveforms
             #may opt to combine or plot 2 separate channels...
             wfm_plot_bars = cur_awg_wfm._get_waveform_plot_segments()
-            for cur_output_channel in wfm_plot_bars[::-1]:
-                cur_trig_start = 0 #TODO: Fill this in with trigger source
-                cur_seg_x = cur_trig_start
-                for cur_wfm_dict in cur_output_channel[1]:
-                    cur_dur = cur_wfm_dict['duration']*scale_fac
-                    self._add_rectangle_with_plot(ax, cur_seg_x, cur_seg_x + cur_dur, bar_width, num_channels, cur_wfm_dict['yPoints'])
-                    cur_seg_x += cur_dur
+            for cur_ch_index, cur_output_channel in enumerate(wfm_plot_bars[::-1]):
+                #Loop over all the trigger edges in the trigger source (each spawning its own waveform event)
+                cur_trig_src = cur_awg_wfm.get_trigger_source(cur_ch_index)
+                if (cur_trig_src == None):
+                    trig_times = [0]
+                else:
+                    trig_times = self._get_trigger_edges(cur_awg_wfm.get_trigger_source(cur_ch_index))
+                for ind, cur_trig in enumerate(trig_times):
+                    cur_trig_start = cur_trig * scale_fac
+                    #Loop over all the waveform segments
+                    cur_seg_x = cur_trig_start
+                    for cur_wfm_dict in cur_output_channel[1]:
+                        cur_dur = cur_wfm_dict['duration']*scale_fac
+                        self._add_rectangle_with_plot(ax, cur_seg_x, cur_seg_x + cur_dur, bar_width, num_channels, cur_wfm_dict['yPoints'])
+                        cur_seg_x += cur_dur
                 num_channels += 1
                 yticklabels.append(cur_output_channel[0])                
         #Plot the DDG output pulses

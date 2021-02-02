@@ -10,17 +10,18 @@ class WaveformAWG:
         self._awg_chan_list = []
         self._awg_mark_list = []
         #TODO: Check that awg_channel_tuples is a list!
-        for cur_ch_tupl in awg_channel_tuples:
+        for ch_index, cur_ch_tupl in enumerate(awg_channel_tuples):
             assert len(cur_ch_tupl) == 2, "The list awg_channel_tuples must contain tuples of form (instr_AWG, channel_name)."
             cur_awg, cur_ch_name = cur_ch_tupl
             self._awg_chan_list.append(AWGOutputChannel(cur_ch_tupl[0], cur_ch_tupl[1]))
             if cur_awg.supports_markers(cur_ch_name):
-                self._awg_mark_list.append(AWGOutputMarker(self))
+                self._awg_mark_list.append(AWGOutputMarker(self, ch_index))
             else:
                 self._awg_mark_list.append(None)
         self._sample_rate = sample_rate
         self._global_factor = global_factor
         self._wfm_segment_list = []
+        self._trig_src_objs = [(None,1)]*len(awg_channel_tuples)
 
     def add_waveform_segment(self, wfm_segment):
         self._wfm_segment_list.append(wfm_segment)
@@ -77,7 +78,24 @@ class WaveformAWG:
         final_wfm *= self._global_factor
         return [final_wfm]*len(self._awg_chan_list)
 
-    def _get_waveform_plot_segments(self, resolution = 21):
+    def set_trigger_source(self, trig_src_obj, trig_pol = 1, ch_index = -1):
+        #TODO: Consider error-checking here
+        #TODO: Override this in multi-channel setups to give the flexible option of different triggers for different channels
+        if (ch_index == -1):
+            for cur_ch in range(len(self._trig_src_objs)):
+                self._trig_src_objs[cur_ch] = (trig_src_obj, trig_pol)
+        else:
+            self._trig_src_objs[ch_index] = (trig_src_obj, trig_pol)
+
+    def get_trigger_source(self, ch_index = 0):
+        '''
+        Get the Trigger object corresponding to the trigger source.
+        '''
+        return self._trig_src_objs[ch_index][0]
+    def get_trigger_polarity(self, ch_index = 0):
+        return self._trig_src_objs[ch_index][1]
+
+    def _get_waveform_plot_segments(self, waveform_index = 0, resolution = 21):
         ret_list = []
         for cur_awg_chan in self._awg_chan_list:
             seg_dicts = []
@@ -91,7 +109,7 @@ class WaveformAWG:
                     cur_y -= min_y
                 max_y = np.max(cur_y)
                 if (max_y > 0):
-                    cur_y /= max_y      
+                    cur_y /= max_y
                 #Downsample the points if necessary to speed up plotting...
                 cur_dict['yPoints'] = signal.resample(cur_y, resolution)
                 seg_dicts.append(cur_dict)

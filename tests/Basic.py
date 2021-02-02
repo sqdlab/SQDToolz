@@ -33,11 +33,24 @@ ddg_module.get_trigger_output('C').TrigPolarity = 1
 ddg_module._set_current_config(temp_config, instr_ddg)
 
 acq_module = ACQ(instr_acq)
-acq_module.NumSamples = 500
+acq_module.NumSamples = 50
 acq_module.SampleRate = 1e9
-acq_module.TriggerEdge = 0
-acq_module.set_trigger_source(ddg_module, 'B')
+acq_module.InputTriggerEdge = 0
+acq_module.set_trigger_source(ddg_module.get_trigger_output('B'))
 
+#
+awg_wfm2 = WaveformAWGIQ([(instr_awg, 'CH3'),(instr_awg, 'CH4')], 1e9, 100e6)
+awg_wfm2.add_waveform_segment(WFS_Gaussian("init", 75e-9, 1.0))
+awg_wfm2.add_waveform_segment(WFS_Constant("pad1", 45e-9, 0.5))
+awg_wfm2.add_waveform_segment(WFS_Constant("hold", 45e-9, 0.5))
+awg_wfm2.add_waveform_segment(WFS_Gaussian("pulse", 75e-9, 1.0))
+awg_wfm2.add_waveform_segment(WFS_Constant("pad2", 45e-9, 0.5))
+awg_wfm2.add_waveform_segment(WFS_Constant("read", 150e-9, 0.0))
+awg_wfm2.get_output_channel(0).Amplitude = 1.0
+awg_wfm2.get_trigger_output(0).set_markers_to_segments(["pad1","pad2"])
+awg_wfm2.get_trigger_output(1).set_markers_to_none()
+awg_wfm2.program_AWG()
+#
 awg_wfm = WaveformAWG([(instr_awg, 'CH2')], 1e9)
 awg_wfm.add_waveform_segment(WFS_Gaussian("init", 35e-9, 0.8))
 awg_wfm.add_waveform_segment(WFS_Constant("hold", 25e-9, 0.0))
@@ -47,16 +60,7 @@ awg_wfm.get_trigger_output().set_markers_to_trigger()
 awg_wfm.get_trigger_output().TrigPulseDelay = 25e-9
 awg_wfm.get_trigger_output().TrigPulseLength = 30e-9
 awg_wfm.program_AWG()
-#
-awg_wfm2 = WaveformAWGIQ([(instr_awg, 'CH3'),(instr_awg, 'CH4')], 1e9, 100e6)
-awg_wfm2.add_waveform_segment(WFS_Gaussian("init", 75e-9, 1.0))
-awg_wfm2.add_waveform_segment(WFS_Constant("hold", 45e-9, 0.5))
-awg_wfm2.add_waveform_segment(WFS_Gaussian("pulse", 75e-9, 1.0))
-awg_wfm2.add_waveform_segment(WFS_Constant("read", 150e-9, 0.0))
-awg_wfm2.get_output_channel(0).Amplitude = 1.0
-awg_wfm2.get_trigger_output(0).set_markers_to_segments(["hold"])
-awg_wfm2.get_trigger_output(1).set_markers_to_none()
-awg_wfm2.program_AWG()
+
 # lePlot = awg_wfm2.plot_waveforms().show()
 # input('press <ENTER> to continue')
 #
@@ -64,15 +68,21 @@ awg_wfm2.program_AWG()
 
 # awg.set_trigger_source(ddg_module, 'A')
 
-tc = TimingConfiguration(1e-6, [ddg_module], [awg_wfm,awg_wfm2], acq_module)
+tc = TimingConfiguration(1e-6, [ddg_module], [awg_wfm2,awg_wfm], acq_module)
 configTc = tc.save_config()
 ddg_module.get_trigger_output('C').TrigPolarity = 1
-acq_module.set_trigger_source(ddg_module, 'C')
+
+acq_module.set_trigger_source(ddg_module.get_trigger_output('C'))
 tc.update_config(configTc)
 
+acq_module.set_trigger_source(awg_wfm.get_trigger_output(0))
+# awg_wfm2.set_trigger_source(ddg_module.get_trigger_output('C'))
+# awg_wfm.set_trigger_source(ddg_module.get_trigger_output('A'))
+awg_wfm.set_trigger_source(awg_wfm2.get_trigger_output(0))
 
-# lePlot = tc.plot().show()
-# input('press <ENTER> to continue')
+
+lePlot = tc.plot().show()
+input('press <ENTER> to continue')
 
 leData = new_exp.run(tc)
 

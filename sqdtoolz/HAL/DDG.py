@@ -15,7 +15,7 @@ class DDG:
         self._output_trigs = {}
         for cur_output_src in instTrigSrcs:
             cur_trig_name = cur_output_src[0]
-            self._output_trigs[cur_trig_name] = Trigger(cur_trig_name, cur_output_src[1])
+            self._output_trigs[cur_trig_name] = Trigger(self, cur_trig_name, cur_output_src[1])
 
     @property
     def name(self):
@@ -27,6 +27,12 @@ class DDG:
         '''
         assert outputID in self._output_trigs, "Trigger output " + str(outputID) + " does not exist in " + self._name
         return self._output_trigs[outputID]
+
+    def get_trigger_source(self):
+        '''
+        Get the Trigger object corresponding to the trigger source.
+        '''
+        return None
 
     def get_all_outputs(self):
         return [self._output_trigs[x] for x in self._output_trigs]

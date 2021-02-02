@@ -1,4 +1,5 @@
 import numpy as np
+from sqdtoolz.HAL.TriggerPulse import TriggerType
 
 class AWGOutputChannel:
     def __init__(self, instr_awg, channel_name):
@@ -32,8 +33,8 @@ class AWGOutputChannel:
     def Output(self, boolVal):
         self.Output = boolVal
 
-class AWGOutputMarker:
-    def __init__(self, parent_waveform_obj):
+class AWGOutputMarker(TriggerType):
+    def __init__(self, parent_waveform_obj, ch_index = 0):
         self._parent = parent_waveform_obj
         #Marker status can be Arbitrary, Segments, None, Trigger
         self._marker_status = 'Arbitrary'
@@ -42,6 +43,7 @@ class AWGOutputMarker:
         self._marker_seg_list = []
         self._marker_trig_delay = 0.0
         self._marker_trig_length = 1e-9
+        self._ch_index = ch_index
         
     def set_markers_to_segments(self, list_seg_names):
         self._marker_status = 'Segments'
@@ -87,10 +89,15 @@ class AWGOutputMarker:
 
     @property
     def TrigPolarity(self):
+        '''
+        Returns the Trigger Polarity (positive or negative - 1 or 0). Only relevant if in Trigger and Segment modes.
+        '''
         return self._marker_pol
     @TrigPolarity.setter
     def TrigPolarity(self, pol):
-        assert self._marker_status == 'Trigger', "Cannot manipulate the marker waveforms on an AWG channel like a Trigger pulse without being in Trigger mode (i.e. call set_markers_to_trigger)"
+        '''
+        Sets the Trigger Polarity (positive or negative - 1 or 0). Only relevant if in Trigger and Segment modes.
+        '''
         self._marker_pol = pol
 
     @property
@@ -98,7 +105,6 @@ class AWGOutputMarker:
         return self._instrTrig.TrigEnable
     @TrigEnable.setter
     def TrigEnable(self, boolVal):
-        assert self._marker_status == 'Trigger', "Cannot manipulate the marker waveforms on an AWG channel like a Trigger pulse without being in Trigger mode (i.e. call set_markers_to_trigger)"
         self._instrTrig.TrigEnable = boolVal
 
     def _validate_trigger_parameters(self):
@@ -149,3 +155,41 @@ class AWGOutputMarker:
                 start_pt, end_pt = self._parent._get_index_points_for_segment(cur_seg_name)
                 final_wfm[start_pt:end_pt] = self._marker_pol
             return final_wfm
+
+    def _get_instr_trig_src(self):
+        '''
+        Used by TimingConfiguration to backtrack through all interdependent trigger sources (i.e. traversing up the tree)
+        '''
+        #Channel index is used in the cases where the trigger sources may be different (e.g. IQ waveform with I and Q from different AWGs)
+        return self._parent.get_trigger_source(self._ch_index)
+    def _get_instr_input_trig_edge(self):
+        return self._parent.get_trigger_polarity(self._ch_index)
+
+    def get_trigger_times(self, input_trig_pol=1):
+        if self._marker_status == 'None':
+            return []
+
+        assert input_trig_pol == 0 or input_trig_pol == 1, "Trigger polarity must be 0 or 1 for negative or positive edge/polarity."
+
+        if self._marker_status == 'Trigger':
+            if input_trig_pol == 0:
+                if self.TrigPolarity == 0:
+                    return [self.TrigPulseDelay]
+                else:
+                    return [self.TrigPulseDelay + self.TrigPulseLength]
+            elif input_trig_pol == 1:
+                if self.TrigPolarity == 0:
+                    return [self.TrigPulseDelay + self.TrigPulseLength]
+                else:
+                    return [self.TrigPulseDelay]
+        elif self._marker_status == 'Arbitrary' or self._marker_status == 'Segments':
+            #TODO: Consider handling Segments by itself without assembling whole array - a small optimisation...
+            cur_fs = self._parent._sample_rate
+            mark_arr = self._assemble_marker_raw()
+            edges = mark_arr-np.roll(mark_arr,1)    #It's 1 if it's a positive edge, -1 if negative edge
+            if input_trig_pol == 1:
+                times = np.where(edges==1)[0] / cur_fs
+            else:
+                times = np.where(edges==-1)[0] / cur_fs
+            return times.tolist()
+

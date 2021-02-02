@@ -2,8 +2,6 @@
 class ACQ:
     def __init__(self, instr_acq):
         self._instr_acq = instr_acq
-        self._trig_src_module = None
-        self._trig_src_id = None
         self._trig_src_obj = None
         self._name = instr_acq.name
 
@@ -23,7 +21,7 @@ class ACQ:
         return self._instr_acq.NumSegments
     @NumSegments.setter
     def NumSegments(self, num_segs):
-        self._instr_acq.NumSegments = num_segs\
+        self._instr_acq.NumSegments = num_segs
 
     @property
     def SampleRate(self):
@@ -33,27 +31,18 @@ class ACQ:
         self._instr_acq.SampleRate = frequency_hertz
 
     @property
-    def TriggerEdge(self):
+    def InputTriggerEdge(self):
         return self._instr_acq.TriggerInputEdge
-    @TriggerEdge.setter
-    def TriggerEdge(self, pol):
+    @InputTriggerEdge.setter
+    def InputTriggerEdge(self, pol):
         self._instr_acq.TriggerInputEdge = pol
 
     def get_data(self):
         return self._instr_acq.get_data()
 
-    def set_trigger_source(self, hal_module, trig_id):
-        '''
-        Sets the trigger source.
-
-        Inputs:
-            - hal_module - Must be a DDG or AWG module (i.e. the digital SYNC, clock or marker outputs that can be used as an instrument trigger)
-            - trig_obj - ID with which to reference the trigger output from the hal_module (to be fed into this instrument)
-        '''
-        self._trig_src_module = hal_module
-        self._trig_src_id = trig_id
-        self._trig_src_obj = hal_module.get_trigger_output(trig_id)
-        assert self._trig_src_obj != None, "The given trigger source is invalid or does not exist."
+    def set_trigger_source(self, trig_src_obj):
+        #TODO: Consider error-checking here
+        self._trig_src_obj = trig_src_obj
 
     def get_trigger_source(self):
         '''
@@ -61,16 +50,22 @@ class ACQ:
         '''
         return self._trig_src_obj
 
+    def _get_trigger_sources(self):
+        return [self._trig_src_obj]
+
+    def _get_acq_window_len(self, segment_index = 0):
+        return self.NumSamples / self.SampleRate
+
     def _get_current_config(self):
         return {
             'instrument' : self.name,
             'type' : 'ACQ',
             'NumSamples' : self.NumSamples,
             'SampleRate' : self.SampleRate,
-            'TriggerEdge' : self.TriggerEdge,
+            'InputTriggerEdge' : self.InputTriggerEdge,
             'TriggerSource' : {
-                'TriggerSourceHAL' : self._trig_src_module.name,
-                'TriggerSourceID' : self._trig_src_id
+                'TriggerSourceHAL' : self._trig_src_obj._parent.name,
+                'TriggerSourceID' : self._trig_src_obj.name
                 }
             }
 
@@ -80,6 +75,6 @@ class ACQ:
             self._instr_acq = instr_obj
         self.NumSamples = dict_config['NumSamples']
         self.SampleRate = dict_config['SampleRate']
-        self.TriggerEdge = dict_config['TriggerEdge']
+        self.InputTriggerEdge = dict_config['InputTriggerEdge']
 
     

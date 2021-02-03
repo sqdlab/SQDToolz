@@ -59,7 +59,11 @@ class Trigger(TriggerType):
         '''
         return self._parent.get_trigger_source()
     def _get_instr_input_trig_edge(self):
-        return self._parent.InputTriggerEdge    #Parent implementing this should have a preferred edge
+        #Sometimes the object (e.g. a DDG) may not have an input trigger...
+        if (hasattr(self._parent,'InputTriggerEdge')):
+            return self._parent.InputTriggerEdge    #Parent implementing this should have a preferred edge
+        else:
+            return 0
 
     def get_trigger_times(self, input_trig_pol=1):
         if input_trig_pol == 0:

@@ -75,17 +75,20 @@ ddg_module.get_trigger_output('C').TrigPolarity = 1
 acq_module.set_trigger_source(ddg_module.get_trigger_output('C'))
 tc.update_config(configTc)
 
-acq_module.set_trigger_source(awg_wfm.get_trigger_output(0))
+
 # awg_wfm2.set_trigger_source(ddg_module.get_trigger_output('C'))
 # awg_wfm.set_trigger_source(ddg_module.get_trigger_output('A'))
-awg_wfm.set_trigger_source(awg_wfm2.get_trigger_output(0))
+
+# awg_wfm.get_waveform_segment("hold").Duration = 1e-9
+
+# awg_wfm.set_trigger_source(awg_wfm2.get_trigger_output(0))
+# acq_module.set_trigger_source(awg_wfm.get_trigger_output(0))
 
 
 lePlot = tc.plot().show()
 input('press <ENTER> to continue')
 
 leData = new_exp.run(tc)
-
 input('press <ENTER> to continue')
 
 

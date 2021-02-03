@@ -25,6 +25,15 @@ class WaveformAWG:
 
     def add_waveform_segment(self, wfm_segment):
         self._wfm_segment_list.append(wfm_segment)
+        
+    def get_waveform_segment(self, wfm_segment_name):
+        the_seg = None
+        for cur_seg in self._wfm_segment_list:
+            if cur_seg.Name == wfm_segment_name:
+                the_seg = cur_seg
+                break
+        assert the_seg != None, "Waveform Segment of name " + seg_name + " is not present in the current list of added Waveform Segments."
+        return the_seg
 
     def get_output_channel(self, outputIndex = 0):
         '''

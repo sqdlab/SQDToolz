@@ -97,5 +97,6 @@ class DummyAWG(Instrument):
             return None
 
     def program_channel(self, chan_id, wfm_data, mkr_data = np.array([])):
-        print(wfm_data)
-        print(mkr_data)
+        # print(wfm_data)
+        # print(mkr_data)
+        pass

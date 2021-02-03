@@ -6,6 +6,7 @@ from sqdtoolz.HAL.AWG import*
 from sqdtoolz.HAL.WaveformSegments import*
 from sqdtoolz.HAL.ACQ import*
 import numpy as np
+from sqdtoolz.Parameter import*
 
 new_exp = Experiment(instr_config_file = "tests\\BenchTest.yaml", save_dir = "", name="test")
 
@@ -153,13 +154,16 @@ acq_module.NumSegments = 1
 # acq_module.TriggerEdge = 0
 # acq_module.set_trigger_source(ddg_module, 'AB')
 
+my_param1 = VariableInstrument("len1", awg_wfm2, 'IQFrequency')
+my_param2 = VariableInstrument("len2", awg_wfm2, 'IQPhase')
+
 tc = TimingConfiguration(1.2e-6, [ddg_module], [awg_wfm2], acq_module)
 # lePlot = tc.plot().show()
-leData = new_exp.run(tc)
+leData = new_exp.run(tc, [(my_param1, np.linspace(20e6,35e6,10)),(my_param2, np.linspace(0,3,3))])
 
-import matplotlib.pyplot as plt
-plt.plot(np.abs(leData[0][0][:]))
-plt.show()
+# import matplotlib.pyplot as plt
+# plt.plot(np.abs(leData[0][0][:]))
+# plt.show()
 
 
 input('press <ENTER> to continue')

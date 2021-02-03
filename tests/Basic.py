@@ -7,6 +7,7 @@ from sqdtoolz.Drivers.dummyDDG import*
 from sqdtoolz.Drivers.dummyACQ import*
 from sqdtoolz.Drivers.dummyAWG import*
 from sqdtoolz.TimingConfiguration import*
+from sqdtoolz.Parameter import*
 
 new_exp = Experiment(instr_config_file = "", save_dir = "C:\\Users\\uqppakk1\\Desktop\\WorkUQ\\sqdtoolz\\save_dir\\", name="test")
 
@@ -81,14 +82,17 @@ tc.update_config(configTc)
 
 # awg_wfm.get_waveform_segment("hold").Duration = 1e-9
 
-# awg_wfm.set_trigger_source(awg_wfm2.get_trigger_output(0))
-# acq_module.set_trigger_source(awg_wfm.get_trigger_output(0))
+awg_wfm.set_trigger_source(awg_wfm2.get_trigger_output(0))
+acq_module.set_trigger_source(awg_wfm.get_trigger_output(0))
 
+my_param_hold = VariableInstrument("len1", awg_wfm2.get_waveform_segment("hold"), 'Duration')
+my_param_read = VariableInstrument("len2", awg_wfm2.get_waveform_segment("read"), 'Duration')
+# my_param.set_raw(90e-9)
 
-lePlot = tc.plot().show()
-input('press <ENTER> to continue')
+# lePlot = tc.plot().show()
+# input('press <ENTER> to continue')
 
-leData = new_exp.run(tc)
+leData = new_exp.run(tc, [(my_param_hold, np.linspace(10e-9,100e-9,3)), (my_param_read, np.linspace(100e-9,300e-9,4))])
 input('press <ENTER> to continue')
 
 

@@ -1484,11 +1484,17 @@ class Agilent_N8241A(Instrument):
         if chan_id == 'ch1':
             if (self._last_handle_wfm1 != None):
                 self.clear_arb_waveform(self._last_handle_wfm1)
-            self._last_handle_wfm1 = self.create_arb_waveform(wfm_data)
+            if mkr_data.size > 0:
+                self._last_handle_wfm1 = self.create_arb_waveform_with_markers(wfm_data, mkr_data[::8] * 2**6)#Bit 6 is Mkr1, Bit 7 is Mkr2
+            else:
+                self._last_handle_wfm1 = self.create_arb_waveform(wfm_data)
             self.configure_arb_waveform(1, self._last_handle_wfm1, 0.5, 0.0)
         elif chan_id == 'ch2':
             if (self._last_handle_wfm2 != None):
                 self.clear_arb_waveform(self._last_handle_wfm2)
-            self._last_handle_wfm2 = self.create_arb_waveform(wfm_data)
+            if mkr_data.size > 0:
+                self._last_handle_wfm2 = self.create_arb_waveform_with_markers(wfm_data, mkr_data[::8] * 2**7)
+            else:
+                self._last_handle_wfm2 = self.create_arb_waveform(wfm_data)
             self.configure_arb_waveform(2, self._last_handle_wfm2, 0.5, 0.0)
     

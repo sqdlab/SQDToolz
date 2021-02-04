@@ -20,9 +20,9 @@ awg_agilent1 = Agilent_N8241A('awg_agilent1', ivi_dll=r'C:\Program Files\IVI Fou
 
 #Ideally, the length and polarity are set to default values in the drivers via the YAML file - i.e. just set TrigPulseDelay
 ddg_module = DDG(new_exp.station.load_pulser())
-ddg_module.get_trigger_output('AB').TrigPulseLength = 50e-9
+ddg_module.get_trigger_output('AB').TrigPulseLength = 500e-9
 ddg_module.get_trigger_output('AB').TrigPolarity = 1
-ddg_module.get_trigger_output('AB').TrigPulseDelay = 10e-9
+ddg_module.get_trigger_output('AB').TrigPulseDelay = 0e-9
 ddg_module.get_trigger_output('CD').TrigPulseLength = 100e-9
 ddg_module.get_trigger_output('CD').TrigPulseDelay = 50e-9
 ddg_module.get_trigger_output('CD').TrigPolarity = 1
@@ -123,27 +123,14 @@ awg_wfm2.IQdcOffset = (0,0)
 awg_wfm2.add_waveform_segment(WFS_Gaussian("init", 512e-9, 1.0))
 awg_wfm2.add_waveform_segment(WFS_Constant("zero1", 128e-9, 0.0))
 awg_wfm2.add_waveform_segment(WFS_Gaussian("init2", 512e-9, 1.0))
-awg_wfm2.add_waveform_segment(WFS_Constant("zero2", 128e-9, 0.0))
-awg_wfm2.add_waveform_segment(WFS_Gaussian("init3", 512e-9, 1.0))
-awg_wfm2.add_waveform_segment(WFS_Constant("zero3", 128e-9, 0.0))
-awg_wfm2.add_waveform_segment(WFS_Gaussian("init4", 512e-9, 1.0))
-awg_wfm2.add_waveform_segment(WFS_Constant("zero4", 128e-9, 0.0))
-awg_wfm2.add_waveform_segment(WFS_Gaussian("init5", 512e-9, 1.0))
-awg_wfm2.add_waveform_segment(WFS_Constant("zero5", 128e-9, 0.0))
-awg_wfm2.add_waveform_segment(WFS_Gaussian("init6", 512e-9, 1.0))
-awg_wfm2.add_waveform_segment(WFS_Constant("zero6", 128e-9, 0.0))
-awg_wfm2.add_waveform_segment(WFS_Gaussian("init7", 512e-9, 1.0))
-awg_wfm2.add_waveform_segment(WFS_Constant("zero7", 128e-9, 0.0))
-awg_wfm2.add_waveform_segment(WFS_Gaussian("init8", 512e-9, 1.0))
-awg_wfm2.add_waveform_segment(WFS_Constant("zero8", 128e-9, 0.0))
-awg_wfm2.add_waveform_segment(WFS_Gaussian("init9", 512e-9, 1.0))
-awg_wfm2.add_waveform_segment(WFS_Constant("zero9", 128e-9, 0.0))
+awg_wfm2.add_waveform_segment(WFS_Constant("zero2", 512e-9, 0.0))
 
 
 # awg_wfm2.get_output_channel(0).Amplitude = 1.0
-# awg_wfm2.get_trigger_output(0).set_markers_to_segments(["hold"])
-awg_wfm2.get_trigger_output(0).set_markers_to_none()
-awg_wfm2.get_trigger_output(1).set_markers_to_none()
+awg_wfm2.get_trigger_output(0).set_markers_to_segments(["init","init2"])
+awg_wfm2.get_trigger_output(1).set_markers_to_segments(["zero1","zero2"])
+# awg_wfm2.get_trigger_output(0).set_markers_to_none()
+# awg_wfm2.get_trigger_output(1).set_markers_to_none()
 awg_wfm2.program_AWG()
 # lePlot = awg_wfm2.plot_waveforms().show()
 
@@ -159,7 +146,7 @@ my_param2 = VariableInstrument("len2", awg_wfm2, 'IQPhase')
 
 tc = TimingConfiguration(1.2e-6, [ddg_module], [awg_wfm2], acq_module)
 # lePlot = tc.plot().show()
-leData = new_exp.run(tc, [(my_param1, np.linspace(20e6,35e6,10)),(my_param2, np.linspace(0,3,3))])
+# leData = new_exp.run(tc, [(my_param1, np.linspace(20e6,35e6,10)),(my_param2, np.linspace(0,3,3))])
 
 # import matplotlib.pyplot as plt
 # plt.plot(np.abs(leData[0][0][:]))

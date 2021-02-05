@@ -208,6 +208,21 @@ class P2584M(Instrument):
         chanlist.lock()
         self.add_submodule('channels', chanlist)
 
+        #TODO: Setup trigger sources to be a parameter...
+        self._TaborSendScpi(":TRIG:SOUR:ENAB TRG1")
+        for cur_ch in [1,2,3,4]:
+            self._TaborSendScpi(":INST:CHAN " + str(cur_ch))
+            self._TaborSendScpi(":TRIG:SOUR:ENAB TRG1") # Set tigger enable signal to TRIG1 (CH specific)
+            self._TaborSendScpi(":TRIG:SEL EXT1") # Select trigger for programming (CH specific)
+            self._TaborSendScpi(":TRIG:LEV 0") # Set trigger level
+            self._TaborSendScpi(":TRIG:COUN 1") # Set number of waveform cycles (1) to generate (CH specific)
+            self._TaborSendScpi(":TRIG:IDLE DC") # Set output idle level to DC (CH specific)
+            # trig_lev = getSclkTrigLev(inst)
+
+            # self._TaborSendScpi(":TRIG:IDLE:LEV {0}".format(trig_lev)) # Set DC level in DAC value (CH specific)
+            self._TaborSendScpi(":TRIG:STAT ON") # Enable trigger state (CH specific)
+            self._TaborSendScpi(":INIT:CONT OFF") # Enable trigger mode (CH specific)
+
     def _TaborOnLoggerEvent(self,sender,e):
         print(e.Message.Trim())
         if (e.Level <= LogLevel.Warning):
@@ -286,7 +301,7 @@ class P2584M(Instrument):
         self._TaborSendScpi(":TASK:DEF:SEGM " + str(wfm_segment))
         self._TaborSendScpi(":TASK:DEF:IDLE FIRS")
         self._TaborSendScpi(":TASK:DEF:IDLE:DC 0")
-        self._TaborSendScpi(":TASK:DEF:ENAB NONE")   #No triggers for now
+        self._TaborSendScpi(":TASK:DEF:ENAB TRG1")   #No triggers for now; TODO: MAKE THIS GENERAL FOR TRIGGER SOURCES
         self._TaborSendScpi(":TASK:DEF:ABOR NONE")   #No exit triggers for now
         self._TaborSendScpi(":TASK:DEF:JUMP EVEN")   #Finish current loop before going to next loop (not relevant without external triggers anyway)
         self._TaborSendScpi(":TASK:DEF:DEST NEXT")   #Jump to NEXT1 on finishing current task

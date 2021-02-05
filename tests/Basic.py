@@ -48,8 +48,8 @@ awg_wfm2.add_waveform_segment(WFS_Gaussian("pulse", 75e-9, 1.0))
 awg_wfm2.add_waveform_segment(WFS_Constant("pad2", 45e-9, 0.5))
 awg_wfm2.add_waveform_segment(WFS_Constant("read", 150e-9, 0.0))
 awg_wfm2.get_output_channel(0).Amplitude = 1.0
-awg_wfm2.get_trigger_output(0).set_markers_to_segments(["pad1","pad2"])
-awg_wfm2.get_trigger_output(1).set_markers_to_none()
+awg_wfm2.get_marker_output(0).set_markers_to_segments(["pad1","pad2"])
+awg_wfm2.get_marker_output(1).set_markers_to_none()
 awg_wfm2.program_AWG()
 #
 awg_wfm = WaveformAWG([(instr_awg, 'CH2')], 1e9)
@@ -82,8 +82,8 @@ tc.update_config(configTc)
 
 # awg_wfm.get_waveform_segment("hold").Duration = 1e-9
 
-awg_wfm.set_trigger_source(awg_wfm2.get_trigger_output(0))
-acq_module.set_trigger_source(awg_wfm.get_trigger_output(0))
+awg_wfm.set_trigger_source(awg_wfm2.get_marker_output(0))
+acq_module.set_trigger_source(awg_wfm.get_marker_output(0))
 
 my_param_hold = VariableInstrument("len1", awg_wfm2.get_waveform_segment("hold"), 'Duration')
 my_param_read = VariableInstrument("len2", awg_wfm2.get_waveform_segment("read"), 'Duration')

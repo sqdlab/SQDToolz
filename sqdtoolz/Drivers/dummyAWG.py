@@ -87,8 +87,8 @@ class DummyAWG(Instrument):
     def TriggerInputEdge(self, pol):
         self._trigger_edge = pol
 
-    def supports_markers(self, channel_name):
-        return True
+    def num_supported_markers(self, channel_name):
+        return 2
 
     def _get_channel_output(self, identifier):
         if identifier in self.submodules:

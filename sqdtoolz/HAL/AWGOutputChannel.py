@@ -34,7 +34,7 @@ class AWGOutputChannel:
         self.Output = boolVal
 
 class AWGOutputMarker(TriggerType):
-    def __init__(self, parent_waveform_obj, ch_index = 0):
+    def __init__(self, parent_waveform_obj, name, ch_index):
         self._parent = parent_waveform_obj
         #Marker status can be Arbitrary, Segments, None, Trigger
         self._marker_status = 'Arbitrary'
@@ -44,6 +44,12 @@ class AWGOutputMarker(TriggerType):
         self._marker_trig_delay = 0.0
         self._marker_trig_length = 1e-9
         self._ch_index = ch_index
+        self._name = name
+
+    @property
+    def name(self):
+        #TODO: Look to make all name properties to start with capital letters...
+        return self._name
         
     def set_markers_to_segments(self, list_seg_names):
         self._marker_status = 'Segments'

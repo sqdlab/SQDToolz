@@ -531,6 +531,42 @@ class Agilent_N8241A(Instrument):
                            set_cmd=False,
                            parameter_class=AGN_Parameter)
 
+        self.ref_clock_source('Internal')
+        self.configure_sample_clock(source=0, freq=1.25e9)
+        self.configure_clock_sync(enabled=False, master=True)
+        #Setup default mode to be burst
+        self.ch1.operation_mode('Burst')
+        self.ch1.burst_count(1)
+        self.ch2.operation_mode('Burst')
+        self.ch2.burst_count(1)
+        #Use amplified output
+        self.ch1.output_configuration('Amplified')
+        self.ch2.output_configuration('Amplified')
+        self.predistortion(False)
+        self.ch1.output_filter(False)
+        self.ch2.output_filter(False)
+        self.ch1.gain(0.5)
+        self.ch2.gain(0.5)    
+        #self.set_ch1_output_bandwidth(500e6)
+        #self.set_ch2_output_bandwidth(500e6)
+        #Set output to be 50Ohm and ON by default
+        self.ch1.output_impedance(50)
+        self.ch2.output_impedance(50)
+        self.ch1.output(True)
+        self.ch2.output(True)
+        #Setup clock and triggers
+        self.clock_source('Internal')
+        #self.ch1.configure_trigger_source(1024) # No Trigger flag
+        #self.ch2.configure_trigger_source(1024) # No Trigger flag
+        self.ch1.configure_trigger_source(1|1026|1028|1032|1040) # any hardware trigger input
+        self.ch2.configure_trigger_source(1|1026|1028|1032|1040) # any hardware trigger input
+        self.trigger_threshold_B(0.7)
+        #Setup the marker sources to be for channels 1 and 2.
+        self.m1.source('Channel 1 Marker 1')
+        self.m2.source('Channel 1 Marker 2')
+        self.m3.source('Channel 2 Marker 1')
+        self.m4.source('Channel 2 Marker 2')
+
         self.get_all()
 
     def _init(self, id_query=True, reset=False):
@@ -1463,8 +1499,8 @@ class Agilent_N8241A(Instrument):
     def __del__(self):
         self.close()
 
-    def supports_markers(self, channel_name):
-        return True
+    def num_supported_markers(self, channel_name):
+        return 2
 
     def _get_channel_output(self, identifier):
         if identifier in self.submodules:
@@ -1480,21 +1516,29 @@ class Agilent_N8241A(Instrument):
         #TODO: this doesn't work - fix it...
         self.configure_sample_clock(source=0, freq=frequency_hertz)
 
-    def program_channel(self, chan_id, wfm_data, mkr_data = np.array([])):
+    def program_channel(self, chan_id, wfm_data, mkr_data = np.array([])):        
+        #Bit 6 is Mkr1, Bit 7 is Mkr2
+        if len(mkr_data) == 2:
+            mkr_data_reduced = np.zeros(int(len(wfm_data)/8))
+            if len(mkr_data[0]) > 0:
+                mkr_data_reduced += mkr_data[0][::8] * 2**6
+            if len(mkr_data[1]) > 0:
+                mkr_data_reduced += mkr_data[1][::8] * 2**7
+        #Program the channels
         if chan_id == 'ch1':
             if (self._last_handle_wfm1 != None):
                 self.clear_arb_waveform(self._last_handle_wfm1)
-            if mkr_data.size > 0:
-                self._last_handle_wfm1 = self.create_arb_waveform_with_markers(wfm_data, mkr_data[::8] * 2**6)#Bit 6 is Mkr1, Bit 7 is Mkr2
+            if len(mkr_data) == 2:
+                self._last_handle_wfm1 = self.create_arb_waveform_with_markers(wfm_data / self.ch1.gain(), mkr_data_reduced)
             else:
-                self._last_handle_wfm1 = self.create_arb_waveform(wfm_data)
-            self.configure_arb_waveform(1, self._last_handle_wfm1, 0.5, 0.0)
+                self._last_handle_wfm1 = self.create_arb_waveform(wfm_data / self.ch1.gain())
+            self.configure_arb_waveform(1, self._last_handle_wfm1, self.ch1.gain(), 0.0)
         elif chan_id == 'ch2':
             if (self._last_handle_wfm2 != None):
                 self.clear_arb_waveform(self._last_handle_wfm2)
-            if mkr_data.size > 0:
-                self._last_handle_wfm2 = self.create_arb_waveform_with_markers(wfm_data, mkr_data[::8] * 2**7)
+            if len(mkr_data) == 2:
+                self._last_handle_wfm2 = self.create_arb_waveform_with_markers(wfm_data / self.ch2.gain(), mkr_data_reduced)
             else:
-                self._last_handle_wfm2 = self.create_arb_waveform(wfm_data)
-            self.configure_arb_waveform(2, self._last_handle_wfm2, 0.5, 0.0)
+                self._last_handle_wfm2 = self.create_arb_waveform(wfm_data / self.ch2.gain())
+            self.configure_arb_waveform(2, self._last_handle_wfm2, self.ch2.gain(), 0.0)
     

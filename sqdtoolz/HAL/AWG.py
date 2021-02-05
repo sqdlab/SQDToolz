@@ -14,10 +14,13 @@ class WaveformAWG:
             assert len(cur_ch_tupl) == 2, "The list awg_channel_tuples must contain tuples of form (instr_AWG, channel_name)."
             cur_awg, cur_ch_name = cur_ch_tupl
             self._awg_chan_list.append(AWGOutputChannel(cur_ch_tupl[0], cur_ch_tupl[1]))
-            if cur_awg.supports_markers(cur_ch_name):
-                self._awg_mark_list.append(AWGOutputMarker(self, ch_index))
-            else:
-                self._awg_mark_list.append(None)
+            
+            cur_mkrs = []
+            num_markers = cur_awg.num_supported_markers(cur_ch_name)
+            if num_markers > 0:
+                for ind in range(1,num_markers+1):
+                    cur_mkrs.append(AWGOutputMarker(self, f'ch{ch_index}_mkr{ind}', ch_index))
+            self._awg_mark_list.append(cur_mkrs)
         self._sample_rate = sample_rate
         self._global_factor = global_factor
         self._wfm_segment_list = []
@@ -45,15 +48,34 @@ class WaveformAWG:
     def get_output_channels(self):
         return self._awg_chan_list[:]
 
-    def get_trigger_output(self, outputIndex = 0):
+    def get_marker_output(self, marker_index, output_channel = 0):
         '''
         Returns an AWGOutputMarker object.
         '''
-        assert outputIndex >= 0 and outputIndex < len(self._awg_chan_list), "Channel output index is out of range"
-        return self._awg_mark_list[outputIndex]
+        assert output_channel >= 0 and output_channel < len(self._awg_chan_list), "Channel output index is out of range"
+        assert marker_index >= 0 and marker_index < len(self._awg_mark_list[output_channel]), "Marker output index is out of range"
+        return self._awg_mark_list[output_channel][marker_index]
 
-    def get_trigger_outputs(self):
+    def get_marker_outputs(self):
         return self._awg_mark_list[:]
+
+    def _get_trigger_output_by_id(self, trigID):
+        '''
+        Some objects may have a hierarchy of trigger outputs - it's best to categorise them via some unique ID which can be referenced easily.
+
+        Inputs:
+            - trigID - unique ID of the trigger (e.g. a string)
+        
+        Returns a TriggerType object representing an output trigger.
+        '''
+        #Doing it this way as the naming scheme may change in the future - just flatten list and find the marker object...
+        cur_obj = None
+        for cur_ch in range(len(self._awg_chan_list)):
+            cur_obj = next((x for x in self._awg_mark_list[cur_ch] if x.name == trigID), None)
+            if cur_obj != None:
+                break
+        assert cur_obj != None, f"The trigger output of ID {trigID} does not exist."
+        return cur_obj
 
     @property
     def Duration(self):
@@ -140,8 +162,9 @@ class WaveformAWG:
         final_wfms = self._assemble_waveform_raw()
         for ind, cur_awg_chan in enumerate(self._awg_chan_list):
             cur_awg_chan._instr_awg.SampleRate = self._sample_rate
-            if self._awg_mark_list[ind] != None:
-                cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.short_name, final_wfms[ind], self._awg_mark_list[ind]._assemble_marker_raw())
+            if len(self._awg_mark_list[ind]) > 0:
+                mkr_list = [x._assemble_marker_raw() for x in self._awg_mark_list[ind]]
+                cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.short_name, final_wfms[ind], mkr_list)
             else:
                 cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.short_name, final_wfms[ind])
 

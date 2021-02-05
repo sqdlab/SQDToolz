@@ -113,7 +113,7 @@ class TimingConfiguration:
                     break
             assert cur_src != None, "Trigger source could not be found for instrument " + cur_dest_obj.name + " sourcing from an unknown module " + cur_src_name
             #Set the trigger source on the destination object (AWGs and ACQ modules have the set_trigger_source function implemented by default) 
-            cur_dest_obj.set_trigger_source(cur_src.get_trigger_output(cur_trig_rel[2]))
+            cur_dest_obj.set_trigger_source(cur_src._get_trigger_output_by_id(cur_trig_rel[2]))
 
     def prepare_instruments(self):
         #TODO: Write rest of this with error checking
@@ -192,7 +192,7 @@ class TimingConfiguration:
         #Plot the AWG output pulses and markers (if any)
         for cur_awg_wfm in self._list_AWGs[::-1]:
             #Assemble the marker channels (if any)
-            for cur_mkr_channel in cur_awg_wfm.get_trigger_outputs()[::-1]:
+            for cur_mkr_channel in cur_awg_wfm.get_marker_outputs()[::-1]:
                 cur_ch_index = cur_mkr_channel._ch_index
                 mkrs = cur_mkr_channel._assemble_marker_raw()
                 if mkrs.size > 0:

@@ -491,8 +491,8 @@ class P2584M(Instrument):
         pass
         #self._trigger_edge = pol
 
-    def supports_markers(self, channel_name):
-        return True
+    def num_supported_markers(self, channel_name):
+        return 2
 
     def _get_channel_output(self, identifier):
         if identifier in self.submodules:

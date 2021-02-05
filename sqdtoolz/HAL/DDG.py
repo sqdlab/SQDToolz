@@ -28,6 +28,9 @@ class DDG:
         assert outputID in self._output_trigs, "Trigger output " + str(outputID) + " does not exist in " + self._name
         return self._output_trigs[outputID]
 
+    def _get_trigger_output_by_id(self, outputID):
+        return self.get_trigger_source(outputID)
+
     def get_trigger_source(self):
         '''
         Get the Trigger object corresponding to the trigger source.

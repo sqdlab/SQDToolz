@@ -192,21 +192,22 @@ class TimingConfiguration:
         #Plot the AWG output pulses and markers (if any)
         for cur_awg_wfm in self._list_AWGs[::-1]:
             #Assemble the marker channels (if any)
-            for cur_mkr_channel in cur_awg_wfm.get_marker_outputs()[::-1]:
-                cur_ch_index = cur_mkr_channel._ch_index
-                mkrs = cur_mkr_channel._assemble_marker_raw()
-                if mkrs.size > 0:
-                    cur_trig_src = cur_awg_wfm.get_trigger_source(cur_ch_index) #TODO: There is code-duplication with below; optimise/pre-calculate...
-                    if (cur_trig_src == None):
-                        trig_times = [0]
-                    else:
-                        trig_times = self._get_trigger_edges(cur_awg_wfm.get_trigger_source(cur_ch_index))
-                    for ind, cur_trig in enumerate(trig_times):
-                        cur_trig_start = cur_trig * scale_fac #TODO: Fill this in with trigger source
-                        self._plot_digital_pulse(ax, mkrs, cur_trig_start, scale_fac/cur_awg_wfm._sample_rate, bar_width, num_channels)
-                    num_channels += 1
-                    cur_ch = cur_awg_wfm.get_output_channel(cur_ch_index)
-                    yticklabels.append(cur_ch._instr_awg.name + ":" + cur_ch._channel_name + "[Mkr]")
+            wfm_plot_bars = cur_awg_wfm._get_waveform_plot_segments()
+            for cur_ch_index, cur_output_channel in enumerate(cur_awg_wfm.get_output_channels()):
+                for cur_mkr_channel in cur_output_channel.get_all_markers()[::-1]:
+                    mkrs = cur_mkr_channel._assemble_marker_raw()
+                    if mkrs.size > 0:
+                        cur_trig_src = cur_awg_wfm.get_trigger_source(cur_ch_index) #TODO: There is code-duplication with below; optimise/pre-calculate...
+                        if (cur_trig_src == None):
+                            trig_times = [0]
+                        else:
+                            trig_times = self._get_trigger_edges(cur_awg_wfm.get_trigger_source(cur_ch_index))
+                        for ind, cur_trig in enumerate(trig_times):
+                            cur_trig_start = cur_trig * scale_fac
+                            self._plot_digital_pulse(ax, mkrs, cur_trig_start, scale_fac/cur_awg_wfm._sample_rate, bar_width, num_channels)
+                        num_channels += 1
+                        cur_ch = cur_awg_wfm.get_output_channel(cur_ch_index)
+                        yticklabels.append(cur_ch._instr_awg.name + ":" + cur_ch._channel_name + "[Mkr]")
             #Assemble the segments into its constituent channel(s) - e.g. IQ waveforms or other multichannel waveforms
             #may opt to combine or plot 2 separate channels...
             wfm_plot_bars = cur_awg_wfm._get_waveform_plot_segments()

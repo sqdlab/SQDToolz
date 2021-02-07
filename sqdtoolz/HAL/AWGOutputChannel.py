@@ -2,15 +2,21 @@ import numpy as np
 from sqdtoolz.HAL.TriggerPulse import TriggerType
 
 class AWGOutputChannel:
-    def __init__(self, instr_awg, channel_name):
+    def __init__(self, instr_awg, channel_name, ch_index, parent_awg_waveform):
         self._instr_awg = instr_awg
         self._channel_name = channel_name
         self._instr_awg_chan = instr_awg._get_channel_output(channel_name)
         assert self._instr_awg_chan != None, "The channel name " + channel_name + " does not exist in the AWG instrument " + self._instr_awg.name
 
+        self._awg_mark_list = []
+        num_markers = self._instr_awg.num_supported_markers(channel_name)
+        if num_markers > 0:
+            for ind in range(1,num_markers+1):
+                self._awg_mark_list.append(AWGOutputMarker(parent_awg_waveform, f'{channel_name}_mkr{ind}', ch_index))
+
     @property
     def Name(self):
-        return self._name
+        return self._channel_name
 
     @property
     def Amplitude(self):
@@ -32,6 +38,32 @@ class AWGOutputChannel:
     @Output.setter
     def Output(self, boolVal):
         self.Output = boolVal
+
+    def marker(self, marker_index):
+        '''
+        Returns an AWGOutputMarker object.
+        '''
+        assert marker_index >= 0 and marker_index < len(self._awg_mark_list), "Marker output index is out of range"
+        return self._awg_mark_list[marker_index]
+
+    def get_all_markers(self):
+        return self._awg_mark_list[:]
+
+    
+    def _get_trigger_output_by_id(self, trigID):
+        '''
+        Some objects may have a hierarchy of trigger outputs - it's best to categorise them via some unique ID which can be referenced easily.
+
+        Inputs:
+            - trigID - unique ID of the trigger (e.g. a string)
+        
+        Returns a TriggerType object representing an output trigger.
+        '''
+        #Doing it this way as the naming scheme may change in the future - just flatten list and find the marker object...
+        cur_obj = None
+        cur_obj = next((x for x in self._awg_mark_list if x.name == trigID), None)
+        assert cur_obj != None, f"The trigger output of ID {trigID} does not exist."
+        return cur_obj
 
 class AWGOutputMarker(TriggerType):
     def __init__(self, parent_waveform_obj, name, ch_index):

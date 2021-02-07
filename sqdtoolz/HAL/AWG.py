@@ -5,26 +5,30 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 
 class WaveformAWG:
-    def __init__(self, awg_channel_tuples, sample_rate, global_factor = 1):
+    _name_ind = 0
+
+    def __init__(self, awg_channel_tuples, sample_rate, global_factor = 1, **kwargs):
+        self._name = kwargs.get('name', '')
+        if self._name == '':
+            self._name = f'waveformDefault{WaveformAWG._name_ind}'
+            WaveformAWG._name_ind += 1
+
         #awg_channel_tuples is given as (instr_AWG, channel_name)
         self._awg_chan_list = []
-        self._awg_mark_list = []
         #TODO: Check that awg_channel_tuples is a list!
         for ch_index, cur_ch_tupl in enumerate(awg_channel_tuples):
             assert len(cur_ch_tupl) == 2, "The list awg_channel_tuples must contain tuples of form (instr_AWG, channel_name)."
             cur_awg, cur_ch_name = cur_ch_tupl
-            self._awg_chan_list.append(AWGOutputChannel(cur_ch_tupl[0], cur_ch_tupl[1]))
+            self._awg_chan_list.append(AWGOutputChannel(cur_ch_tupl[0], cur_ch_tupl[1], ch_index, self))
             
-            cur_mkrs = []
-            num_markers = cur_awg.num_supported_markers(cur_ch_name)
-            if num_markers > 0:
-                for ind in range(1,num_markers+1):
-                    cur_mkrs.append(AWGOutputMarker(self, f'ch{ch_index}_mkr{ind}', ch_index))
-            self._awg_mark_list.append(cur_mkrs)
         self._sample_rate = sample_rate
         self._global_factor = global_factor
         self._wfm_segment_list = []
         self._trig_src_objs = [(None,1)]*len(awg_channel_tuples)
+
+    @property
+    def name(self):
+        return self._name
 
     def add_waveform_segment(self, wfm_segment):
         self._wfm_segment_list.append(wfm_segment)
@@ -48,34 +52,19 @@ class WaveformAWG:
     def get_output_channels(self):
         return self._awg_chan_list[:]
 
-    def get_marker_output(self, marker_index, output_channel = 0):
-        '''
-        Returns an AWGOutputMarker object.
-        '''
-        assert output_channel >= 0 and output_channel < len(self._awg_chan_list), "Channel output index is out of range"
-        assert marker_index >= 0 and marker_index < len(self._awg_mark_list[output_channel]), "Marker output index is out of range"
-        return self._awg_mark_list[output_channel][marker_index]
-
-    def get_marker_outputs(self):
-        return self._awg_mark_list[:]
-
-    def _get_trigger_output_by_id(self, trigID):
-        '''
-        Some objects may have a hierarchy of trigger outputs - it's best to categorise them via some unique ID which can be referenced easily.
-
-        Inputs:
-            - trigID - unique ID of the trigger (e.g. a string)
-        
-        Returns a TriggerType object representing an output trigger.
-        '''
-        #Doing it this way as the naming scheme may change in the future - just flatten list and find the marker object...
-        cur_obj = None
-        for cur_ch in range(len(self._awg_chan_list)):
-            cur_obj = next((x for x in self._awg_mark_list[cur_ch] if x.name == trigID), None)
-            if cur_obj != None:
-                break
-        assert cur_obj != None, f"The trigger output of ID {trigID} does not exist."
-        return cur_obj
+    def _get_current_config(self):
+        #Get settings for the trigger objects
+        # trigObjs = self.get_all_outputs()
+        trigDict = {}
+        # for cur_trig in trigObjs:
+        #     trigDict = {**trigDict, **cur_trig._get_current_config()}
+        retDict = {
+            'instrument' : [(x._instr_awg.name, x.Name) for x in self._awg_chan_list],
+            'type' : 'AWG',
+            'waveformType' : type(self).__name__,
+            'triggers' : trigDict
+            }
+        return retDict
 
     @property
     def Duration(self):
@@ -162,15 +151,15 @@ class WaveformAWG:
         final_wfms = self._assemble_waveform_raw()
         for ind, cur_awg_chan in enumerate(self._awg_chan_list):
             cur_awg_chan._instr_awg.SampleRate = self._sample_rate
-            if len(self._awg_mark_list[ind]) > 0:
-                mkr_list = [x._assemble_marker_raw() for x in self._awg_mark_list[ind]]
+            if len(cur_awg_chan._awg_mark_list) > 0:
+                mkr_list = [x._assemble_marker_raw() for x in cur_awg_chan._awg_mark_list]
                 cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.short_name, final_wfms[ind], mkr_list)
             else:
                 cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.short_name, final_wfms[ind])
 
 
 class WaveformAWGIQ(WaveformAWG):
-    def __init__(self, awg_channel_tuples, sample_rate, iq_frequency, iq_amplitude = 1.0, global_factor = 1):
+    def __init__(self, awg_channel_tuples, sample_rate, iq_frequency, iq_amplitude = 1.0, global_factor = 1, **kwargs):
         super().__init__(awg_channel_tuples, sample_rate, global_factor)
         self._iq_frequency = iq_frequency
         self._iq_amplitude = iq_amplitude   #Given as the raw output voltage (should usually set the envelopes to unity amplitude in this case)

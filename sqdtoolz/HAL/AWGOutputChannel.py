@@ -8,11 +8,14 @@ class AWGOutputChannel:
         self._instr_awg_chan = instr_awg._get_channel_output(channel_name)
         assert self._instr_awg_chan != None, "The channel name " + channel_name + " does not exist in the AWG instrument " + self._instr_awg.name
 
+        self._trig_src_obj = None
+        self._trig_src_pol = 1
+
         self._awg_mark_list = []
         num_markers = self._instr_awg.num_supported_markers(channel_name)
         if num_markers > 0:
             for ind in range(1,num_markers+1):
-                self._awg_mark_list.append(AWGOutputMarker(parent_awg_waveform, f'{channel_name}_mkr{ind}', ch_index))
+                self._awg_mark_list.append(AWGOutputMarker(parent_awg_waveform, self, f'{channel_name}_mkr{ind}', ch_index))
 
     @property
     def Name(self):
@@ -37,7 +40,26 @@ class AWGOutputChannel:
         return self._instr_awg_chan.Output
     @Output.setter
     def Output(self, boolVal):
-        self.Output = boolVal
+        self._instr_awg_chan.Output = boolVal
+
+    @property
+    def InputTriggerEdge(self):
+        return self._trig_src_pol
+    @InputTriggerEdge.setter
+    def InputTriggerEdge(self, pol):
+        self._trig_src_pol = pol
+
+    def set_trigger_source(self, trig_src_obj, trig_pol = -1):
+        #TODO: Consider error-checking here
+        self._trig_src_obj = trig_src_obj
+        if trig_pol != -1:
+            self.InputTriggerEdge = trig_pol
+
+    def get_trigger_source(self):
+        '''
+        Get the Trigger object corresponding to the trigger source.
+        '''
+        return self._trig_src_obj
 
     def marker(self, marker_index):
         '''
@@ -49,25 +71,30 @@ class AWGOutputChannel:
     def get_all_markers(self):
         return self._awg_mark_list[:]
 
-    
-    def _get_trigger_output_by_id(self, trigID):
-        '''
-        Some objects may have a hierarchy of trigger outputs - it's best to categorise them via some unique ID which can be referenced easily.
+    def _get_current_config(self):
+        retDict = {
+            'Name' : self.Name,
+            'Amplitude' : self.Amplitude,
+            'Offset' : self.Offset,
+            'Output' : self.Output,
+            'InputTriggerEdge' : self.InputTriggerEdge
+            }
+        if self._trig_src_obj:
+            retDict['TriggerSource'] = self._trig_src_obj.get_trigger_params()
+        return retDict
 
-        Inputs:
-            - trigID - unique ID of the trigger (e.g. a string)
-        
-        Returns a TriggerType object representing an output trigger.
-        '''
-        #Doing it this way as the naming scheme may change in the future - just flatten list and find the marker object...
-        cur_obj = None
-        cur_obj = next((x for x in self._awg_mark_list if x.name == trigID), None)
-        assert cur_obj != None, f"The trigger output of ID {trigID} does not exist."
-        return cur_obj
+    def _set_current_config(self, dict_config):
+        self._channel_name = dict_config['Name']
+        self.Amplitude = dict_config['Amplitude']
+        self.Offset = dict_config['Offset']
+        self.Output = dict_config['Output']
+        self.InputTriggerEdge = dict_config['InputTriggerEdge']
+
 
 class AWGOutputMarker(TriggerType):
-    def __init__(self, parent_waveform_obj, name, ch_index):
-        self._parent = parent_waveform_obj
+    def __init__(self, parent_waveform_obj, awg_output_ch, name, ch_index):
+        self._parent_waveform_obj = parent_waveform_obj
+        self._awg_output_ch = awg_output_ch
         #Marker status can be Arbitrary, Segments, None, Trigger
         self._marker_status = 'Arbitrary'
         self._marker_pol = 1
@@ -88,7 +115,7 @@ class AWGOutputMarker(TriggerType):
         #Check the listed segments actually exist in the current list of WaveformSegment objects
         for cur_seg_name in list_seg_names:
             found_seg = None
-            for cur_seg_chk in self._parent._wfm_segment_list:
+            for cur_seg_chk in self._parent_waveform_obj._wfm_segment_list:
                 if cur_seg_chk.Name == cur_seg_name:
                     found_seg = cur_seg_chk
                     break
@@ -166,11 +193,11 @@ class AWGOutputMarker(TriggerType):
                 self._marker_trig_delay = 0
                 self._marker_trig_length = 0
             elif len(changes) == 1:
-                self._marker_trig_delay = changes[0] * self._parent._sample_rate
+                self._marker_trig_delay = changes[0] * self._parent_waveform_obj._sample_rate
                 self._marker_trig_length = self.Duration - self._marker_trig_delay
             else:
-                self._marker_trig_delay = changes[0] * self._parent._sample_rate
-                self._marker_trig_length = changes[1] * self._parent._sample_rate - self._marker_trig_delay
+                self._marker_trig_delay = changes[0] * self._parent_waveform_obj._sample_rate
+                self._marker_trig_length = changes[1] * self._parent_waveform_obj._sample_rate - self._marker_trig_delay
         elif self._marker_status == 'None':
             self._marker_trig_delay = 0
             self._marker_trig_length = 0
@@ -180,17 +207,17 @@ class AWGOutputMarker(TriggerType):
             return np.array([], dtype=np.ubyte)
 
         if self._marker_status == 'Trigger':
-            final_wfm = np.zeros(int(np.round(self._parent.NumPts)), dtype=np.ubyte) + 1 - self._marker_pol
-            start_pt = int(np.round(self._marker_trig_delay * self._parent._sample_rate))
-            end_pt = int(np.round((self._marker_trig_delay + self._marker_trig_length) * self._parent._sample_rate))
+            final_wfm = np.zeros(int(np.round(self._parent_waveform_obj.NumPts)), dtype=np.ubyte) + 1 - self._marker_pol
+            start_pt = int(np.round(self._marker_trig_delay * self._parent_waveform_obj._sample_rate))
+            end_pt = int(np.round((self._marker_trig_delay + self._marker_trig_length) * self._parent_waveform_obj._sample_rate))
             final_wfm[start_pt:end_pt+1] = self._marker_pol
             return final_wfm
         elif self._marker_status == 'Arbitrary':
             return self._marker_arb_array
         elif self._marker_status == 'Segments':
-            final_wfm = np.zeros(int(np.round(self._parent.NumPts)), dtype=np.ubyte) + 1 - self._marker_pol
+            final_wfm = np.zeros(int(np.round(self._parent_waveform_obj.NumPts)), dtype=np.ubyte) + 1 - self._marker_pol
             for cur_seg_name in self._marker_seg_list:
-                start_pt, end_pt = self._parent._get_index_points_for_segment(cur_seg_name)
+                start_pt, end_pt = self._parent_waveform_obj._get_index_points_for_segment(cur_seg_name)
                 final_wfm[start_pt:end_pt] = self._marker_pol
             return final_wfm
 
@@ -199,9 +226,9 @@ class AWGOutputMarker(TriggerType):
         Used by TimingConfiguration to backtrack through all interdependent trigger sources (i.e. traversing up the tree)
         '''
         #Channel index is used in the cases where the trigger sources may be different (e.g. IQ waveform with I and Q from different AWGs)
-        return self._parent.get_trigger_source(self._ch_index)
+        return self._awg_output_ch.get_trigger_source()
     def _get_instr_input_trig_edge(self):
-        return self._parent.get_trigger_polarity(self._ch_index)
+        return self._awg_output_ch.InputTriggerEdge
 
     def get_trigger_times(self, input_trig_pol=1):
         if self._marker_status == 'None':
@@ -222,12 +249,19 @@ class AWGOutputMarker(TriggerType):
                     return [self.TrigPulseDelay]
         elif self._marker_status == 'Arbitrary' or self._marker_status == 'Segments':
             #TODO: Consider handling Segments by itself without assembling whole array - a small optimisation...
-            cur_fs = self._parent._sample_rate
+            cur_fs = self._parent_waveform_obj._sample_rate
             mark_arr = self._assemble_marker_raw()
             edges = mark_arr-np.roll(mark_arr,1)    #It's 1 if it's a positive edge, -1 if negative edge
+            edges = edges.astype(np.ubyte)  #Just to be sure as marker is a ubyte array and -1 is 255 in ubytes; in case it changes in the future...
             if input_trig_pol == 1:
                 times = np.where(edges==1)[0] / cur_fs
             else:
-                times = np.where(edges==-1)[0] / cur_fs
+                times = np.where(edges==255)[0] / cur_fs
             return times.tolist()
 
+    def get_trigger_params(self):
+        return {
+                'TriggerHAL' : self._parent_waveform_obj.Name,
+                'TriggerID' : self.name,
+                'TriggerCH' : self._ch_index
+            }

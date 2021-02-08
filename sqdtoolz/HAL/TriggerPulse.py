@@ -6,6 +6,9 @@ class TriggerType:
     def get_trigger_times(self, input_trig_pol=1):
         assert False, "The class implementing a TriggerType must implement the get_trigger_times function."
 
+    def get_trigger_params(self):
+        assert False, "The class implementing a TriggerType must implement the get_trigger_params function."
+
 class Trigger(TriggerType):
     def __init__(self, parent, name, instr_trig_output_channel):
         '''
@@ -100,11 +103,13 @@ class Trigger(TriggerType):
         self.TrigPolarity = dict_config['TrigPolarity']
         self.TrigEnable = dict_config['TrigEnable']
 
-class TriggerSource:
-    def __init__(self, trig_src_module, trig_src_id):
-        self._trig_src_module = None
-        self._trig_src_id = None
-        self._trig_src_obj = None
+    def get_trigger_params(self):
+        return {
+                'TriggerHAL' : self._parent.Name,
+                'TriggerID' : self.name,
+                'TriggerCH' : 0,  #Defaults to 0
+            }
+
 
 class SyncTriggerPulse:
     def __init__(self, trig_len, enableGet, enableSet, trig_pol = 1, trigOutputDelay = 0.0):

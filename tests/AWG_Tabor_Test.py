@@ -34,7 +34,7 @@ new_exp.station.load_pulser().trigger_rate(500e3)
 inst_tabor = P2584M('Tabor_AWG', 0, 3)
 new_exp.add_instrument(inst_tabor)
 
-awg_wfm2 = WaveformAWGIQ([(inst_tabor, 'ch1'),(inst_tabor, 'ch2')], 1.25e9, 26e6, global_factor=0.4)#Clocks were out of sync - so hence 26MHz (it was beating with the DDC sinusoids and the AWG one!)
+awg_wfm2 = WaveformAWGIQ("Waveform 2",[(inst_tabor, 'ch1'),(inst_tabor, 'ch2')], 1.25e9, 26e6, global_factor=0.4)#Clocks were out of sync - so hence 26MHz (it was beating with the DDC sinusoids and the AWG one!)
 awg_wfm2.IQdcOffset = (0,0)
 # awg_wfm2.add_waveform_segment(WFS_Gaussian("init", 512e-9, 1.0))
 # awg_wfm2.add_waveform_segment(WFS_Constant("zero1", 128e-9, 0.0))

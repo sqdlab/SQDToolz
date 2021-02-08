@@ -63,10 +63,7 @@ class ACQ:
             'NumSamples' : self.NumSamples,
             'SampleRate' : self.SampleRate,
             'InputTriggerEdge' : self.InputTriggerEdge,
-            'TriggerSource' : {
-                'TriggerSourceHAL' : self._trig_src_obj._parent.name,
-                'TriggerSourceID' : self._trig_src_obj.name
-                }
+            'TriggerSource' : self._trig_src_obj.get_trigger_params()
             }
 
     def _set_current_config(self, dict_config, instr_obj = None):

@@ -18,7 +18,7 @@ class DDG:
             self._output_trigs[cur_trig_name] = Trigger(self, cur_trig_name, cur_output_src[1])
 
     @property
-    def name(self):
+    def Name(self):
         return self._name
 
     def get_trigger_output(self, outputID):
@@ -28,8 +28,8 @@ class DDG:
         assert outputID in self._output_trigs, "Trigger output " + str(outputID) + " does not exist in " + self._name
         return self._output_trigs[outputID]
 
-    def _get_trigger_output_by_id(self, outputID):
-        return self.get_trigger_source(outputID)
+    def _get_trigger_output_by_id(self, outputID, ch_ID):
+        return self.get_trigger_output(outputID)
 
     def get_trigger_source(self):
         '''
@@ -56,7 +56,7 @@ class DDG:
         for cur_trig in trigObjs:
             trigDict = {**trigDict, **cur_trig._get_current_config()}
         retDict = {
-            'instrument' : self.name,
+            'instrument' : self.Name,
             'type' : 'DDG',
             'triggers' : trigDict
             }

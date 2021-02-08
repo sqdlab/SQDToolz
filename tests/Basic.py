@@ -40,7 +40,7 @@ acq_module.InputTriggerEdge = 0
 acq_module.set_trigger_source(ddg_module.get_trigger_output('B'))
 
 #
-awg_wfm2 = WaveformAWGIQ([(instr_awg, 'CH3'),(instr_awg, 'CH4')], 1e9, 100e6)
+awg_wfm2 = WaveformAWGIQ("Waveform 2", [(instr_awg, 'CH3'),(instr_awg, 'CH4')], 1e9, 100e6)
 awg_wfm2.add_waveform_segment(WFS_Gaussian("init", 75e-9, 1.0))
 awg_wfm2.add_waveform_segment(WFS_Constant("pad1", 45e-9, 0.5))
 awg_wfm2.add_waveform_segment(WFS_Constant("hold", 45e-9, 0.5))
@@ -54,7 +54,7 @@ awg_wfm2.get_output_channel(1).marker(0).set_markers_to_none()
 awg_wfm2.get_output_channel(1).marker(1).set_markers_to_none()
 awg_wfm2.program_AWG()
 #
-awg_wfm = WaveformAWG([(instr_awg, 'CH2')], 1e9)
+awg_wfm = WaveformAWG("Waveform 1", [(instr_awg, 'CH2')], 1e9)
 awg_wfm.add_waveform_segment(WFS_Gaussian("init", 35e-9, 0.8))
 awg_wfm.add_waveform_segment(WFS_Constant("hold", 25e-9, 0.0))
 awg_wfm.add_waveform_segment(WFS_Constant("read", 50e-9, 0.0))
@@ -65,30 +65,26 @@ awg_wfm.get_output_channel().marker(0).TrigPulseLength = 30e-9
 awg_wfm.get_output_channel().marker(1).set_markers_to_none()
 awg_wfm.program_AWG()
 
-temp = awg_wfm2._get_current_config()
-
 # lePlot = awg_wfm2.plot_waveforms().show()
 # input('press <ENTER> to continue')
 #
-# acq_module.set_trigger_source(awg_wfm, 0)
-
-# awg.set_trigger_source(ddg_module, 'A')
 
 tc = TimingConfiguration(1e-6, [ddg_module], [awg_wfm2,awg_wfm], acq_module)
 
-# configTc = tc.save_config()
-# ddg_module.get_trigger_output('C').TrigPolarity = 1
-# acq_module.set_trigger_source(ddg_module.get_trigger_output('C'))
-# tc.update_config(configTc)
-
-
-# awg_wfm2.set_trigger_source(ddg_module.get_trigger_output('C'))
-# awg_wfm.set_trigger_source(ddg_module.get_trigger_output('A'))
-
-# awg_wfm.get_waveform_segment("hold").Duration = 1e-9
-
-awg_wfm.set_trigger_source(awg_wfm2.get_output_channel(0).marker(0))
+awg_wfm2.set_trigger_source_all(ddg_module.get_trigger_output('C'),0)
+awg_wfm.set_trigger_source_all(awg_wfm2.get_output_channel(0).marker(0),1)
 acq_module.set_trigger_source(awg_wfm.get_output_channel().marker(0))
+acq_module.InputTriggerEdge = 0
+
+configTc = tc.save_config()
+ddg_module.get_trigger_output('C').TrigPolarity = 1
+awg_wfm2.set_trigger_source_all(ddg_module.get_trigger_output('A'),0)
+awg_wfm.set_trigger_source_all(awg_wfm2.get_output_channel(0).marker(0), 1)
+acq_module.set_trigger_source(ddg_module.get_trigger_output('C'))
+acq_module.InputTriggerEdge = 1
+tc.update_config(configTc)
+
+# configTc = tc.save_config('tests\\test_time_config.json')
 
 my_param_hold = VariableInstrument("len1", awg_wfm2.get_waveform_segment("hold"), 'Duration')
 my_param_read = VariableInstrument("len2", awg_wfm2.get_waveform_segment("read"), 'Duration')

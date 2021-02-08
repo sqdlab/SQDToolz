@@ -5,13 +5,8 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 
 class WaveformAWG:
-    _name_ind = 0
-
-    def __init__(self, awg_channel_tuples, sample_rate, global_factor = 1, **kwargs):
-        self._name = kwargs.get('name', '')
-        if self._name == '':
-            self._name = f'waveformDefault{WaveformAWG._name_ind}'
-            WaveformAWG._name_ind += 1
+    def __init__(self, name, awg_channel_tuples, sample_rate, global_factor = 1.0, **kwargs):
+        self._name = name
 
         #awg_channel_tuples is given as (instr_AWG, channel_name)
         self._awg_chan_list = []
@@ -24,10 +19,9 @@ class WaveformAWG:
         self._sample_rate = sample_rate
         self._global_factor = global_factor
         self._wfm_segment_list = []
-        self._trig_src_objs = [(None,1)]*len(awg_channel_tuples)
 
     @property
-    def name(self):
+    def Name(self):
         return self._name
 
     def add_waveform_segment(self, wfm_segment):
@@ -52,19 +46,9 @@ class WaveformAWG:
     def get_output_channels(self):
         return self._awg_chan_list[:]
 
-    def _get_current_config(self):
-        #Get settings for the trigger objects
-        # trigObjs = self.get_all_outputs()
-        trigDict = {}
-        # for cur_trig in trigObjs:
-        #     trigDict = {**trigDict, **cur_trig._get_current_config()}
-        retDict = {
-            'instrument' : [(x._instr_awg.name, x.Name) for x in self._awg_chan_list],
-            'type' : 'AWG',
-            'waveformType' : type(self).__name__,
-            'triggers' : trigDict
-            }
-        return retDict
+    def set_trigger_source_all(self, trig_src_obj, trig_pol = 1):
+        for cur_ch in self._awg_chan_list:
+            cur_ch.set_trigger_source(trig_src_obj, trig_pol)
 
     @property
     def Duration(self):
@@ -72,6 +56,10 @@ class WaveformAWG:
         for cur_seg in self._wfm_segment_list:
             full_len += cur_seg.Duration
         return full_len
+
+    @property
+    def SampleRate(self):
+        return self._sample_rate
 
     @property
     def NumPts(self):
@@ -98,22 +86,48 @@ class WaveformAWG:
         final_wfm *= self._global_factor
         return [final_wfm]*len(self._awg_chan_list)
 
-    def set_trigger_source(self, trig_src_obj, trig_pol = 1, ch_index = -1):
-        #TODO: Consider error-checking here
-        #TODO: Override this in multi-channel setups to give the flexible option of different triggers for different channels
-        if (ch_index == -1):
-            for cur_ch in range(len(self._trig_src_objs)):
-                self._trig_src_objs[cur_ch] = (trig_src_obj, trig_pol)
-        else:
-            self._trig_src_objs[ch_index] = (trig_src_obj, trig_pol)
+    def _get_trigger_output_by_id(self, trigID, ch_ID):
+        '''
+        Some objects may have a hierarchy of trigger outputs - it's best to categorise them via some unique ID which can be referenced easily.
 
-    def get_trigger_source(self, ch_index = 0):
+        Inputs:
+            - trigID - unique ID of the trigger (e.g. a string)
+            - ch_ID - auxiliary ID (e.g. channel name)
+        
+        Returns a TriggerType object representing an output trigger.
         '''
-        Get the Trigger object corresponding to the trigger source.
-        '''
-        return self._trig_src_objs[ch_index][0]
-    def get_trigger_polarity(self, ch_index = 0):
-        return self._trig_src_objs[ch_index][1]
+        #Doing it this way as the naming scheme may change in the future - just flatten list and find the marker object...
+        cur_obj = None
+        assert type(ch_ID) is int, "ch_ID must be the channel index."
+        assert ch_ID >= 0 and ch_ID < len(self._awg_chan_list), "ch_ID must be a valid channel index."
+        cur_obj = next((x for x in self.get_output_channel(ch_ID)._awg_mark_list if x.name == trigID), None)
+        assert cur_obj != None, f"The trigger output of ID {trigID} does not exist."
+        return cur_obj
+
+    def _get_current_config(self):
+        retDict = {
+            'instrument' : [(x._instr_awg.name, x.Name) for x in self._awg_chan_list],
+            'type' : 'AWG',
+            'Name' : self.Name,
+            'waveformType' : type(self).__name__,
+            'SampleRate' : self.SampleRate,
+            'global_factor' : self._global_factor,
+            'OutputChannels' : [x._get_current_config() for x in self._awg_chan_list]
+            }
+        return retDict
+    
+    def _set_current_config(self, dict_config, instr_obj = None):
+        assert dict_config['type'] == 'AWG', 'Cannot set configuration to a AWG with a configuration that is of type ' + dict_config['type']
+        assert dict_config['waveformType'] == type(self).__name__, 'Waveform type given in the configuration does not match the current waveform object type.'
+        
+        #TODO: Need to modify this for AWG channel lists?
+        if (instr_obj != None):
+            self._instr_ddg = instr_obj
+        
+        self._sample_rate = dict_config['SampleRate']
+        self._global_factor = dict_config['global_factor']
+        for ind, cur_ch_output in enumerate(dict_config['OutputChannels']):
+            self._awg_chan_list[ind]._set_current_config(cur_ch_output)
 
     def _get_waveform_plot_segments(self, waveform_index = 0, resolution = 21):
         ret_list = []
@@ -159,8 +173,8 @@ class WaveformAWG:
 
 
 class WaveformAWGIQ(WaveformAWG):
-    def __init__(self, awg_channel_tuples, sample_rate, iq_frequency, iq_amplitude = 1.0, global_factor = 1, **kwargs):
-        super().__init__(awg_channel_tuples, sample_rate, global_factor)
+    def __init__(self, name, awg_channel_tuples, sample_rate, iq_frequency, iq_amplitude = 1.0, global_factor = 1, **kwargs):
+        super().__init__(name, awg_channel_tuples, sample_rate, global_factor)
         self._iq_frequency = iq_frequency
         self._iq_amplitude = iq_amplitude   #Given as the raw output voltage (should usually set the envelopes to unity amplitude in this case)
         self._iq_phase = 0.0                #Added onto both the cosine and sine terms

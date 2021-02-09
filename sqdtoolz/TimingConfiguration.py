@@ -82,7 +82,7 @@ class TimingConfiguration:
             cur_acq = self._instr_ACQ
             retVal.append(cur_acq._get_current_config())
         
-        #Save to file is necessary
+        #Save to file if necessary
         if (file_name != ''):
             with open(file_name, 'w') as outfile:
                 json.dump(retVal, outfile, indent=4)

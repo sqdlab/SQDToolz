@@ -49,6 +49,7 @@ class Experiment:
             for ind, cur_val in enumerate(cur_coord):
                 sweep_vars[ind][0].set_raw(cur_val)
             #Now prepare the instrument
+            timing_config.check_conformance()
             timing_config.prepare_instruments()
             data = timing_config.get_data()
             data_all += [np.mean(data[0][0])]

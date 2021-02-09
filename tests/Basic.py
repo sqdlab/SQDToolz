@@ -85,6 +85,7 @@ acq_module.InputTriggerEdge = 1
 awg_wfm.add_waveform_segment(WFS_Constant("read2", 50e-9, 0.0))
 awg_wfm2.add_waveform_segment(WFS_Gaussian("init5", 35e-9, 0.8))
 awg_wfm2.IQFrequency = 50e6
+awg_wfm2.get_output_channel(0).marker(0).set_markers_to_none()
 tc.update_config(configTc)
 # awg_wfm2.plot_waveforms().show()
 # input('press <ENTER> to continue')

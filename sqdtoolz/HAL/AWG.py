@@ -286,6 +286,7 @@ class WaveformAWGIQ(WaveformAWG):
         return ret_dict
 
     def _set_current_config(self, dict_config, instr_obj = None):
+        WaveformAWG._set_current_config(self, dict_config, instr_obj)
         for cur_key in ["IQ Frequency", "IQ Amplitude", "IQ Phase", "IQ Amplitude Factor", "IQ Phase Offset", "IQ DC Offset", "IQ Reset Phase"]:
             assert cur_key in dict_config, "Configuration dictionary does not have the key: " + cur_key
         

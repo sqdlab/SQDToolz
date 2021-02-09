@@ -77,7 +77,8 @@ class AWGOutputChannel:
             'Amplitude' : self.Amplitude,
             'Offset' : self.Offset,
             'Output' : self.Output,
-            'InputTriggerEdge' : self.InputTriggerEdge
+            'InputTriggerEdge' : self.InputTriggerEdge,
+            'Markers' : [x._get_current_config() for x in self._awg_mark_list]
             }
         if self._trig_src_obj:
             retDict['TriggerSource'] = self._trig_src_obj.get_trigger_params()
@@ -89,7 +90,8 @@ class AWGOutputChannel:
         self.Offset = dict_config['Offset']
         self.Output = dict_config['Output']
         self.InputTriggerEdge = dict_config['InputTriggerEdge']
-
+        for ind, cur_mark_dict in enumerate(dict_config['Markers']):
+            self._awg_mark_list[ind]._set_current_config(cur_mark_dict)
 
 class AWGOutputMarker(TriggerType):
     def __init__(self, parent_waveform_obj, awg_output_ch, name, ch_index):
@@ -265,3 +267,28 @@ class AWGOutputMarker(TriggerType):
                 'TriggerID' : self.name,
                 'TriggerCH' : self._ch_index
             }
+    
+    def _get_current_config(self):
+        retDict = {
+            'Name' : self._name,
+            'Channel Index' : self._ch_index,
+            'Status' : self._marker_status,
+            'Polarity' : self._marker_pol,
+            'Arbitrary Array' : self._marker_arb_array.tolist(),
+            'Segment List' : self._marker_seg_list,
+            'Trigger Delay' : self._marker_trig_delay,
+            'Trigger Length' : self._marker_trig_length
+            }
+        return retDict
+
+    def _set_current_config(self, dict_config):
+        errMsg = "The order of the markers for the given output channel has changed in the configuration. The marker configuration list must match the order of the markers in the channel to be updated."
+        assert self._name == dict_config['Name'], errMsg
+        assert self._ch_index == dict_config['Channel Index'], errMsg
+
+        self._marker_status = dict_config['Status']
+        self._marker_pol = dict_config['Polarity']
+        self._marker_arb_array = np.array(dict_config['Arbitrary Array'], dtype=np.ubyte)
+        self._marker_seg_list = dict_config['Segment List']
+        self._marker_trig_delay = dict_config['Trigger Delay']
+        self._marker_trig_length = dict_config['Trigger Length']

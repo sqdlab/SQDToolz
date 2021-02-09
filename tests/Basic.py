@@ -82,9 +82,14 @@ awg_wfm2.set_trigger_source_all(ddg_module.get_trigger_output('A'),0)
 awg_wfm.set_trigger_source_all(awg_wfm2.get_output_channel(0).marker(0), 1)
 acq_module.set_trigger_source(ddg_module.get_trigger_output('C'))
 acq_module.InputTriggerEdge = 1
+awg_wfm.add_waveform_segment(WFS_Constant("read2", 50e-9, 0.0))
+awg_wfm2.add_waveform_segment(WFS_Gaussian("init5", 35e-9, 0.8))
+awg_wfm2.IQFrequency = 50e6
 tc.update_config(configTc)
+# awg_wfm2.plot_waveforms().show()
+# input('press <ENTER> to continue')
 
-# configTc = tc.save_config('tests\\test_time_config.json')
+configTc = tc.save_config('tests\\test_time_config.json')
 
 my_param_hold = VariableInstrument("len1", awg_wfm2.get_waveform_segment("hold"), 'Duration')
 my_param_read = VariableInstrument("len2", awg_wfm2.get_waveform_segment("read"), 'Duration')

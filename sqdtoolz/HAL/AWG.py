@@ -3,6 +3,7 @@ from scipy import signal
 from sqdtoolz.HAL.AWGOutputChannel import*
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
+from sqdtoolz.HAL.WaveformSegments import*
 
 class WaveformAWG:
     def __init__(self, name, awg_channel_tuples, sample_rate, global_factor = 1.0, **kwargs):
@@ -114,7 +115,12 @@ class WaveformAWG:
             'global_factor' : self._global_factor,
             'OutputChannels' : [x._get_current_config() for x in self._awg_chan_list]
             }
+        retDict['WaveformSegments'] = self._get_current_config_waveforms()
         return retDict
+
+    def _get_current_config_waveforms(self):
+        #Write down the waveform-segment data - can be overwritten by the daughter class for a different format if required/desired...
+        return [x._get_current_config() for x in self._wfm_segment_list]
     
     def _set_current_config(self, dict_config, instr_obj = None):
         assert dict_config['type'] == 'AWG', 'Cannot set configuration to a AWG with a configuration that is of type ' + dict_config['type']
@@ -128,6 +134,27 @@ class WaveformAWG:
         self._global_factor = dict_config['global_factor']
         for ind, cur_ch_output in enumerate(dict_config['OutputChannels']):
             self._awg_chan_list[ind]._set_current_config(cur_ch_output)
+
+        self._set_current_config_waveforms(dict_config['WaveformSegments'])
+
+    def _set_current_config_waveforms(self, list_wfm_dict_config):
+        '''
+        Sets the current waveform AWG waveform segments by clearing the current waveform segments, instantiating new classes by using the
+        segment class name (prescribed in the given list of configuration dictionaries) and then finally setting their parameters.
+
+        Input:
+            - list_wfm_dict_config - List of waveform configuration dictionaries recognised by the relevant WaveformSegment classes (i.e.
+                                     daughters of WaveformSegmentBase). The dictionary has the WaveformSegment class type in its key "type".
+
+        Precondition: The WaveformSegment class given in the key "type" in list_wfm_dict_config must exist in WaveformSegments.py. If it is
+                      defined elsewhere, then import said file into this file (AWG.py) to ensure that it is within the current scope.
+        '''
+        self._wfm_segment_list.clear()
+        for cur_wfm in list_wfm_dict_config:
+            cur_wfm_type = cur_wfm['type']
+            assert cur_wfm_type in globals(), cur_wfm_type + " is not in the current namespace. If the class does not exist in WaveformSegments include wherever it lives by importing it in AWG.py."
+            cur_wfm_type = globals()[cur_wfm_type]
+            self._wfm_segment_list.append(cur_wfm_type.fromConfigDict(cur_wfm))
 
     def _get_waveform_plot_segments(self, waveform_index = 0, resolution = 21):
         ret_list = []
@@ -246,6 +273,29 @@ class WaveformAWGIQ(WaveformAWG):
         self.IQdcOffset = dc_offset
         self.IQAmplitudeFactor = amplitude_factor
         self.IQPhaseOffset = phase_offset        
+
+    def _get_current_config(self):
+        ret_dict = WaveformAWG._get_current_config(self)
+        ret_dict["IQ Frequency"] = self._iq_frequency
+        ret_dict["IQ Amplitude"] = self._iq_amplitude
+        ret_dict["IQ Phase"] = self._iq_phase
+        ret_dict["IQ Amplitude Factor"] = self._iq_amplitude_factor
+        ret_dict["IQ Phase Offset"] = self._iq_phase_offset
+        ret_dict["IQ DC Offset"] = self._iq_dc_offsets
+        ret_dict["IQ Reset Phase"] = self._iq_reset_phase
+        return ret_dict
+
+    def _set_current_config(self, dict_config, instr_obj = None):
+        for cur_key in ["IQ Frequency", "IQ Amplitude", "IQ Phase", "IQ Amplitude Factor", "IQ Phase Offset", "IQ DC Offset", "IQ Reset Phase"]:
+            assert cur_key in dict_config, "Configuration dictionary does not have the key: " + cur_key
+        
+        self._iq_frequency = dict_config["IQ Frequency"]
+        self._iq_amplitude = dict_config["IQ Amplitude"]
+        self._iq_phase = dict_config["IQ Phase"]
+        self._iq_amplitude_factor = dict_config["IQ Amplitude Factor"]
+        self._iq_phase_offset = dict_config["IQ Phase Offset"]
+        self._iq_dc_offsets = dict_config["IQ DC Offset"]
+        self._iq_reset_phase  = dict_config["IQ Reset Phase"]
 
     def _assemble_waveform_raw(self):
         #Concatenate the individual waveform segments

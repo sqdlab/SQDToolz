@@ -1,8 +1,9 @@
 import numpy as np
 
 class WaveformSegmentBase:
-    def __init__(self, name):
+    def __init__(self, name, mod_func):
         self._name = name
+        self._mod_func = mod_func
 
     @property
     def Name(self):
@@ -11,12 +12,22 @@ class WaveformSegmentBase:
     def NumPts(self, fs):
         return self.Duration*fs
 
+    def get_waveform(self, fs, t0, ch_index):
+        cur_wfm = self._get_waveform(fs, t0, ch_index)
+        if self._mod_func:
+            return self._mod_func.modify_waveform(cur_wfm, fs, t0, ch_index)
+        else:
+            return cur_wfm
+
+    def _get_waveform(self, fs, t0, ch_index):
+        assert False, "Waveform Segment classes must implement a get_waveform function."
+
     def _get_current_config(self):
         assert False, "Waveform Segment classes must implement a _get_current_config function."
 
 class WFS_Constant(WaveformSegmentBase):
-    def __init__(self, name, time_len, value=0.0):
-        super().__init__(name)
+    def __init__(self, name, mod_func, time_len, value=0.0):
+        super().__init__(name, mod_func)
         self._duration = time_len
         self._value = value
 
@@ -36,7 +47,7 @@ class WFS_Constant(WaveformSegmentBase):
     def Duration(self, len_seconds):
         self._duration = len_seconds
 
-    def get_waveform(self, fs):
+    def _get_waveform(self, fs, t0, ch_index):
         return np.zeros(round(self.NumPts(fs))) + self._value
 
     def _get_current_config(self):
@@ -48,8 +59,8 @@ class WFS_Constant(WaveformSegmentBase):
             }
 
 class WFS_Gaussian(WaveformSegmentBase):
-    def __init__(self, name, time_len, amplitude, num_sd=1.96):
-        super().__init__(name)
+    def __init__(self, name, mod_func, time_len, amplitude, num_sd=1.96):
+        super().__init__(name, mod_func)
         #TODO: Add in a classmethod to use sigma and truncate...
         self._duration = time_len
         self._amplitude = amplitude
@@ -74,7 +85,7 @@ class WFS_Gaussian(WaveformSegmentBase):
     def _gauss(x):
         return np.exp(-x*x / (2*self._sigma*self._sigma))
 
-    def get_waveform(self, fs):
+    def _get_waveform(self, fs, t0, ch_index):
         n = self.NumPts(fs)
         #Generate the sample points on the Gaussian (start and end points are the same)
         sample_points = np.linspace(-self._num_sd, self._num_sd, int(np.round(n)))

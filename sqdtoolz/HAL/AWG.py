@@ -78,14 +78,19 @@ class WaveformAWG:
         return (int(cur_ind), int(cur_ind + cur_seg.NumPts(self._sample_rate) - 1))
 
     def _assemble_waveform_raw(self):
-        #Concatenate the individual waveform segments
-        final_wfm = np.array([])
-        for cur_wfm_seg in self._wfm_segment_list:
-            #TODO: Preallocate - this is a bit inefficient...
-            final_wfm = np.concatenate((final_wfm, cur_wfm_seg.get_waveform(self._sample_rate)))
-        #Scale the waveform via the global scale-factor...
-        final_wfm *= self._global_factor
-        return [final_wfm]*len(self._awg_chan_list)
+        num_chnls = len(self._awg_chan_list)
+        final_wfms = [np.array([])]*num_chnls
+        #Assemble each channel separately
+        for cur_ch in range(len(self._awg_chan_list)):
+            t0 = 0
+            #Concatenate the individual waveform segments
+            for cur_wfm_seg in self._wfm_segment_list:
+                #TODO: Preallocate - this is a bit inefficient...
+                final_wfms[cur_ch] = np.concatenate((final_wfms[cur_ch], cur_wfm_seg.get_waveform(self._sample_rate, t0, cur_ch)))
+                t0 += final_wfms[cur_ch].size
+            #Scale the waveform via the global scale-factor...
+            final_wfms[cur_ch] *= self._global_factor
+        return final_wfms
 
     def _get_trigger_output_by_id(self, trigID, ch_ID):
         '''
@@ -198,127 +203,3 @@ class WaveformAWG:
             else:
                 cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.short_name, final_wfms[ind])
 
-
-class WaveformAWGIQ(WaveformAWG):
-    def __init__(self, name, awg_channel_tuples, sample_rate, iq_frequency, iq_amplitude = 1.0, global_factor = 1, **kwargs):
-        super().__init__(name, awg_channel_tuples, sample_rate, global_factor)
-        self._iq_frequency = iq_frequency
-        self._iq_amplitude = iq_amplitude   #Given as the raw output voltage (should usually set the envelopes to unity amplitude in this case)
-        self._iq_phase = 0.0                #Added onto both the cosine and sine terms
-        self._iq_amplitude_factor = 1.0     #Defined as a = Q/I amplitudes and the factor 'a' is multiplied onto the Q-channel waveform 
-        self._iq_phase_offset = 0.0         #Defined as the phase to add to the Q (sine) term
-        self._iq_dc_offsets = (0.0, 0.0)
-        self._iq_reset_phase = True         #If True, the phases of the cosine and sine waves are reset to zero after every waveform segment.
-
-    @property
-    def IQFrequency(self):
-        return self._iq_frequency
-    @IQFrequency.setter
-    def IQFrequency(self, val):
-        self._iq_frequency = val
-
-    @property
-    def IQPhase(self):
-        return self._iq_phase
-    @IQPhase.setter
-    def IQPhase(self, val):
-        self._iq_phase = val
-
-    @property
-    def IQAmplitude(self):
-        return self._iq_amplitude
-    @IQAmplitude.setter
-    def IQAmplitude(self, val):
-        self._iq_amplitude = val
-
-    @property
-    def IQAmplitude(self):
-        return self._iq_amplitude
-    @IQAmplitude.setter
-    def IQAmplitude(self, val):
-        self._iq_amplitude = val
-
-    @property
-    def IQAmplitudeFactor(self):
-        return self._iq_amplitude_factor
-    @IQAmplitudeFactor.setter
-    def IQAmplitudeFactor(self, val):
-        self._iq_amplitude_factor = val
-
-    @property
-    def IQPhaseOffset(self):
-        return self._iq_phase_offset
-    @IQPhaseOffset.setter
-    def IQPhaseOffset(self, val):
-        self._iq_phase_offset = val
-
-    @property
-    def IQdcOffset(self):
-        return self._iq_dc_offsets
-    @IQdcOffset.setter
-    def IQdcOffset(self, val):
-        self._iq_dc_offsets = val
-
-    @property
-    def IQResetPhase(self):
-        return self._iq_reset_phase
-    @IQResetPhase.setter
-    def IQResetPhase(self, boolVal):
-        #TODO: Add type+error checking to all the boolVal, val etc...
-        self._iq_reset_phase = boolVal
-
-    def set_IQ_parameters(self, amp = 1.0, phase = 0.0, dc_offset = (0.0, 0.0), amplitude_factor = 1.0, phase_offset = 0.0):
-        self.IQAmplitude = amp
-        self.IQPhase = phase
-        self.IQdcOffset = dc_offset
-        self.IQAmplitudeFactor = amplitude_factor
-        self.IQPhaseOffset = phase_offset        
-
-    def _get_current_config(self):
-        ret_dict = WaveformAWG._get_current_config(self)
-        ret_dict["IQ Frequency"] = self._iq_frequency
-        ret_dict["IQ Amplitude"] = self._iq_amplitude
-        ret_dict["IQ Phase"] = self._iq_phase
-        ret_dict["IQ Amplitude Factor"] = self._iq_amplitude_factor
-        ret_dict["IQ Phase Offset"] = self._iq_phase_offset
-        ret_dict["IQ DC Offset"] = self._iq_dc_offsets
-        ret_dict["IQ Reset Phase"] = self._iq_reset_phase
-        return ret_dict
-
-    def _set_current_config(self, dict_config, instr_obj = None):
-        WaveformAWG._set_current_config(self, dict_config, instr_obj)
-        for cur_key in ["IQ Frequency", "IQ Amplitude", "IQ Phase", "IQ Amplitude Factor", "IQ Phase Offset", "IQ DC Offset", "IQ Reset Phase"]:
-            assert cur_key in dict_config, "Configuration dictionary does not have the key: " + cur_key
-        
-        self._iq_frequency = dict_config["IQ Frequency"]
-        self._iq_amplitude = dict_config["IQ Amplitude"]
-        self._iq_phase = dict_config["IQ Phase"]
-        self._iq_amplitude_factor = dict_config["IQ Amplitude Factor"]
-        self._iq_phase_offset = dict_config["IQ Phase Offset"]
-        self._iq_dc_offsets = dict_config["IQ DC Offset"]
-        self._iq_reset_phase  = dict_config["IQ Reset Phase"]
-
-    def _assemble_waveform_raw(self):
-        #Concatenate the individual waveform segments
-        final_wfm_I = np.array([])
-        final_wfm_Q = np.array([])
-        x_prev = 0
-        for cur_wfm_seg in self._wfm_segment_list:
-            cur_wfm_seg_data = cur_wfm_seg.get_waveform(self._sample_rate)
-            #Run the modulation
-            t_vals = (np.arange(cur_wfm_seg_data.size) + x_prev) / self._sample_rate
-            i_vals = cur_wfm_seg_data * self.IQAmplitude * np.cos(2 * np.pi * self.IQFrequency * t_vals + self.IQPhase) + self.IQdcOffset[0]
-            q_vals = cur_wfm_seg_data * self.IQAmplitude * self.IQAmplitudeFactor * np.sin(2 * np.pi * self.IQFrequency * t_vals + self.IQPhase + self.IQPhaseOffset) + self.IQdcOffset[1]
-            
-            if self.IQResetPhase:
-                x_prev = 0
-            else:
-                x_prev += cur_wfm_seg_data.size
-
-            #TODO: Preallocate - this is a bit inefficient...
-            final_wfm_I = np.concatenate((final_wfm_I, i_vals))
-            final_wfm_Q = np.concatenate((final_wfm_Q, q_vals))
-        #Scale the waveform via the global scale-factor...
-        final_wfm_I *= self._global_factor
-        final_wfm_Q *= self._global_factor
-        return [final_wfm_I, final_wfm_Q]

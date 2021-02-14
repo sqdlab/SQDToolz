@@ -91,7 +91,7 @@ class WM_SinusoidalIQ(WaveformModulation):
         if ch_index == 0:   #I-Channel
             return wfm_pts * self.IQAmplitude * np.cos(2 * np.pi * self.IQFrequency * t_vals + self.IQPhase) + self.IQdcOffset[0]
         elif ch_index == 1: #Q-Channel
-            return wfm_pts * self.IQAmplitude * np.cos(2 * np.pi * self.IQFrequency * t_vals + self.IQPhase) + self.IQdcOffset[0]
+            return wfm_pts * self.IQAmplitude * self.IQAmplitudeFactor * np.sin(2 * np.pi * self.IQFrequency * t_vals + self.IQPhase + self.IQPhaseOffset) + self.IQdcOffset[1]
         else:
             assert False, "Channel Index must be 0 or 1 for I or Q respectively."
 

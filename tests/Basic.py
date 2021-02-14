@@ -41,13 +41,14 @@ acq_module.InputTriggerEdge = 0
 acq_module.set_trigger_source(ddg_module.get_trigger_output('B'))
 
 mod_freq1 = WM_SinusoidalIQ("FreqMod 1", 100e6)
+mod_freq2 = WM_SinusoidalIQ("FreqMod 2", 50e6)
 #
 awg_wfm2 = WaveformAWG("Waveform 2", [(instr_awg, 'CH3'),(instr_awg, 'CH4')], 1e9)
 awg_wfm2.add_waveform_segment(WFS_Gaussian("init", mod_freq1, 75e-9, 1.0))
 awg_wfm2.add_waveform_segment(WFS_Constant("pad1", None, 45e-9, 0.5))
 awg_wfm2.add_waveform_segment(WFS_Constant("hold", None, 45e-9, 0.5))
 awg_wfm2.add_waveform_segment(WFS_Gaussian("pulse", None, 75e-9, 1.0))
-awg_wfm2.add_waveform_segment(WFS_Constant("pad2", None, 45e-9, 0.5))
+awg_wfm2.add_waveform_segment(WFS_Constant("pad2", mod_freq2, 45e-9, 0.5))
 awg_wfm2.add_waveform_segment(WFS_Constant("read", None, 150e-9, 0.0))
 awg_wfm2.get_output_channel(0).Amplitude = 1.0
 awg_wfm2.get_output_channel(0).marker(0).set_markers_to_segments(["pad1","pad2"])

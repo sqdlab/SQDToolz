@@ -24,7 +24,7 @@ class VariableInternal:
     def set_raw(self, value):
         self._val = value
     
-class VariableInstrument(VariableBase):
+class VariableProperty(VariableBase):
     def __init__(self, name, halObj, prop_name):
         super().__init__(name)
         assert hasattr(halObj, prop_name), "The given object does not have a property " + prop_name

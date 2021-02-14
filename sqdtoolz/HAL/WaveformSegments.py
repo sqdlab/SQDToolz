@@ -23,7 +23,26 @@ class WaveformSegmentBase:
         assert False, "Waveform Segment classes must implement a get_waveform function."
 
     def _get_current_config(self):
-        assert False, "Waveform Segment classes must implement a _get_current_config function."
+        '''
+        Gets the current JSON-style configuration that can be used to reinstantiate this class. Note that the inherited
+        daughter class should override and call this class and should implement the key 'type' along with other keys that
+        can be used to reinstantiate the daughter class.
+        '''
+        cur_dict = {}
+        cur_dict['Name'] = self.Name
+        if self._mod_func == None:
+            cur_dict['Mod Func'] = ''
+        else:
+            cur_dict['Mod Func'] = self._mod_func.Name
+        return cur_dict
+
+    def _set_base_config(self, config_dict):
+        '''
+        Sets the name and modulation function as appropriate. Daughter classes should call this in their @classmethod fromConfigDict.
+        '''
+        for cur_key in ["Name", "Mod Func"]:
+            assert cur_key in config_dict, "Configuration dictionary does not have the key: " + cur_key
+        
 
 class WFS_Constant(WaveformSegmentBase):
     def __init__(self, name, mod_func, time_len, value=0.0):
@@ -37,7 +56,7 @@ class WFS_Constant(WaveformSegmentBase):
         assert config_dict['type'] == 'WFS_Constant', "Configuration dictionary has the wrong type."
         for cur_key in ["Name", "Duration", "Value"]:
             assert cur_key in config_dict, "Configuration dictionary does not have the key: " + cur_key
-
+        #TODO: Fix the functionality here.
         return cls(config_dict["Name"], config_dict["Duration"], config_dict["Value"])
 
     @property
@@ -51,12 +70,12 @@ class WFS_Constant(WaveformSegmentBase):
         return np.zeros(round(self.NumPts(fs))) + self._value
 
     def _get_current_config(self):
-        return {
-            'type' : 'WFS_Constant',
-            'Name' : self.Name,
-            'Duration' : self._duration,
-            'Value' : self._value
-            }
+        cur_dict = WaveformSegmentBase._get_current_config(self)
+        cur_dict['type'] = 'WFS_Constant'
+        cur_dict['type'] = 'WFS_Constant'
+        cur_dict['Duration'] = self._duration
+        cur_dict['Value'] = self._value
+        return cur_dict
 
 class WFS_Gaussian(WaveformSegmentBase):
     def __init__(self, name, mod_func, time_len, amplitude, num_sd=1.96):
@@ -100,10 +119,9 @@ class WFS_Gaussian(WaveformSegmentBase):
         return self._amplitude * sample_points
 
     def _get_current_config(self):
-        return {
-            'type' : 'WFS_Gaussian',
-            'Name' : self.Name,
-            'Duration' : self._duration,
-            'Amplitude' : self._amplitude,
-            'Num SD' : self._num_sd
-            }
+        cur_dict = WaveformSegmentBase._get_current_config(self)
+        cur_dict['type'] = 'WFS_Gaussian'
+        cur_dict['Duration'] = self._duration
+        cur_dict['Amplitude'] = self._amplitude
+        cur_dict['Num SD'] = self._num_sd
+        return cur_dict

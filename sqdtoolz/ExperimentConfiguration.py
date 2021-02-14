@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import json
 
-class TimingConfiguration:
+class ExperimentConfiguration:
     def __init__(self, duration, list_DDGs, list_AWGs, instr_ACQ = None):
         self._list_DDGs = list_DDGs
         self._instr_ACQ = instr_ACQ

@@ -163,12 +163,15 @@ class WaveformAWG:
 
     def _get_waveform_plot_segments(self, waveform_index = 0, resolution = 21):
         ret_list = []
-        for cur_awg_chan in self._awg_chan_list:
+        for cur_ch_index, cur_awg_chan in enumerate(self._awg_chan_list):
             seg_dicts = []
+            t0 = 0
             for cur_wfm_seg in self._wfm_segment_list:
                 cur_dict = {}
                 cur_dict['duration'] = cur_wfm_seg.Duration
-                cur_y = cur_wfm_seg.get_waveform(self._sample_rate)
+                #TODO: Use _get_waveform to yield the unmodified waveform (i.e. just envelope) if some flag is set
+                cur_y = cur_wfm_seg.get_waveform(self._sample_rate, t0, cur_ch_index)
+                t0 += cur_wfm_seg.NumPts(self._sample_rate) / self._sample_rate
                 #Stretch the plot to occupy the range: [0,1]
                 min_y = np.min(cur_y)
                 if (min_y < 0):

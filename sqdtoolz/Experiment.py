@@ -1,42 +1,25 @@
-import qcodes as qc
-from datetime import datetime
-from pathlib import Path
-import json
 import numpy as np
 import time
+import json
 
 class Experiment:
-    def __init__(self, instr_config_file, save_dir, name=""):
+    def __init__(self, name, expt_config):
         '''
         '''
-
-        if instr_config_file == "":
-            self.station = qc.Station()
-        else:
-            self.station = qc.Station(config_file=instr_config_file)
-        #TODO: Add initialiser for load last file in save_dir thing...
-
-        #Convert Windows backslashes into forward slashes (should be compatible with MAC/Linux then...)
-        self._save_dir = save_dir.replace('\\','/')
         self._name = name
-
+        self._expt_config = expt_config
         #List of digital delay generators
         self._DDGs = []
         #List of arbitrary waveform generators
         self._AWGs = []
         #List of acquisition devices
         self._ACQs = []
-        
-    def add_instrument(self, instrObj):
-        self.station.add_component(instrObj)
 
-    def run(self, timing_config, sweep_vars=[]):
-        #Get time-stamp
-        folder_time_stamp = datetime.now().strftime("%Y-%m-%d/%H%M%S-" + self._name + "/")
-        #Create the nested directory structure if it does not exist...
-        cur_exp_path = self._save_dir + folder_time_stamp
-        Path(cur_exp_path).mkdir(parents=True, exist_ok=True)
+    @property
+    def Name(self):
+        return self._name
 
+    def _run(self, save_dir, sweep_vars=[]):
         param_names = [x[0].name for x in sweep_vars]
         sweep_arrays = [x[1] for x in sweep_vars]
         sweep_grids = np.meshgrid(*sweep_arrays)
@@ -49,9 +32,9 @@ class Experiment:
             for ind, cur_val in enumerate(cur_coord):
                 sweep_vars[ind][0].set_raw(cur_val)
             #Now prepare the instrument
-            timing_config.check_conformance()
-            timing_config.prepare_instruments()
-            data = timing_config.get_data()
+            # self._expt_config.check_conformance() #TODO: Write this
+            self._expt_config.prepare_instruments()
+            data = self._expt_config.get_data()
             data_all += [np.mean(data[0][0])]
         
         #data_all = np.concatenate(data_all)
@@ -76,13 +59,11 @@ class Experiment:
         final_str += "\ttype: value"
 
         #Save data
-        with open(cur_exp_path + 'data.dat', 'w') as outfile:
-            np.savetxt(cur_exp_path + 'data.dat', data_final, delimiter='\t', header=final_str, fmt='%.15f')            
-        # with open(cur_exp_path + 'timing_configuration.txt', 'w') as outfile:
-        #     json.dump(timing_config.save_config(), outfile, indent=4)
-        # with open(cur_exp_path + 'instrument_configuration.txt', 'w') as outfile:
-        #     json.dump(self.station.snapshot_base(), outfile, indent=4)
-
+        np.savetxt(save_dir + 'data.dat', data_final, delimiter='\t', header=final_str, fmt='%.15f')
+        #Save the experiment configuration
+        with open(save_dir + 'experiment_configuration.txt', 'w') as outfile:
+            json.dump(self._expt_config.save_config(), outfile, indent=4)
+        
         return data
 
 

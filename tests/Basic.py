@@ -1,3 +1,4 @@
+from sqdtoolz.Laboratory import Laboratory
 from sqdtoolz.Experiment import Experiment
 from sqdtoolz.HAL.DDG import*
 from sqdtoolz.HAL.ACQ import*
@@ -7,18 +8,18 @@ from sqdtoolz.HAL.WaveformModulations import*
 from sqdtoolz.Drivers.dummyDDG import*
 from sqdtoolz.Drivers.dummyACQ import*
 from sqdtoolz.Drivers.dummyAWG import*
-from sqdtoolz.TimingConfiguration import*
+from sqdtoolz.ExperimentConfiguration import*
 from sqdtoolz.Parameter import*
 
-new_exp = Experiment(instr_config_file = "", save_dir = "mySaves", name="test")
+new_lab = Laboratory(instr_config_file = "", save_dir = "mySaves\\")
 
 #Can be done in YAML
 instr_ddg = DummyDDG('ddg')
-new_exp.add_instrument(instr_ddg)
+new_lab.add_instrument(instr_ddg)
 instr_acq = DummyACQ('acq')
-new_exp.add_instrument(instr_acq)
+new_lab.add_instrument(instr_acq)
 instr_awg = DummyAWG('awg_test_instr')
-new_exp.add_instrument(instr_awg)
+new_lab.add_instrument(instr_awg)
 
 #Ideally, the length and polarity are set to default values in the drivers via the YAML file - i.e. just set TrigPulseDelay
 ddg_module = DDG(instr_ddg)
@@ -68,11 +69,11 @@ awg_wfm.get_output_channel().marker(0).TrigPulseLength = 30e-9
 awg_wfm.get_output_channel().marker(1).set_markers_to_none()
 awg_wfm.program_AWG()
 
-lePlot = awg_wfm2.plot_waveforms().show()
-input('press <ENTER> to continue')
+# lePlot = awg_wfm2.plot_waveforms().show()
+# input('press <ENTER> to continue')
 #
 
-tc = TimingConfiguration(1e-6, [ddg_module], [awg_wfm2,awg_wfm], acq_module)
+tc = ExperimentConfiguration(1e-6, [ddg_module], [awg_wfm2,awg_wfm], acq_module)
 
 awg_wfm2.set_trigger_source_all(ddg_module.get_trigger_output('C'),0)
 awg_wfm.set_trigger_source_all(awg_wfm2.get_output_channel(0).marker(0),1)
@@ -94,16 +95,17 @@ acq_module.InputTriggerEdge = 0
 # awg_wfm2.plot_waveforms().show()
 # input('press <ENTER> to continue')
 
-configTc = tc.save_config('tests\\test_time_config.json')
+# configTc = tc.save_config('tests\\test_time_config.json')
 
-my_param_hold = VariableInstrument("len1", awg_wfm2.get_waveform_segment("hold"), 'Duration')
-my_param_read = VariableInstrument("len2", awg_wfm2.get_waveform_segment("read"), 'Duration')
+my_param_hold = new_lab.add_parameter_property("len1", awg_wfm2.get_waveform_segment("hold"), 'Duration')
+my_param_read = new_lab.add_parameter_property("len2", awg_wfm2.get_waveform_segment("read"), 'Duration')
 # my_param.set_raw(90e-9)
 
-lePlot = tc.plot().show()
-input('press <ENTER> to continue')
+# lePlot = tc.plot().show()
+# input('press <ENTER> to continue')
 
-# leData = new_exp.run(tc, [(my_param_hold, np.linspace(10e-9,100e-9,3)), (my_param_read, np.linspace(100e-9,300e-9,4))])
+new_exp = Experiment("my_exp", tc)
+leData = new_lab.run_single(new_exp, [(my_param_hold, np.linspace(10e-9,100e-9,3)), (my_param_read, np.linspace(100e-9,300e-9,4))])
 # input('press <ENTER> to continue')
 
 

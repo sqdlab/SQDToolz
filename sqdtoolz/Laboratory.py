@@ -16,6 +16,10 @@ class Laboratory:
         #Convert Windows backslashes into forward slashes (should be compatible with MAC/Linux then...)
         self._save_dir = save_dir.replace('\\','/')
 
+    def add_parameter(self, param_name):
+        self._params[param_name] = VariableInternal(param_name)
+        return self._params[param_name]
+
     def add_parameter_property(self, param_name, sqdObj, prop_name):
         self._params[param_name] = VariableProperty(param_name, sqdObj, prop_name)
         return self._params[param_name]
@@ -33,15 +37,19 @@ class Laboratory:
     
     def run_single(self, expt_obj, sweep_vars=[]):
         #Get time-stamp
-        folder_time_stamp = datetime.now().strftime("%Y-%m-%d/%H%M%S-/" + expt_obj.Name + "/")
+        folder_time_stamp = datetime.now().strftime("%Y-%m-%d/%H%M%S-" + expt_obj.Name + "/")
         #Create the nested directory structure if it does not exist...
         cur_exp_path = self._save_dir + folder_time_stamp
         Path(cur_exp_path).mkdir(parents=True, exist_ok=True)
 
         #TODO: Write the sweeping code to appropriately nest folders or perform data-passing
-        ret_vals = expt_obj._run(cur_exp_path, sweep_vars)
+        ret_vals = expt_obj._run(sweep_vars)
+        #Save data and experiment configurations
+        expt_obj.save_data(cur_exp_path, ret_vals)
+        expt_obj.save_config(cur_exp_path)
+        #
+        expt_obj._post_process(ret_vals)
 
-        #Save data
         with open(cur_exp_path + 'instrument_configuration.txt', 'w') as outfile:
             json.dump(self.station.snapshot_base(), outfile, indent=4)
 

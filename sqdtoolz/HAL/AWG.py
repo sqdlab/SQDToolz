@@ -25,6 +25,12 @@ class WaveformAWG:
     def Name(self):
         return self._name
 
+    def clear_segments(self):
+        self._wfm_segment_list.clear()
+
+    def set_waveform_segments(self, wfm_segment_list):
+        self._wfm_segment_list = wfm_segment_list[:]
+
     def add_waveform_segment(self, wfm_segment):
         self._wfm_segment_list.append(wfm_segment)
         

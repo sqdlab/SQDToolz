@@ -19,7 +19,10 @@ class Experiment:
     def Name(self):
         return self._name
 
-    def _run(self, save_dir, sweep_vars=[]):
+    def _post_process(self):
+        pass
+
+    def _run(self, sweep_vars=[]):
         param_names = [x[0].name for x in sweep_vars]
         sweep_arrays = [x[1] for x in sweep_vars]
         sweep_grids = np.meshgrid(*sweep_arrays)
@@ -43,6 +46,9 @@ class Experiment:
 
         #TODO: think about different data-piece sizes: https://stackoverflow.com/questions/3386259/how-to-make-a-multidimension-numpy-array-with-a-varying-row-size
 
+        return data
+    
+    def save_data(self, save_dir, data_final_array):
         final_str = f"Timestamp: {time.asctime()} \n"
         col_num = 1
         for cur_param in param_names:
@@ -59,12 +65,14 @@ class Experiment:
         final_str += "\ttype: value"
 
         #Save data
-        np.savetxt(save_dir + 'data.dat', data_final, delimiter='\t', header=final_str, fmt='%.15f')
+        np.savetxt(save_dir + 'data.dat', data_final_array, delimiter='\t', header=final_str, fmt='%.15f')
+
+    def save_config(self, save_dir):
         #Save the experiment configuration
         with open(save_dir + 'experiment_configuration.txt', 'w') as outfile:
             json.dump(self._expt_config.save_config(), outfile, indent=4)
-        
-        return data
+        #Save a PNG of the Timing Plot
+        self._expt_config.plot().savefig(save_dir + 'experiment_configuration.png')
 
 
 #new_exp.run(tc, [(rabiWait, [0,1,2,3]), (vPower, [0,1,2,3])])

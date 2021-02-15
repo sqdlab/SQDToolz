@@ -13,7 +13,7 @@ class VariableBase:
 
 
 
-class VariableInternal:
+class VariableInternal(VariableBase):
     def __init(self, name, init_val = 0.0):
         super.__init__(self, name)
         self._val = init_val

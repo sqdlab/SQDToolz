@@ -134,6 +134,9 @@ class ExperimentConfiguration:
             #Set the trigger source on the destination object (AWGs and ACQ modules have the set_trigger_source function implemented by default)
             cur_dest_obj.set_trigger_source(cur_src._get_trigger_output_by_id(cur_trig_dict['TriggerID'], cur_trig_dict['TriggerCH']))
 
+    def init_instrument_relations(self):
+        pass
+
     def prepare_instruments(self):
         #TODO: Write rest of this with error checking
         for cur_awg in self._list_AWGs:
@@ -153,7 +156,9 @@ class ExperimentConfiguration:
         cur_src_edge = trig_object._get_instr_input_trig_edge()
         #By not inserting the first one, the times intrinsically start from t=0
         while(cur_trig != None):
-            assert not cur_trig in trig_list, "There is a cyclic dependency on the trigger sources."
+            for cur_trig_chk in trig_list:
+                assert cur_trig != cur_trig_chk[0], "There is a cyclic dependency on the trigger sources. Perhaps look into the appropriate ExperimentConfiguration class in play."
+
             trig_list += [(cur_trig, cur_src_edge)]
             cur_src_edge = cur_trig._get_instr_input_trig_edge()
             cur_trig = cur_trig._get_instr_trig_src()

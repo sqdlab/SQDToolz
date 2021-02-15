@@ -19,7 +19,7 @@ class ExperimentRabi(Experiment):
             wfm_segments += [
                 WFS_Gaussian(f"init{ind}", self._wfm_mod_control, 75e-9, 1.0),
                 WFS_Constant(f"pad1{ind}", None, 45e-9, 0.5),
-                WFS_Constant(f"hold{ind}", None, 45e-9, 0.5),
+                WFS_Constant(f"hold{ind}", None, cur_time, 0.5),
                 WFS_Gaussian(f"pulse{ind}", self._wfm_mod_control, 75e-9, 1.0),
                 WFS_Constant(f"pad2{ind}", None, 45e-9, 0.5),
                 WFS_Constant(f"read{ind}", None, 150e-9, 0.0)

@@ -178,6 +178,9 @@ class WaveformAWG:
                 #TODO: Use _get_waveform to yield the unmodified waveform (i.e. just envelope) if some flag is set
                 cur_y = cur_wfm_seg.get_waveform(self._sample_rate, t0, cur_ch_index)
                 t0 += cur_wfm_seg.NumPts(self._sample_rate) / self._sample_rate
+                #Skip this segment if it's empty...
+                if cur_y.size == 0:
+                    continue
                 #Stretch the plot to occupy the range: [0,1]
                 min_y = np.min(cur_y)
                 if (min_y < 0):

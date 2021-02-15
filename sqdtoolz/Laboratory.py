@@ -20,6 +20,7 @@ class Laboratory:
         self._params[param_name] = VariableInternal(param_name)
         return self._params[param_name]
 
+    #TODO: combine with above
     def add_parameter_property(self, param_name, sqdObj, prop_name):
         self._params[param_name] = VariableProperty(param_name, sqdObj, prop_name)
         return self._params[param_name]

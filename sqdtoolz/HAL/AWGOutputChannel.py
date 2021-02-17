@@ -267,6 +267,9 @@ class AWGOutputMarker(TriggerType):
                 'TriggerID' : self.name,
                 'TriggerCH' : self._ch_index
             }
+
+    def _get_parent_HAL(self):
+        return self._parent_waveform_obj
     
     def _get_current_config(self):
         retDict = {

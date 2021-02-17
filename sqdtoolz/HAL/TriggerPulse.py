@@ -9,6 +9,9 @@ class TriggerType:
     def get_trigger_params(self):
         assert False, "The class implementing a TriggerType must implement the get_trigger_params function."
 
+    def _get_parent_HAL(self):
+        assert False, "The class implementing a TriggerType must implement the _get_parent_HAL function."
+
 class Trigger(TriggerType):
     def __init__(self, parent, name, instr_trig_output_channel):
         '''
@@ -110,6 +113,8 @@ class Trigger(TriggerType):
                 'TriggerCH' : 0,  #Defaults to 0
             }
 
+    def _get_parent_HAL(self):
+        return self._parent
 
 class SyncTriggerPulse:
     def __init__(self, trig_len, enableGet, enableSet, trig_pol = 1, trigOutputDelay = 0.0):

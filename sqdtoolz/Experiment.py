@@ -19,11 +19,10 @@ class Experiment:
     def Name(self):
         return self._name
 
-    def _post_process(self):
+    def _post_process(self, data):
         pass
 
     def _run(self, sweep_vars=[]):
-        param_names = [x[0].name for x in sweep_vars]
         sweep_arrays = [x[1] for x in sweep_vars]
         sweep_grids = np.meshgrid(*sweep_arrays)
         sweep_grids = np.array(sweep_grids).T.reshape(-1,len(sweep_arrays))
@@ -46,9 +45,10 @@ class Experiment:
 
         #TODO: think about different data-piece sizes: https://stackoverflow.com/questions/3386259/how-to-make-a-multidimension-numpy-array-with-a-varying-row-size
 
-        return data
+        return data_final
     
-    def save_data(self, save_dir, data_final_array):
+    def save_data(self, save_dir, data_final_array, sweep_vars):
+        param_names = [x[0].name for x in sweep_vars]
         final_str = f"Timestamp: {time.asctime()} \n"
         col_num = 1
         for cur_param in param_names:

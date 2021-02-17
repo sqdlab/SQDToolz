@@ -4,11 +4,15 @@ import numpy as np
 import json
 
 class ExperimentConfiguration:
-    def __init__(self, duration, list_DDGs, list_AWGs, instr_ACQ = None):
-        self._list_DDGs = list_DDGs
+    def __init__(self, duration, list_DDGs, list_AWGs, instr_ACQ, list_GENs = []):
+        self._list_DDGs = list_DDGs[:]
         self._instr_ACQ = instr_ACQ
-        self._list_AWGs = list_AWGs
+        self._list_AWGs = list_AWGs[:]
+        self._list_GENs = list_GENs[:]
         self._total_time = duration
+
+        #Trigger relations formatted as tuples of the form: destination HAL or channel-HAL object, source Trigger object, input polarity on destination HAL object
+        self._cur_trig_rels = self._get_trigger_relations()
 
     @property
     def RepetitionTime(self):
@@ -17,56 +21,27 @@ class ExperimentConfiguration:
     def RepetitionTime(self, len_seconds):
         self._total_time = len_seconds
 
-    @staticmethod
-    def _add_rectangle(ax, xStart, xEnd, bar_width, yOff):
-        '''
-        Draws a rectangular patch for the timing diagram based on the delay and length values from a trigger object.
+    def _get_trigger_relations(self):
+        trig_src_list = self._list_DDGs + self._list_AWGs
 
-        Inputs:
-            - ax     - Axis object to which the rectangle is to be drawn
-            - xStart - Starting value on the x-axis
-            - xEnd   - Ending value on the x-axis
-            - bar_width - Vertical width of the rectangle to be drawn (should be less than 1 if multiple rows are to not intersect their rectangles)
-            - yOff    - Current y-offset
-        '''
-        rect = patches.Rectangle( (xStart,yOff - 0.5*bar_width), xEnd-xStart, bar_width,
-                                facecolor='white', edgecolor='black', hatch = '///')
-        ax.add_patch(rect)
+        def check_and_add_trig_src_to_list(cur_trig_src, cur_dest):
+            #TODO: Make the TriggerType objects have a __str__ to get the actual trigger source as a string
+            assert cur_trig_src._get_parent_HAL() in trig_src_list, f"The trigger source does not exist in the current ExperimentConfiguration!"
+            check_and_add_trig_src_to_list.trig_rels += [(cur_dest, cur_trig_src, cur_dest.InputTriggerEdge)]
+        check_and_add_trig_src_to_list.trig_rels = []
 
-    @staticmethod
-    def _add_rectangle_with_plot(ax, xStart, xEnd, bar_width, yOff, yVals):
-        rect = patches.Rectangle( (xStart,yOff - 0.5*bar_width), xEnd-xStart, bar_width,
-                                facecolor='white', edgecolor='black')
-        ax.add_patch(rect)
-        xOccupyFactor = 0.8
-        yOccupyFactor = 0.8
-        x0 = xStart + (1-xOccupyFactor)/2*(xEnd-xStart)
-        x1 = xStart + (1+xOccupyFactor)/2*(xEnd-xStart)
-        xVals = np.linspace(x0, x1, yVals.size)
-        y0 = yOff-0.5*bar_width + (1-yOccupyFactor)/2*bar_width
-        y1 = y0 + yOccupyFactor*bar_width
-        yValsPlot = yVals * (y1-y0) + y0
-        ax.plot(xVals, yValsPlot, 'k')
+        #Scan through the triggers for ACQ
+        cur_acq = self._instr_ACQ
+        cur_trig_src = cur_acq.get_trigger_source()
+        check_and_add_trig_src_to_list(cur_trig_src, cur_acq)
+        #Scan through the triggers for AWG outputs
+        for cur_awg in self._list_AWGs:
+            cur_outputs = cur_awg.get_output_channels()
+            for cur_output in cur_outputs:
+                check_and_add_trig_src_to_list(cur_trig_src, cur_output)
+        #TODO: Consider scanning for DDG sources as well?
 
-    @staticmethod
-    def _plot_digital_pulse(ax, vals01, xStart, pts2xVals, bar_width, yOff):
-        xVals = [xStart]
-        yVals = [vals01[0]]
-        last_val = vals01[0]
-        for ind, cur_yval in enumerate(vals01):
-            if cur_yval != last_val:
-                xVals.append(pts2xVals * ind + xStart)
-                xVals.append(pts2xVals * ind + xStart)
-                yVals.append(last_val)
-                yVals.append(cur_yval)
-                last_val = cur_yval
-        xVals.append(pts2xVals * ind + xStart)
-        yVals.append(last_val)
-        #Now scale the pulse appropriately...
-        xVals = np.array(xVals)
-        yVals = np.array(yVals)
-        yVals = yVals*bar_width + yOff - bar_width*0.5
-        ax.plot(xVals, yVals, 'k')
+        return check_and_add_trig_src_to_list.trig_rels
 
     def save_config(self, file_name = ''):
         #Prepare the dictionary of HAL configurations
@@ -135,7 +110,9 @@ class ExperimentConfiguration:
             cur_dest_obj.set_trigger_source(cur_src._get_trigger_output_by_id(cur_trig_dict['TriggerID'], cur_trig_dict['TriggerCH']))
 
     def init_instrument_relations(self):
-        pass
+        #Settle trigger relations in case they have changed in a previous configuration...
+        for cur_trig_rel in self._cur_trig_rels:
+            cur_trig_rel[0].set_trigger_source(cur_trig_rel[1], cur_trig_rel[2])
 
     def prepare_instruments(self):
         #TODO: Write rest of this with error checking
@@ -177,6 +154,57 @@ class ExperimentConfiguration:
                     new_list += [cur_times + cur_time]  #Translate the current trigger edges by the previous trigger edges
                 all_times = np.concatenate(new_list)
         return all_times
+
+    @staticmethod
+    def _add_rectangle(ax, xStart, xEnd, bar_width, yOff):
+        '''
+        Draws a rectangular patch for the timing diagram based on the delay and length values from a trigger object.
+
+        Inputs:
+            - ax     - Axis object to which the rectangle is to be drawn
+            - xStart - Starting value on the x-axis
+            - xEnd   - Ending value on the x-axis
+            - bar_width - Vertical width of the rectangle to be drawn (should be less than 1 if multiple rows are to not intersect their rectangles)
+            - yOff    - Current y-offset
+        '''
+        rect = patches.Rectangle( (xStart,yOff - 0.5*bar_width), xEnd-xStart, bar_width,
+                                facecolor='white', edgecolor='black', hatch = '///')
+        ax.add_patch(rect)
+
+    @staticmethod
+    def _add_rectangle_with_plot(ax, xStart, xEnd, bar_width, yOff, yVals):
+        rect = patches.Rectangle( (xStart,yOff - 0.5*bar_width), xEnd-xStart, bar_width,
+                                facecolor='white', edgecolor='black')
+        ax.add_patch(rect)
+        xOccupyFactor = 0.8
+        yOccupyFactor = 0.8
+        x0 = xStart + (1-xOccupyFactor)/2*(xEnd-xStart)
+        x1 = xStart + (1+xOccupyFactor)/2*(xEnd-xStart)
+        xVals = np.linspace(x0, x1, yVals.size)
+        y0 = yOff-0.5*bar_width + (1-yOccupyFactor)/2*bar_width
+        y1 = y0 + yOccupyFactor*bar_width
+        yValsPlot = yVals * (y1-y0) + y0
+        ax.plot(xVals, yValsPlot, 'k')
+
+    @staticmethod
+    def _plot_digital_pulse(ax, vals01, xStart, pts2xVals, bar_width, yOff):
+        xVals = [xStart]
+        yVals = [vals01[0]]
+        last_val = vals01[0]
+        for ind, cur_yval in enumerate(vals01):
+            if cur_yval != last_val:
+                xVals.append(pts2xVals * ind + xStart)
+                xVals.append(pts2xVals * ind + xStart)
+                yVals.append(last_val)
+                yVals.append(cur_yval)
+                last_val = cur_yval
+        xVals.append(pts2xVals * ind + xStart)
+        yVals.append(last_val)
+        #Now scale the pulse appropriately...
+        xVals = np.array(xVals)
+        yVals = np.array(yVals)
+        yVals = yVals*bar_width + yOff - bar_width*0.5
+        ax.plot(xVals, yVals, 'k')
 
     def plot(self):
         '''

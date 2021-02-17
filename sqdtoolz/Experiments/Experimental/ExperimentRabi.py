@@ -37,7 +37,7 @@ class ExperimentRabi(Experiment):
         data_final = np.c_[self._sample_times, data_final]
         return data_final
     
-    def save_data(self, save_dir, data_final_array):
+    def save_data(self, save_dir, data_final_array, **kwargs):
         final_str = f"Timestamp: {time.asctime()} \n"
         col_num = 1
         final_str += "Column " + str(col_num) + ":\n"

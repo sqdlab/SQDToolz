@@ -47,7 +47,9 @@ class Experiment:
 
         return data_final
     
-    def save_data(self, save_dir, data_final_array, sweep_vars):
+    def save_data(self, save_dir, data_final_array, **kwargs):
+        sweep_vars = kwargs.get('sweep_vars', [])
+
         param_names = [x[0].name for x in sweep_vars]
         final_str = f"Timestamp: {time.asctime()} \n"
         col_num = 1

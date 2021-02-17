@@ -12,7 +12,7 @@ class ExperimentConfiguration:
         self._total_time = duration
 
         #Trigger relations formatted as tuples of the form: destination HAL or channel-HAL object, source Trigger object, input polarity on destination HAL object
-        self._cur_trig_rels = self._get_trigger_relations()
+        self._cur_trig_rels = self._get_current_trigger_relations()
 
     @property
     def RepetitionTime(self):
@@ -21,24 +21,24 @@ class ExperimentConfiguration:
     def RepetitionTime(self, len_seconds):
         self._total_time = len_seconds
 
-    def _get_trigger_relations(self):
+    def _get_current_trigger_relations(self):
         trig_src_list = self._list_DDGs + self._list_AWGs
 
         def check_and_add_trig_src_to_list(cur_trig_src, cur_dest):
-            #TODO: Make the TriggerType objects have a __str__ to get the actual trigger source as a string
-            assert cur_trig_src._get_parent_HAL() in trig_src_list, f"The trigger source does not exist in the current ExperimentConfiguration!"
-            check_and_add_trig_src_to_list.trig_rels += [(cur_dest, cur_trig_src, cur_dest.InputTriggerEdge)]
+            if cur_trig_src:
+                #TODO: Make the TriggerType objects have a __str__ to get the actual trigger source as a string
+                assert cur_trig_src._get_parent_HAL() in trig_src_list, f"The trigger source does not exist in the current ExperimentConfiguration!"
+                check_and_add_trig_src_to_list.trig_rels += [(cur_dest, cur_trig_src, cur_dest.InputTriggerEdge)]
         check_and_add_trig_src_to_list.trig_rels = []
 
         #Scan through the triggers for ACQ
         cur_acq = self._instr_ACQ
-        cur_trig_src = cur_acq.get_trigger_source()
-        check_and_add_trig_src_to_list(cur_trig_src, cur_acq)
+        check_and_add_trig_src_to_list(cur_acq.get_trigger_source(), cur_acq)
         #Scan through the triggers for AWG outputs
         for cur_awg in self._list_AWGs:
             cur_outputs = cur_awg.get_output_channels()
             for cur_output in cur_outputs:
-                check_and_add_trig_src_to_list(cur_trig_src, cur_output)
+                check_and_add_trig_src_to_list(cur_output.get_trigger_source(), cur_output)
         #TODO: Consider scanning for DDG sources as well?
 
         return check_and_add_trig_src_to_list.trig_rels
@@ -115,7 +115,8 @@ class ExperimentConfiguration:
     def init_instrument_relations(self):
         #Settle trigger relations in case they have changed in a previous configuration...
         for cur_trig_rel in self._cur_trig_rels:
-            cur_trig_rel[0].set_trigger_source(cur_trig_rel[1], cur_trig_rel[2])
+            cur_trig_rel[0].set_trigger_source(cur_trig_rel[1])
+            cur_trig_rel[0].InputTriggerEdge = cur_trig_rel[2]
 
     def prepare_instruments(self):
         #TODO: Write rest of this with error checking

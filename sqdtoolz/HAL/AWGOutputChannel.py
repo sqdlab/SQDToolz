@@ -121,7 +121,7 @@ class AWGOutputMarker(TriggerType):
                 if cur_seg_chk.Name == cur_seg_name:
                     found_seg = cur_seg_chk
                     break
-            assert found_seg != None, "WaveformSegment " + found_seg + " has not been added to this Waveform sequence."
+            assert found_seg != None, "WaveformSegment " + cur_seg_name + " has not been added to this Waveform sequence."
         self._marker_seg_list = list_seg_names[:] #Copy over the list
 
     def set_markers_to_arbitrary(self, arb_mkr_list):
@@ -220,7 +220,7 @@ class AWGOutputMarker(TriggerType):
             final_wfm = np.zeros(int(np.round(self._parent_waveform_obj.NumPts)), dtype=np.ubyte) + 1 - self._marker_pol
             for cur_seg_name in self._marker_seg_list:
                 start_pt, end_pt = self._parent_waveform_obj._get_index_points_for_segment(cur_seg_name)
-                final_wfm[start_pt:end_pt] = self._marker_pol
+                final_wfm[start_pt:end_pt+1] = self._marker_pol
             return final_wfm
 
     def _get_instr_trig_src(self):

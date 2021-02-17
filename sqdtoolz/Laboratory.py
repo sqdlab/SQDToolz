@@ -46,7 +46,7 @@ class Laboratory:
         #TODO: Write the sweeping code to appropriately nest folders or perform data-passing
         ret_vals = expt_obj._run(sweep_vars)
         #Save data and experiment configurations
-        expt_obj.save_data(cur_exp_path, ret_vals, sweep_vars)
+        expt_obj.save_data(cur_exp_path, ret_vals, sweep_vars=sweep_vars)
         expt_obj.save_config(cur_exp_path)
         #
         expt_obj._post_process(ret_vals)

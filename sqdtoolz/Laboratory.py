@@ -3,6 +3,7 @@ from sqdtoolz.Parameter import*
 from datetime import datetime
 from pathlib import Path
 import json
+import os
 
 class Laboratory:
     def __init__(self, instr_config_file, save_dir):
@@ -16,6 +17,16 @@ class Laboratory:
         #Convert Windows backslashes into forward slashes (should be compatible with MAC/Linux then...)
         self._save_dir = save_dir.replace('\\','/')
         self._group_dir = {'Dir':"", 'InitDir':""}
+
+    def update_config_from_last_expt(self):
+        dirs = [x[0] for x in os.walk(self._save_dir)]  #Walk gives a tuple: (dirpath, dirnames, filenames)
+        last_dir = dirs[-1].replace('\\','/')
+        if os.path.isfile(last_dir + "/laboratory_parameters.txt"):
+            with open(last_dir + "/laboratory_parameters.txt") as json_file:
+                data = json.load(json_file)
+                for cur_param in data:
+                    if cur_param in self._params:
+                        self._params[cur_param].set_raw(data[cur_param])
 
     def add_parameter(self, param_name):
         self._params[param_name] = VariableInternal(param_name)

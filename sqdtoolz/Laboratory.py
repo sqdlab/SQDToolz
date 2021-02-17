@@ -15,6 +15,7 @@ class Laboratory:
 
         #Convert Windows backslashes into forward slashes (should be compatible with MAC/Linux then...)
         self._save_dir = save_dir.replace('\\','/')
+        self._group_dir = {'Dir':"", 'InitDir':""}
 
     def add_parameter(self, param_name):
         self._params[param_name] = VariableInternal(param_name)
@@ -36,9 +37,22 @@ class Laboratory:
         assert instrID in station.components, f"Instrument by the name {instrID} has not been loaded."
         return station.components[instrID]
     
+    def group_open(self, group_name):
+        self._group_dir['Dir'] = group_name
+        self._group_dir['InitDir'] = ""
+
+    def group_close(self):
+        self._group_dir['Dir'] = ""
+        self._group_dir['InitDir'] = ""
+
     def run_single(self, expt_obj, sweep_vars=[]):
         #Get time-stamp
-        folder_time_stamp = datetime.now().strftime("%Y-%m-%d/%H%M%S-" + expt_obj.Name + "/")
+        if self._group_dir['Dir'] == "":
+            folder_time_stamp = datetime.now().strftime(f"%Y-%m-%d/%H%M%S-" + expt_obj.Name + "/")
+        else:
+            if self._group_dir['InitDir'] == "":
+                self._group_dir['InitDir'] = datetime.now().strftime(f"%Y-%m-%d/%H%M%S-{self._group_dir['Dir']}/")
+            folder_time_stamp = self._group_dir['InitDir'] + datetime.now().strftime(f"%H%M%S-" + expt_obj.Name + "/")
         #Create the nested directory structure if it does not exist...
         cur_exp_path = self._save_dir + folder_time_stamp
         Path(cur_exp_path).mkdir(parents=True, exist_ok=True)
@@ -48,10 +62,14 @@ class Laboratory:
         #Save data and experiment configurations
         expt_obj.save_data(cur_exp_path, ret_vals, sweep_vars=sweep_vars)
         expt_obj.save_config(cur_exp_path)
-        #
-        expt_obj._post_process(ret_vals)
-
+        #Save instrument configurations (QCoDeS)
         with open(cur_exp_path + 'instrument_configuration.txt', 'w') as outfile:
             json.dump(self.station.snapshot_base(), outfile, indent=4)
+        #Save Laboratory Parameters
+        param_dict = {k:v.get_raw() for (k,v) in self._params.items()}
+        with open(cur_exp_path + 'laboratory_parameters.txt', 'w') as outfile:
+            json.dump(param_dict, outfile, indent=4)
+        
+        expt_obj._post_process(ret_vals)
 
         return ret_vals

@@ -2,6 +2,8 @@ import numpy as np
 import time
 import json
 
+import matplotlib.pyplot as plt
+
 class Experiment:
     def __init__(self, name, expt_config):
         '''
@@ -74,7 +76,9 @@ class Experiment:
         with open(save_dir + 'experiment_configuration.txt', 'w') as outfile:
             json.dump(self._expt_config.save_config(), outfile, indent=4)
         #Save a PNG of the Timing Plot
-        self._expt_config.plot().savefig(save_dir + 'experiment_configuration.png')
+        lePlot = self._expt_config.plot()
+        lePlot.savefig(save_dir + 'experiment_configuration.png')
+        plt.close(lePlot)
 
 
 #new_exp.run(tc, [(rabiWait, [0,1,2,3]), (vPower, [0,1,2,3])])

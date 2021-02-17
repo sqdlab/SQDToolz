@@ -56,6 +56,9 @@ class ExperimentConfiguration:
         if (self._instr_ACQ):
             cur_acq = self._instr_ACQ
             retVal.append(cur_acq._get_current_config())
+        #Get the dictionaries for generic HALs
+        for cur_gen in self._list_GENs:
+            retVal.append(cur_gen._get_current_config())
         
         #Save to file if necessary
         if (file_name != ''):

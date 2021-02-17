@@ -1,14 +1,12 @@
+from sqdtoolz.HAL.GEN import GEN
 
-class GENmwSource:
+class GENmwSource(GEN):
     def __init__(self, instr_gen_freq_src_channel):
         '''
         '''
+        super().__init__(instr_gen_freq_src_channel.name)
         self._instr_freq = instr_gen_freq_src_channel
-        self._name = instr_gen_freq_src_channel.name
 
-    @property
-    def Name(self):
-        return self._name
 
     @property
     def OutputEnable(self):

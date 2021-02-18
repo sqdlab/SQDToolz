@@ -45,7 +45,7 @@ awg_wfm_q.set_trigger_source_all(ddg_module.get_trigger_output('A'))
 acq_module.SampleRate = 1e9
 acq_module.NumSamples = 100
 #Cement the parameters into the experiment configuration
-exp_config = ExpConfigIQpulseInSingleOut(2.5e-6, [ddg_module], [awg_wfm_q], acq_module, [freq_src_module], awg_wfm_q)
+exp_config = ExpConfigIQpulseInSingleOut(2.5e-6, [ddg_module], [awg_wfm_q], acq_module, [freq_src_module], awg_wfm_q)   #TODO: Check if the configuration is compatible - e.g. a special function in the translation script?
 
 exp_rabi = ExperimentRabi("myRabi", exp_config, mod_freq_qubit, np.linspace(0,100e-9,5), param_rab_freq)
 leData = new_lab.run_single(exp_rabi)

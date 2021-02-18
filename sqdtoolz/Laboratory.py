@@ -19,6 +19,7 @@ class Laboratory:
         self._group_dir = {'Dir':"", 'InitDir':""}
 
     def update_config_from_last_expt(self):
+        #TODO: Stress test this with say 100000 directories
         dirs = [x[0] for x in os.walk(self._save_dir)]  #Walk gives a tuple: (dirpath, dirnames, filenames)
         last_dir = dirs[-1].replace('\\','/')
         if os.path.isfile(last_dir + "/laboratory_parameters.txt"):
@@ -70,6 +71,7 @@ class Laboratory:
 
         #TODO: Write the sweeping code to appropriately nest folders or perform data-passing
         ret_vals = expt_obj._run(sweep_vars)
+        #TODO: Add flag to get/save for live-plotting
         #Save data and experiment configurations
         expt_obj.save_data(cur_exp_path, ret_vals, sweep_vars=sweep_vars)
         expt_obj.save_config(cur_exp_path)

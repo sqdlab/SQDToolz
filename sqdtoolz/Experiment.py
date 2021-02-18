@@ -39,6 +39,7 @@ class Experiment:
             # self._expt_config.check_conformance() #TODO: Write this
             self._expt_config.prepare_instruments()
             data = self._expt_config.get_data()
+            #TODO: Add in a preprocessor?
             data_all += [np.mean(data[0][0])]
         
         #data_all = np.concatenate(data_all)
@@ -50,9 +51,10 @@ class Experiment:
         return data_final
     
     def save_data(self, save_dir, data_final_array, **kwargs):
+        #TODO: Make a Data storage module for data saving (e.g. HDF5, CSV, IntensitySlice etc...)
         sweep_vars = kwargs.get('sweep_vars', [])
 
-        param_names = [x[0].name for x in sweep_vars]
+        param_names = [x[0].Name for x in sweep_vars]
         final_str = f"Timestamp: {time.asctime()} \n"
         col_num = 1
         for cur_param in param_names:

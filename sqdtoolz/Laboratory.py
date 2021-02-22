@@ -45,9 +45,9 @@ class Laboratory:
     def add_instrument(self, instrObj):
         self.station.add_component(instrObj)
 
-    def get_instrument(instrID):
-        assert instrID in station.components, f"Instrument by the name {instrID} has not been loaded."
-        return station.components[instrID]
+    def get_instrument(self, instrID):
+        assert instrID in self.station.components, f"Instrument by the name {instrID} has not been loaded."
+        return self.station.components[instrID]
     
     def group_open(self, group_name):
         self._group_dir['Dir'] = group_name

@@ -1,0 +1,32 @@
+instruments:
+  awg5014C:
+    driver: sqdtoolz.Drivers.AWG5014C
+    type: AWG5014C
+    address: 'TCPIP::192.168.1.100::INSTR'
+    enable_forced_reconnect: true
+    parameters:
+      CH1.output:
+        initial_value: 'OFF'
+      CH1.amplitude: 
+        initial_value: 1.0
+      CH1.offset: 
+        initial_value: 0.0
+      CH2.output:
+        initial_value: 'OFF'
+      CH2.amplitude: 
+        initial_value: 1.0
+      CH2.offset: 
+        initial_value: 0.0
+      CH3.output:
+        initial_value: 'OFF'
+      CH3.amplitude: 
+        initial_value: 1.0
+      CH3.offset: 
+        initial_value: 0.0
+      CH4.output:
+        initial_value: 'OFF'
+      CH4.amplitude: 
+        initial_value: 1.0
+      CH4.offset: 
+        initial_value: 0.0
+  

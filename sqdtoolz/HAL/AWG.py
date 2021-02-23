@@ -33,9 +33,6 @@ class WaveformAWG:
 
     def add_waveform_segment(self, wfm_segment):
         self._wfm_segment_list.append(wfm_segment)
-
-    def add_waveform_segments(self, wfm_segment_list):
-        self._wfm_segment_list = wfm_segment_list[:]
         
     def get_waveform_segment(self, wfm_segment_name):
         the_seg = None

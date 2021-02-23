@@ -26,9 +26,9 @@ class WaveformSegmentBase:
         
         Returns a numpy array of points representing the total waveform.
         '''
-        cur_wfm = self._get_waveform(fs, t0, ch_index)
+        cur_wfm = self._get_waveform(fs, t0_ind, ch_index)
         if self._mod_func:
-            return self._mod_func.modify_waveform(cur_wfm, fs, t0, ch_index)
+            return self._mod_func.modify_waveform(cur_wfm, fs, t0_ind, ch_index)
         else:
             return cur_wfm
 

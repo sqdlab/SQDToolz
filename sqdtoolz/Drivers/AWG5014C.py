@@ -133,8 +133,8 @@ class AWG5014C(VisaInstrument):
         cur_off = cur_chnl.Offset
         cur_data = (cur_data - cur_off)/cur_amp
 
-        self.send_waveform_real_to_memory(cur_data, default_mem_names[cur_ch])
-        self.do_set_waveform(default_mem_names[cur_ch], cur_ch+1)
+        self._send_wfm_to_memory(default_mem_names[chan_ind], cur_data, mkr_data)
+        self.write(f'SOURce{chan_ind+1}:WAVeform \"{default_mem_names[chan_ind]}\"')
 
         #Turn on the channel output if it was previous on
         if prev_on:
@@ -146,21 +146,22 @@ class AWG5014C(VisaInstrument):
     
     def _send_wfm_to_memory(self, wfm_name, wfm_data_normalised, mkr_data):
         #Delete the waveform (by name) if it already exists...
-        if self.ask(f'WLISt:WAVeform:PREDefined?\"{wfm_name}\"') == 0:
-            self.write(f'WLISt:WAVeform:DELete {wfm_name}')
+        # if self.ask(f'WLIST:WAVEFORM:PREDEFINED? \"{wfm_name}\"') == 0:
+        self.write(f'WLISt:WAVeform:DELete {wfm_name}')
         #Allocate memory for the waveform
         #TODO: Could optimise this by checking waveform size and then not allocating... 
-        self.write(f'WLIST:WAVEFORM:NEW \"{wfm_name}\", {wfm_data.size}, INTEGER')
+        self.write(f'WLIST:WAVEFORM:NEW \"{wfm_name}\", {wfm_data_normalised.size}, INTEGER')
 
         #Convert the waveform array into 14-bit format (see User Online Help in AWG5014C unit under: AWG Reference > Waveform General Information)
         data_ints = (wfm_data_normalised * 8191 + 8191).astype(np.int16)
+        
+        if mkr_data[0].size > 0:
+            data_ints += mkr_data[0] * 2**14
+        if mkr_data[1].size > 0:
+            data_ints += mkr_data[1] * 2**15
 
-        bin_data = data_ints.tobytes()
-        len_file = len(binfile)
-        len_str = len(str(len_file))  # No. of digits needed to write length
-        size_str = (f',#{len_str}{len_file}').encode('ascii')
-
-        # self.write()
+        #TODO: Write multi-block for mega waveforms
+        self.visa_handle.write_binary_values(f"WLIST:WAVEFORM:DATA \"{wfm_name}\",{0},{data_ints.size},", data_ints, datatype='H')
         
 
         

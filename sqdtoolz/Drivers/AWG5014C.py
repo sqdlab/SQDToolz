@@ -26,6 +26,21 @@ class AWG5014Cchannel(InstrumentChannel):
                            get_parser=float, set_parser=float,
                            vals=vals.Numbers(-2.25, 2.25))
 
+        #Marker parameters
+        for cur_mkr in [1,2]:
+            self.add_parameter(f'marker{cur_mkr}_low', label=f'Channel {channel} Marker {cur_mkr} Voltage Low', unit='V',
+                           docstring=f'Channel {channel} Marker {cur_mkr} Voltage Low level', 
+                           get_cmd=f'SOURce{channel}:MARKer{cur_mkr}:VOLTage:LEVel:IMMediate:LOW?',
+                           set_cmd=f'SOURce{channel}:MARKer{cur_mkr}:VOLTage:LEVel:IMMediate:LOW'+' {}',
+                           get_parser=float, set_parser=float,
+                           vals=vals.Numbers(-2, 2))
+            self.add_parameter(f'marker{cur_mkr}_high', label=f'Channel {channel} Marker {cur_mkr} Voltage High', unit='V',
+                           docstring=f'Channel {channel} Marker {cur_mkr} Voltage High level', 
+                           get_cmd=f'SOURce{channel}:MARKer{cur_mkr}:VOLTage:LEVel:IMMediate:HIGH?',
+                           set_cmd=f'SOURce{channel}:MARKer{cur_mkr}:VOLTage:LEVel:IMMediate:HIGH'+' {}',
+                           get_parser=float, set_parser=float,
+                           vals=vals.Numbers(-2, 2))
+
     @property
     def Parent(self):
         return self._parent
@@ -75,6 +90,21 @@ class AWG5014C(VisaInstrument):
                     val_mapping={'AWG has stopped':  0,
                                  'AWG is waiting for trigger': 1,
                                  'AWG is running' : 2})
+        self.add_parameter('run_mode',
+                           get_cmd='AWGControl:RMODe?',
+                           set_cmd='AWGControl:RMODe {}',
+                           vals=vals.Enum('CONT', 'TRIG', 'SEQ', 'GAT'))
+
+        self.add_parameter('clock_source',
+                           label='Clock source',
+                           get_cmd='AWGControl:CLOCk:SOURce?',
+                           set_cmd='AWGControl:CLOCk:SOURce {}',
+                           vals=vals.Enum('INT', 'EXT'))
+        self.add_parameter('ref_clock_source',
+                           label='Reference clock source',
+                           get_cmd='SOURce1:ROSCillator:SOURce?',
+                           set_cmd='SOURce1:ROSCillator:SOURce ' + '{}',
+                           vals=vals.Enum('INT', 'EXT'))
 
         # Output channels added to both the module for snapshots and internal Trigger Sources for the DDG HAL...
         self._ch_list = ['CH1', 'CH2', 'CH3', 'CH4']

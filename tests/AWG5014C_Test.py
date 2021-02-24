@@ -24,3 +24,5 @@ awg_wfm_q.add_waveform_segment(WFS_Constant("zero2", None, 512e-9, 0.0))
 awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments(["init","init2"])
 awg_wfm_q.program_AWG()
 
+awg_wfm_q.plot_waveforms().show()
+input('press <ENTER> to continue')

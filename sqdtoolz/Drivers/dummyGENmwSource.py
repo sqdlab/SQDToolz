@@ -6,26 +6,32 @@ class DummyGENmwSrcChannel(InstrumentChannel):
         self._outputEnable = True
         self._power = 1.0
         self._frequency = 1.0e9
+        self._phase = 0.0
+        self._mode = 'Continuous'   #Can be: Continuous, PulseModulated
 
         self.add_parameter(
-                'power', label='Output Power', unit='V',
+                'power', label='Output Power', unit='dBm',
                 get_cmd=lambda : self._power,
                 set_cmd=self._set_power)
         self.add_parameter('frequency', label='Output Frequency', unit='Hz',
-                           docstring='Polarity of the output',
                            get_cmd=lambda : self._frequency,
                            set_cmd=self._set_frequency)
+        self.add_parameter('phase', label='Output Phase', unit='deg',
+                           get_cmd=lambda : self._phase,
+                           set_cmd=self._set_phase)
 
     def _set_power(self, val):
         self._power = val
     def _set_frequency(self, val):
         self._frequency = val
+    def _set_phase(self, val):
+        self._phase = val
         
     @property
-    def OutputEnable(self):
+    def Output(self):
         return self._outputEnable
-    @OutputEnable.setter
-    def OutputEnable(self, val):
+    @Output.setter
+    def Output(self, val):
         self._outputEnable = val
         
     @property
@@ -41,6 +47,22 @@ class DummyGENmwSrcChannel(InstrumentChannel):
     @Frequency.setter
     def Frequency(self, val):
         self.frequency(val)
+        
+    @property
+    def Phase(self):
+        return self.phase()
+    @Phase.setter
+    def Phase(self, val):
+        self.phase(val)
+
+    @property
+    def Mode(self):
+        return self._mode
+    @Mode.setter
+    def Mode(self, new_mode):
+        assert new_mode == 'Continuous' or new_mode == 'PulseModulated', "MW source output mode must either be Continuous or PulseModulated."
+        self._mode = new_mode
+        #Perform mode settings
 
 
 class DummyGENmwSrc(Instrument):

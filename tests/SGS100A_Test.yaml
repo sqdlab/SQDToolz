@@ -1,0 +1,33 @@
+instruments:
+  pulser:
+    driver: sqdtoolz.Drivers.DDG_DG645
+    type: DG645
+    address: 'TCPIP::192.168.1.42::INSTR' #'TCPIP::192.168.1.120::INSTR'
+    enable_forced_reconnect: true
+  SGS100A:
+    driver: sqdtoolz.Drivers.MWS_SGS100A
+    type: MWS_SGS100A
+    address: 'TCPIP::192.168.1.131::INSTR'
+    enable_forced_reconnect: true
+    parameters:
+      ref_osc_source:
+        initial_value: 'INT' #Can be INT or EXT
+      ref_osc_output_freq:
+        initial_value: '10MHz'  #Can be '10MHz', '100MHz', '1000MHz'
+      ref_osc_external_freq:
+        initial_value: '10MHz'  #Can be '10MHz', '100MHz', '1000MHz'
+      alc:
+        initial_value: 'OFF'  #Can be ON, OFF, AUTO
+      #Output Channel Parameters
+      RFOUT.output:
+        initial_value: 'OFF'
+      RFOUT.frequency:
+        initial_value: 1e6
+      RFOUT.phase:
+        initial_value: 0.0
+      RFOUT.power:
+        initial_value: -30
+      RFOUT.pulsemod_state:
+        initial_value: 'OFF'
+      RFOUT.pulsemod_source:
+        initial_value: 'EXT'

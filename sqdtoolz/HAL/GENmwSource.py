@@ -9,11 +9,11 @@ class GENmwSource(GEN):
 
 
     @property
-    def OutputEnable(self):
-        return self._instr_freq.OutputEnable
-    @OutputEnable.setter
-    def OutputEnable(self, val):
-        self._instr_freq.OutputEnable = val
+    def Output(self):
+        return self._instr_freq.Output
+    @Output.setter
+    def Output(self, val):
+        self._instr_freq.Output = val
         
     @property
     def Power(self):
@@ -27,4 +27,19 @@ class GENmwSource(GEN):
         return self._instr_freq.Frequency
     @Frequency.setter
     def Frequency(self, val):
-        self._instr_freq.Frequency
+        self._instr_freq.Frequency = val
+        
+    @property
+    def Phase(self):
+        return self._instr_freq.Phase
+    @Phase.setter
+    def Phase(self, val):
+        self._instr_freq.Phase = val
+        
+    @property
+    def Mode(self):
+        return self._instr_freq.Phase
+    @Mode.setter
+    def Mode(self, new_mode):
+        assert new_mode == 'Continuous' or new_mode == 'PulseModulated', "MW source output mode must either be Continuous or PulseModulated."
+        self._instr_freq.Mode = new_mode

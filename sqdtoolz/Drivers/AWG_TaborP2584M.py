@@ -37,6 +37,14 @@ class AWG_TaborP2584M_channel(InstrumentChannel):
             get_cmd=partial(self._get_cmd, ':OUTP?'),
             set_cmd=partial(self._set_cmd, ':OUTP'),
             val_mapping={True:  1, False: 0})
+        
+        #Marker parameters
+        for cur_mkr in [1,2]:            
+            self.add_parameter(
+                f'marker{cur_mkr}_output', label=f'Channel {channel} Marker {cur_mkr} output',
+                get_cmd=partial(self._get_mkr_cmd, ':MARK?', cur_mkr),
+                set_cmd=partial(self._set_mkr_cmd, ':MARK', cur_mkr),
+                val_mapping={True:  1, False: 0})
 
     def _get_cmd(self, cmd):
         #Perform channel-select
@@ -49,6 +57,23 @@ class AWG_TaborP2584M_channel(InstrumentChannel):
         self._parent._inst.send_scpi_cmd(f':INST:CHAN {self._channel}')
         #Perform command
         self._parent._inst.send_scpi_cmd(f'{cmd} {value}')
+
+    def _get_mkr_cmd(self, cmd, mkr_num):
+        #Perform channel-select
+        self._parent._inst.send_scpi_cmd(f':INST:CHAN {self._channel}')
+        #Perform marker-select
+        self._parent._inst.send_scpi_cmd(f':MARK:SEL {mkr_num}')
+        #Perform command
+        self._parent._inst.send_scpi_query(cmd)
+
+    def _set_mkr_cmd(self, cmd, mkr_num, value):
+        #Perform channel-select
+        self._parent._inst.send_scpi_cmd(f':INST:CHAN {self._channel}')
+        #Perform marker-select
+        self._parent._inst.send_scpi_cmd(f':MARK:SEL {mkr_num}')
+        #Perform command
+        self._parent._inst.send_scpi_cmd(f'{cmd} {value}')
+
 
     @property
     def Parent(self):
@@ -213,13 +238,13 @@ class AWG_TaborP2584M(Instrument):
         self._send_cmd(f':TRAC:DEF {seg_id}, {cur_data.size}')
         
         # self._send_data_to_memory(seg_id, cur_data)
-        self._send_data_to_memory(seg_id, cur_data)
-        self._send_cmd(f':TRAC:DEF {seg_id+1}, {cur_data.size}')
-        self._send_data_to_memory(seg_id+1, -cur_data)
-
-        self._program_task_table(chan_ind+1, [AWG_TaborP2584M_task(seg_id, 1, 2, 'TRG1'),AWG_TaborP2584M_task(seg_id+1, 1, 1, 'NONE')])
-        self._set_cmd(':SOUR:FUNC:MODE:TASK', 1)
-        self._set_cmd(':SOUR:FUNC:MODE:TYPE', 'TASK')        
+        self._send_data_to_memory(seg_id, cur_data, mkr_data)
+        self._program_task_table(chan_ind+1, [AWG_TaborP2584M_task(seg_id, 1, 1, 'TRG1')])
+        
+        # self._set_cmd(':INST:CHAN', chan_ind+1)
+        # self._set_cmd(':SOUR:FUNC:MODE:TASK', 1)
+        self._set_cmd(':SOUR:FUNC:MODE:TYPE', 'TASK')
+        # self._set_cmd('FUNC:MODE','TASK')
 
     def _program_task_table(self, channel_index, tasks):
         #Select current channel
@@ -232,7 +257,7 @@ class AWG_TaborP2584M(Instrument):
             #Set the task to be solitary (i.e. not a part of an internal sequence inside Tabor...)
             self._send_cmd(':TASK:COMP:TYPE SING')
             #Set task parameters...
-            self._set_cmd(':TASK:COMP:LOOP', cur_task.num_cycles)
+            self._set_cmd(':TASK:COMP:LOOP', cur_task.num_cycles*channel_index)
             self._set_cmd(':TASK:COMP:SEGM', cur_task.seg_num)
             self._set_cmd(':TASK:COMP:NEXT1', cur_task.next_task_ind)
             self._set_cmd(':TASK:COMP:ENAB', cur_task.trig_src)
@@ -246,10 +271,9 @@ class AWG_TaborP2584M(Instrument):
         resp = resp.rstrip()
         assert resp.startswith('0'), 'ERROR: "{0}" after writing task table'.format(resp)
 
-    def _send_data_to_memory(self, seg_ind, wfm_data_normalised):
+    def _send_data_to_memory(self, seg_ind, wfm_data_normalised, mkr_data):
         #Condition the data
         final_data = (wfm_data_normalised * self._half_dac + self._half_dac).astype(self._data_type)
-        
         #Select the segment
         self._set_cmd(':TRAC:SEL', seg_ind)
         #Increase the timeout before writing binary-data:
@@ -267,4 +291,26 @@ class AWG_TaborP2584M(Instrument):
         resp = resp.rstrip()
         assert resp.startswith('0'), 'ERROR: "{0}" after writing binary values'.format(resp)
 
+        for mkr_ind, cur_mkr_data in enumerate(mkr_data):
+            if mkr_data[mkr_ind].size == 0:
+                continue
+            # self._set_cmd(':MARK:SEL', mkr_ind+1)
+
+            if self._data_type == np.uint16:
+                cur_mkrs = mkr_data[mkr_ind][::4].astype(np.uint8)
+            else:
+                cur_mkrs = mkr_data[mkr_ind][::8].astype(np.uint8)
+            cur_mkrs *= 255
+
+            #Increase the timeout before writing binary-data:
+            self._inst.timeout = 30000
+            # Send the binary-data with *OPC? added to the beginning of its prefix.
+            self._inst.write_binary_data(':MARK:DATA', cur_mkrs)
+            # Read the response to the *OPC? query that was added to the prefix of the binary data
+            #resp = inst.read()
+            # Set normal timeout
+            self._inst.timeout = 10000
+            resp = self._inst.send_scpi_query(':SYST:ERR?')
+            resp = resp.rstrip()
+            assert resp.startswith('0'), 'ERROR: "{0}" after writing binary values'.format(resp)
 

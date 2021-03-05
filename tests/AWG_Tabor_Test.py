@@ -36,15 +36,18 @@ new_lab.add_instrument(inst_tabor)
 
 mod_freq_qubit = WM_SinusoidalIQ("QubitFreqMod", 10e6)
 
-awg_wfm_q = WaveformAWG("Waveform 2 CH", [(inst_tabor, 'CH1')], 1e9)
-awg_wfm_q.add_waveform_segment(WFS_Gaussian("init", None, 512e-9, 0.5))
+awg_wfm_q = WaveformAWG("Waveform 2 CH", [(inst_tabor, 'CH1'),(inst_tabor, 'CH2')], 1e9)
+awg_wfm_q.add_waveform_segment(WFS_Gaussian("init", mod_freq_qubit, 512e-9, 0.5))
 awg_wfm_q.add_waveform_segment(WFS_Constant("zero1", None, 512e-9, 0.25))
 awg_wfm_q.add_waveform_segment(WFS_Gaussian("init2", None, 512e-9, 0.5))
 awg_wfm_q.add_waveform_segment(WFS_Constant("zero2", None, 512e-9, 0.0))
 awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments(["init","init2"])
+awg_wfm_q.get_output_channel(0).marker(1).set_markers_to_segments(["zero1","zero2"])
 awg_wfm_q.program_AWG()
 
 inst_tabor._get_channel_output('CH1').Output = True
+inst_tabor._get_channel_output('CH2').Output = True
+inst_tabor._get_channel_output('CH1').marker1_output(True)
 
 # my_param1 = VariableInstrument("len1", awg_wfm2, 'IQFrequency')
 # my_param2 = VariableInstrument("len2", awg_wfm2, 'IQPhase')

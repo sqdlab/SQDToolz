@@ -7,7 +7,7 @@ import re
 from qcodes import Instrument, Parameter, InstrumentChannel
 from qcodes.utils import validators as vals
 
-from .Dependences.Agilent_N8241A_constants_python3 import *
+from sqdtoolz.Drivers.Dependences.Agilent_N8241A_constants_python3 import *
 
 def basestring(s):
     return bytes(str(s), encoding='ascii')

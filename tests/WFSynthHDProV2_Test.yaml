@@ -1,0 +1,11 @@
+instruments:
+  pulser:
+    driver: sqdtoolz.Drivers.DDG_DG645
+    type: DG645
+    address: 'TCPIP::192.168.1.42::INSTR' #'TCPIP::192.168.1.120::INSTR'
+    enable_forced_reconnect: true
+  MWS_Windfreak:
+    driver: sqdtoolz.Drivers.MWS_WFSynthHDProV2
+    type: MWS_WFSynthHDProV2
+    address: 'COM4'
+    enable_forced_reconnect: true

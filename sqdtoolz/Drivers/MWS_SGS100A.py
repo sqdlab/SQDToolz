@@ -3,10 +3,6 @@ from qcodes import Instrument, InstrumentChannel, VisaInstrument, validators as 
 class MWS_SGS100A_Channel(InstrumentChannel):
     def __init__(self, parent:Instrument, name:str) -> None:
         super().__init__(parent, name)
-        self._outputEnable = True
-        self._power = 1.0
-        self._frequency = 1.0e9
-        self._phase = 0.0
         self._mode = 'Continuous'   #Can be: Continuous, PulseModulated
         
         self.add_parameter(name='power', label='Output Power', unit='dBm',

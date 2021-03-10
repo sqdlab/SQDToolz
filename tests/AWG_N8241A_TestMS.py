@@ -20,6 +20,7 @@ new_lab = Laboratory(instr_config_file = "tests\\AWG_N8241A_TestMS.yaml", save_d
 # - SYNC CLK OUT on Master goes into SYNC CLK IN on Slave
 # - Using M4 on master to trigger the slave AWG via Trigger 4 (could simply do this by just routing the clock lines to both AWGs...)
 # - The DDG output triggers the first master AWG
+# - Also using an external 10MHz reference on the AWG...
 
 #Sample Clock
 freq_module = GENmwSource(new_lab.station.load_SGS100A().get_output('RFOUT'))
@@ -58,6 +59,5 @@ awg_wfm_q2.add_waveform_segment(WFS_Gaussian("init2", mod_freq_qubit, 512e-9, 0.
 awg_wfm_q2.add_waveform_segment(WFS_Constant("zero2", None, 512e-9, 0.0))
 awg_wfm_q2.get_output_channel(0).marker(0).set_markers_to_segments(["init","init2"])
 awg_wfm_q2.program_AWG()
-
 
 input('press <ENTER> to continue')

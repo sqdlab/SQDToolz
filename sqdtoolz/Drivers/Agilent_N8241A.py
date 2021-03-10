@@ -531,6 +531,15 @@ class Agilent_N8241A(Instrument):
                            set_cmd=False,
                            parameter_class=AGN_Parameter)
 
+        ########################
+        #!!!!!!DISCLAIMER!!!!!!#
+        #
+        #THE FOLLOWING CODE IS PRESENT TO INITIALISE THE AWG INTO ITS USUAL DEFAULT STATE
+        #ADD IN ENTRIES INTO THE YAML TO CHANGE SAID DEFAULTS. THE CURRENT ORDERING WORKS
+        #IN BOTH INDEPENDENT AND MASTER/SLAVE CONFIGURATIONS - SO IF THESE COMMANDS ARE
+        #CHANGED, ENSURE THAT THE MASTER/SLAVE CONFIGURATION STILL WORKS CORRECTLY BEFORE
+        #PROCEEDING ONWARDS.
+
         #Setup clock to be internal for this case...
         self.ref_clock_source('External')
         if init_clk_src == 'Internal':
@@ -569,8 +578,8 @@ class Agilent_N8241A(Instrument):
         # self.clock_source('Internal')
         #self.ch1.configure_trigger_source(1024) # No Trigger flag
         #self.ch2.configure_trigger_source(1024) # No Trigger flag
-        # self.ch1.configure_trigger_source(1|1026|1028|1032|1040) # any hardware trigger input
-        # self.ch2.configure_trigger_source(1|1026|1028|1032|1040) # any hardware trigger input
+        self.ch1.configure_trigger_source(1|1026|1028|1032|1040) # any hardware trigger input
+        self.ch2.configure_trigger_source(1|1026|1028|1032|1040) # any hardware trigger input
         #Setup the marker sources to be for channels 1 and 2.
         self.m1.source('Channel 1 Marker 1')
         self.m2.source('Channel 1 Marker 2')
@@ -1555,7 +1564,7 @@ class Agilent_N8241A(Instrument):
             else:
                 self._last_handle_wfm2 = self.create_arb_waveform(wfm_data / self.ch2.gain())
             self.configure_arb_waveform(2, self._last_handle_wfm2, self.ch2.gain(), 0.0)
-
+        #Not required for Independent mode, but it is required for Master/Slave mode
         self.run()
     
     def _get_awg_sync_state(self):

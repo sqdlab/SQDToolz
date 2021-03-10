@@ -208,7 +208,7 @@ class WaveformAWG:
         #Prepare the waveform
         final_wfms = self._assemble_waveform_raw()
         for ind, cur_awg_chan in enumerate(self._awg_chan_list):
-            cur_awg_chan._instr_awg.SampleRate = self._sample_rate
+            # cur_awg_chan._instr_awg.SampleRate = self._sample_rate
             if len(cur_awg_chan._awg_mark_list) > 0:
                 mkr_list = [x._assemble_marker_raw() for x in cur_awg_chan._awg_mark_list]
                 cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.short_name, final_wfms[ind], mkr_list)

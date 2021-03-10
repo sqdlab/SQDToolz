@@ -7,7 +7,7 @@ import re
 from qcodes import Instrument, Parameter, InstrumentChannel
 from qcodes.utils import validators as vals
 
-from sqdtoolz.Drivers.Dependences.Agilent_N8241A_constants_python3 import *
+from sqdtoolz.Drivers.Dependencies.Agilent_N8241A_constants_python3 import *
 
 def basestring(s):
     return bytes(str(s), encoding='ascii')
@@ -412,7 +412,7 @@ class Agilent_N8241A(Instrument):
             'TCPIP0::192.168.15.100::inst0::INSTR'
         **kwargs: passed to base class
     """
-    def __init__(self, name: str, ivi_dll: str, address: str, reset: bool=False, **kwargs) -> None:
+    def __init__(self, name: str, ivi_dll: str, address: str, init_clk_src='Internal', init_sync_mode='Independent', reset: bool=False, **kwargs) -> None:
 
         super().__init__(name=name, **kwargs)
 
@@ -531,9 +531,20 @@ class Agilent_N8241A(Instrument):
                            set_cmd=False,
                            parameter_class=AGN_Parameter)
 
-        self.ref_clock_source('Internal')
-        self.configure_sample_clock(source=0, freq=1.25e9)
-        self.configure_clock_sync(enabled=False, master=True)
+        #Setup clock to be internal for this case...
+        self.ref_clock_source('External')
+        if init_clk_src == 'Internal':
+            self.configure_sample_clock(source=0, freq=1.25e9)
+        else:
+            self.configure_sample_clock(source=1, freq=1.25e9)
+
+        #Setup synchronisation state
+        self._sync_state = init_sync_mode
+        self.add_parameter('Sync_State', label='Output Enable',
+            get_cmd=self._get_awg_sync_state,
+            set_cmd=self._set_awg_sync_state)
+        self.Sync_State(self._sync_state)
+
         #Setup default mode to be burst
         self.ch1.operation_mode('Burst')
         self.ch1.burst_count(1)
@@ -546,7 +557,7 @@ class Agilent_N8241A(Instrument):
         self.ch1.output_filter(False)
         self.ch2.output_filter(False)
         self.ch1.gain(0.5)
-        self.ch2.gain(0.5)    
+        self.ch2.gain(0.5)
         #self.set_ch1_output_bandwidth(500e6)
         #self.set_ch2_output_bandwidth(500e6)
         #Set output to be 50Ohm and ON by default
@@ -555,17 +566,18 @@ class Agilent_N8241A(Instrument):
         self.ch1.output(True)
         self.ch2.output(True)
         #Setup clock and triggers
-        self.clock_source('Internal')
+        # self.clock_source('Internal')
         #self.ch1.configure_trigger_source(1024) # No Trigger flag
         #self.ch2.configure_trigger_source(1024) # No Trigger flag
-        self.ch1.configure_trigger_source(1|1026|1028|1032|1040) # any hardware trigger input
-        self.ch2.configure_trigger_source(1|1026|1028|1032|1040) # any hardware trigger input
-        self.trigger_threshold_B(0.7)
+        # self.ch1.configure_trigger_source(1|1026|1028|1032|1040) # any hardware trigger input
+        # self.ch2.configure_trigger_source(1|1026|1028|1032|1040) # any hardware trigger input
         #Setup the marker sources to be for channels 1 and 2.
         self.m1.source('Channel 1 Marker 1')
         self.m2.source('Channel 1 Marker 2')
         self.m3.source('Channel 2 Marker 1')
         self.m4.source('Channel 2 Marker 2')
+        self.trigger_threshold_A(0.7)
+        self.trigger_threshold_B(0.7)
 
         self.get_all()
 
@@ -1066,7 +1078,7 @@ class Agilent_N8241A(Instrument):
         if source == 'Internal':
           self.configure_sample_clock(0, 1.25e9)
         elif source == 'External':
-          self.configure_sample_clock(0, self.clock_frequency())
+          self.configure_sample_clock(1, self.clock_frequency())
 
     def _set_sample_clock_frequency(self, freq):
         if self.clock_source():
@@ -1517,6 +1529,8 @@ class Agilent_N8241A(Instrument):
         self.configure_sample_clock(source=0, freq=frequency_hertz)
 
     def program_channel(self, chan_id, wfm_data, mkr_data = np.array([])):        
+        self.stop()
+
         #Bit 6 is Mkr1, Bit 7 is Mkr2
         if len(mkr_data) == 2:
             mkr_data_reduced = np.zeros(int(len(wfm_data)/8))
@@ -1541,4 +1555,20 @@ class Agilent_N8241A(Instrument):
             else:
                 self._last_handle_wfm2 = self.create_arb_waveform(wfm_data / self.ch2.gain())
             self.configure_arb_waveform(2, self._last_handle_wfm2, self.ch2.gain(), 0.0)
+
+        self.run()
     
+    def _get_awg_sync_state(self):
+        return self._sync_state #TODO: Remove this redundant state variable and augment sync_mode?
+    def _set_awg_sync_state(self, new_state):
+        if new_state == 'Independent':
+            self.configure_clock_sync(enabled=False, master=True)
+        elif new_state == 'Master':
+            # self.sync(True)
+            self.configure_clock_sync(enabled=True, master=True)
+        elif new_state == 'Slave':
+            self.configure_clock_sync(enabled=True, master=False)
+        else:
+            assert False, "The AWG SYNC state must be Independent, Master or Slave."
+        self._sync_state = new_state
+        

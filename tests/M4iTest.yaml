@@ -1,0 +1,65 @@
+instruments:
+  M4iDigitizer:
+    driver: sqdtoolz.Drivers.ACQ_M4i_Digitiser
+    type: ACQ_M4i_Digitiser
+    init:
+      cardid: 'spcm0'
+  #The following is just for a DDG, a M/S Agilent setup and a SGS100A for the source. Not really necessary, but nice to have something feeding it...
+  pulser:
+    driver: sqdtoolz.Drivers.DDG_DG645
+    type: DG645
+    address: 'TCPIP::192.168.1.122::INSTR' #'TCPIP::192.168.1.120::INSTR'
+    enable_forced_reconnect: true
+  Agi1:
+    driver: sqdtoolz.Drivers.Agilent_N8241A
+    type: Agilent_N8241A
+    init:
+      address: 'TCPIP::192.168.1.102::INSTR'
+      ivi_dll: 'C:/Program Files/IVI Foundation/IVI/Bin/AGN6030A.dll'
+      init_sync_mode: 'Master'
+      init_clk_src: 'External'
+      reset: True
+    parameters:
+      clock_frequency:
+        initial_value: 1.25e9
+      m4.source:
+        initial_value: 'Hardware Trigger 1' #Set after default configuration sets it to Burst Mode...
+  Agi2:
+    driver: sqdtoolz.Drivers.Agilent_N8241A
+    type: Agilent_N8241A
+    init:
+      address: 'TCPIP::192.168.1.101::INSTR'
+      ivi_dll: 'C:/Program Files/IVI Foundation/IVI/Bin/AGN6030A.dll'
+      init_sync_mode: 'Slave'
+      init_clk_src: 'External'
+      reset: True
+    parameters:
+      clock_frequency:
+        initial_value: 1.25e9
+  SGS100A:
+    driver: sqdtoolz.Drivers.MWS_SGS100A
+    type: MWS_SGS100A
+    address: 'TCPIP::192.168.1.118::INSTR'
+    enable_forced_reconnect: true
+    parameters:
+      ref_osc_source:
+        initial_value: 'INT' #Can be INT or EXT
+      ref_osc_output_freq:
+        initial_value: '10MHz'  #Can be '10MHz', '100MHz', '1000MHz'
+      ref_osc_external_freq:
+        initial_value: '10MHz'  #Can be '10MHz', '100MHz', '1000MHz'
+      alc:
+        initial_value: 'OFF'  #Can be ON, OFF, AUTO
+      #Output Channel Parameters
+      RFOUT.output:
+        initial_value: 'OFF'
+      RFOUT.frequency:
+        initial_value: 1.25e9
+      RFOUT.phase:
+        initial_value: 0.0
+      RFOUT.power:
+        initial_value: 0
+      RFOUT.pulsemod_state:
+        initial_value: 'OFF'
+      RFOUT.pulsemod_source:
+        initial_value: 'EXT'

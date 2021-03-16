@@ -343,3 +343,106 @@ class AWG_TaborP2584M(Instrument):
             resp = resp.rstrip()
             assert resp.startswith('0'), 'ERROR: "{0}" after writing binary values'.format(resp)
 
+
+    def get_data(self):
+        ##########Setup Digitizer
+
+        # Setup the digitizer in two-channels mode
+        self._inst.send_scpi_cmd(':DIG:MODE DUAL')
+        self._inst.send_scpi_cmd(':DIG:FREQ 2500MHZ')
+
+        # Set Trigger level to 0.2V
+        self._inst.send_scpi_cmd(':DIG:TRIG:LEV1 0.7')
+
+        # Enable capturing data from channel 1
+        self._inst.send_scpi_cmd(':DIG:CHAN:SEL 1')
+        self._inst.send_scpi_cmd(':DIG:CHAN:STATE ENAB')
+        # Select the external-trigger as start-capturing trigger:
+        self._inst.send_scpi_cmd(':DIG:TRIG:SOURCE EXT')
+
+        # Enable capturing data from channel 2
+        self._inst.send_scpi_cmd(':DIG:CHAN:SEL 2')
+        self._inst.send_scpi_cmd(':DIG:CHAN:STATE ENAB')
+        # Select the external-trigger as start-capturing trigger:
+        self._inst.send_scpi_cmd(':DIG:TRIG:SOURCE EXT')
+
+        # Allocate four frames of 4800 samples
+        numframes, framelen = 4, 4800
+        cmd = ':DIG:ACQuire:FRAM:DEF {0},{1}'.format(numframes, framelen)
+        self._inst.send_scpi_cmd(cmd)
+
+        # Select the frames for the capturing 
+        # (all the four frames in this example)
+        capture_first, capture_count = 1, numframes
+        cmd = ":DIG:ACQuire:FRAM:CAPT {0},{1}".format(capture_first, capture_count)
+        self._inst.send_scpi_cmd(cmd)
+
+        # Clean memory 
+        self._inst.send_scpi_cmd(':DIG:ACQ:ZERO:ALL')
+
+        resp = self._inst.send_scpi_query(':SYST:ERR?')
+
+
+        ##########Setup Digitizer
+        # Stop the digitizer's capturing machine (to be on the safe side)
+        self._inst.send_scpi_cmd(':DIG:INIT OFF')
+
+        # Start the digitizer's capturing machine
+        self._inst.send_scpi_cmd(':DIG:INIT ON')
+
+        print('Waiting for status done bit ..')
+        loopcount = 0
+        done = 0
+        while done == 0:
+            resp = self._inst.send_scpi_query(":DIG:ACQuire:FRAM:STATus?")
+            resp_items = resp.split(',')
+            done = int(resp_items[1])
+            print("{0}. {1}".format(done, resp_items))
+            loopcount += 1
+            if loopcount == 10:
+                print("No Trigger was detected")
+                done = 1  
+        print("Capture Done")
+
+        # Stop the digitizer's capturing machine (to be on the safe side)
+        self._inst.send_scpi_cmd(':DIG:INIT OFF')
+
+        resp = self._inst.send_scpi_query(':SYST:ERR?')
+
+
+        ################## Read all frames from Memory
+        # Choose which frames to read (all in this example)
+        self._inst.send_scpi_cmd(':DIG:DATA:SEL ALL')
+
+        # Choose what to read 
+        # (only the frame-data without the header in this example)
+        self._inst.send_scpi_cmd(':DIG:DATA:TYPE FRAM')
+
+        # Get the total data size (in bytes)
+        resp = self._inst.send_scpi_query(':DIG:DATA:SIZE?')
+        num_bytes = np.uint32(resp)
+        print('Total size in bytes: ' + resp)
+        print()
+
+        # Read the data that was captured by channel 1:
+        self._inst.send_scpi_cmd(':DIG:CHAN:SEL 1')
+
+        wavlen = num_bytes // 2
+
+        wav1 = np.zeros(wavlen, dtype=np.uint16)
+
+        rc = self._inst.read_binary_data(':DIG:DATA:READ?', wav1, num_bytes)
+
+        # Read the data that was captured by channel 2:
+        self._inst.send_scpi_cmd(':DIG:CHAN:SEL 2')
+
+        wavlen = num_bytes // 2
+
+        wav2 = np.zeros(wavlen, dtype=np.uint16)
+
+        rc = self._inst.read_binary_data(':DIG:DATA:READ?', wav2, num_bytes)
+
+        resp = self._inst.send_scpi_query(':SYST:ERR?')
+
+
+        return wav1

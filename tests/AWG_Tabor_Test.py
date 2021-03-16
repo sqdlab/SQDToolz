@@ -56,9 +56,10 @@ inst_tabor._get_channel_output('CH1').marker2_output(True)
 # lePlot = tc.plot().show()
 # leData = new_exp.run(tc, [(my_param1, np.linspace(20e6,35e6,10)),(my_param2, np.linspace(0,3,3))])
 
-# import matplotlib.pyplot as plt
-# plt.plot(np.abs(leData[0][0][:]))
-# plt.show()
+a = inst_tabor.get_data()
+import matplotlib.pyplot as plt
+plt.plot(a)
+plt.show()
 input('press <ENTER> to continue')
 
 awg_wfm_A = WaveformAWG("Waveform 2 CH", [(inst_tabor, 'CH1')], 1e9)

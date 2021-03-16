@@ -37,7 +37,7 @@ class AWG_TaborP2584M_channel(InstrumentChannel):
             'output', label='Output Enable',
             get_cmd=partial(self._get_cmd, ':OUTP?'),
             set_cmd=partial(self._set_cmd, ':OUTP'),
-            val_mapping={True:  1, False: 0})
+            val_mapping={True: 'ON', False: 'OFF'})
 
         self.add_parameter(
             'trig_src', label='Output Enable',
@@ -48,10 +48,10 @@ class AWG_TaborP2584M_channel(InstrumentChannel):
         #Marker parameters
         for cur_mkr in [1,2]:            
             self.add_parameter(
-                f'marker{cur_mkr}_output', label=f'Channel {channel} Marker {cur_mkr} output',
+                f'marker{cur_mkr}_output', label=f'Channel {channel} Marker {cur_mkr-1} output',
                 get_cmd=partial(self._get_mkr_cmd, ':MARK?', cur_mkr),
                 set_cmd=partial(self._set_mkr_cmd, ':MARK', cur_mkr),
-                val_mapping={True:  1, False: 0})
+                val_mapping={True: 'ON', False: 'OFF'})
 
     def _get_cmd(self, cmd):
         #Perform channel-select
@@ -71,7 +71,7 @@ class AWG_TaborP2584M_channel(InstrumentChannel):
         #Perform marker-select
         self._parent._inst.send_scpi_cmd(f':MARK:SEL {mkr_num}')
         #Perform command
-        self._parent._inst.send_scpi_query(cmd)
+        return self._parent._inst.send_scpi_query(cmd)
 
     def _set_mkr_cmd(self, cmd, mkr_num, value):
         #Perform channel-select
@@ -184,7 +184,7 @@ class AWG_TaborP2584M(Instrument):
             cur_channel = AWG_TaborP2584M_channel(self, ch_name, ch_ind+1)
             self.add_submodule(ch_name, cur_channel)
 
-    def close():
+    def close(self):
         #Override QCoDeS function to ensure proper resource release
         #close connection
         self._inst.close_instrument()
@@ -309,6 +309,7 @@ class AWG_TaborP2584M(Instrument):
         resp = resp.rstrip()
         assert resp.startswith('0'), 'ERROR: "{0}" after writing binary values'.format(resp)
 
+        total_mkrs = np.array([])
         for mkr_ind, cur_mkr_data in enumerate(mkr_data):
             if mkr_data[mkr_ind].size == 0:
                 continue
@@ -318,12 +319,22 @@ class AWG_TaborP2584M(Instrument):
                 cur_mkrs = mkr_data[mkr_ind][::4].astype(np.uint8)
             else:
                 cur_mkrs = mkr_data[mkr_ind][::8].astype(np.uint8)
-            cur_mkrs *= 255
-
+            #Bit 1 for MKR1, Bit 2 for MKR2 - must perform bit-shifts if it's MKR3 or MKR4, but these outputs are not present in this module...
+            if mkr_ind == 0:
+                cur_mkrs *= 1
+            elif mkr_ind == 1:
+                cur_mkrs *= 2
+            #
+            if total_mkrs.size == 0:
+                total_mkrs = cur_mkrs
+            else:
+                total_mkrs += cur_mkrs
+        #
+        if total_mkrs.size > 0:
             #Increase the timeout before writing binary-data:
             self._inst.timeout = 30000
             # Send the binary-data with *OPC? added to the beginning of its prefix.
-            self._inst.write_binary_data(':MARK:DATA', cur_mkrs)
+            self._inst.write_binary_data(':MARK:DATA', total_mkrs)
             # Read the response to the *OPC? query that was added to the prefix of the binary data
             #resp = inst.read()
             # Set normal timeout

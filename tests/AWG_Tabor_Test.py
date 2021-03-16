@@ -47,6 +47,7 @@ awg_wfm_q.program_AWG()
 awg_wfm_q.get_output_channel(0).Output = True
 awg_wfm_q.get_output_channel(1).Output = True
 inst_tabor._get_channel_output('CH1').marker1_output(True)
+inst_tabor._get_channel_output('CH1').marker2_output(True)
 
 # my_param1 = VariableInstrument("len1", awg_wfm2, 'IQFrequency')
 # my_param2 = VariableInstrument("len2", awg_wfm2, 'IQPhase')

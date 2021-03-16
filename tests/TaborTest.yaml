@@ -4,3 +4,14 @@ instruments:
     type: DG645
     address: 'TCPIP::192.168.1.42::INSTR' #'TCPIP::192.168.1.120::INSTR'
     enable_forced_reconnect: true
+  TaborAWG:
+    driver: sqdtoolz.Drivers.AWG_TaborP2584M
+    type: AWG_TaborP2584M
+    init:
+      pxi_chassis: 0
+      pxi_slot: 3
+    parameters:
+      CH1.trig_src:
+        initial_value: 'TRG1'
+      CH2.trig_src:
+        initial_value: 'TRG1'

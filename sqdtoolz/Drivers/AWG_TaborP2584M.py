@@ -7,6 +7,7 @@ import numpy as np
 import time
 
 from qcodes import Instrument, InstrumentChannel, validators as vals
+from qcodes.instrument.parameter import ManualParameter
 import numpy as np
 from functools import partial
 
@@ -37,6 +38,12 @@ class AWG_TaborP2584M_channel(InstrumentChannel):
             get_cmd=partial(self._get_cmd, ':OUTP?'),
             set_cmd=partial(self._set_cmd, ':OUTP'),
             val_mapping={True:  1, False: 0})
+
+        self.add_parameter(
+            'trig_src', label='Output Enable',
+            parameter_class=ManualParameter,
+            initial_value='NONE',
+            vals=vals.Enum('NONE','TRG1','TRG2'))
         
         #Marker parameters
         for cur_mkr in [1,2]:            
@@ -158,7 +165,6 @@ class AWG_TaborP2584M(Instrument):
             vals=vals.Numbers(1e9, 9e9),    #Note that this is a cheat using Nyquist trickery...
             get_parser=float)
             
-            
         #Setup triggering
         # self._set_cmd(':TRIG:SOUR:ENAB', 'TRG1')
         self._set_cmd(':TRIG:SEL', 'TRG1')
@@ -239,12 +245,9 @@ class AWG_TaborP2584M(Instrument):
         
         # self._send_data_to_memory(seg_id, cur_data)
         self._send_data_to_memory(seg_id, cur_data, mkr_data)
-        self._program_task_table(chan_ind+1, [AWG_TaborP2584M_task(seg_id, 1, 1, 'TRG1')])
+        self._program_task_table(chan_ind+1, [AWG_TaborP2584M_task(seg_id, 1, 1, cur_chnl.trig_src())])
         
-        # self._set_cmd(':INST:CHAN', chan_ind+1)
-        # self._set_cmd(':SOUR:FUNC:MODE:TASK', 1)
-        self._set_cmd(':SOUR:FUNC:MODE:TYPE', 'TASK')
-        # self._set_cmd('FUNC:MODE','TASK')
+        self._set_cmd('FUNC:MODE', 'TASK')
 
     def _program_task_table(self, channel_index, tasks):
         #Select current channel
@@ -252,12 +255,19 @@ class AWG_TaborP2584M(Instrument):
         #Allocate a set number of rows for the task table
         self._set_cmd(':TASK:COMP:LENG', len(tasks))
 
+        #Check that there is at most one trigger source and record it if applicable
+        cur_trig_src = ''
+        for cur_task in tasks:
+            if cur_task.trig_src != '' and cur_task.trig_src != 'NONE':
+                assert cur_trig_src == '' or cur_trig_src == cur_task.trig_src, "Cannot have multiple trigger sources for a given Tabor channel input."
+                cur_trig_src = cur_task.trig_src
+
         for task_ind, cur_task in enumerate(tasks):
             self._set_cmd(':TASK:COMP:SEL', task_ind + 1)
             #Set the task to be solitary (i.e. not a part of an internal sequence inside Tabor...)
             self._send_cmd(':TASK:COMP:TYPE SING')
             #Set task parameters...
-            self._set_cmd(':TASK:COMP:LOOP', cur_task.num_cycles*channel_index)
+            self._set_cmd(':TASK:COMP:LOOP', cur_task.num_cycles)
             self._set_cmd(':TASK:COMP:SEGM', cur_task.seg_num)
             self._set_cmd(':TASK:COMP:NEXT1', cur_task.next_task_ind)
             self._set_cmd(':TASK:COMP:ENAB', cur_task.trig_src)
@@ -271,6 +281,14 @@ class AWG_TaborP2584M(Instrument):
         resp = resp.rstrip()
         assert resp.startswith('0'), 'ERROR: "{0}" after writing task table'.format(resp)
 
+        #Enable triggers if applicable to this channel
+        if cur_trig_src != '':
+            #Select current channel (just in case)
+            self._set_cmd(':INST:CHAN', channel_index)
+            #Enable triggers...
+            self._set_cmd(':TRIG:SEL', cur_trig_src)
+            self._set_cmd(':TRIG:STAT', 'ON')
+        
     def _send_data_to_memory(self, seg_ind, wfm_data_normalised, mkr_data):
         #Condition the data
         final_data = (wfm_data_normalised * self._half_dac + self._half_dac).astype(self._data_type)

@@ -10,7 +10,7 @@ from sqdtoolz.Parameter import*
 from sqdtoolz.Laboratory import*
 from sqdtoolz.Drivers.AWG_TaborP2584M import*
 
-new_lab = Laboratory(instr_config_file = "tests\\SGS100A_Test.yaml", save_dir = "mySaves\\")
+new_lab = Laboratory(instr_config_file = "tests\\TaborTest.yaml", save_dir = "mySaves\\")
 
 #Can be done in YAML
 # instr_ddg = DDG_DG645('ddg_real')
@@ -31,8 +31,7 @@ ddg_module.get_trigger_output('EF').TrigPolarity = 0
 
 new_lab.station.load_pulser().trigger_rate(100e3)
 
-inst_tabor = AWG_TaborP2584M('Tabor_AWG', 0, 3)
-new_lab.add_instrument(inst_tabor)
+inst_tabor = new_lab.station.load_TaborAWG()
 
 mod_freq_qubit = WM_SinusoidalIQ("QubitFreqMod", 10e6)
 
@@ -45,8 +44,8 @@ awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments(["init","init2
 awg_wfm_q.get_output_channel(0).marker(1).set_markers_to_segments(["zero1","zero2"])
 awg_wfm_q.program_AWG()
 
-inst_tabor._get_channel_output('CH1').Output = True
-inst_tabor._get_channel_output('CH2').Output = True
+awg_wfm_q.get_output_channel(0).Output = True
+awg_wfm_q.get_output_channel(1).Output = True
 inst_tabor._get_channel_output('CH1').marker1_output(True)
 
 # my_param1 = VariableInstrument("len1", awg_wfm2, 'IQFrequency')
@@ -59,5 +58,29 @@ inst_tabor._get_channel_output('CH1').marker1_output(True)
 # import matplotlib.pyplot as plt
 # plt.plot(np.abs(leData[0][0][:]))
 # plt.show()
+input('press <ENTER> to continue')
+
+awg_wfm_A = WaveformAWG("Waveform 2 CH", [(inst_tabor, 'CH1')], 1e9)
+awg_wfm_A.add_waveform_segment(WFS_Gaussian("init", None, 512e-9, 0.5))
+awg_wfm_A.add_waveform_segment(WFS_Constant("zero1", None, 512e-9, 0.25))
+awg_wfm_A.add_waveform_segment(WFS_Gaussian("init2", None, 512e-9, 0.5))
+awg_wfm_A.add_waveform_segment(WFS_Constant("zero2", None, 512e-9, 0.0))
+awg_wfm_A.get_output_channel(0).marker(0).set_markers_to_segments(["init","init2"])
+awg_wfm_A.get_output_channel(0).marker(1).set_markers_to_segments(["zero1","zero2"])
+awg_wfm_A.program_AWG()
+
+awg_wfm_B = WaveformAWG("Waveform 2 CH", [(inst_tabor, 'CH1')], 1e9)
+awg_wfm_B.add_waveform_segment(WFS_Gaussian("init", None, 512e-9, -0.5))
+awg_wfm_B.add_waveform_segment(WFS_Constant("zero1", None, 512e-9, 0.25))
+awg_wfm_B.add_waveform_segment(WFS_Gaussian("init2", None, 512e-9, -0.5))
+awg_wfm_B.add_waveform_segment(WFS_Constant("zero2", None, 512e-9, 0.0))
+awg_wfm_B.get_output_channel(0).marker(0).set_markers_to_segments(["init","init2"])
+awg_wfm_B.get_output_channel(0).marker(1).set_markers_to_segments(["zero1","zero2"])
+awg_wfm_B.program_AWG()
+
+inst_tabor._get_channel_output('CH1').Output = True
+inst_tabor._get_channel_output('CH2').Output = True
+inst_tabor._get_channel_output('CH1').marker1_output(True)
+
 
 input('press <ENTER> to continue')

@@ -55,31 +55,31 @@ class AWG_TaborP2584M_channel(InstrumentChannel):
 
     def _get_cmd(self, cmd):
         #Perform channel-select
-        self._parent._inst.send_scpi_cmd(f':INST:CHAN {self._channel}')
+        self._parent.parent._inst.send_scpi_cmd(f':INST:CHAN {self._channel}')
         #Query command
-        return self._parent._inst.send_scpi_query(cmd)
+        return self._parent.parent._inst.send_scpi_query(cmd)
 
     def _set_cmd(self, cmd, value):
         #Perform channel-select
-        self._parent._inst.send_scpi_cmd(f':INST:CHAN {self._channel}')
+        self._parent.parent._inst.send_scpi_cmd(f':INST:CHAN {self._channel}')
         #Perform command
-        self._parent._inst.send_scpi_cmd(f'{cmd} {value}')
+        self._parent.parent._inst.send_scpi_cmd(f'{cmd} {value}')
 
     def _get_mkr_cmd(self, cmd, mkr_num):
         #Perform channel-select
-        self._parent._inst.send_scpi_cmd(f':INST:CHAN {self._channel}')
+        self._parent.parent._inst.send_scpi_cmd(f':INST:CHAN {self._channel}')
         #Perform marker-select
-        self._parent._inst.send_scpi_cmd(f':MARK:SEL {mkr_num}')
+        self._parent.parent._inst.send_scpi_cmd(f':MARK:SEL {mkr_num}')
         #Perform command
-        return self._parent._inst.send_scpi_query(cmd)
+        return self._parent.parent._inst.send_scpi_query(cmd)
 
     def _set_mkr_cmd(self, cmd, mkr_num, value):
         #Perform channel-select
-        self._parent._inst.send_scpi_cmd(f':INST:CHAN {self._channel}')
+        self._parent.parent._inst.send_scpi_cmd(f':INST:CHAN {self._channel}')
         #Perform marker-select
-        self._parent._inst.send_scpi_cmd(f':MARK:SEL {mkr_num}')
+        self._parent.parent._inst.send_scpi_cmd(f':MARK:SEL {mkr_num}')
         #Perform command
-        self._parent._inst.send_scpi_cmd(f'{cmd} {value}')
+        self._parent.parent._inst.send_scpi_cmd(f'{cmd} {value}')
 
 
     @property
@@ -114,9 +114,9 @@ class AWG_TaborP2584M_task:
         self.next_task_ind = next_task_ind  #NOTE: Indexed from 1
         self.trig_src = trig_src
 
-class TaborP2584M_AWG:
-    def __init__(self, parent_instr):
-        self.parent = parent_instr
+class TaborP2584M_AWG(InstrumentChannel):
+    def __init__(self, parent):
+        super().__init__(parent, 'AWG')
 
         self.parent._set_cmd(':INST:CHAN', 1)
         self.parent._send_cmd(':TRAC:DEL:ALL')        
@@ -138,7 +138,7 @@ class TaborP2584M_AWG:
         #Get the available memory in bytes of wavform-data (per DDR):
         self._arbmem_capacity_bytes = int(self.parent._get_cmd(":TRACe:FREE?"))
         
-        self.parent.add_parameter(
+        self.add_parameter(
             'sample_rate', label='Sample Rate', unit='Hz',
             get_cmd=partial(self.parent._get_cmd, ':SOUR:FREQ:RAST?'),
             set_cmd=partial(self.parent._set_cmd, ':SOUR:FREQ:RAST'),
@@ -160,18 +160,16 @@ class TaborP2584M_AWG:
 
         self._ch_list = ['CH1', 'CH2', 'CH3', 'CH4']
         # Output channels added to both the module for snapshots and internal Trigger Sources for the DDG HAL...
-        #!!!NOTE!!! The submodules are added to the parent to keep things simple on the QCoDeS end.
-        #TODO: Look into changing this? Perhaps submodules can be added as Instrument objects instead of channels? Could an AWG object be a channel and have its own sub-channel objects?
         for ch_ind, ch_name in enumerate(self._ch_list):
-            cur_channel = AWG_TaborP2584M_channel(self.parent, ch_name, ch_ind+1)
-            self.parent.add_submodule(ch_name, cur_channel)
+            cur_channel = AWG_TaborP2584M_channel(self, ch_name, ch_ind+1)
+            self.add_submodule(ch_name, cur_channel)
 
     @property
     def SampleRate(self):
-        return self.parent.sample_rate()
+        return self.sample_rate()
     @SampleRate.setter
     def SampleRate(self, frequency_hertz):
-        self.parent.sample_rate(frequency_hertz)
+        self.sample_rate(frequency_hertz)
 
     @property
     def TriggerInputEdge(self):
@@ -184,8 +182,8 @@ class TaborP2584M_AWG:
         return 2
 
     def _get_channel_output(self, identifier):
-        if identifier in self.parent.submodules:
-            return self.parent.submodules[identifier]  #!!!NOTE: Note from above in the initialiser regarding the parent storing the AWG channel submodule
+        if identifier in self.submodules:
+            return self.submodules[identifier]  #!!!NOTE: Note from above in the initialiser regarding the parent storing the AWG channel submodule
         else:
             return None
 
@@ -333,6 +331,7 @@ class Tabor_P2584M(Instrument):
         self._inst.send_scpi_cmd( "*RST")
 
         self._subInst_AWG = TaborP2584M_AWG(self)
+        self.add_submodule('AWG', self._subInst_AWG)
 
         
         ##################################################################

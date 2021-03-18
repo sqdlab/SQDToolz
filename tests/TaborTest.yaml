@@ -11,7 +11,7 @@ instruments:
       pxi_chassis: 0
       pxi_slot: 3
     parameters:
-      CH1.trig_src:
+      AWG.CH1.trig_src:
         initial_value: 'TRG1'
-      CH2.trig_src:
+      AWG.CH2.trig_src:
         initial_value: 'TRG1'

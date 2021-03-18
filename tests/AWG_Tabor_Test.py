@@ -55,12 +55,13 @@ inst_tabor.AWG._get_channel_output('CH1').marker2_output(True)
 # lePlot = tc.plot().show()
 # leData = new_exp.run(tc, [(my_param1, np.linspace(20e6,35e6,10)),(my_param2, np.linspace(0,3,3))])
 
-
-# a = inst_tabor.ACQ.get_data()
-# import matplotlib.pyplot as plt
-# plt.plot(a[0])
-# plt.plot(a[1])
-# plt.show()
+inst_tabor.ACQ.TriggerInputEdge = 0
+a = inst_tabor.ACQ.get_data()
+import matplotlib.pyplot as plt
+plt.plot(a[0][0])
+plt.plot(a[0][1])
+plt.plot(a[1][0])
+plt.show()  #!!!REMEMBER TO CLOSE THE PLOT WINDOW BEFORE CLOSING PYTHON KERNEL OR TABOR LOCKS UP (PC restart won't cut it - needs to be a chassis restart)!!!
 input('press <ENTER> to continue')
 
 awg_wfm_A = WaveformAWG("Waveform 2 CH", [(inst_tabor.AWG, 'CH1')], 1e9)

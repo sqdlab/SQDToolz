@@ -29,7 +29,7 @@ ddg_module.get_trigger_output('EF').TrigPulseDelay = 10e-9
 ddg_module.get_trigger_output('EF').TrigPolarity = 0
 # awg.set_trigger_source(ddg_module.get_trigger_source('A'))
 
-new_lab.station.load_pulser().trigger_rate(100e3)
+new_lab.station.load_pulser().trigger_rate(300e3)
 
 inst_tabor = new_lab.station.load_TaborAWG()
 
@@ -56,9 +56,13 @@ inst_tabor._get_channel_output('CH1').marker2_output(True)
 # lePlot = tc.plot().show()
 # leData = new_exp.run(tc, [(my_param1, np.linspace(20e6,35e6,10)),(my_param2, np.linspace(0,3,3))])
 
+import time
+time.sleep(5)
+
 a = inst_tabor.get_data()
 import matplotlib.pyplot as plt
-plt.plot(a)
+plt.plot(a[0])
+plt.plot(a[1])
 plt.show()
 input('press <ENTER> to continue')
 

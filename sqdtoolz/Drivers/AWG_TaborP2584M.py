@@ -118,7 +118,6 @@ class AWG_TaborP2584M_task:
 class AWG_TaborP2584M(Instrument):
     def __init__(self, name, pxi_chassis: int,  pxi_slot: int, **kwargs):
         super().__init__(name, **kwargs) #No address...
-
         #Currently Tabor doesn't seem to use pxi_chassis in their newer drivers - curious...
 
         # Use lib_dir_path = None 
@@ -381,7 +380,8 @@ class AWG_TaborP2584M(Instrument):
         self._inst.send_scpi_cmd(':DIG:ACQ:ZERO:ALL')
 
         resp = self._inst.send_scpi_query(':SYST:ERR?')
-
+        print(resp)
+        time.sleep(2)
 
         ##########Setup Digitizer
         # Stop the digitizer's capturing machine (to be on the safe side)
@@ -408,6 +408,8 @@ class AWG_TaborP2584M(Instrument):
         self._inst.send_scpi_cmd(':DIG:INIT OFF')
 
         resp = self._inst.send_scpi_query(':SYST:ERR?')
+        print(resp)
+        time.sleep(2)
 
 
         ################## Read all frames from Memory
@@ -443,6 +445,7 @@ class AWG_TaborP2584M(Instrument):
         rc = self._inst.read_binary_data(':DIG:DATA:READ?', wav2, num_bytes)
 
         resp = self._inst.send_scpi_query(':SYST:ERR?')
+        print(resp)
 
 
-        return wav1
+        return (wav1, wav2)

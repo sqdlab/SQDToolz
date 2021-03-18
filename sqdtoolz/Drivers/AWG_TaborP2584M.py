@@ -114,7 +114,6 @@ class AWG_TaborP2584M_task:
         self.next_task_ind = next_task_ind  #NOTE: Indexed from 1
         self.trig_src = trig_src
 
-
 class AWG_TaborP2584M(Instrument):
     def __init__(self, name, pxi_chassis: int,  pxi_slot: int, **kwargs):
         super().__init__(name, **kwargs) #No address...
@@ -137,6 +136,10 @@ class AWG_TaborP2584M(Instrument):
         #Reset - must!
         self._inst.send_scpi_cmd( "*CLS")
         self._inst.send_scpi_cmd( "*RST")
+
+        ##################################################################
+        ##########################INITIALISE AWG##########################
+
         self._inst.send_scpi_cmd( ":INST:CHAN 1")
         self._inst.send_scpi_cmd( ":TRAC:DEL:ALL")        
             
@@ -182,6 +185,46 @@ class AWG_TaborP2584M(Instrument):
         for ch_ind, ch_name in enumerate(self._ch_list):
             cur_channel = AWG_TaborP2584M_channel(self, ch_name, ch_ind+1)
             self.add_submodule(ch_name, cur_channel)
+        ##################################################################
+        
+        ##################################################################
+        ##########################INITIALISE ADC##########################
+        # Setup the digitizer in two-channels mode
+        self._set_cmd(':DIG:MODE', 'DUAL')
+        self._set_cmd(':DIG:FREQ', 2.0e9)
+
+        # Set Trigger level to 0.2V
+        self._set_cmd(':DIG:TRIG:LEV1', 0.7)
+
+        # Enable capturing data from channel 1
+        self._set_cmd(':DIG:CHAN:SEL', 1)
+        self._set_cmd(':DIG:CHAN:STATE', 'ENAB')
+        # Select the external-trigger as start-capturing trigger:
+        self._inst.send_scpi_cmd(':DIG:TRIG:SOURCE EXT')
+
+        # Enable capturing data from channel 2
+        self._inst.send_scpi_cmd(':DIG:CHAN:SEL 2')
+        self._inst.send_scpi_cmd(':DIG:CHAN:STATE ENAB')
+        # Select the external-trigger as start-capturing trigger:
+        self._inst.send_scpi_cmd(':DIG:TRIG:SOURCE EXT')
+
+        # Allocate four frames of 4800 samples
+        numframes, framelen = 4, 4800
+        cmd = ':DIG:ACQuire:FRAM:DEF {0},{1}'.format(numframes, framelen)
+        self._inst.send_scpi_cmd(cmd)
+
+        # Select the frames for the capturing 
+        # (all the four frames in this example)
+        capture_first, capture_count = 1, numframes
+        cmd = ":DIG:ACQuire:FRAM:CAPT {0},{1}".format(capture_first, capture_count)
+        self._inst.send_scpi_cmd(cmd)
+
+        # Clean memory 
+        self._inst.send_scpi_cmd(':DIG:ACQ:ZERO:ALL')
+
+        resp = self._inst.send_scpi_query(':SYST:ERR?')
+        print(resp)
+        time.sleep(1)
 
     def close(self):
         #Override QCoDeS function to ensure proper resource release
@@ -344,44 +387,7 @@ class AWG_TaborP2584M(Instrument):
 
 
     def get_data(self):
-        ##########Setup Digitizer
 
-        # Setup the digitizer in two-channels mode
-        self._inst.send_scpi_cmd(':DIG:MODE DUAL')
-        self._inst.send_scpi_cmd(':DIG:FREQ 2500MHZ')
-
-        # Set Trigger level to 0.2V
-        self._inst.send_scpi_cmd(':DIG:TRIG:LEV1 0.7')
-
-        # Enable capturing data from channel 1
-        self._inst.send_scpi_cmd(':DIG:CHAN:SEL 1')
-        self._inst.send_scpi_cmd(':DIG:CHAN:STATE ENAB')
-        # Select the external-trigger as start-capturing trigger:
-        self._inst.send_scpi_cmd(':DIG:TRIG:SOURCE EXT')
-
-        # Enable capturing data from channel 2
-        self._inst.send_scpi_cmd(':DIG:CHAN:SEL 2')
-        self._inst.send_scpi_cmd(':DIG:CHAN:STATE ENAB')
-        # Select the external-trigger as start-capturing trigger:
-        self._inst.send_scpi_cmd(':DIG:TRIG:SOURCE EXT')
-
-        # Allocate four frames of 4800 samples
-        numframes, framelen = 4, 4800
-        cmd = ':DIG:ACQuire:FRAM:DEF {0},{1}'.format(numframes, framelen)
-        self._inst.send_scpi_cmd(cmd)
-
-        # Select the frames for the capturing 
-        # (all the four frames in this example)
-        capture_first, capture_count = 1, numframes
-        cmd = ":DIG:ACQuire:FRAM:CAPT {0},{1}".format(capture_first, capture_count)
-        self._inst.send_scpi_cmd(cmd)
-
-        # Clean memory 
-        self._inst.send_scpi_cmd(':DIG:ACQ:ZERO:ALL')
-
-        resp = self._inst.send_scpi_query(':SYST:ERR?')
-        print(resp)
-        time.sleep(2)
 
         ##########Setup Digitizer
         # Stop the digitizer's capturing machine (to be on the safe side)

@@ -9,4 +9,13 @@ The format breakdown is mapped onto the required properties for ACQ-compatible d
 - `NumSegments` - Number of segments within an experiment window
 - `NumRepetitions` - Number of experiment windows to capture
 
-Note that each reptitition is typically synchronised via a sequence trigger along with the individual acquisition triggers over each individual segment. The resulting array is referenced as `data[channel][repetition][segment][sample]`. Note that the channels are set or queried via the mandatory driver property `ChannelsAcquired` which holds a boolean list of enabled channels. If multiple channels are to be acquired in a disjointed manner, then one may subdivide the instrument driver into channels which are themselves ACQ-compatible driver objects; a pattern similar to that adopted with the AWG or microwave source drivers. The reason to 
+Note that each reptitition is typically synchronised via a sequence trigger along with the individual acquisition triggers over each individual segment. The resulting array is referenced as `data[channel][repetition][segment][sample]`. Now the demarcation of the channels might suggest that one returns one ACQ-compatible instrument object per channel of the acquisition instrument. However, most acquisition cards tend to operate on the principle of a single acquisition trigger and then acquiring synchronously across multiple input channels. Thus, the channel selection/binding is provided via the following mandatory driver-level properties:
+
+- `ChannelsAvailable` - Read-only property that returns the number of available channels.
+- `ChannelsAcquired`  - A boolean list (size equal to the number of available channels) indexing the channels currently being acquired. For example, if channels 2 and 3 on a 4-channel ACQ instrument are to be read, then the list is: `[False, True, True, False]`.
+
+The idea is that the channels are to read concurrently. If multiple channels are to acquire in a disjointed manner, then one may subdivide the instrument driver into channels which are themselves ACQ-compatible driver objects; a pattern similar to that adopted with the AWG or microwave source drivers. Nonetheless, one may choose to pair up individual portions to perform the device-optimised concurrent readout.
+
+# Note on multipurpose instruments
+
+Some instruments can act as both AWG and ACQ instruments (e.g. the Tabor P2584M). In such cases, there may be a conflict of properties. In such cases, the driver should internally instantiate two separate classes (e.g. one for AWG and one for ACQ) that coordinate with the main driver class. In the case of instantiating a HAL object, one should have a function that returns the appropriate AWG or ACQ object.

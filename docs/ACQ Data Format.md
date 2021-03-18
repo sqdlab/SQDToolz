@@ -18,4 +18,4 @@ The idea is that the channels are to read concurrently. If multiple channels are
 
 # Note on multipurpose instruments
 
-Some instruments can act as both AWG and ACQ instruments (e.g. the Tabor P2584M). In such cases, there may be a conflict of properties. In such cases, the driver should internally instantiate two separate classes (e.g. one for AWG and one for ACQ) that coordinate with the main driver class. In the case of instantiating a HAL object, one should have a function that returns the appropriate AWG or ACQ object.
+Some instruments can act as both AWG and ACQ instruments (e.g. the Tabor P2584M). In such cases, there may be a conflict of properties. In such cases, the driver should internally instantiate two separate `InstrumentChannel` submodules in QCoDeS for each sub-instrument type (e.g. for AWG and ACQ). In the case of instantiating a HAL object, one can access the appropriate submodule for the required AWG or ACQ HAL-level object.

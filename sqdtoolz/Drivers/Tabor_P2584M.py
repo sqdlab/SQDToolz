@@ -117,12 +117,13 @@ class AWG_TaborP2584M_task:
 class TaborP2584M_AWG(InstrumentChannel):
     def __init__(self, parent):
         super().__init__(parent, 'AWG')
+        self._parent = parent
 
-        self.parent._set_cmd(':INST:CHAN', 1)
-        self.parent._send_cmd(':TRAC:DEL:ALL')        
+        self._parent._set_cmd(':INST:CHAN', 1)
+        self._parent._send_cmd(':TRAC:DEL:ALL')        
 
         #Get the DAC mode (8 bits or 16 bits)
-        dac_mode = self.parent._get_cmd(':SYST:INF:DAC?')
+        dac_mode = self._parent._get_cmd(':SYST:INF:DAC?')
         if dac_mode == 'M0':
             self._max_dac = 65535
             self._data_type = np.uint16 
@@ -132,28 +133,28 @@ class TaborP2584M_AWG(InstrumentChannel):
         self._half_dac = self._max_dac // 2.0
 
         #Get number of channels
-        self._num_channels = int(self.parent._get_cmd(":INST:CHAN? MAX"))
+        self._num_channels = int(self._parent._get_cmd(":INST:CHAN? MAX"))
         #Get the maximal number of segments
-        self._max_seg_number = int(self.parent._get_cmd(":TRACe:SELect:SEGMent? MAX"))
+        self._max_seg_number = int(self._parent._get_cmd(":TRACe:SELect:SEGMent? MAX"))
         #Get the available memory in bytes of wavform-data (per DDR):
-        self._arbmem_capacity_bytes = int(self.parent._get_cmd(":TRACe:FREE?"))
+        self._arbmem_capacity_bytes = int(self._parent._get_cmd(":TRACe:FREE?"))
         
         self.add_parameter(
             'sample_rate', label='Sample Rate', unit='Hz',
-            get_cmd=partial(self.parent._get_cmd, ':SOUR:FREQ:RAST?'),
-            set_cmd=partial(self.parent._set_cmd, ':SOUR:FREQ:RAST'),
+            get_cmd=partial(self._parent._get_cmd, ':SOUR:FREQ:RAST?'),
+            set_cmd=partial(self._parent._set_cmd, ':SOUR:FREQ:RAST'),
             vals=vals.Numbers(1e9, 9e9),    #Note that this is a cheat using Nyquist trickery...
             get_parser=float)
             
         #Setup triggering
         # self._set_cmd(':TRIG:SOUR:ENAB', 'TRG1')
-        self.parent._set_cmd(':TRIG:SEL', 'TRG1')
-        self.parent._set_cmd(':TRIG:STAT', 'ON')
-        self.parent._set_cmd(':TRIG:LEV', 0.3)
-        self.parent._set_cmd(':TRIG:SEL', 'TRG2')
-        self.parent._set_cmd(':TRIG:STAT', 'OFF')
-        self.parent._set_cmd(':TRIG:SEL', 'INT')
-        self.parent._set_cmd(':TRIG:STAT', 'OFF')
+        self._parent._set_cmd(':TRIG:SEL', 'TRG1')
+        self._parent._set_cmd(':TRIG:STAT', 'ON')
+        self._parent._set_cmd(':TRIG:LEV', 0.3)
+        self._parent._set_cmd(':TRIG:SEL', 'TRG2')
+        self._parent._set_cmd(':TRIG:STAT', 'OFF')
+        self._parent._set_cmd(':TRIG:SEL', 'INT')
+        self._parent._set_cmd(':TRIG:STAT', 'OFF')
         # self._set_cmd(':INIT:CONT', 'OFF')
 
         self._trigger_edge = 1
@@ -201,23 +202,23 @@ class TaborP2584M_AWG(InstrumentChannel):
         #Idea is to use 1 segment for each waveform channel inside said bank...
         
         #Select channel
-        self.parent._set_cmd(':INST:CHAN', chan_ind+1)
+        self._parent._set_cmd(':INST:CHAN', chan_ind+1)
         #Delete and Define segment (noting that it's taken as 1 or 2 for channels 1|3 and 2|4 respectively...)
         seg_id = int(chan_ind % 2 + 1)
-        self.parent._set_cmd('TRAC:DEL', seg_id)
-        self.parent._send_cmd(f':TRAC:DEF {seg_id}, {cur_data.size}')
+        self._parent._set_cmd('TRAC:DEL', seg_id)
+        self._parent._send_cmd(f':TRAC:DEF {seg_id}, {cur_data.size}')
         
         # self._send_data_to_memory(seg_id, cur_data)
         self._send_data_to_memory(seg_id, cur_data, mkr_data)
         self._program_task_table(chan_ind+1, [AWG_TaborP2584M_task(seg_id, 1, 1, cur_chnl.trig_src())])
         
-        self.parent._set_cmd('FUNC:MODE', 'TASK')
+        self._parent._set_cmd('FUNC:MODE', 'TASK')
 
     def _program_task_table(self, channel_index, tasks):
         #Select current channel
-        self.parent._set_cmd(':INST:CHAN', channel_index)
+        self._parent._set_cmd(':INST:CHAN', channel_index)
         #Allocate a set number of rows for the task table
-        self.parent._set_cmd(':TASK:COMP:LENG', len(tasks))
+        self._parent._set_cmd(':TASK:COMP:LENG', len(tasks))
 
         #Check that there is at most one trigger source and record it if applicable
         cur_trig_src = ''
@@ -227,49 +228,49 @@ class TaborP2584M_AWG(InstrumentChannel):
                 cur_trig_src = cur_task.trig_src
 
         for task_ind, cur_task in enumerate(tasks):
-            self.parent._set_cmd(':TASK:COMP:SEL', task_ind + 1)
+            self._parent._set_cmd(':TASK:COMP:SEL', task_ind + 1)
             #Set the task to be solitary (i.e. not a part of an internal sequence inside Tabor...)
-            self.parent._send_cmd(':TASK:COMP:TYPE SING')
+            self._parent._send_cmd(':TASK:COMP:TYPE SING')
             #Set task parameters...
-            self.parent._set_cmd(':TASK:COMP:LOOP', cur_task.num_cycles)
-            self.parent._set_cmd(':TASK:COMP:SEGM', cur_task.seg_num)
-            self.parent._set_cmd(':TASK:COMP:NEXT1', cur_task.next_task_ind)
-            self.parent._set_cmd(':TASK:COMP:ENAB', cur_task.trig_src)
+            self._parent._set_cmd(':TASK:COMP:LOOP', cur_task.num_cycles)
+            self._parent._set_cmd(':TASK:COMP:SEGM', cur_task.seg_num)
+            self._parent._set_cmd(':TASK:COMP:NEXT1', cur_task.next_task_ind)
+            self._parent._set_cmd(':TASK:COMP:ENAB', cur_task.trig_src)
       
         #Download task table to channel
-        self.parent._send_cmd(':TASK:COMP:WRIT')
+        self._parent._send_cmd(':TASK:COMP:WRIT')
         # self._set_cmd(':FUNC:MODE', 'TASK')
 
         #Check for errors...
-        resp = self.parent._get_cmd(':SYST:ERR?')
+        resp = self._parent._get_cmd(':SYST:ERR?')
         resp = resp.rstrip()
         assert resp.startswith('0'), 'ERROR: "{0}" after writing task table'.format(resp)
 
         #Enable triggers if applicable to this channel
         if cur_trig_src != '':
             #Select current channel (just in case)
-            self.parent._set_cmd(':INST:CHAN', channel_index)
+            self._parent._set_cmd(':INST:CHAN', channel_index)
             #Enable triggers...
-            self.parent._set_cmd(':TRIG:SEL', cur_trig_src)
-            self.parent._set_cmd(':TRIG:STAT', 'ON')
+            self._parent._set_cmd(':TRIG:SEL', cur_trig_src)
+            self._parent._set_cmd(':TRIG:STAT', 'ON')
         
     def _send_data_to_memory(self, seg_ind, wfm_data_normalised, mkr_data):
         #Condition the data
         final_data = (wfm_data_normalised * self._half_dac + self._half_dac).astype(self._data_type)
         #Select the segment
-        self.parent._set_cmd(':TRAC:SEL', seg_ind)
+        self._parent._set_cmd(':TRAC:SEL', seg_ind)
         #Increase the timeout before writing binary-data:
-        self.parent._inst.timeout = 30000
+        self._parent._inst.timeout = 30000
         #Send the binary-data with *OPC? added to the beginning of its prefix.
         # self._inst.write_binary_data('*OPC?; :TRAC:DATA', final_data)
         #!!!There seems to be some API changes that basically breaks their code - removing OPC for now...
-        self.parent._inst.write_binary_data(':TRAC:DATA', final_data)
+        self._parent._inst.write_binary_data(':TRAC:DATA', final_data)
         #Read the response to the *OPC? query that was added to the prefix of the binary data
         #resp = self._inst.()
         #Set normal timeout
-        self.parent._inst.timeout = 10000
+        self._parent._inst.timeout = 10000
         #Check for errors...
-        resp = self.parent._inst.send_scpi_query(':SYST:ERR?')
+        resp = self._parent._inst.send_scpi_query(':SYST:ERR?')
         resp = resp.rstrip()
         assert resp.startswith('0'), 'ERROR: "{0}" after writing binary values'.format(resp)
 
@@ -296,16 +297,125 @@ class TaborP2584M_AWG(InstrumentChannel):
         #
         if total_mkrs.size > 0:
             #Increase the timeout before writing binary-data:
-            self.parent._inst.timeout = 30000
+            self._parent._inst.timeout = 30000
             # Send the binary-data with *OPC? added to the beginning of its prefix.
-            self.parent._inst.write_binary_data(':MARK:DATA', total_mkrs)
+            self._parent._inst.write_binary_data(':MARK:DATA', total_mkrs)
             # Read the response to the *OPC? query that was added to the prefix of the binary data
             #resp = inst.read()
             # Set normal timeout
-            self.parent._inst.timeout = 10000
-            resp = self.parent._get_cmd(':SYST:ERR?')
+            self._parent._inst.timeout = 10000
+            resp = self._parent._get_cmd(':SYST:ERR?')
             resp = resp.rstrip()
             assert resp.startswith('0'), 'ERROR: "{0}" after writing binary values'.format(resp)
+
+class TaborP2584M_ACQ(InstrumentChannel):
+    def __init__(self, parent):
+        super().__init__(parent, 'ACQ')
+        self._parent = parent
+
+        # Setup the digitizer in two-channels mode
+        self._parent._set_cmd(':DIG:MODE', 'DUAL')
+        self._parent._set_cmd(':DIG:FREQ', 2.0e9)
+
+        # Set Trigger level to 0.2V
+        self._parent._set_cmd(':DIG:TRIG:LEV1', 0.7)
+
+        # Enable capturing data from channel 1
+        self._parent._set_cmd(':DIG:CHAN:SEL', 1)
+        self._parent._set_cmd(':DIG:CHAN:STATE', 'ENAB')
+        # Select the external-trigger as start-capturing trigger:
+        self._parent._set_cmd(':DIG:TRIG:SOURCE', 'EXT')
+
+        # Enable capturing data from channel 2
+        self._parent._set_cmd(':DIG:CHAN:SEL', 2)
+        self._parent._set_cmd(':DIG:CHAN:STATE', 'ENAB')
+        # Select the external-trigger as start-capturing trigger:
+        self._parent._set_cmd(':DIG:TRIG:SOURCE', 'EXT')
+
+        # Allocate four frames of 4800 samples
+        numframes, framelen = 4, 4800
+        cmd = ':DIG:ACQuire:FRAM:DEF {0},{1}'.format(numframes, framelen)
+        self._parent._send_cmd(cmd)
+
+        # Select the frames for the capturing 
+        # (all the four frames in this example)
+        capture_first, capture_count = 1, numframes
+        cmd = ":DIG:ACQuire:FRAM:CAPT {0},{1}".format(capture_first, capture_count)
+        self._parent._send_cmd(cmd)
+
+        # Clean memory 
+        self._parent._send_cmd(':DIG:ACQ:ZERO:ALL')
+
+        resp = self._parent._get_cmd(':SYST:ERR?')
+        print(resp)
+        time.sleep(1)
+
+    def get_data(self):
+        ##########Setup Digitizer
+        # Stop the digitizer's capturing machine (to be on the safe side)
+        self._parent._set_cmd(':DIG:INIT', 'OFF')
+
+        # Start the digitizer's capturing machine
+        self._parent._set_cmd(':DIG:INIT', 'ON')
+
+        print('Waiting for status done bit ..')
+        loopcount = 0
+        done = 0
+        while done == 0:
+            resp = self._parent._get_cmd(":DIG:ACQuire:FRAM:STATus?")
+            resp_items = resp.split(',')
+            done = int(resp_items[1])
+            print("{0}. {1}".format(done, resp_items))
+            loopcount += 1
+            if loopcount == 10:
+                print("No Trigger was detected")
+                done = 1  
+        print("Capture Done")
+
+        # Stop the digitizer's capturing machine (to be on the safe side)
+        self._parent._set_cmd(':DIG:INIT', 'OFF')
+
+        resp = self._parent._get_cmd(':SYST:ERR?')
+        print(resp)
+        time.sleep(2)
+
+        ################## Read all frames from Memory
+        # Choose which frames to read (all in this example)
+        self._parent._set_cmd(':DIG:DATA:SEL', 'ALL')
+
+        # Choose what to read 
+        # (only the frame-data without the header in this example)
+        self._parent._set_cmd(':DIG:DATA:TYPE', 'FRAM')
+
+        # Get the total data size (in bytes)
+        resp = self._parent._get_cmd(':DIG:DATA:SIZE?')
+        num_bytes = np.uint32(resp)
+        print('Total size in bytes: ' + resp)
+        print()
+
+        # Read the data that was captured by channel 1:
+        self._parent._set_cmd(':DIG:CHAN:SEL', 1)
+
+        wavlen = num_bytes // 2
+
+        wav1 = np.zeros(wavlen, dtype=np.uint16)
+
+        rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav1, num_bytes)
+
+        # Read the data that was captured by channel 2:
+        self._parent._set_cmd(':DIG:CHAN:SEL', 2)
+
+        wavlen = num_bytes // 2
+
+        wav2 = np.zeros(wavlen, dtype=np.uint16)
+
+        rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav2, num_bytes)
+
+        resp = self._parent._get_cmd(':SYST:ERR?')
+        print(resp)
+
+        return (wav1, wav2)
+
 
 class Tabor_P2584M(Instrument):
     def __init__(self, name, pxi_chassis: int,  pxi_slot: int, **kwargs):
@@ -330,48 +440,9 @@ class Tabor_P2584M(Instrument):
         self._inst.send_scpi_cmd( "*CLS")
         self._inst.send_scpi_cmd( "*RST")
 
-        self._subInst_AWG = TaborP2584M_AWG(self)
-        self.add_submodule('AWG', self._subInst_AWG)
-
-        
-        ##################################################################
-        ##########################INITIALISE ADC##########################
-        # Setup the digitizer in two-channels mode
-        self._set_cmd(':DIG:MODE', 'DUAL')
-        self._set_cmd(':DIG:FREQ', 2.0e9)
-
-        # Set Trigger level to 0.2V
-        self._set_cmd(':DIG:TRIG:LEV1', 0.7)
-
-        # Enable capturing data from channel 1
-        self._set_cmd(':DIG:CHAN:SEL', 1)
-        self._set_cmd(':DIG:CHAN:STATE', 'ENAB')
-        # Select the external-trigger as start-capturing trigger:
-        self._inst.send_scpi_cmd(':DIG:TRIG:SOURCE EXT')
-
-        # Enable capturing data from channel 2
-        self._inst.send_scpi_cmd(':DIG:CHAN:SEL 2')
-        self._inst.send_scpi_cmd(':DIG:CHAN:STATE ENAB')
-        # Select the external-trigger as start-capturing trigger:
-        self._inst.send_scpi_cmd(':DIG:TRIG:SOURCE EXT')
-
-        # Allocate four frames of 4800 samples
-        numframes, framelen = 4, 4800
-        cmd = ':DIG:ACQuire:FRAM:DEF {0},{1}'.format(numframes, framelen)
-        self._inst.send_scpi_cmd(cmd)
-
-        # Select the frames for the capturing 
-        # (all the four frames in this example)
-        capture_first, capture_count = 1, numframes
-        cmd = ":DIG:ACQuire:FRAM:CAPT {0},{1}".format(capture_first, capture_count)
-        self._inst.send_scpi_cmd(cmd)
-
-        # Clean memory 
-        self._inst.send_scpi_cmd(':DIG:ACQ:ZERO:ALL')
-
-        resp = self._inst.send_scpi_query(':SYST:ERR?')
-        print(resp)
-        time.sleep(1)
+        #Add the AWG and ACQ submodules to cordon off the different sub-instrument properties...
+        self.add_submodule('AWG', TaborP2584M_AWG(self))    #!!!NOTE: If this name is changed from 'AWG', make sure to change it in the TaborP2584M_AWG class initializer!
+        self.add_submodule('ACQ', TaborP2584M_ACQ(self))    #!!!NOTE: If this name is changed from 'ACQ', make sure to change it in the TaborP2584M_ACQ class initializer!
 
     def close(self):
         #Override QCoDeS function to ensure proper resource release
@@ -386,74 +457,3 @@ class Tabor_P2584M(Instrument):
         return self._inst.send_scpi_query(cmd)
     def _set_cmd(self, cmd, value):
         self._inst.send_scpi_cmd(f"{cmd} {value}")
-
-    def get_AWG(self):
-        return self._subInst_AWG
-
-    def get_data(self):
-        ##########Setup Digitizer
-        # Stop the digitizer's capturing machine (to be on the safe side)
-        self._inst.send_scpi_cmd(':DIG:INIT OFF')
-
-        # Start the digitizer's capturing machine
-        self._inst.send_scpi_cmd(':DIG:INIT ON')
-
-        print('Waiting for status done bit ..')
-        loopcount = 0
-        done = 0
-        while done == 0:
-            resp = self._inst.send_scpi_query(":DIG:ACQuire:FRAM:STATus?")
-            resp_items = resp.split(',')
-            done = int(resp_items[1])
-            print("{0}. {1}".format(done, resp_items))
-            loopcount += 1
-            if loopcount == 10:
-                print("No Trigger was detected")
-                done = 1  
-        print("Capture Done")
-
-        # Stop the digitizer's capturing machine (to be on the safe side)
-        self._inst.send_scpi_cmd(':DIG:INIT OFF')
-
-        resp = self._inst.send_scpi_query(':SYST:ERR?')
-        print(resp)
-        time.sleep(2)
-
-
-        ################## Read all frames from Memory
-        # Choose which frames to read (all in this example)
-        self._inst.send_scpi_cmd(':DIG:DATA:SEL ALL')
-
-        # Choose what to read 
-        # (only the frame-data without the header in this example)
-        self._inst.send_scpi_cmd(':DIG:DATA:TYPE FRAM')
-
-        # Get the total data size (in bytes)
-        resp = self._inst.send_scpi_query(':DIG:DATA:SIZE?')
-        num_bytes = np.uint32(resp)
-        print('Total size in bytes: ' + resp)
-        print()
-
-        # Read the data that was captured by channel 1:
-        self._inst.send_scpi_cmd(':DIG:CHAN:SEL 1')
-
-        wavlen = num_bytes // 2
-
-        wav1 = np.zeros(wavlen, dtype=np.uint16)
-
-        rc = self._inst.read_binary_data(':DIG:DATA:READ?', wav1, num_bytes)
-
-        # Read the data that was captured by channel 2:
-        self._inst.send_scpi_cmd(':DIG:CHAN:SEL 2')
-
-        wavlen = num_bytes // 2
-
-        wav2 = np.zeros(wavlen, dtype=np.uint16)
-
-        rc = self._inst.read_binary_data(':DIG:DATA:READ?', wav2, num_bytes)
-
-        resp = self._inst.send_scpi_query(':SYST:ERR?')
-        print(resp)
-
-
-        return (wav1, wav2)

@@ -8,7 +8,6 @@ from sqdtoolz.HAL.WaveformModulations import*
 import numpy as np
 from sqdtoolz.Parameter import*
 from sqdtoolz.Laboratory import*
-from sqdtoolz.Drivers.AWG_TaborP2584M import*
 
 new_lab = Laboratory(instr_config_file = "tests\\TaborTest.yaml", save_dir = "mySaves\\")
 
@@ -31,7 +30,8 @@ ddg_module.get_trigger_output('EF').TrigPolarity = 0
 
 new_lab.station.load_pulser().trigger_rate(300e3)
 
-inst_tabor = new_lab.station.load_TaborAWG()
+inst_tabor_main = new_lab.station.load_TaborAWG()
+inst_tabor = inst_tabor_main.get_AWG()
 
 mod_freq_qubit = WM_SinusoidalIQ("QubitFreqMod", 10e6)
 
@@ -57,7 +57,7 @@ inst_tabor._get_channel_output('CH1').marker2_output(True)
 # leData = new_exp.run(tc, [(my_param1, np.linspace(20e6,35e6,10)),(my_param2, np.linspace(0,3,3))])
 
 
-a = inst_tabor.get_data()
+# a = inst_tabor.get_data()
 # import matplotlib.pyplot as plt
 # plt.plot(a[0])
 # plt.plot(a[1])

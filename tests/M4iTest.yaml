@@ -10,6 +10,30 @@ instruments:
     type: DG645
     address: 'TCPIP::192.168.1.122::INSTR' #'TCPIP::192.168.1.120::INSTR'
     enable_forced_reconnect: true
+    parameters:
+      trigger_source:
+        initial_value: 'Internal'
+      trigger_inhibit:
+        initial_value: 'AB, CD, EF, GH'
+      trigger_holdoff:
+        initial_value: 0.0
+      advanced_trigger:
+        initial_value: False
+      burst_mode:
+        initial_value: False
+      CD.trigPulseLength:
+        initial_value: 10.0e-9
+      CD.trigPulseDelay:
+        initial_value: 10.0e-9
+      EF.trigPulseLength:
+        initial_value: 10.0e-9
+      EF.trigPulseDelay:
+        initial_value: 10.0e-9
+      GH.trigPulseLength:
+        initial_value: 10.0e-9
+      GH.trigPulseDelay:
+        initial_value: 10.0e-9
+
   Agi1:
     driver: sqdtoolz.Drivers.Agilent_N8241A
     type: Agilent_N8241A

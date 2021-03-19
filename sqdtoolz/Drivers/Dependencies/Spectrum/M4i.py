@@ -849,11 +849,11 @@ class M4i(Instrument):
         # * SPC_MEMSIZE is ignored
         # * SPC_SEGMENTSIZE is # of samples/segment
         # * SPC_TRIGGERCOUNTER returns # of acquisitions (uint_48)
-        self.total_segments(segments)
         self.segment_size(samples)
         if posttrigger is None:
             posttrigger = samples - 16
         self.posttrigger_memory_size(posttrigger)
+        self.total_segments(segments)
         numch = bin(self.enable_channels()).count("1")
         if not numch:
             raise RuntimeError('No channels are enabled.')
@@ -903,10 +903,17 @@ class M4i(Instrument):
                     data_buffer = ct.cast(ct.addressof(data_buffers) + user_position, 
                                         ct.POINTER(user_length//2*ct.c_int16))
                     data = np.frombuffer(data_buffer.contents, dtype=ct.c_int16)
+                    #Abort if the array is empty (nothing to return/yield...) - See <Comment ALPHA> below
+                    if data.size == 0:
+                        break
                     # abort acquisition if the user sends False
                     abort = yield data.reshape(user_length//samples//numch//2, samples, numch)
                     # free yielded portion of the buffer
                     self._set_param32bit(pyspcm.SPC_DATA_AVAIL_CARD_LEN, user_length)
+                    #Ignore the pyspcm.M2STAT_DATA_END check    - <Commend ALPHA> i.e. otherwise if one requests N segments, it returns N-1 segments (that's not good)
+                    #Realistically speaking, one should 'RTFM' this, but the logic should be sound as it effectively "queries" the buffer to be empty by noting that
+                    #the returned data is of size zero (hence, breaking the loop as above). PP and RB
+                    continue
                 else:
                     # in normal operation, user_length != 0 always coincides with a new block
                     # if a buffer overrun occurs, no new block is reported and 
@@ -1268,3 +1275,15 @@ class M4i(Instrument):
             print('card_memory: %s' % (data.value))
         return (data.value)
         
+
+def runme():
+    new_digi = M4i("test")
+    new_digi.pretrigger_memory_size(0)
+    a = [np.array(x) for x in new_digi.multiple_trigger_fifo_acquisition(8,512,1, posttrigger=512)]
+
+    # assert (num_of_acquisitions*self.samples.get()%4096 == 0) or (num_of_acquisitions*self.samples.get() in [2**4, 2**5, 2**6, 2**7, 2**8, 2**9, 2**10, 2**11]), "The number of total samples requested to the card is not valid.\nThis must be 16, 32, 64, 128, 256, 512, 1k ,2k or any multiple of 4k.\nThe easiest way to ensure this is to use powers of 2 for averages, samples and segments, probably in that order of priority."
+    s=0
+    print("done")
+
+if __name__ == '__main__':
+    runme()

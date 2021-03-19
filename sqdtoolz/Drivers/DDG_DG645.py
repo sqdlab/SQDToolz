@@ -158,8 +158,8 @@ class DG645(VisaInstrument):
         )
         # Burst mode parameters
         self.add_parameter('burst_mode', label='Burst Mode', 
-                           get_cmd='BURM?', get_parser=lambda v: bool(int(v)), 
-                           set_cmd='BURM {}', vals=vals.Bool())
+                           get_cmd='BURM?', 
+                           set_cmd='BURM {}', val_mapping={True:1, False:0})
         self.add_parameter('burst_delay', label='Burst Delay', unit='s',
                            get_cmd='BURD?', get_parser=float,
                            set_cmd='BURD {:.12f}', vals=vals.Numbers(0, 2000))

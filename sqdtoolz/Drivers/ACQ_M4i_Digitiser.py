@@ -76,6 +76,8 @@ class ACQ_M4i_Digitiser(M4i):
             docstring="Number of segments.\
                        Set to zero for autosegmentation.\
                        Connect the sequence start trigger to X0 (X1) for channels 0 (1) of the digitizer.")
+        
+        self._repetitions = 1
     
     @property
     def NumSamples(self):
@@ -97,6 +99,13 @@ class ACQ_M4i_Digitiser(M4i):
     @NumSegments.setter
     def NumSegments(self, num_segs):
         self.segments(num_segs)
+
+    @property
+    def NumRepetitions(self):
+        return self._repetitions
+    @NumRepetitions.setter
+    def NumRepetitions(self, num_reps):
+        self._repetitions = num_reps
 
     @property
     def TriggerInputEdge(self):
@@ -124,9 +133,10 @@ class ACQ_M4i_Digitiser(M4i):
             # only one segment. Not checking for sequence start trigger
             self.multipurpose_mode_0.set('disabled')
         else:
+            self.multipurpose_mode_0.set('disabled')
             # setting number of segments to specific value.
             # Assuming X0 is the sequence start trigger.
-            self.multipurpose_mode_0.set('digital_in')
+            # self.multipurpose_mode_0.set('digital_in')
 
     def _set_channels(self, num_of_channels):
         if num_of_channels == 1:
@@ -153,6 +163,9 @@ class ACQ_M4i_Digitiser(M4i):
         #     logging.warn('Only acquiring {} acquisitions. \
         #     Make sure averages is divisible by {} to acquire the correct number.'.format(blocksize//segments, blocksize//segments))
 
+        total_frames = self.NumRepetitions*self.NumSegments
+        self.multiple_trigger_fifo_acquisition(total_frames, self.NumSamples, 1)
+
         final_arr = [np.array(x) for x in self.multiple_trigger_fifo_acquisition(self.NumSegments, self.NumSamples, 1)]
         #Concatenate the blocks
         final_arr = np.concatenate(final_arr)
@@ -160,14 +173,22 @@ class ACQ_M4i_Digitiser(M4i):
 
 def runme():
     new_digi = ACQ_M4i_Digitiser("test")
-    new_digi.segments(2)#3 * (2**26))
-    new_digi.samples(256)#2**8+2**7)
+    new_digi.segments(4)#3 * (2**26))
+    new_digi.samples(1024)#2**8+2**7)
     
     # term = new_digi._param32bit(30130)
     # term = new_digi.termination_1()
     # new_digi.snapshot()
 
+    # new_digi.pretrigger_memory_size(0)
     a = new_digi.get_data()
+
+    
+    import matplotlib.pyplot as plt
+    for m in range(4):
+        plt.plot(a[0][m])
+    # plt.plot(leData[0][0])
+    plt.show()
 
     #a = [print(np.array(x)) for x in new_digi.multiple_trigger_fifo_acquisition(3*2**26,384,2**11)]
 

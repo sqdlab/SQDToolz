@@ -24,6 +24,13 @@ class ACQ:
         self._instr_acq.NumSegments = num_segs
 
     @property
+    def NumRepetitions(self):
+        return self._instr_acq.NumRepetitions
+    @NumRepetitions.setter
+    def NumRepetitions(self, num_reps):
+        self._instr_acq.NumRepetitions = num_reps
+
+    @property
     def SampleRate(self):
         return self._instr_acq.SampleRate
     @SampleRate.setter

@@ -164,12 +164,12 @@ class ACQ_M4i_Digitiser(M4i):
         #     Make sure averages is divisible by {} to acquire the correct number.'.format(blocksize//segments, blocksize//segments))
 
         total_frames = self.NumRepetitions*self.NumSegments
-        self.multiple_trigger_fifo_acquisition(total_frames, self.NumSamples, 1)
+        # self.multiple_trigger_fifo_acquisition(total_frames, self.NumSamples, 1)
 
-        final_arr = [np.array(x) for x in self.multiple_trigger_fifo_acquisition(self.NumSegments, self.NumSamples, 1)]
+        final_arr = [np.array(x) for x in self.multiple_trigger_fifo_acquisition(total_frames, self.NumSamples, 1)]
         #Concatenate the blocks
         final_arr = np.concatenate(final_arr)
-        return np.array([final_arr[:,:,m] for m in range(self.num_channels)])
+        return np.array([final_arr[:,:,m].reshape(self.NumRepetitions, self.NumSegments, self.NumSamples) for m in range(self.num_channels)])
 
 def runme():
     new_digi = ACQ_M4i_Digitiser("test")

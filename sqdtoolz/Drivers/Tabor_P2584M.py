@@ -46,12 +46,14 @@ class AWG_TaborP2584M_channel(InstrumentChannel):
             vals=vals.Enum('NONE','TRG1','TRG2'))
         
         #Marker parameters
-        for cur_mkr in [1,2]:            
+        for cur_mkr in [1,2]:
             self.add_parameter(
                 f'marker{cur_mkr}_output', label=f'Channel {channel} Marker {cur_mkr-1} output',
                 get_cmd=partial(self._get_mkr_cmd, ':MARK?', cur_mkr),
                 set_cmd=partial(self._set_mkr_cmd, ':MARK', cur_mkr),
                 val_mapping={True: 'ON', False: 'OFF'})
+            self._set_mkr_cmd(':MARK:VOLT:PTOP', cur_mkr, 1.2)
+
 
     def _get_cmd(self, cmd):
         #Perform channel-select
@@ -277,10 +279,11 @@ class TaborP2584M_AWG(InstrumentChannel):
             # self._set_cmd(':MARK:SEL', mkr_ind+1)
 
             if self._data_type == np.uint16:
-                cur_mkrs = mkr_data[mkr_ind][::4].astype(np.uint8)
+                cur_mkrs = mkr_data[mkr_ind][::2].astype(np.uint8)
             else:
-                cur_mkrs = mkr_data[mkr_ind][::8].astype(np.uint8)
-            #Bit 1 for MKR1, Bit 2 for MKR2 - must perform bit-shifts if it's MKR3 or MKR4, but these outputs are not present in this module...
+                #cur_mkrs = mkr_data[mkr_ind][::4].astype(np.uint8)
+                assert False, "Unsupported format! Why is it not even 16-bit anyway? Read the manual to support this format..."
+            #Bit 0 for MKR1, Bit 1 for MKR2 - must perform bit-shifts if it's MKR3 or MKR4, but these outputs are not present in this module...
             if mkr_ind == 0:
                 cur_mkrs *= 1
             elif mkr_ind == 1:
@@ -291,7 +294,9 @@ class TaborP2584M_AWG(InstrumentChannel):
             else:
                 total_mkrs += cur_mkrs
         #
-        if total_mkrs.size > 0:
+        if total_mkrs.size > 0:            
+            #The arrangement four MSBs are for the even marker segments while the four LSBs are for the odd marker segments (starting the count at 1)
+            total_mkrs = total_mkrs[0::2] + np.left_shift(total_mkrs[1::2], 4)
             #Increase the timeout before writing binary-data:
             self._parent._inst.timeout = 30000
             # Send the binary-data with *OPC? added to the beginning of its prefix.
@@ -325,7 +330,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
         self.sample_rate(2.0e9)
 
         # Set Trigger level to 0.5V
-        self._parent._set_cmd(':DIG:TRIG:LEV1', 0.5)
+        self._parent._set_cmd(':DIG:TRIG:LEV1', 0.0)
 
         # Enable capturing data from channel 1
         self._parent._set_cmd(':DIG:CHAN:SEL', 1)
@@ -341,6 +346,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
         self._num_samples = 4800
         self._num_segs = 4
+        self._num_repetitions = 1
         self._last_mem_frames_samples = (-1,-1)
 
     @property
@@ -365,6 +371,13 @@ class TaborP2584M_ACQ(InstrumentChannel):
         self._num_segs = num_segs
 
     @property
+    def NumRepetitions(self):
+        return self._num_repetitions
+    @NumRepetitions.setter
+    def NumRepetitions(self, num_reps):
+        self._num_repetitions = num_reps
+
+    @property
     def TriggerInputEdge(self):
         return self.trigPolarity()
     @TriggerInputEdge.setter
@@ -373,23 +386,23 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
     def _allocate_frame_memory(self):
         # Allocate four frames of 4800 samples
-        cmd = ':DIG:ACQuire:FRAM:DEF {0},{1}'.format(self.NumSegments, self.NumSamples)
+        cmd = ':DIG:ACQuire:FRAM:DEF {0},{1}'.format(self.NumRepetitions*self.NumSegments, self.NumSamples)
         self._parent._send_cmd(cmd)
 
         # Select the frames for the capturing 
         # (all the four frames in this example)
         #TODO: Optimise for repetitions!
-        capture_first, capture_count = 1, self.NumSegments
+        capture_first, capture_count = 1, self.NumRepetitions*self.NumSegments
         cmd = ":DIG:ACQuire:FRAM:CAPT {0},{1}".format(capture_first, capture_count)
         self._parent._send_cmd(cmd)
 
-        self._last_mem_frames_samples = (self.NumSegments, self.NumSamples)
+        self._last_mem_frames_samples = (self.NumRepetitions, self.NumSegments, self.NumSamples)
         self._parent._chk_err('after allocating readout ACQ memory.')
 
     def get_data(self):
         assert self.NumSamples % 48 == 0, "The number of samples must be divisible by 48 if in DUAL mode."
 
-        if self._last_mem_frames_samples[0] != self.NumSegments or self._last_mem_frames_samples[1] != self.NumSamples:
+        if self._last_mem_frames_samples[0] != self.NumRepetitions or self._last_mem_frames_samples[1] != self.NumSegments or self._last_mem_frames_samples[2] != self.NumSamples:
             self._allocate_frame_memory()
 
         # Clean memory 
@@ -414,7 +427,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
             done = int(resp_items[1])
             #print("{0}. {1}".format(done, resp_items))
             loopcount += 1
-            if loopcount == 10:
+            if loopcount == 1000:
                 #print("No Trigger was detected")
                 assert False, "No trigger detected during the acquisiton sniffing window."
                 done = 1  
@@ -453,7 +466,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
         self._parent._chk_err('after downloading the ACQ data from the FGPA DRAM.')
 
-        return [wav1.reshape(self.NumSegments, self.NumSamples), wav2.reshape(self.NumSegments, self.NumSamples)]
+        return [wav1.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples), wav2.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)]
 
 
 class Tabor_P2584M(Instrument):

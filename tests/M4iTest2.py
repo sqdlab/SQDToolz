@@ -75,8 +75,8 @@ leData = expConfig.get_data().astype(np.float32)
 leData2 = expConfig.get_data().astype(np.float32)
 
 import matplotlib.pyplot as plt
-for r in range(leData[0].shape[0]):
-    for s in range(4):
+for r in range(acq_module.NumRepetitions):
+    for s in range(acq_module.NumSegments):
         plt.plot(leData[0][r][s]+4000*r)
 # plt.plot(leData[0][0])
 plt.show()

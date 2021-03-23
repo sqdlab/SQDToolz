@@ -165,19 +165,18 @@ class ACQ_M4i_Digitiser(M4i):
         #     logging.warn('Only acquiring {} acquisitions. \
         #     Make sure averages is divisible by {} to acquire the correct number.'.format(blocksize//segments, blocksize//segments))
 
-        total_frames = self.NumRepetitions*self.NumSegments
-        # self.multiple_trigger_fifo_acquisition(total_frames, self.NumSamples, 1)
+        #Capture extra frame when running SEQ triggering as the SEQ trigger signal on X0 may not align exactly before the first captured segment trigger...
+        if self.enable_TS_SEQ_trig():
+            total_frames = (self.NumRepetitions+1)*self.NumSegments
+        else:
+            total_frames = self.NumRepetitions*self.NumSegments
 
         final_arr = [np.array(x) for x in self.multiple_trigger_fifo_acquisition(total_frames, self.NumSamples, 2, self.NumSegments)]
         #Concatenate the blocks
-        final_arr = np.concatenate(final_arr)
-        
-        #The returned samples may be off due to the SEQ trigger arriving later...
-        num_frames = final_arr.shape[0]
-        num_reps_actual = int(num_frames / self.NumSegments)
-        final_arr = final_arr[:(num_reps_actual * self.NumSegments)]
+        final_arr = np.concatenate(final_arr)       
+        final_arr = final_arr[:(self.NumRepetitions*self.NumSegments)]  #Trim off the end segments if using SEQ trigger (i.e. residual segments that form an incomplete repetition)
 
-        return np.array([final_arr[:,:,m].reshape(num_reps_actual, self.NumSegments, self.NumSamples) for m in range(self.num_channels)])
+        return np.array([final_arr[:,:,m].reshape(self.NumRepetitions, self.NumSegments, self.NumSamples) for m in range(self.num_channels)])
 
 def runme():
     new_digi = ACQ_M4i_Digitiser("test")

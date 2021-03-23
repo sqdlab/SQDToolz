@@ -136,6 +136,7 @@ class ACQ_M4i_Digitiser(M4i):
         else:
             self.multipurpose_mode_0.set('disabled')
             self.enable_TS_SEQ_trig(True)
+            self.initialise_time_stamp_mode()
             # setting number of segments to specific value.
             # Assuming X0 is the sequence start trigger.
             # self.multipurpose_mode_0.set('digital_in')
@@ -156,14 +157,8 @@ class ACQ_M4i_Digitiser(M4i):
         '''
         Gets processed data from the GPU. Processing involves gathering data and passing it through TvMode
         '''
-        # segments = self.segments()
-        # blocksize = min(segments*2**11, segments*1)#2**28//2**int(np.ceil(np.log2(m4idigi.samples.get())))
-        # if segments*1%blocksize == 0:
-        #     blocks = segments*1//blocksize
-        # else:
-        #     blocks = 1
-        #     logging.warn('Only acquiring {} acquisitions. \
-        #     Make sure averages is divisible by {} to acquire the correct number.'.format(blocksize//segments, blocksize//segments))
+        assert self.NumSamples > 32, "M4i requires the number of samples per segment to be at least 32."
+        assert self.NumSamples % 16 == 0, "M4i requires the number of samples per segment to be divisible by 16."
 
         #Capture extra frame when running SEQ triggering as the SEQ trigger signal on X0 may not align exactly before the first captured segment trigger...
         if self.enable_TS_SEQ_trig():
@@ -175,7 +170,7 @@ class ACQ_M4i_Digitiser(M4i):
         #Concatenate the blocks
         final_arr = np.concatenate(final_arr)       
         final_arr = final_arr[:(self.NumRepetitions*self.NumSegments)]  #Trim off the end segments if using SEQ trigger (i.e. residual segments that form an incomplete repetition)
-
+        #TODO: Investigate the impact of multiplying by mVrange/1000/ADC_to_voltage() to get the voltage - may have a slight performance impact?
         return np.array([final_arr[:,:,m].reshape(self.NumRepetitions, self.NumSegments, self.NumSamples) for m in range(self.num_channels)])
 
 def runme():

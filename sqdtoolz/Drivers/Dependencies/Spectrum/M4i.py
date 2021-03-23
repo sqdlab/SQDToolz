@@ -824,15 +824,7 @@ class M4i(Instrument):
         return voltages
 
     def initialise_time_stamp_mode(self):
-        # self.general_command(pyspcm.M2CMD_CARD_START | pyspcm.M2CMD_CARD_ENABLETRIGGER)
         self._set_param32bit(pyspcm.SPC_TIMESTAMP_CMD, pyspcm.SPC_TSMODE_STARTRESET | pyspcm.SPC_TSCNT_REFCLOCKPOS)   #i.e. with reset X0 as the reference reset clock used for sequence triggering
-        # self._set_param32bit(pyspcm.SPC_TIMESTAMP_TIMEOUT, 1500)
-        # # self._set_param32bit(pyspcm.SPC_TIMESTAMP_CMD, pyspcm.SPC_TS_RESET)
-        # assert self.get_error_info32bit() != pyspcm.ERR_TIMEOUT, "Synchronization with external clock signal failed"
-        # #Now we read out the stored synchronization clock and date
-        # sync_data = self._param32bit(pyspcm.SPC_TIMESTAMP_STARTDATE)
-        # sync_time = self._param32bit(pyspcm.SPC_TIMESTAMP_STARTTIME)
-        a=0
 
     def multiple_trigger_fifo_acquisition(self, segments, samples, blocksize, segmentsPerSEQ=0, posttrigger=None):
         '''

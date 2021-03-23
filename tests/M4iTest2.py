@@ -50,7 +50,7 @@ for m in range(4):
     read_segs += [f"init{m}"]
 # awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments(["init","init2"])
 awg_wfm_q.get_output_channel(0).marker(1).set_markers_to_segments(read_segs)
-awg_wfm_q.get_output_channel(1).marker(0).set_markers_to_segments(['SEQPAD'])
+awg_wfm_q.get_output_channel(1).marker(0).set_markers_to_segments(['SEQPAD', 'init0'])
 awg_wfm_q.program_AWG()
 awg_wfm_q.get_output_channel(0).Output = True
 
@@ -64,13 +64,10 @@ acq_module.SampleRate = 500e6
 acq_module.TriggerEdge = 1
 acq_module.set_trigger_source(awg_wfm_q.get_output_channel(0).marker(1))
 
-# awg.set_trigger_source(ddg_module.get_trigger_source('A'))
-
 expConfig = ExperimentConfiguration(10e-6, [ddg_module], [awg_wfm_q], acq_module, [freq_module])
 # lePlot = expConfig.plot().show()
 # input('press <ENTER> to continue')
 
-instr_digi.initialise_time_stamp_mode()
 leData = expConfig.get_data().astype(np.float32)
 leData2 = expConfig.get_data().astype(np.float32)
 
@@ -78,7 +75,6 @@ import matplotlib.pyplot as plt
 for r in range(acq_module.NumRepetitions):
     for s in range(acq_module.NumSegments):
         plt.plot(leData[0][r][s]+4000*r)
-# plt.plot(leData[0][0])
 plt.show()
 
 input('press <ENTER> to continue')

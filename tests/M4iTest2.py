@@ -57,7 +57,7 @@ awg_wfm_q.get_output_channel(0).Output = True
 instr_digi = new_lab.station.load_M4iDigitizer()
 acq_module = ACQ(instr_digi)
 acq_module.NumSamples = 512
-acq_module.NumSegments = 2
+acq_module.NumSegments = 4
 acq_module.NumRepetitions = 2
 acq_module.SampleRate = 500e6
 acq_module.TriggerEdge = 1
@@ -72,10 +72,11 @@ expConfig = ExperimentConfiguration(10e-6, [ddg_module], [awg_wfm_q], acq_module
 
 instr_digi.initialise_time_stamp_mode()
 leData = expConfig.get_data()
+leData2 = expConfig.get_data()
 
 import matplotlib.pyplot as plt
 for r in range(2):
-    for s in range(2):
+    for s in range(4):
         plt.plot(leData[0][r][s])
 # plt.plot(leData[0][0])
 plt.show()

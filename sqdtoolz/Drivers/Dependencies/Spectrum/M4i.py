@@ -786,6 +786,8 @@ class M4i(Instrument):
 
         # invalidate buffer
         self._invalidate_buf(pyspcm.SPCM_BUF_DATA)
+        # invalidate timestamp buffer
+        self._invalidate_buf(pyspcm.SPCM_BUF_TIMESTAMP)
 
         self.general_command(pyspcm.M2CMD_CARD_STOP)
 
@@ -815,8 +817,8 @@ class M4i(Instrument):
         return voltages
 
     def initialise_time_stamp_mode(self):
-        self.general_command(pyspcm.M2CMD_CARD_START | pyspcm.M2CMD_CARD_ENABLETRIGGER)
-        self._set_param32bit(pyspcm.SPC_TIMESTAMP_CMD, pyspcm.SPC_TSMODE_STARTRESET | pyspcm.SPC_TSCNT_INTERNAL)   #i.e. with reset X0 as the reference reset clock used for sequence triggering
+        # self.general_command(pyspcm.M2CMD_CARD_START | pyspcm.M2CMD_CARD_ENABLETRIGGER)
+        self._set_param32bit(pyspcm.SPC_TIMESTAMP_CMD, pyspcm.SPC_TSMODE_STARTRESET | pyspcm.SPC_TSCNT_REFCLOCKPOS)   #i.e. with reset X0 as the reference reset clock used for sequence triggering
         # self._set_param32bit(pyspcm.SPC_TIMESTAMP_TIMEOUT, 1500)
         # # self._set_param32bit(pyspcm.SPC_TIMESTAMP_CMD, pyspcm.SPC_TS_RESET)
         # assert self.get_error_info32bit() != pyspcm.ERR_TIMEOUT, "Synchronization with external clock signal failed"
@@ -890,8 +892,8 @@ class M4i(Instrument):
 
         try:
             # start data acquisition & transfer
-            self.general_command(pyspcm.M2CMD_CARD_START | pyspcm.M2CMD_CARD_ENABLETRIGGER)
-            self.general_command(pyspcm.M2CMD_DATA_STARTDMA | pyspcm.M2CMD_EXTRA_POLL)
+            self.general_command(pyspcm.M2CMD_EXTRA_POLL)
+            self.general_command(pyspcm.M2CMD_CARD_START | pyspcm.M2CMD_CARD_ENABLETRIGGER | pyspcm.M2CMD_DATA_STARTDMA)
             # data transfer
             # SPC_M2STATUS: 
             # * M2STAT_DATA_OVERRUN indicates a buffer overrun on the card
@@ -934,11 +936,11 @@ class M4i(Instrument):
                             lIndex = int (byte_pos / 8) + i * int (16 / 8)
                             # calculate timestamp value
                             timestampVal = pllData[lIndex]
-                            print(timestampVal)
+                            print(((timestampVal & 0xFFFFF0000000000)>>40, timestampVal & 0xFFFFFFFFFF))
                             # # write timestamp value to file
                             ts_vals += [timestampVal]
                             # fileTS.write (str (timestampVal) + "\n")
-
+                        self._set_param32bit(pyspcm.SPC_TS_AVAIL_CARD_LEN, avail_bytes)
 
                         # time_buffer = ct.cast(ct.addressof(time_buffers) + byte_pos, 
                         #                     ct.POINTER(avail_bytes//2*ct.c_int16))

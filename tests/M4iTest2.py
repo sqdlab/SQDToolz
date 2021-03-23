@@ -75,7 +75,7 @@ leData = expConfig.get_data()
 leData2 = expConfig.get_data()
 
 import matplotlib.pyplot as plt
-for r in range(2):
+for r in range(leData[0].shape[0]):
     for s in range(4):
         plt.plot(leData[0][r][s])
 # plt.plot(leData[0][0])

@@ -132,8 +132,10 @@ class ACQ_M4i_Digitiser(M4i):
         elif segments == 1:
             # only one segment. Not checking for sequence start trigger
             self.multipurpose_mode_0.set('disabled')
+            self.enable_TS_SEQ_trig(False)
         else:
             self.multipurpose_mode_0.set('disabled')
+            self.enable_TS_SEQ_trig(True)
             # setting number of segments to specific value.
             # Assuming X0 is the sequence start trigger.
             # self.multipurpose_mode_0.set('digital_in')
@@ -169,7 +171,13 @@ class ACQ_M4i_Digitiser(M4i):
         final_arr = [np.array(x) for x in self.multiple_trigger_fifo_acquisition(total_frames, self.NumSamples, 2)]
         #Concatenate the blocks
         final_arr = np.concatenate(final_arr)
-        return np.array([final_arr[:,:,m].reshape(self.NumRepetitions, self.NumSegments, self.NumSamples) for m in range(self.num_channels)])
+        
+        #The returned samples may be off due to the SEQ trigger arriving later...
+        num_frames = final_arr.shape[0]
+        num_reps_actual = int(num_frames / self.NumSegments)
+        final_arr = final_arr[:(num_reps_actual * self.NumSegments)]
+
+        return np.array([final_arr[:,:,m].reshape(num_reps_actual, self.NumSegments, self.NumSamples) for m in range(self.num_channels)])
 
 def runme():
     new_digi = ACQ_M4i_Digitiser("test")

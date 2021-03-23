@@ -36,8 +36,9 @@ import ctypes as ct
 from functools import partial
 from typing import Union, Type
 
-from qcodes.utils.validators import Enum, Numbers, Anything, Ints
+from qcodes.utils.validators import Enum, Numbers, Anything, Ints, Bool
 from qcodes.instrument.base import Instrument
+from qcodes import ManualParameter
 
 log = logging.getLogger(__name__)
 
@@ -627,6 +628,12 @@ class M4i(Instrument):
                                            pyspcm.SPC_M2CMD),
                            docstring='executes a command for the card or data transfer')
 
+        self.add_parameter('enable_TS_SEQ_trig',
+                           parameter_class=ManualParameter,
+                           initial_value=False,
+                           label='Enable SEQ triggering via X0 input and timestamping',
+                           vals=Bool())
+
         # memsize used for simple channel read-out
         self._channel_memsize = 2**12
 
@@ -882,22 +889,29 @@ class M4i(Instrument):
             0, buffer_bytes*nbuffers
         )
 
-        time_buffers = ct.create_string_buffer(4096*2)
-        #Notify size of 4096 is ignored but needs to be set to 4k...
-        self._def_transfer64bit(
-            pyspcm.SPCM_BUF_TIMESTAMP, pyspcm.SPCM_DIR_CARDTOPC, 4096, ct.byref(time_buffers), 
-            0, 4096*2
-        )
-        pllData = ct.cast (time_buffers, pyspcm.ptr64)
+        first_acq = False
+        if self.enable_TS_SEQ_trig():
+            time_buffers = ct.create_string_buffer(4096*2)
+            #Notify size of 4096 is ignored but needs to be set to 4k...
+            self._def_transfer64bit(
+                pyspcm.SPCM_BUF_TIMESTAMP, pyspcm.SPCM_DIR_CARDTOPC, 4096, ct.byref(time_buffers), 
+                0, 4096*2
+            )
+            pllData = ct.cast (time_buffers, pyspcm.ptr64)
+            first_acq = True
 
         try:
             # start data acquisition & transfer
-            self.general_command(pyspcm.M2CMD_EXTRA_POLL)
+            if self.enable_TS_SEQ_trig():
+                self.general_command(pyspcm.M2CMD_EXTRA_POLL)
             self.general_command(pyspcm.M2CMD_CARD_START | pyspcm.M2CMD_CARD_ENABLETRIGGER | pyspcm.M2CMD_DATA_STARTDMA)
             # data transfer
             # SPC_M2STATUS: 
             # * M2STAT_DATA_OVERRUN indicates a buffer overrun on the card
-            self.general_command(pyspcm.M2CMD_DATA_WAITDMA | pyspcm.M2CMD_EXTRA_WAITDMA)
+            if self.enable_TS_SEQ_trig():
+                self.general_command(pyspcm.M2CMD_DATA_WAITDMA | pyspcm.M2CMD_EXTRA_WAITDMA)
+            else:
+                self.general_command(pyspcm.M2CMD_DATA_WAITDMA)
             status = 0
             abort = False
             overrun = False
@@ -926,29 +940,32 @@ class M4i(Instrument):
                     #Abort if the array is empty (nothing to return/yield...) - See <Comment ALPHA> below
                     if data.size == 0:
                         break
+                    ret_data = data.reshape(user_length//samples//numch//2, samples, numch)
 
-                    avail_bytes = self._param32bit(pyspcm.SPC_TS_AVAIL_USER_LEN)
-                    ts_vals = []
-                    if avail_bytes >= 16:
-                        byte_pos = self._param32bit(pyspcm.SPC_TS_AVAIL_USER_POS)
-                        for i in range (0, int (avail_bytes / 16), 1):
-                            # calculate current timestamp buffer index
-                            lIndex = int (byte_pos / 8) + i * int (16 / 8)
-                            # calculate timestamp value
-                            timestampVal = pllData[lIndex]
-                            print(((timestampVal & 0xFFFFF0000000000)>>40, timestampVal & 0xFFFFFFFFFF))
-                            # # write timestamp value to file
-                            ts_vals += [timestampVal]
-                            # fileTS.write (str (timestampVal) + "\n")
-                        self._set_param32bit(pyspcm.SPC_TS_AVAIL_CARD_LEN, avail_bytes)
-
-                        # time_buffer = ct.cast(ct.addressof(time_buffers) + byte_pos, 
-                        #                     ct.POINTER(avail_bytes//2*ct.c_int16))
-                        # time_stamps = np.frombuffer(time_buffer.contents, dtype=ct.c_int64)
-
+                    if first_acq:
+                        ts_vals = []
+                        if self.enable_TS_SEQ_trig():
+                            avail_bytes = self._param32bit(pyspcm.SPC_TS_AVAIL_USER_LEN)
+                            if avail_bytes >= 16:
+                                byte_pos = self._param32bit(pyspcm.SPC_TS_AVAIL_USER_POS)
+                                for i in range (0, int (avail_bytes / 16), 1):
+                                    # calculate current timestamp buffer index
+                                    lIndex = int (byte_pos / 8) + i * int (16 / 8)
+                                    # calculate timestamp value
+                                    timestampVal = pllData[lIndex]
+                                    #Note that:
+                                    # (timestampVal & 0xFFFFF0000000000)>>40 gives the number of X0 pulses 
+                                    # timestampVal & 0xFFFFFFFFFF gives the time since last X0 pulse (in terms of number of TRIG pulses)
+                                    ts_vals += [(timestampVal & 0xFFFFF0000000000)>>40]
+                                self._set_param32bit(pyspcm.SPC_TS_AVAIL_CARD_LEN, avail_bytes)
+                        #Get first non-zero element - i.e. where the SEQ trigger on X0 has hit
+                        first_ind = next((i for i, x in enumerate(ts_vals) if x), None)
+                        assert first_ind != None, "The SEQ trigger has not been captured - check that it's connected to input X0..."
+                        ret_data = ret_data[first_ind:]
+                        first_acq = False
 
                     # abort acquisition if the user sends False
-                    abort = yield data.reshape(user_length//samples//numch//2, samples, numch)
+                    abort = yield ret_data
                     # free yielded portion of the buffer
                     self._set_param32bit(pyspcm.SPC_DATA_AVAIL_CARD_LEN, user_length)
                     #Ignore the pyspcm.M2STAT_DATA_END check    - <Commend ALPHA> i.e. otherwise if one requests N segments, it returns N-1 segments (that's not good)

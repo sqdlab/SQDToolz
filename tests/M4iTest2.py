@@ -41,6 +41,7 @@ mod_freq_qubit = WM_SinusoidalIQ("QubitFreqMod", 100e6)
 instr_Agi1 = new_lab.station.load_Agi1()
 awg_wfm_q = WaveformAWG("Waveform 1", [(instr_Agi1, 'ch1'),(instr_Agi1, 'ch2')], 1.25e9)
 read_segs = []
+awg_wfm_q.add_waveform_segment(WFS_Constant("SEQPAD", None, 64e-9, 0.0))
 for m in range(4):
     awg_wfm_q.add_waveform_segment(WFS_Gaussian(f"init{m}", mod_freq_qubit, 512e-9, 0.5-0.1*m))
     awg_wfm_q.add_waveform_segment(WFS_Constant(f"zero1{m}", None, 512e-9, 0.01*m))
@@ -49,7 +50,7 @@ for m in range(4):
     read_segs += [f"init{m}"]
 # awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments(["init","init2"])
 awg_wfm_q.get_output_channel(0).marker(1).set_markers_to_segments(read_segs)
-awg_wfm_q.get_output_channel(1).marker(0).set_markers_to_segments(['init0'])
+awg_wfm_q.get_output_channel(1).marker(0).set_markers_to_segments(['SEQPAD'])
 awg_wfm_q.program_AWG()
 awg_wfm_q.get_output_channel(0).Output = True
 
@@ -58,7 +59,7 @@ instr_digi = new_lab.station.load_M4iDigitizer()
 acq_module = ACQ(instr_digi)
 acq_module.NumSamples = 512
 acq_module.NumSegments = 4
-acq_module.NumRepetitions = 2
+acq_module.NumRepetitions = 10
 acq_module.SampleRate = 500e6
 acq_module.TriggerEdge = 1
 acq_module.set_trigger_source(awg_wfm_q.get_output_channel(0).marker(1))
@@ -66,18 +67,17 @@ acq_module.set_trigger_source(awg_wfm_q.get_output_channel(0).marker(1))
 # awg.set_trigger_source(ddg_module.get_trigger_source('A'))
 
 expConfig = ExperimentConfiguration(10e-6, [ddg_module], [awg_wfm_q], acq_module, [freq_module])
-# expConfig = ExperimentConfiguration(10e-6, [ddg_module], [], acq_module, [freq_module])
 # lePlot = expConfig.plot().show()
 # input('press <ENTER> to continue')
 
 instr_digi.initialise_time_stamp_mode()
-leData = expConfig.get_data()
-leData2 = expConfig.get_data()
+leData = expConfig.get_data().astype(np.float32)
+leData2 = expConfig.get_data().astype(np.float32)
 
 import matplotlib.pyplot as plt
 for r in range(leData[0].shape[0]):
     for s in range(4):
-        plt.plot(leData[0][r][s])
+        plt.plot(leData[0][r][s]+4000*r)
 # plt.plot(leData[0][0])
 plt.show()
 

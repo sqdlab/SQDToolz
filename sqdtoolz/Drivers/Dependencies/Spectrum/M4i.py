@@ -834,7 +834,7 @@ class M4i(Instrument):
         # sync_time = self._param32bit(pyspcm.SPC_TIMESTAMP_STARTTIME)
         a=0
 
-    def multiple_trigger_fifo_acquisition(self, segments, samples, blocksize, posttrigger=None):
+    def multiple_trigger_fifo_acquisition(self, segments, samples, blocksize, segmentsPerSEQ=0, posttrigger=None):
         '''
         Multiple recording acquisition with background DMA data transfer.
         
@@ -846,6 +846,8 @@ class M4i(Instrument):
             Number of samples per segment
         blocksize: `int`
             Number of segments per block dispatched for data processing
+        segmentsPerSEQ: `int`
+            Number of segments per repetition (only relevant when using sequence triggering in which enable_TS_SEQ_trig is True)
         posttrigger: `int`, range 16 to samples-16 in steps of 16
             Number of samples recorded after each trigger. Defaults to samples-16. 
             
@@ -892,10 +894,10 @@ class M4i(Instrument):
         first_acq = False
         if self.enable_TS_SEQ_trig():
             time_buffers = ct.create_string_buffer(4096*2)
-            #Notify size of 4096 is ignored but needs to be set to 4k...
+            #Notify size of 4096 is ignored in polling-mode, but needs to be set to 4k...
             self._def_transfer64bit(
                 pyspcm.SPCM_BUF_TIMESTAMP, pyspcm.SPCM_DIR_CARDTOPC, 4096, ct.byref(time_buffers), 
-                0, 4096*2
+                0, (segmentsPerSEQ+1)*16 #Accounting for the 64-bit time-stamp value (allocating 2 blocks' worth - assuming that a block holds one full repetition)
             )
             pllData = ct.cast (time_buffers, pyspcm.ptr64)
             first_acq = True
@@ -944,6 +946,7 @@ class M4i(Instrument):
 
                     if first_acq:
                         ts_vals = []
+                        ts_times = []
                         if self.enable_TS_SEQ_trig():
                             avail_bytes = self._param32bit(pyspcm.SPC_TS_AVAIL_USER_LEN)
                             if avail_bytes >= 16:
@@ -956,8 +959,12 @@ class M4i(Instrument):
                                     #Note that:
                                     # (timestampVal & 0xFFFFF0000000000)>>40 gives the number of X0 pulses 
                                     # timestampVal & 0xFFFFFFFFFF gives the time since last X0 pulse (in terms of number of TRIG pulses)
+                                    ts_times += [timestampVal & 0xFFFFFFFFFF]
                                     ts_vals += [(timestampVal & 0xFFFFF0000000000)>>40]
                                 self._set_param32bit(pyspcm.SPC_TS_AVAIL_CARD_LEN, avail_bytes)
+                        #Debugging helpers:
+                        # print(ts_times)
+                        # print(ts_vals)
                         #Get first non-zero element - i.e. where the SEQ trigger on X0 has hit
                         first_ind = next((i for i, x in enumerate(ts_vals) if x), None)
                         assert first_ind != None, "The SEQ trigger has not been captured - check that it's connected to input X0..."

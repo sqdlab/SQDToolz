@@ -49,12 +49,13 @@ for m in range(4):
     read_segs += [f"init{m}"]
 # awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments(["init","init2"])
 awg_wfm_q.get_output_channel(0).marker(1).set_markers_to_segments(read_segs)
+awg_wfm_q.get_output_channel(1).marker(0).set_markers_to_segments(['init0'])
 awg_wfm_q.program_AWG()
 awg_wfm_q.get_output_channel(0).Output = True
 
 #CONNECTED CHANNEL 1 of Agi1 to Input 0 of digitizer and MARKER 2 of Agi1 to Input Trg0 of digitizer
-
-acq_module = ACQ(new_lab.station.load_M4iDigitizer())
+instr_digi = new_lab.station.load_M4iDigitizer()
+acq_module = ACQ(instr_digi)
 acq_module.NumSamples = 512
 acq_module.NumSegments = 2
 acq_module.NumRepetitions = 2
@@ -69,6 +70,7 @@ expConfig = ExperimentConfiguration(10e-6, [ddg_module], [awg_wfm_q], acq_module
 # lePlot = expConfig.plot().show()
 # input('press <ENTER> to continue')
 
+instr_digi.initialise_time_stamp_mode()
 leData = expConfig.get_data()
 
 import matplotlib.pyplot as plt

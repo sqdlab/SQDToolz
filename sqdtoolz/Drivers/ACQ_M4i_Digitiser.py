@@ -166,7 +166,7 @@ class ACQ_M4i_Digitiser(M4i):
         total_frames = self.NumRepetitions*self.NumSegments
         # self.multiple_trigger_fifo_acquisition(total_frames, self.NumSamples, 1)
 
-        final_arr = [np.array(x) for x in self.multiple_trigger_fifo_acquisition(total_frames, self.NumSamples, 1)]
+        final_arr = [np.array(x) for x in self.multiple_trigger_fifo_acquisition(total_frames, self.NumSamples, 2)]
         #Concatenate the blocks
         final_arr = np.concatenate(final_arr)
         return np.array([final_arr[:,:,m].reshape(self.NumRepetitions, self.NumSegments, self.NumSamples) for m in range(self.num_channels)])

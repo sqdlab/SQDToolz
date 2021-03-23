@@ -814,6 +814,17 @@ class M4i(Instrument):
 
         return voltages
 
+    def initialise_time_stamp_mode(self):
+        self.general_command(pyspcm.M2CMD_CARD_START | pyspcm.M2CMD_CARD_ENABLETRIGGER)
+        self._set_param32bit(pyspcm.SPC_TIMESTAMP_CMD, pyspcm.SPC_TSMODE_STARTRESET | pyspcm.SPC_TSCNT_INTERNAL)   #i.e. with reset X0 as the reference reset clock used for sequence triggering
+        # self._set_param32bit(pyspcm.SPC_TIMESTAMP_TIMEOUT, 1500)
+        # # self._set_param32bit(pyspcm.SPC_TIMESTAMP_CMD, pyspcm.SPC_TS_RESET)
+        # assert self.get_error_info32bit() != pyspcm.ERR_TIMEOUT, "Synchronization with external clock signal failed"
+        # #Now we read out the stored synchronization clock and date
+        # sync_data = self._param32bit(pyspcm.SPC_TIMESTAMP_STARTDATE)
+        # sync_time = self._param32bit(pyspcm.SPC_TIMESTAMP_STARTTIME)
+        a=0
+
     def multiple_trigger_fifo_acquisition(self, segments, samples, blocksize, posttrigger=None):
         '''
         Multiple recording acquisition with background DMA data transfer.
@@ -869,15 +880,22 @@ class M4i(Instrument):
             0, buffer_bytes*nbuffers
         )
 
+        time_buffers = ct.create_string_buffer(4096*2)
+        #Notify size of 4096 is ignored but needs to be set to 4k...
+        self._def_transfer64bit(
+            pyspcm.SPCM_BUF_TIMESTAMP, pyspcm.SPCM_DIR_CARDTOPC, 4096, ct.byref(time_buffers), 
+            0, 4096*2
+        )
+        pllData = ct.cast (time_buffers, pyspcm.ptr64)
+
         try:
             # start data acquisition & transfer
             self.general_command(pyspcm.M2CMD_CARD_START | pyspcm.M2CMD_CARD_ENABLETRIGGER)
-            self.general_command(pyspcm.M2CMD_DATA_STARTDMA)
-
+            self.general_command(pyspcm.M2CMD_DATA_STARTDMA | pyspcm.M2CMD_EXTRA_POLL)
             # data transfer
             # SPC_M2STATUS: 
             # * M2STAT_DATA_OVERRUN indicates a buffer overrun on the card
-            self.general_command(pyspcm.M2CMD_DATA_WAITDMA)
+            self.general_command(pyspcm.M2CMD_DATA_WAITDMA | pyspcm.M2CMD_EXTRA_WAITDMA)
             status = 0
             abort = False
             overrun = False
@@ -906,6 +924,27 @@ class M4i(Instrument):
                     #Abort if the array is empty (nothing to return/yield...) - See <Comment ALPHA> below
                     if data.size == 0:
                         break
+
+                    avail_bytes = self._param32bit(pyspcm.SPC_TS_AVAIL_USER_LEN)
+                    ts_vals = []
+                    if avail_bytes >= 16:
+                        byte_pos = self._param32bit(pyspcm.SPC_TS_AVAIL_USER_POS)
+                        for i in range (0, int (avail_bytes / 16), 1):
+                            # calculate current timestamp buffer index
+                            lIndex = int (byte_pos / 8) + i * int (16 / 8)
+                            # calculate timestamp value
+                            timestampVal = pllData[lIndex]
+                            print(timestampVal)
+                            # # write timestamp value to file
+                            ts_vals += [timestampVal]
+                            # fileTS.write (str (timestampVal) + "\n")
+
+
+                        # time_buffer = ct.cast(ct.addressof(time_buffers) + byte_pos, 
+                        #                     ct.POINTER(avail_bytes//2*ct.c_int16))
+                        # time_stamps = np.frombuffer(time_buffer.contents, dtype=ct.c_int64)
+
+
                     # abort acquisition if the user sends False
                     abort = yield data.reshape(user_length//samples//numch//2, samples, numch)
                     # free yielded portion of the buffer

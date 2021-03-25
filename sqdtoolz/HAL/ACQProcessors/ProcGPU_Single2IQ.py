@@ -20,7 +20,7 @@ class ProcGPU_Single2IQ(ACQProcessor):
         self._ddc_req_freq_smplrt = (0,0)
 
     def pass_data(self, arr):
-        assert arr.shape[0] == 1, "Currently this class does not support multiple channels."
+        assert len(arr) == 1, "Currently this class does not support multiple channels."
 
         self.cur_data_queue.append(arr[0])
         #Start a new thread - otherwise, the thread will automatically check and pop the new array for processing

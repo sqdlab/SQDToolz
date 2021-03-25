@@ -178,10 +178,10 @@ class ACQ_M4i_Digitiser(M4i):
         else:
             #Gather data and either pass it to the data-processor or just collate it under final_arr - note that it is sent to the processor as properly grouped under the ACQ
             #data format specification.
-            cache_array = None
+            cache_array = []
             for cur_block in self.multiple_trigger_fifo_acquisition(total_frames, self.NumSamples, 2, self.NumSegments):
-                if cache_array != None:
-                    arr_blk = np.concatenate(cache_array, np.array(cur_block))
+                if len(cache_array) > 0:
+                    arr_blk = np.concatenate((cache_array, np.array(cur_block)))
                 else:
                     arr_blk = np.array(cur_block)
 

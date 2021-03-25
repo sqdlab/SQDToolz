@@ -13,7 +13,7 @@ from sqdtoolz.Parameter import*
 from sqdtoolz.HAL.WaveformSegments import*
 from sqdtoolz.HAL.WaveformModulations import*
 from sqdtoolz.Parameter import*
-
+from sqdtoolz.HAL.ACQProcessors.ProcGPU_Single2IQ import*
 
 new_lab = Laboratory(instr_config_file = "tests\\M4iTest.yaml", save_dir = "mySaves\\")
 
@@ -68,13 +68,25 @@ expConfig = ExperimentConfiguration(10e-6, [ddg_module], [awg_wfm_q], acq_module
 # lePlot = expConfig.plot().show()
 # input('press <ENTER> to continue')
 
-leData = expConfig.get_data().astype(np.float32)
-leData2 = expConfig.get_data().astype(np.float32)
+# leData = expConfig.get_data().astype(np.float32)
+# leData2 = expConfig.get_data().astype(np.float32)
+# import matplotlib.pyplot as plt
+# for r in range(acq_module.NumRepetitions):
+#     for s in range(acq_module.NumSegments):
+#         plt.plot(leData[0][r][s]+4000*r)
+# plt.show()
+# input('press <ENTER> to continue')
 
+myProc = ProcGPU_Single2IQ()
+myProc.set_ddc_params(500e6, 100e6)
+myProc.add_FIR_LP(40, 25e6)
+acq_module.set_data_processor(myProc)
+leData = expConfig.get_data()
+leData2 = expConfig.get_data()
 import matplotlib.pyplot as plt
 for r in range(acq_module.NumRepetitions):
     for s in range(acq_module.NumSegments):
-        plt.plot(leData[0][r][s]+4000*r)
+        plt.plot(leData[0][r][s].astype(np.float32)+4000*r)
 plt.show()
-
 input('press <ENTER> to continue')
+

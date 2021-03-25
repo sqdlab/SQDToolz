@@ -44,6 +44,6 @@ class DummyACQ(Instrument):
     def TriggerInputEdge(self, pol):
         self._trigger_edge = pol
 
-    def get_data(self):
+    def get_data(self, **kwargs):
         #channels, segments, samples
         return np.array([[np.random.rand(self.NumSamples)]*self.NumSegments])

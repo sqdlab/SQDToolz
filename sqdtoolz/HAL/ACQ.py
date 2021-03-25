@@ -4,6 +4,7 @@ class ACQ:
         self._instr_acq = instr_acq
         self._trig_src_obj = None
         self._name = instr_acq.name
+        self.data_processor = None
 
     @property
     def name(self):
@@ -44,8 +45,11 @@ class ACQ:
     def InputTriggerEdge(self, pol):
         self._instr_acq.TriggerInputEdge = pol
 
+    def set_data_processor(self, proc_obj):
+        self.data_processor = proc_obj
+
     def get_data(self):
-        return self._instr_acq.get_data()
+        return self._instr_acq.get_data(data_processor = self.data_processor)
 
     def set_trigger_source(self, trig_src_obj):
         #TODO: Consider error-checking here

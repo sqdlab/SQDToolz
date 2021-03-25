@@ -190,7 +190,7 @@ class ETHFPGA(Instrument):
     #     self._trigger_edge = pol
     
     
-    def get_data(self):
+    def get_data(self, **kwargs):
         #channels, segments, samples
         return self._call('get_data_blocking')
         

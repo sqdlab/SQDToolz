@@ -153,12 +153,14 @@ class ACQ_M4i_Digitiser(M4i):
         new_rate = self.sample_rate.get()
         logging.warning(f"Cannot set sampling rate to {rate}, it is set to {new_rate} instead")
 
-    def get_data(self):
+    def get_data(self, **kwargs):
         '''
         Gets processed data from the GPU. Processing involves gathering data and passing it through TvMode
         '''
         assert self.NumSamples > 32, "M4i requires the number of samples per segment to be at least 32."
         assert self.NumSamples % 16 == 0, "M4i requires the number of samples per segment to be divisible by 16."
+
+        cur_processor = kwargs.get('data_processor', None)
 
         #Capture extra frame when running SEQ triggering as the SEQ trigger signal on X0 may not align exactly before the first captured segment trigger...
         if self.enable_TS_SEQ_trig():
@@ -166,12 +168,34 @@ class ACQ_M4i_Digitiser(M4i):
         else:
             total_frames = self.NumRepetitions*self.NumSegments
 
-        final_arr = [np.array(x) for x in self.multiple_trigger_fifo_acquisition(total_frames, self.NumSamples, 2, self.NumSegments)]
-        #Concatenate the blocks
-        final_arr = np.concatenate(final_arr)       
-        final_arr = final_arr[:(self.NumRepetitions*self.NumSegments)]  #Trim off the end segments if using SEQ trigger (i.e. residual segments that form an incomplete repetition)
-        #TODO: Investigate the impact of multiplying by mVrange/1000/ADC_to_voltage() to get the voltage - may have a slight performance impact?
-        return np.array([final_arr[:,:,m].reshape(self.NumRepetitions, self.NumSegments, self.NumSamples) for m in range(self.num_channels)])
+        if cur_processor == None:
+            final_arr = [np.array(x) for x in self.multiple_trigger_fifo_acquisition(total_frames, self.NumSamples, 2, self.NumSegments)]
+            #Concatenate the blocks
+            final_arr = np.concatenate(final_arr)       
+            final_arr = final_arr[:(self.NumRepetitions*self.NumSegments)]  #Trim off the end segments if using SEQ trigger (i.e. residual segments that form an incomplete repetition)
+            #TODO: Investigate the impact of multiplying by mVrange/1000/ADC_to_voltage() to get the voltage - may have a slight performance impact?
+            return np.array([final_arr[:,:,m].reshape(self.NumRepetitions, self.NumSegments, self.NumSamples) for m in range(self.num_channels)])
+        else:
+            #Gather data and either pass it to the data-processor or just collate it under final_arr - note that it is sent to the processor as properly grouped under the ACQ
+            #data format specification.
+            cache_array = None
+            for cur_block in self.multiple_trigger_fifo_acquisition(total_frames, self.NumSamples, 2, self.NumSegments):
+                if cache_array != None:
+                    arr_blk = np.concatenate(cache_array, np.array(cur_block))
+                else:
+                    arr_blk = np.array(cur_block)
+
+                num_reps = int(arr_blk.shape[0] / self.NumSegments)
+                cache_array = arr_blk[(num_reps*self.NumSegments):]
+                arr_blk = arr_blk[0:(num_reps*self.NumSegments)]
+
+                blocksize, samples, channels = arr_blk.shape
+                #Separate out the multiple channels
+                arr_blk = [arr_blk[:,:,m].reshape(num_reps, self.NumSegments, samples) for m in range(self.num_channels)]
+
+                cur_processor.pass_data(arr_blk)
+        
+            return cur_processor.get_all_data()
 
 def runme():
     new_digi = ACQ_M4i_Digitiser("test")

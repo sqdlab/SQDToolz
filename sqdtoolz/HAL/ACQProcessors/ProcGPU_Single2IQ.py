@@ -19,7 +19,7 @@ class ProcGPU_Single2IQ(ACQProcessor):
         self._ddc_cur_freq_smplrt = (0,0)
         self._ddc_req_freq_smplrt = (0,0)
 
-    def pass_data(self, arr):
+    def push_data(self, arr):
         assert len(arr) == 1, "Currently this class does not support multiple channels."
 
         self.cur_data_queue.append(arr[0])

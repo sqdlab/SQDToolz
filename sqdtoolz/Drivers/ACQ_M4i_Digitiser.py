@@ -193,7 +193,7 @@ class ACQ_M4i_Digitiser(M4i):
                 #Separate out the multiple channels
                 arr_blk = [arr_blk[:,:,m].reshape(num_reps, self.NumSegments, samples) for m in range(self.num_channels)]
 
-                cur_processor.pass_data(arr_blk)
+                cur_processor.push_data(arr_blk)
         
             return cur_processor.get_all_data()
 

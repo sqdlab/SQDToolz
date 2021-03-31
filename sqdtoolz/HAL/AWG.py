@@ -20,10 +20,20 @@ class WaveformAWG:
         self._sample_rate = sample_rate
         self._global_factor = global_factor
         self._wfm_segment_list = []
+        self._auto_comp = 'None'
+        self._auto_comp_algos = ['None', 'Basic']
 
     @property
     def Name(self):
         return self._name
+
+    @property
+    def AutoCompression(self):
+        return self._auto_comp
+    @AutoCompression.setter
+    def AutoCompression(self, algorithm):
+        assert algorithm in ['None', 'Basic'], f"Unknown algorithm for auto-compression. Allowed algorithms are: {self._auto_comp_algos}"
+        self._auto_comp = algorithm
 
     def clear_segments(self):
         self._wfm_segment_list.clear()
@@ -208,10 +218,54 @@ class WaveformAWG:
         #Prepare the waveform
         final_wfms = self._assemble_waveform_raw()
         for ind, cur_awg_chan in enumerate(self._awg_chan_list):
-            # cur_awg_chan._instr_awg.SampleRate = self._sample_rate
-            if len(cur_awg_chan._awg_mark_list) > 0:
-                mkr_list = [x._assemble_marker_raw() for x in cur_awg_chan._awg_mark_list]
-                cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.short_name, final_wfms[ind], mkr_list)
-            else:
-                cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.short_name, final_wfms[ind])
+            dict_auto_comp = cur_awg_chan._instr_awg.AutoCompressionSupport
+            if self.AutoCompression == 'None' or not dict_auto_comp['Supported'] or final_wfms[0].size < dict_auto_comp['MinSize']*2:
+                #Don't compress if disabled, unsupported or if the waveform size is too small to compress
+                self._program_auto_comp_none(cur_awg_chan, final_wfms[ind])
+            elif self.AutoCompression == 'Basic':
+                #BASIC COMPRESSION
+                #The basic compression algorithm is to chop up the waveform into its minimum set of bite-sized pieces and to find repetitive aspects
+                self._program_auto_comp_basic(cur_awg_chan, final_wfms[ind])
 
+    def _program_auto_comp_none(self, cur_awg_chan, final_wfm_for_chan):
+        #UNCOMPRESSED
+        #Just program the AWG via over a single waveform
+        if len(cur_awg_chan._awg_mark_list) > 0:
+            mkr_list = [x._assemble_marker_raw() for x in cur_awg_chan._awg_mark_list]
+            cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.short_name, final_wfm_for_chan, mkr_list)
+        else:
+            cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.short_name, final_wfm_for_chan)
+
+    def _program_auto_comp_basic(self, cur_awg_chan, final_wfm_for_chan):
+        #TODO: Add flags for changed/requires-update to ensure that segments in sequence are not unnecessary programmed repeatedly...
+        #TODO: Improve algorithm
+        dict_auto_comp = cur_awg_chan._instr_awg.AutoCompressionSupport        
+        dS = dict_auto_comp['MinSize']
+        num_main_secs = int(np.floor(final_wfm_for_chan.size / dS))
+        seq_segs = [final_wfm_for_chan[0:dS]]
+        seq_ids = [0]
+        for m in range(1,num_main_secs):
+            cur_seg = final_wfm_for_chan[(m*dS):((m+1)*dS)]
+            found_match = False
+            for ind, cur_seq_seg in enumerate(seq_segs):
+                if np.array_equal(cur_seg, cur_seq_seg):
+                    seq_ids += [ind]
+                    found_match = True
+                    break
+            if not found_match:
+                seq_ids += [len(seq_segs)]
+                seq_segs += [cur_seg]
+        if (m+1)*dS < final_wfm_for_chan.size:
+            #Reverse it if it was matched against some other segment previously...
+            if found_match:
+                seq_ids[-1] = len(seq_segs)
+                seq_segs += final_wfm_for_chan[(m*dS):]
+            else:
+                seq_segs[-1] = final_wfm_for_chan[(m*dS):]
+
+        if len(cur_awg_chan._awg_mark_list) > 0:
+            mkr_list = [x._assemble_marker_raw() for x in cur_awg_chan._awg_mark_list]
+            cur_awg_chan._instr_awg.program_channel_sequence(cur_awg_chan._instr_awg_chan.short_name, seq_segs, seq_ids, mkr_list)
+        else:
+            cur_awg_chan._instr_awg.program_channel_sequence(cur_awg_chan._instr_awg_chan.short_name, seq_segs, seq_ids, final_wfm_for_chan)
+        

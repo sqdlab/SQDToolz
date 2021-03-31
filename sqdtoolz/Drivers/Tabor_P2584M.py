@@ -166,6 +166,11 @@ class TaborP2584M_AWG(InstrumentChannel):
         for ch_ind, ch_name in enumerate(self._ch_list):
             cur_channel = AWG_TaborP2584M_channel(self, ch_name, ch_ind+1)
             self.add_submodule(ch_name, cur_channel)
+        self._used_memory_segments = [None]*2
+
+        self._sequence_cache = {}
+        for ch_name in self._ch_list:
+            self._sequence_cache[ch_name] = {'seq_segs' : [], 'seq_ids' : [], 'mkr_data' : None}
 
     @property
     def SampleRate(self):
@@ -184,6 +189,10 @@ class TaborP2584M_AWG(InstrumentChannel):
     def num_supported_markers(self, channel_name):
         return 2
 
+    @property
+    def AutoCompressionSupport(self):
+        return {'Supported' : True, 'MinSize' : 1024, 'Multiple' : 32}
+
     def _get_channel_output(self, identifier):
         if identifier in self.submodules:
             return self.submodules[identifier]  #!!!NOTE: Note from above in the initialiser regarding the parent storing the AWG channel submodule
@@ -199,6 +208,58 @@ class TaborP2584M_AWG(InstrumentChannel):
         cur_amp = cur_chnl.Amplitude/2
         cur_off = cur_chnl.Offset
         cur_data = (cur_data - cur_off)/cur_amp
+        
+        #So channels 1 and 2 share segment memory and channels 3 and 4 share a separate bank of segment memory
+        #Idea is to use 1 segment for each waveform channel inside said bank...
+        
+        #Select channel
+        self._parent._set_cmd(':INST:CHAN', chan_ind+1)
+        #Delete and Define segment (noting that it's taken as 1 or 2 for channels 1|3 and 2|4 respectively...)
+        seg_id = int(chan_ind % 2 + 1)
+        self._parent._set_cmd('TRAC:DEL', seg_id)
+        self._parent._send_cmd(f':TRAC:DEF {seg_id}, {cur_data.size}')
+        
+        # self._send_data_to_memory(seg_id, cur_data)
+        self._send_data_to_memory(seg_id, cur_data, mkr_data)
+        self._program_task_table(chan_ind+1, [AWG_TaborP2584M_task(seg_id, 1, 1, cur_chnl.trig_src())])
+        
+        self._parent._set_cmd('FUNC:MODE', 'TASK')
+
+    def prepare_sequence(self, chan_id, seq_segs, seq_ids, mkr_data = np.array([])):
+        self._sequence_cache[chan_id]['seq_segs'] = seq_segs
+        self._sequence_cache[chan_id]['seq_ids'] = seq_ids
+        self._sequence_cache[chan_id]['mkr_data'] = mkr_data
+        self._banks_setup = False
+
+    def _setup_memory_banks(chan_id):
+
+        self._banks_setup = True
+
+    def finalise_waveforms(self, chan_id):
+        chan_ind = self._ch_list.index(chan_id)
+        cur_chnl = self._get_channel_output(chan_id)
+
+        #Select channel
+        self._parent._set_cmd(':INST:CHAN', chan_ind+1)
+
+        #A function that needs to be called once - it'll be done on the first channel to be programmed...
+        if not self._banks_setup:
+            self._setup_memory_banks()
+
+        if chan_ind+1 == 1:
+            #The first few segments are free realestate.
+
+
+
+
+    def program_channel_sequence(self, chan_id, seq_segs, seq_ids, mkr_data = np.array([])):
+        
+
+        #Condition the waveform
+        cur_amp = cur_chnl.Amplitude/2
+        cur_off = cur_chnl.Offset
+        for m in range(len(seq_segs)):
+            seq_segs[m] = (seq_segs[m] - cur_off)/cur_amp
         
         #So channels 1 and 2 share segment memory and channels 3 and 4 share a separate bank of segment memory
         #Idea is to use 1 segment for each waveform channel inside said bank...

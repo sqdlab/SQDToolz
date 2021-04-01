@@ -51,7 +51,9 @@ for m in range(4):
 # awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments(["init","init2"])
 awg_wfm_q.get_output_channel(0).marker(1).set_markers_to_segments(read_segs)
 awg_wfm_q.get_output_channel(1).marker(0).set_markers_to_segments(['SEQPAD', 'init0'])
-awg_wfm_q.program_AWG()
+awg_wfm_q.AutoCompression = 'Basic'#'Basic'
+awg_wfm_q.prepare_AWG_Waveforms()
+awg_wfm_q.program_AWG_Waveforms()
 awg_wfm_q.get_output_channel(0).Output = True
 
 #CONNECTED CHANNEL 1 of Agi1 to Input 0 of digitizer and MARKER 2 of Agi1 to Input Trg0 of digitizer

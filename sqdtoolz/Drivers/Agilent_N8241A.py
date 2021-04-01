@@ -1537,7 +1537,21 @@ class Agilent_N8241A(Instrument):
         #TODO: this doesn't work - fix it...
         self.configure_sample_clock(source=0, freq=frequency_hertz)
 
-    def program_channel(self, chan_id, wfm_data, mkr_data = np.array([])):        
+    @property
+    def AutoCompressionSupport(self):
+        return {'Supported' : False, 'MinSize' : 128 , 'Multiple' : 8}
+
+    def prepare_waveform_memory(self, chan_id, seg_lens):
+        #Sequencing mode is only allowed for sequences of at least 2 segments...
+        if len(seg_lens) > 1:
+            pass
+
+    def program_channel(self, chan_id, dict_wfm_data):
+        #Sequencing mode is only allowed for sequences of at least 2 segments...
+        if len(dict_wfm_data['waveforms']) == 1:
+            self._program_channel_non_sequence(chan_id, dict_wfm_data['waveforms'][0], dict_wfm_data['markers'][0])
+
+    def _program_channel_non_sequence(self, chan_id, wfm_data, mkr_data = np.array([])):
         self.stop()
 
         #Bit 6 is Mkr1, Bit 7 is Mkr2

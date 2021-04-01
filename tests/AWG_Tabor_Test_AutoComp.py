@@ -39,13 +39,14 @@ read_segs = []
 for m in range(4):
     awg_wfm_q.add_waveform_segment(WFS_Gaussian(f"init{m}", mod_freq_qubit, 512e-9, 0.5-0.1*m))
     awg_wfm_q.add_waveform_segment(WFS_Constant(f"zero1{m}", None, 512e-9, 0.01*m))
-    awg_wfm_q.add_waveform_segment(WFS_Gaussian(f"init2{m}", mod_freq_qubit, 512e-9, 0.5-0.1*m))
-    awg_wfm_q.add_waveform_segment(WFS_Constant(f"zero2{m}", None, 576e-9, 0.0))
+    awg_wfm_q.add_waveform_segment(WFS_Gaussian(f"init2{m}", mod_freq_qubit, 512e-9, 0.0))# 0.5-0.1*m))
+    awg_wfm_q.add_waveform_segment(WFS_Constant(f"zero2{m}", None, 512e-9, 0.0))
     read_segs += [f"init{m}"]
 # awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments(["init0","init2"])
-awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments(read_segs)
-awg_wfm_q.AutoCompression = 'Basic'
-awg_wfm_q.program_AWG()
+awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments([read_segs[0]])
+awg_wfm_q.AutoCompression = 'Basic'#'Basic'
+awg_wfm_q.prepare_AWG_Waveforms()
+awg_wfm_q.program_AWG_Waveforms()
 
 awg_wfm_q.get_output_channel(0).Output = True
 awg_wfm_q.get_output_channel(1).Output = True
@@ -61,38 +62,62 @@ inst_tabor.AWG._get_channel_output('CH1').marker2_output(True)
 
 inst_tabor.ACQ.TriggerInputEdge = 1
 acq_module = ACQ(inst_tabor.ACQ)
-acq_module.NumSamples = 2400
-acq_module.NumSegments = 2
-acq_module.NumRepetitions = 2
+# acq_module.NumSamples = 2400
+# acq_module.NumSegments = 2
+# acq_module.NumRepetitions = 2
+acq_module.NumSamples = 16848
+acq_module.NumSegments = 1
+acq_module.NumRepetitions = 1
 leData = inst_tabor.ACQ.get_data()
 import matplotlib.pyplot as plt
-for r in range(2):
-    for s in range(2):
+for r in range(acq_module.NumRepetitions):
+    for s in range(acq_module.NumSegments):
         plt.plot(leData[0][r][s])
 plt.show()  #!!!REMEMBER TO CLOSE THE PLOT WINDOW BEFORE CLOSING PYTHON KERNEL OR TABOR LOCKS UP (PC restart won't cut it - needs to be a chassis restart)!!!
 input('press <ENTER> to continue')
 
-awg_wfm_A = WaveformAWG("Waveform 2 CH", [(inst_tabor.AWG, 'CH1')], 1e9)
+awg_wfm_A = WaveformAWG("Waveform CH1", [(inst_tabor.AWG, 'CH1')], 1e9)
 awg_wfm_A.add_waveform_segment(WFS_Gaussian("init", None, 512e-9, 0.5))
 awg_wfm_A.add_waveform_segment(WFS_Constant("zero1", None, 512e-9, 0.25))
 awg_wfm_A.add_waveform_segment(WFS_Gaussian("init2", None, 512e-9, 0.5))
-awg_wfm_A.add_waveform_segment(WFS_Constant("zero2", None, 512e-9, 0.0))
-awg_wfm_A.get_output_channel(0).marker(0).set_markers_to_segments(["init","init2"])
-awg_wfm_A.get_output_channel(0).marker(1).set_markers_to_segments(["zero1","zero2"])
-awg_wfm_A.program_AWG()
+awg_wfm_A.add_waveform_segment(WFS_Constant("zero2", None, 512e-9, 0.25))
+awg_wfm_A.add_waveform_segment(WFS_Gaussian("init3", None, 512e-9, 0.5))
+awg_wfm_A.add_waveform_segment(WFS_Constant("zero3", None, 512e-9, 0.25))
+awg_wfm_A.add_waveform_segment(WFS_Gaussian("init4", None, 2048e-9, 0.0))
+awg_wfm_A.get_output_channel(0).marker(0).set_markers_to_segments(["init"])
+awg_wfm_A.get_output_channel(0).marker(1).set_markers_to_segments(["zero1"])
+awg_wfm_A.AutoCompression = 'Basic'
+awg_wfm_A.prepare_AWG_Waveforms()
 
-awg_wfm_B = WaveformAWG("Waveform 2 CH", [(inst_tabor.AWG, 'CH1')], 1e9)
+awg_wfm_B = WaveformAWG("Waveform CH2", [(inst_tabor.AWG, 'CH2')], 1e9)
 awg_wfm_B.add_waveform_segment(WFS_Gaussian("init", None, 512e-9, -0.5))
 awg_wfm_B.add_waveform_segment(WFS_Constant("zero1", None, 512e-9, 0.25))
-awg_wfm_B.add_waveform_segment(WFS_Gaussian("init2", None, 512e-9, -0.5))
+awg_wfm_B.add_waveform_segment(WFS_Gaussian("init2", None, 512e-9, 0.0))
 awg_wfm_B.add_waveform_segment(WFS_Constant("zero2", None, 512e-9, 0.0))
 awg_wfm_B.get_output_channel(0).marker(0).set_markers_to_segments(["init","init2"])
 awg_wfm_B.get_output_channel(0).marker(1).set_markers_to_segments(["zero1","zero2"])
-awg_wfm_B.program_AWG()
+awg_wfm_B.prepare_AWG_Waveforms()
+
+awg_wfm_A.program_AWG_Waveforms()
+awg_wfm_B.program_AWG_Waveforms()
 
 inst_tabor.AWG._get_channel_output('CH1').Output = True
 inst_tabor.AWG._get_channel_output('CH2').Output = True
 inst_tabor.AWG._get_channel_output('CH1').marker1_output(True)
 
+inst_tabor.ACQ.TriggerInputEdge = 1
+acq_module = ACQ(inst_tabor.ACQ)
+# acq_module.NumSamples = 2400
+# acq_module.NumSegments = 2
+# acq_module.NumRepetitions = 2
+acq_module.NumSamples = 10176
+acq_module.NumSegments = 1
+acq_module.NumRepetitions = 1
+leData = inst_tabor.ACQ.get_data()
+import matplotlib.pyplot as plt
+for r in range(acq_module.NumRepetitions):
+    for s in range(acq_module.NumSegments):
+        plt.plot(leData[0][r][s])
+plt.show()  #!!!REMEMBER TO CLOSE THE PLOT WINDOW BEFORE CLOSING PYTHON KERNEL OR TABOR LOCKS UP (PC restart won't cut it - needs to be a chassis restart)!!!
 
 input('press <ENTER> to continue')

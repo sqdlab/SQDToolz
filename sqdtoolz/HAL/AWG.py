@@ -217,65 +217,82 @@ class WaveformAWG:
     def prepare_AWG_Waveforms(self):
         #Prepare the waveform
         final_wfms = self._assemble_waveform_raw()
+
         self.cur_wfms_to_commit = []
         for ind, cur_awg_chan in enumerate(self._awg_chan_list):
+            if len(cur_awg_chan._awg_mark_list) > 0:
+                mkr_list = [x._assemble_marker_raw() for x in cur_awg_chan._awg_mark_list]
+            else:
+                mkr_list = [np.array([])]
+                
             dict_auto_comp = cur_awg_chan._instr_awg.AutoCompressionSupport
             if self.AutoCompression == 'None' or not dict_auto_comp['Supported'] or final_wfms[0].size < dict_auto_comp['MinSize']*2:
+                #UNCOMPRESSED
+                #Just program the AWG via over a single waveform    
                 #Don't compress if disabled, unsupported or if the waveform size is too small to compress
-                dict_wfm_data = self._program_auto_comp_none(cur_awg_chan, final_wfms[ind])
+                dict_wfm_data = {'waveforms' : [final_wfms[ind]], 'markers' : [mkr_list], 'seq_ids' : [0]}
             elif self.AutoCompression == 'Basic':
                 #BASIC COMPRESSION
                 #The basic compression algorithm is to chop up the waveform into its minimum set of bite-sized pieces and to find repetitive aspects
-                dict_wfm_data = self._program_auto_comp_basic(cur_awg_chan, final_wfms[ind])
+                dict_wfm_data = self._program_auto_comp_basic(cur_awg_chan, final_wfms[ind], mkr_list)
                 
             seg_lens = [x.size for x in dict_wfm_data['waveforms']]
-            cur_awg_chan._instr_awg.prepare_memory(cur_awg_chan._instr_awg_chan.short_name, seg_lens)
+            cur_awg_chan._instr_awg.prepare_waveform_memory(cur_awg_chan._instr_awg_chan.short_name, seg_lens)
             self.cur_wfms_to_commit.append(dict_wfm_data)
 
     def program_AWG_Waveforms(self):
         for ind, cur_awg_chan in enumerate(self._awg_chan_list):
             cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.short_name, self.cur_wfms_to_commit[ind])                
 
-    def _program_auto_comp_none(self, cur_awg_chan, final_wfm_for_chan):
-        #UNCOMPRESSED
-        #Just program the AWG via over a single waveform
-        if len(cur_awg_chan._awg_mark_list) > 0:
-            mkr_list = [x._assemble_marker_raw() for x in cur_awg_chan._awg_mark_list]
-        else:
-            mkr_list = np.array([])
-        return {'waveforms' : [final_wfm_for_chan], 'markers' : [mkr_list], 'seq_ids' = [0]}
+    def _extract_marker_segments(self, mkr_list_overall, slice_start, slice_end):
+        cur_mkrs = []
+        for sub_mkr in range(len(mkr_list_overall)):
+            if mkr_list_overall[sub_mkr].size > 0:
+                cur_mkrs += [ mkr_list_overall[sub_mkr][slice_start:slice_end] ]
+            else:
+                cur_mkrs += [ mkr_list_overall[sub_mkr][:] ]    #Copy over the empty array...
+        return cur_mkrs
 
-    def _program_auto_comp_basic(self, cur_awg_chan, final_wfm_for_chan):
+    def _program_auto_comp_basic(self, cur_awg_chan, final_wfm_for_chan, mkr_list):
         #TODO: Add flags for changed/requires-update to ensure that segments in sequence are not unnecessary programmed repeatedly...
         #TODO: Improve algorithm
         dict_auto_comp = cur_awg_chan._instr_awg.AutoCompressionSupport
         dS = dict_auto_comp['MinSize']
         num_main_secs = int(np.floor(final_wfm_for_chan.size / dS))
         seq_segs = [final_wfm_for_chan[0:dS]]
-        seq_ids = [0]
+        seq_mkrs = [self._extract_marker_segments(mkr_list, 0, dS)]
+        seq_ids  = [0]
         for m in range(1,num_main_secs):
             cur_seg = final_wfm_for_chan[(m*dS):((m+1)*dS)]
+            cur_mkrs = self._extract_marker_segments(mkr_list, m*dS, (m+1)*dS)
             found_match = False
             for ind, cur_seq_seg in enumerate(seq_segs):
+                #Check main waveform array
                 if np.array_equal(cur_seg, cur_seq_seg):
-                    seq_ids += [ind]
-                    found_match = True
-                    break
+                    #Check the sub-markers
+                    mkrs_match = True
+                    for mkr in range(len(cur_mkrs)):
+                        if not np.array_equal(seq_mkrs[ind][mkr], cur_mkrs[mkr]):
+                            mkrs_match = False
+                            break
+                    if mkrs_match:
+                        seq_ids += [ind]
+                        found_match = True
+                        break
             if not found_match:
                 seq_ids += [len(seq_segs)]
                 seq_segs += [cur_seg]
+                seq_mkrs += [cur_mkrs]
         if (m+1)*dS < final_wfm_for_chan.size:
             #Reverse it if it was matched against some other segment previously...
+            cur_mkrs = self._extract_marker_segments(mkr_list, m*dS, mkr_list[0].size)
             if found_match:
                 seq_ids[-1] = len(seq_segs)
                 seq_segs += final_wfm_for_chan[(m*dS):]
+                seq_mkrs += [cur_mkrs]
             else:
                 seq_segs[-1] = final_wfm_for_chan[(m*dS):]
+                seq_mkrs[-1] = cur_mkrs
 
-        if len(cur_awg_chan._awg_mark_list) > 0:
-            mkr_list = [x._assemble_marker_raw() for x in cur_awg_chan._awg_mark_list]
-        else:
-            mkr_list = np.array([])
-
-        return {'waveforms' : seq_segs, 'markers' : [mkr_list], 'seq_ids' = seq_ids}
+        return {'waveforms' : seq_segs, 'markers' : seq_mkrs, 'seq_ids' : seq_ids}
         

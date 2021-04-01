@@ -121,8 +121,9 @@ class TaborP2584M_AWG(InstrumentChannel):
         super().__init__(parent, 'AWG')
         self._parent = parent
 
-        self._parent._set_cmd(':INST:CHAN', 1)
-        self._parent._send_cmd(':TRAC:DEL:ALL')        
+        for m in range(4):
+            self._parent._set_cmd(':INST:CHAN', m+1)
+            self._parent._send_cmd(':TRAC:DEL:ALL')        
 
         #Get the DAC mode (8 bits or 16 bits)
         dac_mode = self._parent._get_cmd(':SYST:INF:DAC?')
@@ -166,6 +167,9 @@ class TaborP2584M_AWG(InstrumentChannel):
         for ch_ind, ch_name in enumerate(self._ch_list):
             cur_channel = AWG_TaborP2584M_channel(self, ch_name, ch_ind+1)
             self.add_submodule(ch_name, cur_channel)
+        self._used_memory_segments = [None]*2
+
+        self._sequence_lens = [None]*4
 
     @property
     def SampleRate(self):
@@ -184,35 +188,107 @@ class TaborP2584M_AWG(InstrumentChannel):
     def num_supported_markers(self, channel_name):
         return 2
 
+    @property
+    def AutoCompressionSupport(self):
+        return {'Supported' : True, 'MinSize' : 1024, 'Multiple' : 32}
+
     def _get_channel_output(self, identifier):
         if identifier in self.submodules:
             return self.submodules[identifier]  #!!!NOTE: Note from above in the initialiser regarding the parent storing the AWG channel submodule
         else:
             return None
 
-    def program_channel(self, chan_id, wfm_data, mkr_data = np.array([])):
+    # def program_channel(self, chan_id, wfm_data, mkr_data = np.array([])):
+    #     chan_ind = self._ch_list.index(chan_id)
+    #     cur_chnl = self._get_channel_output(chan_id)
+
+    #     #Condition the waveform
+    #     cur_data = wfm_data
+    #     cur_amp = cur_chnl.Amplitude/2
+    #     cur_off = cur_chnl.Offset
+    #     cur_data = (cur_data - cur_off)/cur_amp
+        
+    #     #So channels 1 and 2 share segment memory and channels 3 and 4 share a separate bank of segment memory
+    #     #Idea is to use 1 segment for each waveform channel inside said bank...
+        
+    #     #Select channel
+    #     self._parent._set_cmd(':INST:CHAN', chan_ind+1)
+    #     #Delete and Define segment (noting that it's taken as 1 or 2 for channels 1|3 and 2|4 respectively...)
+    #     seg_id = int(chan_ind % 2 + 1)
+    #     self._parent._set_cmd('TRAC:DEL', seg_id)
+    #     self._parent._send_cmd(f':TRAC:DEF {seg_id}, {cur_data.size}')
+        
+    #     # self._send_data_to_memory(seg_id, cur_data)
+    #     self._send_data_to_memory(seg_id, cur_data, mkr_data)
+    #     self._program_task_table(chan_ind+1, [AWG_TaborP2584M_task(seg_id, 1, 1, cur_chnl.trig_src())])
+        
+    #     self._parent._set_cmd('FUNC:MODE', 'TASK')
+
+    def prepare_waveform_memory(self, chan_id, seg_lens):
+        chan_ind = self._ch_list.index(chan_id)
+        self._sequence_lens[chan_ind] = seg_lens
+        self._banks_setup = False
+
+    def _setup_memory_banks(self):
+        if self._banks_setup:
+            return
+
+        if self._sequence_lens[0] != None:
+            self._seg_off_ch2 = len(self._sequence_lens[0])
+        if self._sequence_lens[2] != None:
+            self._seg_off_ch4 = len(self._sequence_lens[2])
+
+        #Settle Memory Bank 1 (shared among channels 1 and 2) and Memory Bank 2 (shared among channels 3 and 4)
+        seg_id = 1
+        reset_remaining = False
+        for cur_ch_ind in range(4):
+            if cur_ch_ind == 2:
+                seg_id = 1      #Going to the next memory bank now...
+                reset_remaining = False
+            if self._sequence_lens[cur_ch_ind] != None:
+                #Select current channel
+                self._parent._set_cmd(':INST:CHAN', cur_ch_ind+1)
+                for cur_len in self._sequence_lens[cur_ch_ind]:
+                    self._parent._set_cmd(':TRACe:SEL', seg_id)
+                    cur_mem_len = self._parent._get_cmd(':TRAC:DEF:LENG?')
+                    if reset_remaining or cur_mem_len == '' or cur_len != int(cur_mem_len):
+                        self._parent._set_cmd(':TRAC:DEL', seg_id)
+                        reset_remaining = True
+                    self._parent._send_cmd(f':TRAC:DEF {seg_id}, {cur_len}')
+                    seg_id += 1
+            self._sequence_lens[cur_ch_ind] = None
+
+        self._banks_setup = True
+
+    def program_channel(self, chan_id, dict_wfm_data):
         chan_ind = self._ch_list.index(chan_id)
         cur_chnl = self._get_channel_output(chan_id)
 
-        #Condition the waveform
-        cur_data = wfm_data
-        cur_amp = cur_chnl.Amplitude/2
-        cur_off = cur_chnl.Offset
-        cur_data = (cur_data - cur_off)/cur_amp
-        
-        #So channels 1 and 2 share segment memory and channels 3 and 4 share a separate bank of segment memory
-        #Idea is to use 1 segment for each waveform channel inside said bank...
-        
+        self._setup_memory_banks()
+        if chan_ind == 1:
+            seg_offset = self._seg_off_ch2
+        elif chan_ind == 3:
+            seg_offset = self._seg_off_ch4
+        else:
+            seg_offset = 0
+
         #Select channel
         self._parent._set_cmd(':INST:CHAN', chan_ind+1)
-        #Delete and Define segment (noting that it's taken as 1 or 2 for channels 1|3 and 2|4 respectively...)
-        seg_id = int(chan_ind % 2 + 1)
-        self._parent._set_cmd('TRAC:DEL', seg_id)
-        self._parent._send_cmd(f':TRAC:DEF {seg_id}, {cur_data.size}')
-        
-        # self._send_data_to_memory(seg_id, cur_data)
-        self._send_data_to_memory(seg_id, cur_data, mkr_data)
-        self._program_task_table(chan_ind+1, [AWG_TaborP2584M_task(seg_id, 1, 1, cur_chnl.trig_src())])
+
+        #Program the memory banks
+        for m in range(len(dict_wfm_data['waveforms'])):
+            cur_data = dict_wfm_data['waveforms'][m]
+            cur_amp = cur_chnl.Amplitude/2
+            cur_off = cur_chnl.Offset
+            cur_data = (cur_data - cur_off)/cur_amp
+            self._send_data_to_memory(m+1 + seg_offset, cur_data, dict_wfm_data['markers'][m])
+        #Program the task table...
+        task_list = []
+        for m, seg_id in enumerate(dict_wfm_data['seq_ids']):
+            task_list += [AWG_TaborP2584M_task(seg_id+1 + seg_offset, 1, (m+1)+1)]
+        task_list[0].trig_src = cur_chnl.trig_src()     #First task is triggered off the TRIG source
+        task_list[-1].next_task_ind = 1                 #Last task maps back onto the first task
+        self._program_task_table(chan_ind+1, task_list)
         
         self._parent._set_cmd('FUNC:MODE', 'TASK')
 
@@ -262,7 +338,7 @@ class TaborP2584M_AWG(InstrumentChannel):
         #Increase the timeout before writing binary-data:
         self._parent._inst.timeout = 30000
         #Send the binary-data with *OPC? added to the beginning of its prefix.
-        # self._inst.write_binary_data('*OPC?; :TRAC:DATA', final_data)
+        #self._parent._inst.write_binary_data('*OPC?; :TRAC:DATA', final_data*0)
         #!!!There seems to be some API changes that basically breaks their code - removing OPC for now...
         self._parent._inst.write_binary_data(':TRAC:DATA', final_data)
         #Read the response to the *OPC? query that was added to the prefix of the binary data

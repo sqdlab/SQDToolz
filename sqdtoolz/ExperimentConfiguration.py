@@ -122,7 +122,9 @@ class ExperimentConfiguration:
         #TODO: Write rest of this with error checking
         for cur_awg in self._list_AWGs:
             #TODO: Write concurrence/change checks to better optimise AwG...
-            cur_awg.program_AWG()
+            cur_awg.prepare_AWG_Waveforms()
+        for cur_awg in self._list_AWGs:
+            cur_awg.program_AWG_Waveforms()
 
     def get_data(self):
         #TODO: Pack the data appropriately if using multiple ACQ objects (coordinating their starts/finishes perhaps?)

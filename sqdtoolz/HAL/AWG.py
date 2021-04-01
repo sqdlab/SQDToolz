@@ -214,32 +214,41 @@ class WaveformAWG:
             axs[ind].plot(t_vals, cur_wfm)
         return fig
 
-    def program_AWG(self):
+    def prepare_AWG_Waveforms(self):
         #Prepare the waveform
         final_wfms = self._assemble_waveform_raw()
+        self.cur_wfms_to_commit = []
         for ind, cur_awg_chan in enumerate(self._awg_chan_list):
             dict_auto_comp = cur_awg_chan._instr_awg.AutoCompressionSupport
             if self.AutoCompression == 'None' or not dict_auto_comp['Supported'] or final_wfms[0].size < dict_auto_comp['MinSize']*2:
                 #Don't compress if disabled, unsupported or if the waveform size is too small to compress
-                self._program_auto_comp_none(cur_awg_chan, final_wfms[ind])
+                dict_wfm_data = self._program_auto_comp_none(cur_awg_chan, final_wfms[ind])
             elif self.AutoCompression == 'Basic':
                 #BASIC COMPRESSION
                 #The basic compression algorithm is to chop up the waveform into its minimum set of bite-sized pieces and to find repetitive aspects
-                self._program_auto_comp_basic(cur_awg_chan, final_wfms[ind])
+                dict_wfm_data = self._program_auto_comp_basic(cur_awg_chan, final_wfms[ind])
+                
+            seg_lens = [x.size for x in dict_wfm_data['waveforms']]
+            cur_awg_chan._instr_awg.prepare_memory(cur_awg_chan._instr_awg_chan.short_name, seg_lens)
+            self.cur_wfms_to_commit.append(dict_wfm_data)
+
+    def program_AWG_Waveforms(self):
+        for ind, cur_awg_chan in enumerate(self._awg_chan_list):
+            cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.short_name, self.cur_wfms_to_commit[ind])                
 
     def _program_auto_comp_none(self, cur_awg_chan, final_wfm_for_chan):
         #UNCOMPRESSED
         #Just program the AWG via over a single waveform
         if len(cur_awg_chan._awg_mark_list) > 0:
             mkr_list = [x._assemble_marker_raw() for x in cur_awg_chan._awg_mark_list]
-            cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.short_name, final_wfm_for_chan, mkr_list)
         else:
-            cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.short_name, final_wfm_for_chan)
+            mkr_list = np.array([])
+        return {'waveforms' : [final_wfm_for_chan], 'markers' : [mkr_list], 'seq_ids' = [0]}
 
     def _program_auto_comp_basic(self, cur_awg_chan, final_wfm_for_chan):
         #TODO: Add flags for changed/requires-update to ensure that segments in sequence are not unnecessary programmed repeatedly...
         #TODO: Improve algorithm
-        dict_auto_comp = cur_awg_chan._instr_awg.AutoCompressionSupport        
+        dict_auto_comp = cur_awg_chan._instr_awg.AutoCompressionSupport
         dS = dict_auto_comp['MinSize']
         num_main_secs = int(np.floor(final_wfm_for_chan.size / dS))
         seq_segs = [final_wfm_for_chan[0:dS]]
@@ -265,7 +274,8 @@ class WaveformAWG:
 
         if len(cur_awg_chan._awg_mark_list) > 0:
             mkr_list = [x._assemble_marker_raw() for x in cur_awg_chan._awg_mark_list]
-            cur_awg_chan._instr_awg.program_channel_sequence(cur_awg_chan._instr_awg_chan.short_name, seq_segs, seq_ids, mkr_list)
         else:
-            cur_awg_chan._instr_awg.program_channel_sequence(cur_awg_chan._instr_awg_chan.short_name, seq_segs, seq_ids, final_wfm_for_chan)
+            mkr_list = np.array([])
+
+        return {'waveforms' : seq_segs, 'markers' : [mkr_list], 'seq_ids' = seq_ids}
         

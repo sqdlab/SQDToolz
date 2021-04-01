@@ -168,9 +168,7 @@ class TaborP2584M_AWG(InstrumentChannel):
             self.add_submodule(ch_name, cur_channel)
         self._used_memory_segments = [None]*2
 
-        self._sequence_cache = {}
-        for ch_name in self._ch_list:
-            self._sequence_cache[ch_name] = {'seq_segs' : [], 'seq_ids' : [], 'mkr_data' : None}
+        self._sequence_lens = [None]*4
 
     @property
     def SampleRate(self):
@@ -225,55 +223,62 @@ class TaborP2584M_AWG(InstrumentChannel):
         
         self._parent._set_cmd('FUNC:MODE', 'TASK')
 
-    def prepare_sequence(self, chan_id, seq_segs, seq_ids, mkr_data = np.array([])):
-        self._sequence_cache[chan_id]['seq_segs'] = seq_segs
-        self._sequence_cache[chan_id]['seq_ids'] = seq_ids
-        self._sequence_cache[chan_id]['mkr_data'] = mkr_data
+    def prepare_sequence_memory(self, chan_id, seg_lens):
+        chan_ind = self._ch_list.index(chan_id)
+        self._sequence_lens[chan_ind] = seg_lens
         self._banks_setup = False
 
-    def _setup_memory_banks(chan_id):
+    def _setup_memory_banks():
+        if self._banks_setup:
+            return
+
+        if self._sequence_lens[0] != None:
+            self._seg_off_ch2 = self._sequence_lens[0]
+        if self._sequence_lens[2] != None:
+            self._seg_off_ch4 = self._sequence_lens[0]
+
+        #Settle Memory Bank 1 (shared among channels 1 and 2) and Memory Bank 2 (shared among channels 3 and 4)
+        seg_id == 1
+        for cur_ch_ind in range(4):
+            if cur_ch_ind == 2:
+                seg_id = 1      #Going to the next memory bank now...
+            if self._sequence_lens[cur_ch_ind] != None:
+                #Select current channel
+                self._parent._set_cmd(':INST:CHAN', cur_ch_ind+1)
+                for cur_len in self._sequence_lens[cur_ch_ind]:
+                    self._parent.set_cmd(':TRACe:SEL', seg_id)
+                    if cur_len != int(self._parent._get_cmd(':TRAC:LENG?')):
+                        self._parent._send_cmd(f':TRAC:DEF {seg_id}, {cur_len}')
+                    seg_id += 1
+            self._sequence_lens[chan_ind] = None
 
         self._banks_setup = True
 
-    def finalise_waveforms(self, chan_id):
+    def program_channel(self, chan_id, dict_wfm_data):
         chan_ind = self._ch_list.index(chan_id)
         cur_chnl = self._get_channel_output(chan_id)
 
+        self._setup_memory_banks()
+        if chan_ind == 1:
+            seg_offset = self._seg_off_ch2
+        elif chan_ind == 3:
+            seg_offset = self._seg_off_ch4
+        else:
+            seg_offset = 0
+
         #Select channel
         self._parent._set_cmd(':INST:CHAN', chan_ind+1)
 
-        #A function that needs to be called once - it'll be done on the first channel to be programmed...
-        if not self._banks_setup:
-            self._setup_memory_banks()
-
-        if chan_ind+1 == 1:
-            #The first few segments are free realestate.
-
-
-
-
-    def program_channel_sequence(self, chan_id, seq_segs, seq_ids, mkr_data = np.array([])):
-        
-
-        #Condition the waveform
-        cur_amp = cur_chnl.Amplitude/2
-        cur_off = cur_chnl.Offset
-        for m in range(len(seq_segs)):
-            seq_segs[m] = (seq_segs[m] - cur_off)/cur_amp
-        
-        #So channels 1 and 2 share segment memory and channels 3 and 4 share a separate bank of segment memory
-        #Idea is to use 1 segment for each waveform channel inside said bank...
-        
-        #Select channel
-        self._parent._set_cmd(':INST:CHAN', chan_ind+1)
-        #Delete and Define segment (noting that it's taken as 1 or 2 for channels 1|3 and 2|4 respectively...)
-        seg_id = int(chan_ind % 2 + 1)
-        self._parent._set_cmd('TRAC:DEL', seg_id)
-        self._parent._send_cmd(f':TRAC:DEF {seg_id}, {cur_data.size}')
-        
-        # self._send_data_to_memory(seg_id, cur_data)
-        self._send_data_to_memory(seg_id, cur_data, mkr_data)
-        self._program_task_table(chan_ind+1, [AWG_TaborP2584M_task(seg_id, 1, 1, cur_chnl.trig_src())])
+        #Program the memory banks
+        for m in range(len(dict_wfm_data['waveforms'])):
+            self._send_data_to_memory(m+1 + seg_offset, dict_wfm_data['waveforms'][m], mkr_data = np.array([]))
+        #Program the task table...
+        task_list = []
+        for m, seg_id in enumerate(dict_wfm_data['seq_ids']):
+            AWG_TaborP2584M_task(seg_id, 1, (m+1)+1)
+        task_list[0].trig_src = cur_chnl.trig_src()     #First task is triggered off the TRIG source
+        task_list[-1].next_task_ind = 1                 #Last task maps back onto the first task
+        self._program_task_table(chan_ind+1, task_list)
         
         self._parent._set_cmd('FUNC:MODE', 'TASK')
 

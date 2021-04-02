@@ -508,6 +508,11 @@ class Agilent_N8241A(Instrument):
 
         self.add_submodule('ch1', AGN_Channel(self, 'ch1', 1))
         self.add_submodule('ch2', AGN_Channel(self, 'ch2', 2))
+        self._seq_wfms = {'ch1' : [], 'ch2' : []}
+        self._seq_handles = {'ch1' : None, 'ch2' : None}
+        self.done_programming = True
+        self._raw_wfm_data = {}
+        self._seq_mode = False
 
         self.add_submodule('m1', AGN_Marker(self, 'm1', 1))
         self.add_submodule('m2', AGN_Marker(self, 'm2', 2))
@@ -1539,20 +1544,194 @@ class Agilent_N8241A(Instrument):
 
     @property
     def AutoCompressionSupport(self):
-        return {'Supported' : False, 'MinSize' : 128 , 'Multiple' : 8}
+        return {'Supported' : True, 'MinSize' : 128 , 'Multiple' : 8}
 
-    def prepare_waveform_memory(self, chan_id, seg_lens):
-        #Sequencing mode is only allowed for sequences of at least 2 segments...
+    def prepare_waveform_memory(self, chan_id, seg_lens, **kwargs):
         if len(seg_lens) > 1:
-            pass
+            self._seq_mode = True
+        self._raw_wfm_data[chan_id] = kwargs.get('raw_data')
+        self.done_programming = False
 
     def program_channel(self, chan_id, dict_wfm_data):
-        #Sequencing mode is only allowed for sequences of at least 2 segments...
-        if len(dict_wfm_data['waveforms']) == 1:
-            self._program_channel_non_sequence(chan_id, dict_wfm_data['waveforms'][0], dict_wfm_data['markers'][0])
+        if self.done_programming:
+            #If no waveform preparation calls are made, then the done_programming flag stays True
+            return
+
+        #!!!NOTE!!!
+        #Since the channels cannot be independently programmed, this function must be called after programming both channels (i.e. calling prepare_waveform_memory).
+        #Just be aware of this during debugging.
+
+        if len(self._seq_wfms[chan_id]) > 0:
+            #TODO: Implement the update-flag discriminator here... (If it's even possible with this AWG?)
+            for cur_wgm_handle in self._seq_wfms_ch1:
+                self.clear_arb_waveform(cur_wgm_handle)
+        self._seq_wfms[chan_id] = []
+
+        if self._seq_mode:
+            self._program_channels_sequence()
+        else:
+            #There is at most one waveform committed to each channel. So use Arbitrary mode...
+            if 'ch1' in self._raw_wfm_data:
+                self._program_channel_non_sequence(chan_id, self._raw_wfm_data['ch1']['waveforms'][0], self._raw_wfm_data['ch1']['markers'][0])
+                if 'ch2' in self._raw_wfm_data:
+                    self._program_channel_non_sequence(chan_id, self._raw_wfm_data['ch2']['waveforms'][0], self._raw_wfm_data['ch2']['markers'][0])
+            else:
+                #Channel 2 has a waveform, but Channel 1 is empty. Due to the waveform handle restrictions, a dummy waveform is filled in channel 1's memory to enable writes to Channel 2...
+                self._wfm_clog_memory()
+                self._program_channel_non_sequence(chan_id, self._raw_wfm_data['ch2']['waveforms'][0], self._raw_wfm_data['ch2']['markers'][0])
+
+        self.done_programming = True
+        self._seq_mode = False
+        self._raw_wfm_data = {}
+
+    def _wfm_clog_memory(self):
+        return self.create_arb_waveform_with_markers([0]*128, [0]*16)
+
+    def _upload_waveforms(self, chan_id, wfm_data, mkr_data, gain_val):
+        if len(mkr_data) == 2:
+            mkr_data_reduced = np.zeros(int(len(wfm_data)/8))
+            if len(mkr_data[0]) > 0:
+                mkr_data_reduced += mkr_data[0][::8] * 2**6
+            if len(mkr_data[1]) > 0:
+                mkr_data_reduced += mkr_data[1][::8] * 2**7
+        #Okay, the AWG has a strange quirk in which:
+        #   - Waveforms cannot be updated, they can only be created
+        #   - Waveforms are stored into AWG memory depending on the ordering of calls
+        #   - So ensure that the order in uploading is always one waveform in channel 1 and then one in channel 2 etc...
+        if len(mkr_data) == 2:
+            self._seq_wfms[chan_id] += [self.create_arb_waveform_with_markers(wfm_data / gain_val, mkr_data_reduced)]
+        else:
+            self._seq_wfms[chan_id] += [self.create_arb_waveform(wfm_data / gain_val)]
+
+    def _extract_marker_segments(self, mkr_list_overall, slice_start, slice_end):
+        cur_mkrs = []
+        for sub_mkr in range(len(mkr_list_overall)):
+            if mkr_list_overall[sub_mkr].size > 0:
+                cur_mkrs += [ mkr_list_overall[sub_mkr][slice_start:slice_end] ]
+            else:
+                cur_mkrs += [ mkr_list_overall[sub_mkr][:] ]    #Copy over the empty array...
+        return cur_mkrs
+
+    def _segment_single_waveform_into_2(self, chan_id):
+        #Note that the presumption is that the other waveform channel has at least 2 segments in its sequence and thus, more than 256 points...
+        dict_cur_wfm = self._raw_wfm_data[chan_id]
+        cur_wfm = dict_cur_wfm['waveforms'][0]
+        mkrs = [[None,None],[None,None]]
+        if cur_wfm.size > 256:
+            self._raw_wfm_data[chan_id]['waveforms'] = [cur_wfm[:128], cur_wfm[128:]]
+            for mkr_ind, cur_mkr in enumerate(self._raw_wfm_data[chan_id]['markers'][0]):
+                if cur_mkr.size > 0:
+                    mkrs[0][mkr_ind] = cur_mkr[:128]
+                    mkrs[1][mkr_ind] = cur_mkr[128:]
+                else:
+                    mkrs[0][mkr_ind] = cur_mkr[:]
+                    mkrs[1][mkr_ind] = cur_mkr[:]
+        elif cur_wfm.size > 128:
+            wfm2 = np.concatenate((cur_wfm[128:] , np.repeat(cur_wfm[-1], cur_wfm.size - 128) ))
+            self._raw_wfm_data[chan_id]['waveforms'] = [cur_wfm[:128], wfm2]
+            for mkr_ind, cur_mkr in enumerate(self._raw_wfm_data[chan_id]['markers'][0]):
+                if cur_mkr.size > 0:
+                    mkrs[0][mkr_ind] = cur_mkr[:128]
+                    mkrs[1][mkr_ind] = np.concatenate((cur_mkr[128:] , np.repeat(cur_mkr[-1], cur_mkr.size - 128) ))
+                else:
+                    mkrs[0][mkr_ind] = cur_mkr[:]
+                    mkrs[1][mkr_ind] = cur_mkr[:]
+        else:
+            wfm1 = np.concatenate((cur_wfm, np.repeat(cur_wfm[-1], 128 - cur_wfm.size) ))
+            wfm2 = np.repeat(cur_wfm[-1], 128)
+            self._raw_wfm_data[chan_id]['waveforms'] = [wfm1, wfm2]
+            for mkr_ind, cur_mkr in enumerate(self._raw_wfm_data[chan_id]['markers'][0]):
+                if cur_mkr.size > 0:
+                    mkrs[0][mkr_ind] = np.concatenate((cur_mkr, np.repeat(cur_mkr[-1], 128 - cur_mkr.size) ))
+                    mkrs[1][mkr_ind] = np.repeat(cur_mkr[-1], 128)
+                else:
+                    mkrs[0][mkr_ind] = cur_mkr[:]
+                    mkrs[1][mkr_ind] = cur_mkr[:]
+        self._raw_wfm_data[chan_id]['markers'] = mkrs
+        self._raw_wfm_data[chan_id]['seq_ids'] = [1,2]
+
+    def _program_channels_sequence(self):
+        self.stop()
+        self.output_mode('Sequence')
+
+        gain_1 = self.ch1.gain()
+        gain_2 = self.ch2.gain()
+
+        if 'ch1' in self._raw_wfm_data:
+            num_wfms1 = len(self._raw_wfm_data['ch1']['waveforms'])
+        else:
+            num_wfms1 = 0
+        if 'ch2' in self._raw_wfm_data:
+            num_wfms2 = len(self._raw_wfm_data['ch2']['waveforms'])
+        else:
+            num_wfms2 = 0
+        num_seg_pairs = max(num_wfms1, num_wfms2)
+
+        #If one of the waveforms is a single-segment waveform, then it must be split and possibly padded to ensure it meets the minimum 2 segment sequence requirement...
+        if num_wfms1 == 1:
+            self._segment_single_waveform_into_2('ch1')
+            num_wfms1 = 2
+        if num_wfms2 == 1:
+            self._segment_single_waveform_into_2('ch2')
+            num_wfms2 = 2
+
+        for m in range(num_seg_pairs):
+            if m == 40:
+                a=0
+            if m < num_wfms1:
+                self._upload_waveforms('ch1', self._raw_wfm_data['ch1']['waveforms'][m], self._raw_wfm_data['ch1']['markers'][m], gain_1)
+                #A strange bug where the returned waveform handle is odd... Just reupload waveform...
+                while self._seq_wfms['ch1'][-1] % 2 == 1:
+                    self._seq_wfms['ch1'].pop(-1)
+                    self._upload_waveforms('ch1', self._raw_wfm_data['ch1']['waveforms'][m], self._raw_wfm_data['ch1']['markers'][m], gain_1)
+            else:
+                self._seq_wfms['ch1'] += [self._wfm_clog_memory()]  #Clogs need to be registered to be ridden in the next episode...
+                #A strange bug where the returned waveform handle is odd... Just reupload waveform...
+                while self._seq_wfms['ch1'][-1] % 2 == 1:
+                    self._seq_wfms['ch1'].pop(-1)
+                    self._seq_wfms['ch1'] += [self._wfm_clog_memory()]
+            if m < num_wfms2:
+                self._upload_waveforms('ch2', self._raw_wfm_data['ch2']['waveforms'][m], self._raw_wfm_data['ch2']['markers'][m], gain_2)
+                #A strange bug where the returned waveform handle is even... Just reupload waveform...
+                while self._seq_wfms['ch2'][-1] % 2 == 0:
+                    self._seq_wfms['ch2'].pop(-1)
+                    self._upload_waveforms('ch2', self._raw_wfm_data['ch2']['waveforms'][m], self._raw_wfm_data['ch2']['markers'][m], gain_2)
+            else:
+                self._seq_wfms['ch2'] += [self._wfm_clog_memory()]  #Clogs need to be registered to be ridden in the next episode...
+                #A strange bug where the returned waveform handle is even... Just reupload waveform...
+                while self._seq_wfms['ch2'][-1] % 2 == 0:
+                    self._seq_wfms['ch2'].pop(-1)
+                    self._seq_wfms['ch2'] += [self._wfm_clog_memory()]
+
+        # seq_len_1 = len(self._raw_wfm_data['ch1']['seq_ids'])
+        # seq_len_2 = len(self._raw_wfm_data['ch2']['seq_ids'])
+        # if seq_len_1 > seq_len_2:
+        #     self._raw_wfm_data['ch2']['seq_ids'] += [self._raw_wfm_data['ch2']['seq_ids'][-1]]*( seq_len_1 - seq_len_2 )
+        # if seq_len_2 > seq_len_1:
+        #     self._raw_wfm_data['ch1']['seq_ids'] += [self._raw_wfm_data['ch1']['seq_ids'][-1]]*( seq_len_2 - seq_len_1 ) 
+
+        num_wfms = (num_wfms1, num_wfms2)
+        gains = (gain_1, gain_2)
+        for ind, chan_id in enumerate(['ch1', 'ch2']):
+            if num_wfms[ind] == 0:
+                continue
+            #Clear previous sequence if it exists...
+            if self._seq_handles[chan_id] != None:
+                self.clear_arb_sequence(self._seq_handles[chan_id])
+            #Upload sequence
+            wfm_handle_seq = [self._seq_wfms[chan_id][x] for x in self._raw_wfm_data[chan_id]['seq_ids']]
+            loop_counts = [1]*len(wfm_handle_seq)
+            self._seq_handles[chan_id] = self.create_arb_sequence(wfm_handle_seq, loop_counts)
+        
+        self.configure_arb_sequence(2, self._seq_handles['ch2'], gains[1], 0.0)
+        self.configure_arb_sequence(1, self._seq_handles['ch1'], gains[0], 0.0)
+
+        #Not required for Independent mode, but it is required for Master/Slave mode
+        self.run()
 
     def _program_channel_non_sequence(self, chan_id, wfm_data, mkr_data = np.array([])):
         self.stop()
+        self.output_mode('Arbitrary Waveform')
 
         #Bit 6 is Mkr1, Bit 7 is Mkr2
         if len(mkr_data) == 2:
@@ -1563,21 +1742,17 @@ class Agilent_N8241A(Instrument):
                 mkr_data_reduced += mkr_data[1][::8] * 2**7
         #Program the channels
         if chan_id == 'ch1':
-            if (self._last_handle_wfm1 != None):
-                self.clear_arb_waveform(self._last_handle_wfm1)
             if len(mkr_data) == 2:
-                self._last_handle_wfm1 = self.create_arb_waveform_with_markers(wfm_data / self.ch1.gain(), mkr_data_reduced)
+                self._seq_wfms['ch1'] = self.create_arb_waveform_with_markers(wfm_data / self.ch1.gain(), mkr_data_reduced)
             else:
-                self._last_handle_wfm1 = self.create_arb_waveform(wfm_data / self.ch1.gain())
-            self.configure_arb_waveform(1, self._last_handle_wfm1, self.ch1.gain(), 0.0)
+                self._seq_wfms['ch1'] = self.create_arb_waveform(wfm_data / self.ch1.gain())
+            self.configure_arb_waveform(1, self._seq_wfms['ch1'], self.ch1.gain(), 0.0)
         elif chan_id == 'ch2':
-            if (self._last_handle_wfm2 != None):
-                self.clear_arb_waveform(self._last_handle_wfm2)
             if len(mkr_data) == 2:
-                self._last_handle_wfm2 = self.create_arb_waveform_with_markers(wfm_data / self.ch2.gain(), mkr_data_reduced)
+                self._seq_wfms['ch2'] = self.create_arb_waveform_with_markers(wfm_data / self.ch2.gain(), mkr_data_reduced)
             else:
-                self._last_handle_wfm2 = self.create_arb_waveform(wfm_data / self.ch2.gain())
-            self.configure_arb_waveform(2, self._last_handle_wfm2, self.ch2.gain(), 0.0)
+                self._seq_wfms['ch2'] = self.create_arb_waveform(wfm_data / self.ch2.gain())
+            self.configure_arb_waveform(2, self._seq_wfms['ch2'], self.ch2.gain(), 0.0)
         #Not required for Independent mode, but it is required for Master/Slave mode
         self.run()
     

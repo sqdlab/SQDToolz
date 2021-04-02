@@ -41,12 +41,12 @@ mod_freq_qubit = WM_SinusoidalIQ("QubitFreqMod", 100e6)
 instr_Agi1 = new_lab.station.load_Agi1()
 awg_wfm_q = WaveformAWG("Waveform 1", [(instr_Agi1, 'ch1'),(instr_Agi1, 'ch2')], 1.25e9)
 read_segs = []
-awg_wfm_q.add_waveform_segment(WFS_Constant("SEQPAD", None, 64e-9, 0.0))
+awg_wfm_q.add_waveform_segment(WFS_Constant("SEQPAD", None, 102.4e-9, 0.0))
 for m in range(4):
-    awg_wfm_q.add_waveform_segment(WFS_Gaussian(f"init{m}", mod_freq_qubit, 512e-9, 0.5-0.1*m))
+    awg_wfm_q.add_waveform_segment(WFS_Gaussian(f"init{m}", None, 512e-9, 0.5-0.1*m))
     awg_wfm_q.add_waveform_segment(WFS_Constant(f"zero1{m}", None, 512e-9, 0.01*m))
-    awg_wfm_q.add_waveform_segment(WFS_Gaussian(f"init2{m}", mod_freq_qubit, 512e-9, 0.5-0.1*m))
-    awg_wfm_q.add_waveform_segment(WFS_Constant(f"zero2{m}", None, 576e-9, 0.0))
+    awg_wfm_q.add_waveform_segment(WFS_Gaussian(f"init2{m}", None, 512e-9, 0.5-0.1*m))
+    awg_wfm_q.add_waveform_segment(WFS_Constant(f"zero2{m}", None, 512e-9, 0.0))
     read_segs += [f"init{m}"]
 # awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments(["init","init2"])
 awg_wfm_q.get_output_channel(0).marker(1).set_markers_to_segments(read_segs)

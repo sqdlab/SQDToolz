@@ -224,7 +224,7 @@ class TaborP2584M_AWG(InstrumentChannel):
         
     #     self._parent._set_cmd('FUNC:MODE', 'TASK')
 
-    def prepare_waveform_memory(self, chan_id, seg_lens):
+    def prepare_waveform_memory(self, chan_id, seg_lens, **kwargs):
         chan_ind = self._ch_list.index(chan_id)
         self._sequence_lens[chan_ind] = seg_lens
         self._banks_setup = False

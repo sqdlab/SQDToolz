@@ -237,7 +237,7 @@ class WaveformAWG:
                 dict_wfm_data = self._program_auto_comp_basic(cur_awg_chan, final_wfms[ind], mkr_list)
                 
             seg_lens = [x.size for x in dict_wfm_data['waveforms']]
-            cur_awg_chan._instr_awg.prepare_waveform_memory(cur_awg_chan._instr_awg_chan.short_name, seg_lens)
+            cur_awg_chan._instr_awg.prepare_waveform_memory(cur_awg_chan._instr_awg_chan.short_name, seg_lens, raw_data=dict_wfm_data)
             self.cur_wfms_to_commit.append(dict_wfm_data)
 
     def program_AWG_Waveforms(self):
@@ -288,7 +288,7 @@ class WaveformAWG:
             cur_mkrs = self._extract_marker_segments(mkr_list, m*dS, mkr_list[0].size)
             if found_match:
                 seq_ids[-1] = len(seq_segs)
-                seq_segs += final_wfm_for_chan[(m*dS):]
+                seq_segs += [final_wfm_for_chan[(m*dS):]]
                 seq_mkrs += [cur_mkrs]
             else:
                 seq_segs[-1] = final_wfm_for_chan[(m*dS):]

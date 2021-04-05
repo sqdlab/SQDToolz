@@ -44,7 +44,8 @@ for m in range(4):
     read_segs += [f"init{m}"]
 # awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments(["init0","init2"])
 awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments(read_segs)
-awg_wfm_q.program_AWG()
+awg_wfm_q.prepare_AWG_Waveforms()
+awg_wfm_q.program_AWG_Waveforms()
 
 awg_wfm_q.get_output_channel(0).Output = True
 awg_wfm_q.get_output_channel(1).Output = True
@@ -67,7 +68,7 @@ leData = inst_tabor.ACQ.get_data()
 import matplotlib.pyplot as plt
 for r in range(2):
     for s in range(2):
-        plt.plot(leData[0][r][s])
+        plt.plot(leData['data']['ch1'][r][s])
 plt.show()  #!!!REMEMBER TO CLOSE THE PLOT WINDOW BEFORE CLOSING PYTHON KERNEL OR TABOR LOCKS UP (PC restart won't cut it - needs to be a chassis restart)!!!
 input('press <ENTER> to continue')
 

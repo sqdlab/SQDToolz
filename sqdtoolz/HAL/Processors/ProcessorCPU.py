@@ -1,24 +1,10 @@
 from  sqdtoolz.HAL.ACQProcessor import ACQProcessor
 from multiprocessing.pool import ThreadPool
-import cupy as cp
 import numpy as np
 
-class ProcNodeGPU:
+class ProcNodeCPU:
     def __init__(self):
         pass
-
-    @staticmethod
-    def check_conv_to_cupy_array(arr):
-        '''
-        A light-weight helper function to convert an ND-array into a CuPy array if it is somehow a numpy array (e.g. first stage in the pipeline).
-
-        Inputs:
-            - arr - An ND-array that is either numpy or CuPy type - DO NOT FEED ANYTHING ELSE AS THIS FUNCTION DOES NOT CHECK FOR THAT!
-        '''
-        if type(arr) is np.ndarray:
-            return cp.array(arr)
-        else:
-            return arr
 
     def input_format(self):
         raise NotImplementedError()
@@ -30,9 +16,9 @@ class ProcNodeGPU:
         raise NotImplementedError()
 
 
-class ProcessorGPU(ACQProcessor):
+class ProcessorCPU(ACQProcessor):
     def __init__(self):
-        self.tp_GPU = ThreadPool(processes=1)
+        self.tp_CPU = ThreadPool(processes=1)
         self.cur_async_handle = None
 
         self.pipeline = []
@@ -41,7 +27,7 @@ class ProcessorGPU(ACQProcessor):
 
     def push_data(self, data_pkt):
         self.cur_data_queue.append(data_pkt)
-        #Start a new thread - otherwise, the thread will automatically check and pop the new array for processing
+        Start a new thread - otherwise, the thread will automatically check and pop the new array for processing
         if self.cur_async_handle == None:
             self.cur_async_handle = self.tp_GPU.apply_async(self._process_all)
         elif self.cur_async_handle.ready():
@@ -79,31 +65,25 @@ class ProcessorGPU(ACQProcessor):
             for cur_proc in self.pipeline:
                 cur_data = cur_proc.process_data(cur_data)
             
-            #Drain the GPU memory and transfer to CPU before processing next data packet...
-            for cur_ch in cur_data['data'].keys():
-                cp_arr = cur_data['data'].pop(cur_ch)
-                cur_data['data'][cur_ch] = cp.asnumpy(cp_arr)
-                del cp_arr
-            
             self.cur_data_processed.append(cur_data)
 
 
     def reset_pipeline(self):
         self.pipeline.clear()
 
-    def add_stage(self, ProcNodeGPUobj):
-        self.pipeline.append(ProcNodeGPUobj)
+    def add_stage(self, ProcNodeCPUobj):
+        self.pipeline.append(ProcNodeCPUobj)
 
 
-# from sqdtoolz.HAL.Processors.GPU.GPU_DDC import*
-# from sqdtoolz.HAL.Processors.GPU.GPU_FIR import*
-# from sqdtoolz.HAL.Processors.GPU.GPU_Mean import*
+# from sqdtoolz.HAL.Processors.CPU.CPU_DDC import*
+# from sqdtoolz.HAL.Processors.CPU.CPU_FIR import*
+# from sqdtoolz.HAL.Processors.CPU.CPU_Mean import*
 # def runme():
-#     new_proc = ProcessorGPU()
-#     new_proc.add_stage(GPU_DDC([0.1]))
-#     new_proc.add_stage(GPU_FIR([{'Type' : 'low', 'Taps' : 40, 'fc' : 0.01, 'Win' : 'hamming'}]*2))
+#     new_proc = ProcessorCPU()
+#     new_proc.add_stage(CPU_DDC([0.1]))
+#     new_proc.add_stage(CPU_FIR([{'Type' : 'low', 'Taps' : 40, 'fc' : 0.01, 'Win' : 'hamming'}]*2))
 
-#     data_size = 1024*1024*4
+#     data_size = 1024#*1024*4
 #     omega = 2*np.pi*0.1
 #     data = np.exp(-(np.arange(data_size)-200.0)**2/10000)*np.sin(omega*np.arange(data_size)+1.5+1.5)
 #     num_reps = 3
@@ -134,7 +114,7 @@ class ProcessorGPU(ACQProcessor):
 #         'misc' : {'SampleRates' : [1]}
 #     }
 
-#     new_proc.add_stage(GPU_Mean('repetition'))
+#     new_proc.add_stage(CPU_Mean('repetition'))
 #     new_proc.push_data(cur_data)
 #     fin_data = new_proc.get_all_data()
 

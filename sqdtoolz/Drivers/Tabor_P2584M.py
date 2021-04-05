@@ -475,8 +475,10 @@ class TaborP2584M_ACQ(InstrumentChannel):
         self._last_mem_frames_samples = (self.NumRepetitions, self.NumSegments, self.NumSamples)
         self._parent._chk_err('after allocating readout ACQ memory.')
 
-    def get_data(self):
+    def get_data(self, **kwargs):
         assert self.NumSamples % 48 == 0, "The number of samples must be divisible by 48 if in DUAL mode."
+
+        cur_processor = kwargs.get('data_processor', None)
 
         if self._last_mem_frames_samples[0] != self.NumRepetitions or self._last_mem_frames_samples[1] != self.NumSegments or self._last_mem_frames_samples[2] != self.NumSamples:
             self._allocate_frame_memory()
@@ -542,7 +544,9 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
         self._parent._chk_err('after downloading the ACQ data from the FGPA DRAM.')
 
-        return  {
+        #TODO: Write some blocked caching code here (like with the M4i)...
+        cur_processor
+        ret_val = {
                     'parameters' : ['repetition', 'segment', 'sample'],
                     'data' : {
                                 'ch1' : wav1.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples),
@@ -550,6 +554,11 @@ class TaborP2584M_ACQ(InstrumentChannel):
                              },
                     'misc' : {'SampleRates' : [self.SampleRate]*2}
                 }
+        if cur_processor:
+            cur_processor.push_data(ret_val)
+            return cur_processor.get_all_data()
+        else:
+            return ret_val
 
 class Tabor_P2584M(Instrument):
     def __init__(self, name, pxi_chassis: int,  pxi_slot: int, **kwargs):

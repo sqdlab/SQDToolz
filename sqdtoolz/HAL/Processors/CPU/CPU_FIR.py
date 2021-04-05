@@ -1,10 +1,9 @@
-from sqdtoolz.HAL.Processors.ProcessorGPU import*
-import cupy as cp
+from sqdtoolz.HAL.Processors.ProcessorCPU import*
 import numpy as np
-import cupyx.scipy.ndimage
+import scipy.ndimage
 import scipy.signal
 
-class GPU_FIR(ProcNodeGPU):
+class CPU_FIR(ProcNodeCPU):
     def __init__(self, fir_specs = [{'Type' : 'low', 'Taps' : 40, 'fc' : 10e6, 'Win' : 'hamming'}]):
         '''
         A general FIR filter applied across different channels in the input dataset.
@@ -37,9 +36,9 @@ class GPU_FIR(ProcNodeGPU):
             nyq_rate = sample_rate*0.5
             freq_cutoff_norm = self._fir_specs[ch_ind]['fc']/nyq_rate
             if self._fir_specs[ch_ind]['Type'] == 'low':
-                myFilt_vals = cp.array(scipy.signal.firwin(self._fir_specs[ch_ind]['Taps'], freq_cutoff_norm, window=self._fir_specs[ch_ind]['Win']))
+                myFilt_vals = np.array(scipy.signal.firwin(self._fir_specs[ch_ind]['Taps'], freq_cutoff_norm, window=self._fir_specs[ch_ind]['Win']))
             else:
-                myFilt_vals = 1.0 - cp.array(scipy.signal.firwin(self._fir_specs[ch_ind]['Taps'], freq_cutoff_norm, window=self._fir_specs[ch_ind]['Win']))
-            data_pkt['data'][cur_ch] = cupyx.scipy.ndimage.convolve1d( ProcNodeGPU.check_conv_to_cupy_array(data_pkt['data'][cur_ch]) , myFilt_vals)
+                myFilt_vals = 1.0 - np.array(scipy.signal.firwin(self._fir_specs[ch_ind]['Taps'], freq_cutoff_norm, window=self._fir_specs[ch_ind]['Win']))
+            data_pkt['data'][cur_ch] = scipy.ndimage.convolve1d( data_pkt['data'][cur_ch] , myFilt_vals)
 
         return data_pkt

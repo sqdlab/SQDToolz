@@ -542,8 +542,14 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
         self._parent._chk_err('after downloading the ACQ data from the FGPA DRAM.')
 
-        return [wav1.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples), wav2.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)]
-
+        return  {
+                    'parameters' : ['repetition', 'segment', 'sample'],
+                    'data' : {
+                                'ch1' : wav1.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples),
+                                'ch2' : wav2.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples),
+                             },
+                    'misc' : {'SampleRates' : [self.SampleRate]*2}
+                }
 
 class Tabor_P2584M(Instrument):
     def __init__(self, name, pxi_chassis: int,  pxi_slot: int, **kwargs):

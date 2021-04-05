@@ -81,6 +81,10 @@ class DummyAWG(Instrument):
         self._sample_rate = frequency_hertz
 
     @property
+    def AutoCompressionSupport(self):
+        return {'Supported' : False, 'MinSize' : 1024, 'Multiple' : 32}
+
+    @property
     def TriggerInputEdge(self):
         return self._trigger_edge
     @TriggerInputEdge.setter
@@ -95,8 +99,12 @@ class DummyAWG(Instrument):
             return self.submodules[identifier]
         else:
             return None
+    
+    def prepare_waveform_memory(self, chan_id, seg_lens, **kwargs):
+        pass
 
-    def program_channel(self, chan_id, wfm_data, mkr_data = np.array([])):
+    def program_channel(self, chan_id, dict_wfm_data):
+        print(dict_wfm_data['waveforms'][0])
         # print(wfm_data)
         # print(mkr_data)
         pass

@@ -174,7 +174,11 @@ class ACQ_M4i_Digitiser(M4i):
             final_arr = np.concatenate(final_arr)       
             final_arr = final_arr[:(self.NumRepetitions*self.NumSegments)]  #Trim off the end segments if using SEQ trigger (i.e. residual segments that form an incomplete repetition)
             #TODO: Investigate the impact of multiplying by mVrange/1000/ADC_to_voltage() to get the voltage - may have a slight performance impact?
-            return np.array([final_arr[:,:,m].reshape(self.NumRepetitions, self.NumSegments, self.NumSamples) for m in range(self.num_channels)])
+            return {
+                'parameters' : ['repetition', 'segment', 'sample'],
+                'data' : { f'ch{m}' : final_arr[:,:,m].reshape(self.NumRepetitions, self.NumSegments, self.NumSamples) for m in range(self.num_channels) },
+                'misc' : {'SampleRates' : [self.sample_rate.get()]*self.num_channels}
+            }
         else:
             #Gather data and either pass it to the data-processor or just collate it under final_arr - note that it is sent to the processor as properly grouped under the ACQ
             #data format specification.
@@ -190,10 +194,12 @@ class ACQ_M4i_Digitiser(M4i):
                 arr_blk = arr_blk[0:(num_reps*self.NumSegments)]
 
                 blocksize, samples, channels = arr_blk.shape
-                #Separate out the multiple channels
-                arr_blk = [arr_blk[:,:,m].reshape(num_reps, self.NumSegments, samples) for m in range(self.num_channels)]
 
-                cur_processor.push_data(arr_blk)
+                cur_processor.push_data({
+                    'parameters' : ['repetition', 'segment', 'sample'],
+                    'data' : { f'ch{m}' : arr_blk[:,:,m].reshape(num_reps, self.NumSegments, samples) for m in range(self.num_channels) },
+                    'misc' : {'SampleRates' : [self.sample_rate.get()]*self.num_channels}
+                })
         
             return cur_processor.get_all_data()
 

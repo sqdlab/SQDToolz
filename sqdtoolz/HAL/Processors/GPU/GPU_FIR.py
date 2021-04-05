@@ -1,4 +1,4 @@
-from sqdtoolz.HAL.Processors.ProcGPU import*
+from sqdtoolz.HAL.Processors.ProcessorGPU import*
 import cupy as cp
 import numpy as np
 import cupyx.scipy.ndimage

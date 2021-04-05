@@ -1572,13 +1572,13 @@ class Agilent_N8241A(Instrument):
         else:
             #There is at most one waveform committed to each channel. So use Arbitrary mode...
             if 'ch1' in self._raw_wfm_data:
-                self._program_channel_non_sequence(chan_id, self._raw_wfm_data['ch1']['waveforms'][0], self._raw_wfm_data['ch1']['markers'][0])
+                self._program_channel_non_sequence('ch1', self._raw_wfm_data['ch1']['waveforms'][0], self._raw_wfm_data['ch1']['markers'][0])
                 if 'ch2' in self._raw_wfm_data:
-                    self._program_channel_non_sequence(chan_id, self._raw_wfm_data['ch2']['waveforms'][0], self._raw_wfm_data['ch2']['markers'][0])
+                    self._program_channel_non_sequence('ch2', self._raw_wfm_data['ch2']['waveforms'][0], self._raw_wfm_data['ch2']['markers'][0])
             else:
                 #Channel 2 has a waveform, but Channel 1 is empty. Due to the waveform handle restrictions, a dummy waveform is filled in channel 1's memory to enable writes to Channel 2...
                 self._wfm_clog_memory()
-                self._program_channel_non_sequence(chan_id, self._raw_wfm_data['ch2']['waveforms'][0], self._raw_wfm_data['ch2']['markers'][0])
+                self._program_channel_non_sequence('ch2', self._raw_wfm_data['ch2']['waveforms'][0], self._raw_wfm_data['ch2']['markers'][0])
 
         self.done_programming = True
         self._seq_mode = False

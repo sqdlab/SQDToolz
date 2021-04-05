@@ -13,7 +13,9 @@ from sqdtoolz.Parameter import*
 from sqdtoolz.HAL.WaveformSegments import*
 from sqdtoolz.HAL.WaveformModulations import*
 from sqdtoolz.Parameter import*
-from sqdtoolz.HAL.ACQProcessors.ProcGPU_Single2IQ import*
+from sqdtoolz.HAL.Processors.ProcessorGPU import*
+from sqdtoolz.HAL.Processors.GPU.GPU_DDC import*
+from sqdtoolz.HAL.Processors.GPU.GPU_FIR import*
 
 new_lab = Laboratory(instr_config_file = "tests\\M4iTest.yaml", save_dir = "mySaves\\")
 
@@ -43,7 +45,7 @@ awg_wfm_q = WaveformAWG("Waveform 1", [(instr_Agi1, 'ch1'),(instr_Agi1, 'ch2')],
 read_segs = []
 awg_wfm_q.add_waveform_segment(WFS_Constant("SEQPAD", None, 102.4e-9, 0.0))
 for m in range(4):
-    awg_wfm_q.add_waveform_segment(WFS_Gaussian(f"init{m}", None, 512e-9, 0.5-0.1*m))
+    awg_wfm_q.add_waveform_segment(WFS_Gaussian(f"init{m}", mod_freq_qubit, 512e-9, 0.5-0.1*m))
     awg_wfm_q.add_waveform_segment(WFS_Constant(f"zero1{m}", None, 512e-9, 0.01*m))
     awg_wfm_q.add_waveform_segment(WFS_Gaussian(f"init2{m}", None, 512e-9, 0.5-0.1*m))
     awg_wfm_q.add_waveform_segment(WFS_Constant(f"zero2{m}", None, 512e-9, 0.0))
@@ -51,7 +53,7 @@ for m in range(4):
 # awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments(["init","init2"])
 awg_wfm_q.get_output_channel(0).marker(1).set_markers_to_segments(read_segs)
 awg_wfm_q.get_output_channel(1).marker(0).set_markers_to_segments(['SEQPAD', 'init0'])
-awg_wfm_q.AutoCompression = 'Basic'#'Basic'
+awg_wfm_q.AutoCompression = 'None'#'Basic'
 awg_wfm_q.prepare_AWG_Waveforms()
 awg_wfm_q.program_AWG_Waveforms()
 awg_wfm_q.get_output_channel(0).Output = True
@@ -79,16 +81,16 @@ expConfig = ExperimentConfiguration(10e-6, [ddg_module], [awg_wfm_q], acq_module
 # plt.show()
 # input('press <ENTER> to continue')
 
-myProc = ProcGPU_Single2IQ()
-myProc.set_ddc_params(500e6, 100e6)
-myProc.add_FIR_LP(40, 25e6)
+myProc = ProcessorGPU()
+myProc.add_stage(GPU_DDC([100e6]))
+myProc.add_stage(GPU_FIR([{'Type' : 'low', 'Taps' : 40, 'fc' : 25e6, 'Win' : 'hamming'}]*2))
 acq_module.set_data_processor(myProc)
 leData = expConfig.get_data()
 leData2 = expConfig.get_data()
 import matplotlib.pyplot as plt
 for r in range(acq_module.NumRepetitions):
     for s in range(acq_module.NumSegments):
-        plt.plot(leData[0][r][s].astype(np.float32)+4000*r)
+        plt.plot(leData['data']['ch0_I'][r][s].astype(np.float32)+4000*r)
 plt.show()
 input('press <ENTER> to continue')
 

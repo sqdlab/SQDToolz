@@ -9,6 +9,11 @@ import numpy as np
 from sqdtoolz.Parameter import*
 from sqdtoolz.Laboratory import*
 
+from sqdtoolz.HAL.Processors.ProcessorCPU import*
+from sqdtoolz.HAL.Processors.CPU.CPU_DDC import*
+from sqdtoolz.HAL.Processors.CPU.CPU_FIR import*
+from sqdtoolz.HAL.Processors.CPU.CPU_Mean import*
+
 new_lab = Laboratory(instr_config_file = "tests\\TaborTest.yaml", save_dir = "mySaves\\")
 
 #Can be done in YAML
@@ -32,7 +37,7 @@ new_lab.station.load_pulser().trigger_rate(300e3)
 
 inst_tabor = new_lab.station.load_TaborAWG()
 
-mod_freq_qubit = WM_SinusoidalIQ("QubitFreqMod", 10e6)
+mod_freq_qubit = WM_SinusoidalIQ("QubitFreqMod", 100e6)
 
 awg_wfm_q = WaveformAWG("Waveform 2 CH", [(inst_tabor.AWG, 'CH1'),(inst_tabor.AWG, 'CH2')], 1e9)
 read_segs = []
@@ -64,11 +69,18 @@ acq_module = ACQ(inst_tabor.ACQ)
 acq_module.NumSamples = 2400
 acq_module.NumSegments = 2
 acq_module.NumRepetitions = 2
-leData = inst_tabor.ACQ.get_data()
+
+myProc = ProcessorCPU()
+myProc.add_stage(CPU_DDC([100e6]*2))
+myProc.add_stage(CPU_FIR([{'Type' : 'low', 'Taps' : 40, 'fc' : 10e6, 'Win' : 'hamming'}]*4))
+acq_module.set_data_processor(myProc)
+
+leData = acq_module.get_data()
+
 import matplotlib.pyplot as plt
 for r in range(2):
     for s in range(2):
-        plt.plot(leData['data']['ch1'][r][s])
+        plt.plot(leData['data']['ch1_I'][r][s])
 plt.show()  #!!!REMEMBER TO CLOSE THE PLOT WINDOW BEFORE CLOSING PYTHON KERNEL OR TABOR LOCKS UP (PC restart won't cut it - needs to be a chassis restart)!!!
 input('press <ENTER> to continue')
 

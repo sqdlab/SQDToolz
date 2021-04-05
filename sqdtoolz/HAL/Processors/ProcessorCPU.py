@@ -27,11 +27,11 @@ class ProcessorCPU(ACQProcessor):
 
     def push_data(self, data_pkt):
         self.cur_data_queue.append(data_pkt)
-        Start a new thread - otherwise, the thread will automatically check and pop the new array for processing
+        #Start a new thread - otherwise, the thread will automatically check and pop the new array for processing
         if self.cur_async_handle == None:
-            self.cur_async_handle = self.tp_GPU.apply_async(self._process_all)
+            self.cur_async_handle = self.tp_CPU.apply_async(self._process_all)
         elif self.cur_async_handle.ready():
-            self.cur_async_handle = self.tp_GPU.apply_async(self._process_all)
+            self.cur_async_handle = self.tp_CPU.apply_async(self._process_all)
         # self._process_all()
 
     def get_all_data(self):
@@ -47,7 +47,9 @@ class ProcessorCPU(ACQProcessor):
         for cur_ch in ret_data['data'].keys():
             ret_data['data'][cur_ch] = np.concatenate( [cur_data['data'][cur_ch] for cur_data in self.cur_data_processed] )
 
-        del self.cur_data_processed
+        if len(self.cur_data_processed) > 1:
+            for cur_arr in self.cur_data_processed[1:]:
+                del cur_arr
         self.cur_data_processed = []
 
         return ret_data

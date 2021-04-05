@@ -61,7 +61,9 @@ class ProcessorGPU(ACQProcessor):
         for cur_ch in ret_data['data'].keys():
             ret_data['data'][cur_ch] = np.concatenate( [cur_data['data'][cur_ch] for cur_data in self.cur_data_processed] )
 
-        del self.cur_data_processed
+        if len(self.cur_data_processed) > 1:
+            for cur_arr in self.cur_data_processed[1:]:
+                del cur_arr
         self.cur_data_processed = []
 
         return ret_data

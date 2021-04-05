@@ -45,5 +45,22 @@ class DummyACQ(Instrument):
         self._trigger_edge = pol
 
     def get_data(self, **kwargs):
+        cur_processor = kwargs.get('data_processor', None)
+
         #channels, segments, samples
+
+        ret_val = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : {
+                        'ch1' : wav1.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples),
+                        'ch2' : wav2.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples),
+                        },
+            'misc' : {'SampleRates' : [self.SampleRate]*2}
+        }
+        if cur_processor:
+            cur_processor.push_data(ret_val)
+            return cur_processor.get_all_data()
+        else:
+            return ret_val
+
         return np.array([[np.random.rand(self.NumSamples)]*self.NumSegments])

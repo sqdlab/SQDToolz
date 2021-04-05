@@ -545,7 +545,6 @@ class TaborP2584M_ACQ(InstrumentChannel):
         self._parent._chk_err('after downloading the ACQ data from the FGPA DRAM.')
 
         #TODO: Write some blocked caching code here (like with the M4i)...
-        cur_processor
         ret_val = {
                     'parameters' : ['repetition', 'segment', 'sample'],
                     'data' : {

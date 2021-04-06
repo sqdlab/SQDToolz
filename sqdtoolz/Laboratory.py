@@ -70,10 +70,10 @@ class Laboratory:
         Path(cur_exp_path).mkdir(parents=True, exist_ok=True)
 
         #TODO: Write the sweeping code to appropriately nest folders or perform data-passing
-        ret_vals = expt_obj._run(sweep_vars)
+        ret_vals = expt_obj._run(cur_exp_path, sweep_vars)
         #TODO: Add flag to get/save for live-plotting
         #Save data and experiment configurations
-        expt_obj.save_data(cur_exp_path, ret_vals, sweep_vars=sweep_vars)
+        #expt_obj.save_data(cur_exp_path, ret_vals, sweep_vars=sweep_vars)
         expt_obj.save_config(cur_exp_path)
         #Save instrument configurations (QCoDeS)
         with open(cur_exp_path + 'instrument_configuration.txt', 'w') as outfile:

@@ -13,6 +13,7 @@ class DummyACQ(Instrument):
 
         self._num_samples = 10
         self._num_segs = 1
+        self._num_reps = 1
         self._sample_rate = 10e9
         self._trigger_edge = 1
 
@@ -29,6 +30,13 @@ class DummyACQ(Instrument):
     @SampleRate.setter
     def SampleRate(self, frequency_hertz):
         self._sample_rate = frequency_hertz
+
+    @property
+    def NumRepetitions(self):
+        return self._num_reps
+    @NumRepetitions.setter
+    def NumRepetitions(self, num_reps):
+        self._num_reps = num_reps
 
     @property
     def NumSegments(self):
@@ -48,7 +56,8 @@ class DummyACQ(Instrument):
         cur_processor = kwargs.get('data_processor', None)
 
         #channels, segments, samples
-
+        wav1 = np.array([[np.random.rand(self.NumSamples)]*self.NumSegments])
+        wav2 = np.array([[np.random.rand(self.NumSamples)]*self.NumSegments])
         ret_val = {
             'parameters' : ['repetition', 'segment', 'sample'],
             'data' : {

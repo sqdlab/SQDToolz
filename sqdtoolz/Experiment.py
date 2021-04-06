@@ -26,7 +26,7 @@ class Experiment:
     def _post_process(self, data):
         pass
 
-    def _run(self, sweep_vars=[]):
+    def _run(self, file_path, sweep_vars=[]):
         self._hf = None
 
         sweep_arrays = [x[1] for x in sweep_vars]
@@ -43,19 +43,21 @@ class Experiment:
             # self._expt_config.check_conformance() #TODO: Write this
             self._expt_config.prepare_instruments()
             data = self._expt_config.get_data()
+            self.update_file(file_path, data, sweep_vars)
             #TODO: Add in a preprocessor?
-            data_all += [np.mean(data[0][0])]
+            # data_all += [np.mean(data[0][0])]
         
         #data_all = np.concatenate(data_all)
-        data_final = np.c_[sweep_grids, np.real(np.array(data_all))]
-        data_final = np.c_[data_final, np.imag(np.array(data_all))]
+        # data_final = np.c_[sweep_grids, np.real(np.array(data_all))]
+        # data_final = np.c_[data_final, np.imag(np.array(data_all))]
 
         if self._hf:
             self._hf.close()
+            self._hf = None
 
         #TODO: think about different data-piece sizes: https://stackoverflow.com/questions/3386259/how-to-make-a-multidimension-numpy-array-with-a-varying-row-size
 
-        return data_final
+        return None#data_final
     
     def update_file(self, save_dir, data_pkt, sweep_vars):
         if self._hf == None:
@@ -68,31 +70,33 @@ class Experiment:
                 grp_params = self._hf.create_group('parameters')
                 #Assumes uniformity - TODO: Look into padding with NaNs if the inner data packets change in shape (e.g. different repetitions etc...)
                 for m, cur_param in enumerate(sweep_vars):
-                    grp_params.create_dataset(cur_param[0], data=np.hstack([m,cur_param[1]]))
+                    grp_params.create_dataset(cur_param[0].Name, data=np.hstack([m,cur_param[1]]))
                 offset = len(sweep_vars)
+                #
+                random_dataset = next(iter(data_pkt['data'].values()))
+                param_sizes = random_dataset.shape
                 for m, cur_param in enumerate(data_pkt['parameters']):
-                    grp_params.create_dataset(cur_param, data=np.hstack([m+offset,flux_vals]))
+                    grp_params.create_dataset(cur_param, data=np.hstack([m+offset,np.arange(param_sizes[m])]))
                 
                 #Write down the measurement output channels (i.e. dependent variables)
                 grp_meas = self._hf.create_group('measurements')
+                self._meas_chs = []
                 for m, cur_meas_ch in enumerate(data_pkt['data'].keys()):
                     grp_meas.create_dataset(cur_meas_ch, data=np.hstack([m]))
+                    self._meas_chs += [cur_meas_ch]
 
-                arr = np.zeros(data_arr.shape)
+                data_array_shape = [x[1].size for x in sweep_vars] + list(param_sizes)
+                arr_size = np.prod(data_array_shape)
+                self._datapkt_size = np.prod(list(param_sizes))
+
+                arr = np.zeros((arr_size, len(data_pkt['data'].keys())))
                 arr[:] = np.nan
-                self._dset = hf.create_dataset("data", data=arr, compression="gzip")
+                self._dset = self._hf.create_dataset("data", data=arr, compression="gzip")
+                self._dset_ind = 0
         
-        self._dset
-        num_segs = 10
-        num_rows_per_sample = int(len(data_arr)/num_segs)
-        # Now it is safe for the reader to open the swmr.h5 file
-        for i in range(num_segs):
-            # new_shape = ((i+1) * len(arr), 2)
-            # dset.resize( new_shape )
-            dset[i*num_rows_per_sample:(i+1)*num_rows_per_sample] = data_arr[i*num_rows_per_sample:(i+1)*num_rows_per_sample]
-            dset.flush()
-            a=0
-            # Notify the reader process that new data has been written
+        self._dset[self._dset_ind*self._datapkt_size : (self._dset_ind+1)*self._datapkt_size] = np.vstack([data_pkt['data'][x].flatten() for x in self._meas_chs]).T
+        self._dset_ind += 1
+        self._dset.flush()
 
 
     def save_data(self, save_dir, data_final_array, **kwargs):

@@ -44,6 +44,4 @@ class ExpConfigIQpulseInSingleOut(ExperimentConfiguration):
 
     def get_data(self):
         #TODO: Pack the data appropriately if using multiple ACQ objects (coordinating their starts/finishes perhaps?)
-        cur_acq = self._instr_ACQ
-        cur_data = cur_acq.get_data()
-        return cur_data[self._acq_ch_ind]  #Isolate the channel given that it is just a single-channel acquisition
+        return self._instr_ACQ.get_data()

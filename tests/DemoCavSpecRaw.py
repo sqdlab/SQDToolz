@@ -7,7 +7,7 @@ from sqdtoolz.HAL.GENmwSource import*
 from sqdtoolz.HAL.WaveformSegments import*
 from sqdtoolz.HAL.WaveformModulations import*
 from sqdtoolz.Drivers.dummyDDG import*
-from sqdtoolz.Drivers.dummyACQ import*
+from sqdtoolz.Drivers.dummyACQex import*
 from sqdtoolz.Drivers.dummyAWG import*
 from sqdtoolz.Drivers.dummyGENmwSource import*
 from sqdtoolz.ExperimentConfiguration import*
@@ -18,7 +18,7 @@ new_lab = Laboratory(instr_config_file = "", save_dir = "mySaves\\")
 #Can be done in YAML
 instr_ddg = DummyDDG('ddg')
 new_lab.add_instrument(instr_ddg)
-instr_acq = DummyACQ('acq')
+instr_acq = DummyACQex('acq')
 new_lab.add_instrument(instr_acq)
 instr_awg = DummyAWG('awg_test_instr')
 new_lab.add_instrument(instr_awg)

@@ -104,7 +104,5 @@ class DummyAWG(Instrument):
         pass
 
     def program_channel(self, chan_id, dict_wfm_data):
-        print(dict_wfm_data['waveforms'][0])
-        # print(wfm_data)
-        # print(mkr_data)
+        # print(dict_wfm_data['waveforms'][0])
         pass

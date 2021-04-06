@@ -16,6 +16,7 @@ from sqdtoolz.HAL.Processors.ProcessorCPU import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Max import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Mean import*
 
+from sqdtoolz.Experiments.Experimental.ExperimentCavitySpectroscopy2 import*
 from sqdtoolz.ExperimentConfigurations.Experimental.ExpConfigIQpulseInSingleOut import ExpConfigIQpulseInSingleOut
 from sqdtoolz.Experiments.Experimental.ExperimentRabi import ExperimentRabi
 import numpy as np
@@ -39,8 +40,16 @@ freq_src_module = GENmwSource(instr_fsrc.get_output('CH1'))
 
 mod_freq_qubit = WM_SinusoidalIQ("QubitFreqMod", 100e6)
 
+#
+#Setup Parameters
+#
+param_cav_freq = new_lab.add_parameter_property('Cavity Frequency', freq_src_module, 'Frequency')
 param_rab_freq = new_lab.add_parameter('Rabi Frequency')
+param_rab_power = new_lab.add_parameter('Power')
 
+#
+#Setup ExperimentConfiguration
+#
 #Setup the trigger and instrument relations
 ddg_module.set_trigger_output_params('A', 0.0, 50e-9)
 acq_module.set_trigger_source(awg_wfm_q.get_output_channel(0).marker(0))
@@ -55,11 +64,19 @@ myProc.add_stage(CPU_Mean('repetition'))
 acq_module.set_data_processor(myProc)
 
 #Cement the parameters into the experiment configuration
-exp_config = ExpConfigIQpulseInSingleOut(2.5e-6, [ddg_module], [awg_wfm_q], acq_module, [freq_src_module], awg_wfm_q)   #TODO: Check if the configuration is compatible - e.g. a special function in the translation script?
+exp_config = ExpConfigIQpulseInSingleOut(2.5e-6, [ddg_module], [awg_wfm_q], acq_module, [freq_src_module], awg_wfm_q)
 
+#
+#Setup Experiments
+#
+#Rabi Experiment that fits and sets the Rabi Frequency.
 exp_rabi = ExperimentRabi("myRabi", exp_config, mod_freq_qubit, np.linspace(0,100e-9,30), param_rab_freq)
-leData = new_lab.run_single(exp_rabi)
-# input('press <ENTER> to continue')
+
+new_lab.group_open("MyExp")
+for m in range(10):
+    param_rab_power.set_raw(m)
+    new_lab.run_single(exp_rabi)        #Run Rabi Experiment
+new_lab.group_close()
 
 # lePlot = exp_config.plot().show()
 # input('press <ENTER> to continue')

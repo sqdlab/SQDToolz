@@ -55,6 +55,11 @@ class ACQ:
         #TODO: Consider error-checking here
         self._trig_src_obj = trig_src_obj
 
+    def set_acq_params(self, reps, segs, samples):
+        self.NumRepetitions = reps
+        self.NumSegments = segs
+        self.NumSamples = samples
+
     def get_trigger_source(self):
         '''
         Get the Trigger object corresponding to the trigger source.

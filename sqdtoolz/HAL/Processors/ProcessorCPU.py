@@ -1,5 +1,6 @@
 from  sqdtoolz.HAL.ACQProcessor import ACQProcessor
 from multiprocessing.pool import ThreadPool
+import queue
 import numpy as np
 
 class ProcNodeCPU:
@@ -22,11 +23,11 @@ class ProcessorCPU(ACQProcessor):
         self.cur_async_handle = None
 
         self.pipeline = []
-        self.cur_data_queue = []
+        self.cur_data_queue = queue.Queue()
         self.cur_data_processed = []
 
     def push_data(self, data_pkt):
-        self.cur_data_queue.append(data_pkt)
+        self.cur_data_queue.put(data_pkt)
         #Start a new thread - otherwise, the thread will automatically check and pop the new array for processing
         if self.cur_async_handle == None:
             self.cur_async_handle = self.tp_CPU.apply_async(self._process_all)
@@ -38,6 +39,8 @@ class ProcessorCPU(ACQProcessor):
         #Wait until ready
         while not self.ready():
             continue
+        #Empty the queue just in case...
+        self._process_all()
 
         if len(self.cur_data_processed) == 0:
             return None
@@ -60,8 +63,8 @@ class ProcessorCPU(ACQProcessor):
         return self.cur_async_handle.ready()
 
     def _process_all(self):
-        while (len(self.cur_data_queue) > 0):
-            cur_data = self.cur_data_queue.pop(0)
+        while not self.cur_data_queue.empty():
+            cur_data = self.cur_data_queue.get()
             
             #Run the processes
             for cur_proc in self.pipeline:

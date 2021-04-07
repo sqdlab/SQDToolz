@@ -38,3 +38,17 @@ class VariableProperty(VariableBase):
 
     def set_raw(self, value):
         setattr(self._obj, self._prop, value)
+
+class VariableSpaced(VariableBase):
+    def __init__(self, name, var_1, var_2, space_val):
+        super().__init__(name)
+        self._var_1 = var_1
+        self._var_2 = var_2
+        self.space_val = space_val
+
+    def get_raw(self):
+        return self._var_1.get_raw()
+
+    def set_raw(self, value):
+        self._var_1.set_raw(value)
+        self._var_2.set_raw(value + self.space_val)

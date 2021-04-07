@@ -169,7 +169,7 @@ class ACQ_M4i_Digitiser(M4i):
             total_frames = self.NumRepetitions*self.NumSegments
 
         if cur_processor == None:
-            final_arr = [np.array(x) for x in self.multiple_trigger_fifo_acquisition(total_frames, self.NumSamples, 2, self.NumSegments)]
+            final_arr = [np.array(x) for x in self.multiple_trigger_fifo_acquisition(total_frames, self.NumSamples, 1, self.NumSegments)]
             #Concatenate the blocks
             final_arr = np.concatenate(final_arr)       
             final_arr = final_arr[:(self.NumRepetitions*self.NumSegments)]  #Trim off the end segments if using SEQ trigger (i.e. residual segments that form an incomplete repetition)
@@ -183,7 +183,7 @@ class ACQ_M4i_Digitiser(M4i):
             #Gather data and either pass it to the data-processor or just collate it under final_arr - note that it is sent to the processor as properly grouped under the ACQ
             #data format specification.
             cache_array = []
-            for cur_block in self.multiple_trigger_fifo_acquisition(total_frames, self.NumSamples, 2, self.NumSegments):
+            for cur_block in self.multiple_trigger_fifo_acquisition(total_frames, self.NumSamples, 1, self.NumSegments):
                 if len(cache_array) > 0:
                     arr_blk = np.concatenate((cache_array, np.array(cur_block)))
                 else:
@@ -203,17 +203,31 @@ class ACQ_M4i_Digitiser(M4i):
         
             return cur_processor.get_all_data()
 
+from sqdtoolz.HAL.Processors.ProcessorCPU import*
+from sqdtoolz.HAL.Processors.CPU.CPU_DDC import*
+from sqdtoolz.HAL.Processors.CPU.CPU_FIR import*
+from sqdtoolz.HAL.Processors.CPU.CPU_Mean import*
+
 def runme():
     new_digi = ACQ_M4i_Digitiser("test")
-    new_digi.segments(4)#3 * (2**26))
-    new_digi.samples(1024)#2**8+2**7)
-    
+    new_digi.segments(1)#3 * (2**26))
+    new_digi.samples(64)#2**8+2**7)
+    new_digi.NumRepetitions = 1000
+
     # term = new_digi._param32bit(30130)
     # term = new_digi.termination_1()
     # new_digi.snapshot()
 
+
+    myProc = ProcessorCPU()
+    myProc.add_stage(CPU_DDC([100e6]))
+    myProc.add_stage(CPU_FIR([{'Type' : 'low', 'Taps' : 40, 'fc' : 25e6, 'Win' : 'hamming'}]*2))
+    myProc.add_stage(CPU_Mean('sample'))
+
     # new_digi.pretrigger_memory_size(0)
-    a = new_digi.get_data()
+    for m in range(20):
+        a = new_digi.get_data(data_processor=myProc)
+        print(a['data']['ch0_I'].shape)
 
     
     import matplotlib.pyplot as plt

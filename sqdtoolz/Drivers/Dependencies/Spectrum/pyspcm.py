@@ -47,7 +47,8 @@ uptr64 = POINTER (uint64)
 
 # Windows
 if os.name == 'nt':
-    sys.stdout.write("Windows found")
+    #!!!!!!!!!!! CAN UNCOMMENT IT FOR A HELPFUL MESSAGE!!!!!!!!
+    # sys.stdout.write("Windows found")
 
     # define card handle type
     if (bIs64Bit):

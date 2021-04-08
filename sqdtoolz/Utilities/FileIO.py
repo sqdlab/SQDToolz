@@ -11,6 +11,7 @@ class FileIOWriter:
         if self._hf == None:
             if os.path.isfile(self._filepath):
                 self._hf = h5py.File(self._filepath, 'a', libver='latest')
+                self._hf.swmr_mode = True
             else:
                 self._hf = h5py.File(self._filepath, 'w', libver='latest')
                 
@@ -44,6 +45,8 @@ class FileIOWriter:
                 arr[:] = np.nan
                 self._dset = self._hf.create_dataset("data", data=arr, compression="gzip")
                 self._dset_ind = 0
+                
+                self._hf.swmr_mode = True
 
     def push_datapkt(self, data_pkt, sweep_vars):
         self._init_hdf5(sweep_vars, data_pkt)

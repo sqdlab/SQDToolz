@@ -12,6 +12,9 @@ from sqdtoolz.Drivers.dummyAWG import*
 from sqdtoolz.Drivers.dummyGENmwSource import*
 from sqdtoolz.ExperimentConfiguration import*
 from sqdtoolz.Parameter import*
+from sqdtoolz.HAL.Processors.ProcessorCPU import*
+from sqdtoolz.HAL.Processors.CPU.CPU_Max import*
+from sqdtoolz.HAL.Processors.CPU.CPU_Mean import*
 
 new_lab = Laboratory(instr_config_file = "", save_dir = "mySaves\\")
 
@@ -38,6 +41,8 @@ acq_module.set_trigger_source(awg_wfm_q.get_output_channel(0).marker(0))
 awg_wfm_q.set_trigger_source_all(ddg_module.get_trigger_output('A'))
 acq_module.SampleRate = 1e9
 acq_module.NumSamples = 100
+acq_module.NumSegments = 1
+acq_module.NumRepetitions = 200
 #Cement the parameters into the experiment configuration
 exp_config = ExperimentConfiguration(100e-9, [ddg_module], [awg_wfm_q], acq_module, [freq_src_module])
 
@@ -50,5 +55,13 @@ awg_wfm_q.get_output_channel().marker(0).TrigPulseLength = 30e-9
 # exp_config.plot().show()
 # input('press <ENTER> to continue')
 
+myProc = ProcessorCPU()
+myProc.add_stage(CPU_Max('sample'))
+myProc.add_stage(CPU_Max('segment'))
+# myProc.add_stage(CPU_Mean('repetition'))    #This should cause an error when run
+myProc.add_stage_end(CPU_Mean('repetition'))
+acq_module.set_data_processor(myProc)
+
 new_exp = Experiment("cav_exp", exp_config)
 leData = new_lab.run_single(new_exp, [(param_cav_freq, np.linspace(100e9,500e9,5))])
+a=0

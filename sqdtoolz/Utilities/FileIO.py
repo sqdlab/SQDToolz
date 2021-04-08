@@ -33,10 +33,13 @@ class FileIOWriter:
                     grp_meas.create_dataset(cur_meas_ch, data=np.hstack([m]))
                     self._meas_chs += [cur_meas_ch]
 
+                if len(param_sizes) == 0:
+                    self._datapkt_size = 1
+                else:
+                    self._datapkt_size = np.prod(list(param_sizes))
+
                 data_array_shape = [x[1].size for x in sweep_vars] + list(param_sizes)
                 arr_size = np.prod(data_array_shape)
-                self._datapkt_size = np.prod(list(param_sizes))
-
                 arr = np.zeros((arr_size, len(data_pkt['data'].keys())))
                 arr[:] = np.nan
                 self._dset = self._hf.create_dataset("data", data=arr, compression="gzip")

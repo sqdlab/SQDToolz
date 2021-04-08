@@ -24,7 +24,7 @@ class CPU_FIR(ProcNodeCPU):
     def output_format(self):
         return ['repetition', 'segment', 'sample']
 
-    def process_data(self, data_pkt):
+    def process_data(self, data_pkt, **kwargs):
         assert 'misc' in data_pkt, "The data packet does not have miscellaneous data under the key 'misc'"
         assert 'SampleRates' in data_pkt['misc'], "The data packet does not have SampleRate under the entry 'misc'"
 

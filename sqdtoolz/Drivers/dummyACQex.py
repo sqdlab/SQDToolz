@@ -73,18 +73,27 @@ class DummyACQex(Instrument):
         probs = 0.5 + 0.5*np.cos(2*np.pi* (2+self._drive_ind) *np.arange(self.NumSegments)/self.NumSegments)
         self._drive_ind += 1
 
-        wav1 = np.array([self.gen_ss_traces(probs) for x in range(self.NumRepetitions)])
-        wav2 = np.array([self.gen_ss_traces(probs) for x in range(self.NumRepetitions)])
+        wav1 = np.array([self.gen_ss_traces(probs) for x in range(int(self.NumRepetitions/2))])
+        wav2 = np.array([self.gen_ss_traces(probs) for x in range(int(self.NumRepetitions/2))])
         ret_val = {
             'parameters' : ['repetition', 'segment', 'sample'],
             'data' : {
-                        'ch1' : wav1.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples),
-                        'ch2' : wav2.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples),
+                        'ch1' : wav1.reshape(int(self.NumRepetitions/2), self.NumSegments, self.NumSamples),
+                        'ch2' : wav2.reshape(int(self.NumRepetitions/2), self.NumSegments, self.NumSamples),
+                        },
+            'misc' : {'SampleRates' : [self.SampleRate]*2}
+        }
+        ret_val2 = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : {
+                        'ch1' : wav1.reshape(int(self.NumRepetitions/2), self.NumSegments, self.NumSamples),
+                        'ch2' : wav2.reshape(int(self.NumRepetitions/2), self.NumSegments, self.NumSamples),
                         },
             'misc' : {'SampleRates' : [self.SampleRate]*2}
         }
         if cur_processor:
             cur_processor.push_data(ret_val)
+            cur_processor.push_data(ret_val2)
             return cur_processor.get_all_data()
         else:
             return ret_val

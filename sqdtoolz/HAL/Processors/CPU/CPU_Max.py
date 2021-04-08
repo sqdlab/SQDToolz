@@ -17,10 +17,13 @@ class CPU_Max(ProcNodeCPU):
     def output_format(self):
         return ['repetition', 'segment', 'sample']
 
-    def process_data(self, data_pkt):
+    def process_data(self, data_pkt, **kwargs):
         assert self._param_name in data_pkt['parameters'], f"The indexing parameter '{self._param_name}' is not in the current dataset."
 
+        end_stage = kwargs.get('EndStage', False)
+
         axis_num = data_pkt['parameters'].index(self._param_name)
+        assert (not end_stage) or axis_num > 0, "Cannot and should not take the maximum across the first variable unless it is in the end-stages."
 
         #Process means on a per-channel basis
         for ch_ind, cur_ch in enumerate(data_pkt['data'].keys()):

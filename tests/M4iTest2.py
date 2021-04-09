@@ -17,6 +17,8 @@ from sqdtoolz.HAL.Processors.ProcessorGPU import*
 from sqdtoolz.HAL.Processors.GPU.GPU_DDC import*
 from sqdtoolz.HAL.Processors.GPU.GPU_FIR import*
 
+import matplotlib.pyplot as plt
+
 new_lab = Laboratory(instr_config_file = "tests\\M4iTest.yaml", save_dir = "mySaves\\")
 
 #Note the following:
@@ -63,23 +65,25 @@ instr_digi = new_lab.station.load_M4iDigitizer()
 acq_module = ACQ(instr_digi)
 acq_module.NumSamples = 512
 acq_module.NumSegments = 4
-acq_module.NumRepetitions = 10
+acq_module.NumRepetitions = 5
 acq_module.SampleRate = 500e6
 acq_module.TriggerEdge = 1
-acq_module.set_trigger_source(awg_wfm_q.get_output_channel(0).marker(1))
+# acq_module.set_trigger_source(awg_wfm_q.get_output_channel(0).marker(1))
 
-expConfig = ExperimentConfiguration(10e-6, [ddg_module], [awg_wfm_q], acq_module, [freq_module])
+#expConfig = ExperimentConfiguration(10e-6, [ddg_module], [awg_wfm_q], acq_module, [freq_module])
+expConfig = ExperimentConfiguration(10e-6, [ddg_module], [], acq_module, [freq_module])
 # lePlot = expConfig.plot().show()
 # input('press <ENTER> to continue')
 
-# leData = expConfig.get_data().astype(np.float32)
-# leData2 = expConfig.get_data().astype(np.float32)
-# import matplotlib.pyplot as plt
-# for r in range(acq_module.NumRepetitions):
-#     for s in range(acq_module.NumSegments):
-#         plt.plot(leData[0][r][s]+4000*r)
-# plt.show()
-# input('press <ENTER> to continue')
+
+leData = expConfig.get_data()
+# leData2 = expConfig.get_data()
+for r in range(1):#acq_module.NumRepetitions):
+    for s in range(acq_module.NumSegments):
+        arr = leData['data']['ch0'][r][s]+4000*r
+        plt.plot(arr.tolist())
+plt.show()
+input('press <ENTER> to continue')
 
 myProc = ProcessorGPU()
 myProc.add_stage(GPU_DDC([100e6]))

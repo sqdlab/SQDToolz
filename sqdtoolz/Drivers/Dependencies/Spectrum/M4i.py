@@ -826,7 +826,7 @@ class M4i(Instrument):
     def initialise_time_stamp_mode(self):
         self._set_param32bit(pyspcm.SPC_TIMESTAMP_CMD, pyspcm.SPC_TSMODE_STARTRESET | pyspcm.SPC_TSCNT_REFCLOCKPOS)   #i.e. with reset X0 as the reference reset clock used for sequence triggering
 
-    def multiple_trigger_fifo_acquisition(self, segments, samples, blocksize, segmentsPerSEQ=0, posttrigger=None):
+    def multiple_trigger_fifo_acquisition(self, segments, samples, blocksize, segmentsPerSEQ=0, posttrigger=None, notify_page_size_bytes = 4096):
         '''
         Multiple recording acquisition with background DMA data transfer.
         
@@ -879,8 +879,8 @@ class M4i(Instrument):
         data_buffers = (ct.c_int16*buffer_samples*nbuffers)()
 
         self._def_transfer64bit(
-            pyspcm.SPCM_BUF_DATA, pyspcm.SPCM_DIR_CARDTOPC, buffer_bytes, ct.byref(data_buffers), 
-            0, buffer_bytes*nbuffers
+            pyspcm.SPCM_BUF_DATA, pyspcm.SPCM_DIR_CARDTOPC, notify_page_size_bytes, ct.byref(data_buffers), 
+            0, notify_page_size_bytes*nbuffers
         )
 
         first_acq = False
@@ -909,6 +909,7 @@ class M4i(Instrument):
             status = 0
             abort = False
             overrun = False
+            ts_index = 0
             while True:
                 if overrun:
                     # user_length must be queried before status for overrun detection
@@ -926,7 +927,7 @@ class M4i(Instrument):
                 if status & pyspcm.M2STAT_DATA_BLOCKREADY:
                     # user_length must be queried after status for this
                     # clip shape[0] of the output array to block_size
-                    user_length = min(self.user_available_length(), buffer_bytes)
+                    user_length = min(self.user_available_length(), notify_page_size_bytes)
                     user_position = self.user_available_position()
                     data_buffer = ct.cast(ct.addressof(data_buffers) + user_position, 
                                         ct.POINTER(user_length//2*ct.c_int16))
@@ -934,9 +935,14 @@ class M4i(Instrument):
                     #Abort if the array is empty (nothing to return/yield...) - See <Comment ALPHA> below
                     if data.size == 0:
                         break
-                    ret_data = data.reshape(user_length//samples//numch//2, samples, numch)
+                    ret_data = data
 
-                    if first_acq:
+                    if ts_index > 0:
+                        if ts_index > ret_data.size:
+                            ts_index -= ret_data.size
+                            del ret_data
+                            ret_data = None
+                    elif first_acq:
                         ts_vals = []
                         ts_times = []
                         if self.enable_TS_SEQ_trig():
@@ -959,12 +965,23 @@ class M4i(Instrument):
                         # print(ts_vals)
                         #Get first non-zero element - i.e. where the SEQ trigger on X0 has hit
                         first_ind = next((i for i, x in enumerate(ts_vals) if x), None)
-                        assert first_ind != None, "The SEQ trigger has not been captured - check that it's connected to input X0..."
-                        ret_data = ret_data[first_ind:]
-                        first_acq = False
+                        if first_ind != None:
+                            first_ind = first_ind*samples*numch
+                            if first_ind > ret_data.size:
+                                ts_index = first_ind - ret_data.size
+                                del ret_data
+                                ret_data = None
+                            else:
+                                ts_index = first_ind
+                                #assert first_ind != None, "The SEQ trigger has not been captured - check that it's connected to input X0..."
+                                first_acq = False
+                        else:
+                            del ret_data
+                            ret_data = None
 
                     # abort acquisition if the user sends False
-                    abort = yield ret_data
+                    if type(ret_data) == np.ndarray:
+                        abort = yield ret_data
                     # free yielded portion of the buffer
                     self._set_param32bit(pyspcm.SPC_DATA_AVAIL_CARD_LEN, user_length)
                     #Ignore the pyspcm.M2STAT_DATA_END check    - <Commend ALPHA> i.e. otherwise if one requests N segments, it returns N-1 segments (that's not good)

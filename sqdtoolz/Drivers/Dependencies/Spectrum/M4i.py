@@ -6,7 +6,7 @@
 #
 # QuTech
 #
-# Written by: Luka Bavdaz, Marco Tagliaferri, Pieter Eendebak
+# Written by: Prasanna Pakkiam and Rohit Beriwal - these guys screwed it up: Luka Bavdaz, Marco Tagliaferri, Pieter Eendebak
 # Also see: http://spectrum-instrumentation.com/en/m4i-platform-overview
 #
 
@@ -36,9 +36,13 @@ import ctypes as ct
 from functools import partial
 from typing import Union, Type
 
+from sqdtoolz.Drivers.Dependencies.Spectrum.py_header.spcerr import*
+from sqdtoolz.Drivers.Dependencies.Spectrum.py_header.regs import*
+
 from qcodes.utils.validators import Enum, Numbers, Anything, Ints, Bool
 from qcodes.instrument.base import Instrument
 from qcodes import ManualParameter
+
 
 log = logging.getLogger(__name__)
 
@@ -826,7 +830,7 @@ class M4i(Instrument):
     def initialise_time_stamp_mode(self):
         self._set_param32bit(pyspcm.SPC_TIMESTAMP_CMD, pyspcm.SPC_TSMODE_STARTRESET | pyspcm.SPC_TSCNT_REFCLOCKPOS)   #i.e. with reset X0 as the reference reset clock used for sequence triggering
 
-    def multiple_trigger_fifo_acquisition(self, segments, samples, blocksize, segmentsPerSEQ=0, posttrigger=None, notify_page_size_bytes = 4096):
+    def multiple_trigger_fifo_acquisition(self, segments, num_samples, blocksize, segmentsPerSEQ=0, posttrigger=None, notify_page_size_bytes = 4096):
         '''
         Multiple recording acquisition with background DMA data transfer.
         
@@ -863,25 +867,21 @@ class M4i(Instrument):
         # * SPC_MEMSIZE is ignored
         # * SPC_SEGMENTSIZE is # of samples/segment
         # * SPC_TRIGGERCOUNTER returns # of acquisitions (uint_48)
-        self.segment_size(samples)
+        self.segment_size(num_samples)
         if posttrigger is None:
-            posttrigger = samples - 16
+            posttrigger = num_samples - 16
         self.posttrigger_memory_size(posttrigger)
-        self.total_segments(segments)
+        self.total_segments(0)  #Apparently SPC_LOOPS has to be zero?
         numch = bin(self.enable_channels()).count("1")
         if not numch:
             raise RuntimeError('No channels are enabled.')
 
         # setup software buffer(s)
-        nbuffers = 2
-        buffer_samples = blocksize * samples * numch
-        buffer_bytes = 2*buffer_samples
-        data_buffers = (ct.c_int16*buffer_samples*nbuffers)()
-
-        self._def_transfer64bit(
-            pyspcm.SPCM_BUF_DATA, pyspcm.SPCM_DIR_CARDTOPC, notify_page_size_bytes, ct.byref(data_buffers), 
-            0, notify_page_size_bytes*nbuffers
-        )
+        qwBufferSize = pyspcm.uint64 (pyspcm.MEGA_B(4))
+        pvBuffer = ct.create_string_buffer(qwBufferSize.value)
+        lNotifySize = pyspcm.int32 (pyspcm.KILO_B(8)) 
+        #Setup H/W buffer
+        pyspcm.spcm_dwDefTransfer_i64(self.hCard, pyspcm.SPCM_BUF_DATA, pyspcm.SPCM_DIR_CARDTOPC, lNotifySize, pvBuffer, pyspcm.uint64 (0), qwBufferSize)
 
         first_acq = False
         if self.enable_TS_SEQ_trig():
@@ -898,107 +898,76 @@ class M4i(Instrument):
             # start data acquisition & transfer
             if self.enable_TS_SEQ_trig():
                 self.general_command(pyspcm.M2CMD_EXTRA_POLL)
-            self.general_command(pyspcm.M2CMD_CARD_START | pyspcm.M2CMD_CARD_ENABLETRIGGER | pyspcm.M2CMD_DATA_STARTDMA)
-            # data transfer
-            # SPC_M2STATUS: 
-            # * M2STAT_DATA_OVERRUN indicates a buffer overrun on the card
-            if self.enable_TS_SEQ_trig():
-                self.general_command(pyspcm.M2CMD_DATA_WAITDMA | pyspcm.M2CMD_EXTRA_WAITDMA)
-            else:
-                self.general_command(pyspcm.M2CMD_DATA_WAITDMA)
-            status = 0
-            abort = False
-            overrun = False
+            dwError = pyspcm.spcm_dwSetParam_i32(self.hCard, pyspcm.SPC_M2CMD, pyspcm.M2CMD_CARD_START | pyspcm.M2CMD_CARD_ENABLETRIGGER | pyspcm.M2CMD_DATA_STARTDMA)
+            if dwError != ERR_OK:
+                szErrorTextBuffer = create_string_buffer (ERRORTEXTLEN)
+                pyspcm.spcm_dwGetErrorInfo_i32 (self.hCard, None, None, szErrorTextBuffer)
+                print("{0}\n".format(szErrorTextBuffer.value))
+                print('Could not start DMA transfer on M4i Digitiser card')
+                spcm_vClose (self.hCard)
+            
             ts_index = 0
-            while True:
-                if overrun:
-                    # user_length must be queried before status for overrun detection
-                    user_length = self.user_available_length()
-                status = self.card_status()
-                #print('status=0x{:02x}, available={}k'.format(status, self.user_available_length()//1024))
-                #if (not overrun) and (status & (pyspcm.M2STAT_DATA_OVERRUN | pyspcm.M2STAT_CARD_READY)):
-                if status & (pyspcm.M2STAT_DATA_OVERRUN):
-                    # M2STAT_DATA_OVERRUN is only returned once and may be lost
-                    # if WAITDMA if used or the user queries the card status
-                    # M2STAT_CARD_READY indicates that the card has stopped
-                    # which may be the result of a overrun or end of the measurement
-                    logging.error('A buffer overrun occured on the digitizer. Aborting.')
-                    overrun = True
-                if status & pyspcm.M2STAT_DATA_BLOCKREADY:
-                    # user_length must be queried after status for this
-                    # clip shape[0] of the output array to block_size
-                    user_length = min(self.user_available_length(), notify_page_size_bytes)
-                    user_position = self.user_available_position()
-                    data_buffer = ct.cast(ct.addressof(data_buffers) + user_position, 
-                                        ct.POINTER(user_length//2*ct.c_int16))
-                    data = np.frombuffer(data_buffer.contents, dtype=ct.c_int16)
-                    #Abort if the array is empty (nothing to return/yield...) - See <Comment ALPHA> below
-                    if data.size == 0:
-                        break
-                    ret_data = data
-
-                    if ts_index > 0:
-                        if ts_index > ret_data.size:
-                            ts_index -= ret_data.size
-                            del ret_data
-                            ret_data = None
-                    elif first_acq:
-                        ts_vals = []
-                        ts_times = []
-                        if self.enable_TS_SEQ_trig():
-                            avail_bytes = self._param32bit(pyspcm.SPC_TS_AVAIL_USER_LEN)
-                            if avail_bytes >= 16:
-                                byte_pos = self._param32bit(pyspcm.SPC_TS_AVAIL_USER_POS)
-                                for i in range (0, int (avail_bytes / 16), 1):
-                                    # calculate current timestamp buffer index
-                                    lIndex = int (byte_pos / 8) + i * int (16 / 8)
-                                    # calculate timestamp value
-                                    timestampVal = pllData[lIndex]
-                                    #Note that:
-                                    # (timestampVal & 0xFFFFF0000000000)>>40 gives the number of X0 pulses 
-                                    # timestampVal & 0xFFFFFFFFFF gives the time since last X0 pulse (in terms of number of TRIG pulses)
-                                    ts_times += [timestampVal & 0xFFFFFFFFFF]
-                                    ts_vals += [(timestampVal & 0xFFFFF0000000000)>>40]
-                                self._set_param32bit(pyspcm.SPC_TS_AVAIL_CARD_LEN, avail_bytes)
-                        #Debugging helpers:
-                        # print(ts_times)
-                        # print(ts_vals)
-                        #Get first non-zero element - i.e. where the SEQ trigger on X0 has hit
-                        first_ind = next((i for i, x in enumerate(ts_vals) if x), None)
-                        if first_ind != None:
-                            first_ind = first_ind*samples*numch
-                            if first_ind > ret_data.size:
-                                ts_index = first_ind - ret_data.size
-                                del ret_data
-                                ret_data = None
-                            else:
-                                ts_index = first_ind
-                                #assert first_ind != None, "The SEQ trigger has not been captured - check that it's connected to input X0..."
-                                first_acq = False
-                        else:
-                            del ret_data
-                            ret_data = None
-
-                    # abort acquisition if the user sends False
-                    if type(ret_data) == np.ndarray:
-                        abort = yield ret_data
-                    # free yielded portion of the buffer
-                    self._set_param32bit(pyspcm.SPC_DATA_AVAIL_CARD_LEN, user_length)
-                    #Ignore the pyspcm.M2STAT_DATA_END check    - <Commend ALPHA> i.e. otherwise if one requests N segments, it returns N-1 segments (that's not good)
-                    #Realistically speaking, one should 'RTFM' this, but the logic should be sound as it effectively "queries" the buffer to be empty by noting that
-                    #the returned data is of size zero (hence, breaking the loop as above). PP and RB
-                    continue
-                else:
-                    # in normal operation, user_length != 0 always coincides with a new block
-                    # if a buffer overrun occurs, no new block is reported and 
-                    # user_length != 0 marks the last (incomplete) block
-                    if overrun and (user_length != 0):
-                        break
-                    time.sleep(0)
-                if abort or (status & pyspcm.M2STAT_DATA_END): 
+            
+            lStatus = pyspcm.int32 ()
+            lAvailUser = pyspcm.int32 ()
+            lPCPos = pyspcm.int32 ()
+            #
+            qwTotalMem = pyspcm.uint64 (0)
+            lSegmentIndex = pyspcm.uint32 (0)
+            lSegmentCnt = pyspcm.uint32 (0)
+            while qwTotalMem.value < segments*num_samples*numch:
+                dwError = pyspcm.spcm_dwSetParam_i32 (self.hCard, pyspcm.SPC_M2CMD, pyspcm.M2CMD_DATA_WAITDMA)
+                if dwError != ERR_OK:
+                    assert dwError == ERR_TIMEOUT, "... Timeout\n"
+                    print("... Error: {0:d}\n".format(dwError))
                     break
-                #if self.general_command(pyspcm.M2CMD_DATA_WAITDMA):
-                #    raise RuntimeError('M4i WAITDMA returned an error.')
+                else:
+                    pyspcm.spcm_dwGetParam_i32 (self.hCard, pyspcm.SPC_M2STATUS,            pyspcm.byref (lStatus))
+                    pyspcm.spcm_dwGetParam_i32 (self.hCard, pyspcm.SPC_DATA_AVAIL_USER_LEN, pyspcm.byref (lAvailUser))
+                    pyspcm.spcm_dwGetParam_i32 (self.hCard, pyspcm.SPC_DATA_AVAIL_USER_POS, pyspcm.byref (lPCPos))
+
+                    if lAvailUser.value >= lNotifySize.value:
+                        qwTotalMem.value += lNotifySize.value
+                        
+                        # this is the point to do anything with the data
+                        # e.g. calculate minimum and maximum of the acquired data
+                        pnData = ct.cast(pvBuffer, pyspcm.ptr16) # cast to pointer to 16bit integer
+                        data_arr = []
+                        for i in range(lNotifySize.value):
+                            data_arr += [pnData[i]]
+
+                            lSegmentIndex.value += 1
+                            lSegmentIndex.value %= num_samples
+                            # check end of acquired segment
+                            if (lSegmentIndex.value == 0):
+                                lSegmentCnt.value += 1
+
+                        yield np.array(data_arr)
+                        pyspcm.spcm_dwSetParam_i32(self.hCard, pyspcm.SPC_DATA_AVAIL_CARD_LEN, lNotifySize)        
+                        
+                    # spcm_dwGetParam_i32 (self.hCard, SPC_TS_AVAIL_USER_LEN, byref (lAvailUserTS))
+                    
+                    # # read timestamp value (1 timestamp = 8 bytes (M2i, M3i) or 16 byte (M4i))
+                    # if (lAvailUserTS.value >= lBytesPerTS):
+
+                    #     spcm_dwGetParam_i32 (hCard, SPC_TS_AVAIL_USER_POS, byref (lPCPosTS))
+                        
+                    #     if ((lPCPosTS.value + lAvailUserTS.value) >= qwBufferSizeTS.value):
+                    #         lAvailUserTS.value = qwBufferSizeTS.value - lPCPosTS.value
+
+                    #     for i in range (0, int (lAvailUserTS.value / lBytesPerTS), 1):
+
+                    #         # calculate current timestamp buffer index
+                    #         lIndex = int (lPCPosTS.value / 8) + i * int (lBytesPerTS / 8)
+
+                    #         # calculate timestamp value
+                    #         timestampVal = pllData[lIndex] / llSamplingrate.value
+
+                    #         # write timestamp value to file
+                    #         fileTS.write (str (timestampVal) + "\n")
+                            
+                    #     spcm_dwSetParam_i32 (hCard, SPC_TS_AVAIL_CARD_LEN, lAvailUserTS.value)
+
         finally:
             # stop transfer before invalidating buffer
             self._stop_acquisition()
@@ -1269,6 +1238,7 @@ class M4i(Instrument):
         if self.hCard is not None:
             pyspcm.spcm_vClose(self.hCard)
             self.hCard = None
+            print('hello')
         super().close()
 
     def get_card_type(self, verbose=0):

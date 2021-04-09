@@ -137,7 +137,7 @@ class ACQ_M4i_Digitiser(M4i):
         else:
             self.multipurpose_mode_0.set('disabled')
             self.enable_TS_SEQ_trig(True)
-            self.initialise_time_stamp_mode()
+            # self.initialise_time_stamp_mode()
             # setting number of segments to specific value.
             # Assuming X0 is the sequence start trigger.
             # self.multipurpose_mode_0.set('digital_in')
@@ -165,25 +165,30 @@ class ACQ_M4i_Digitiser(M4i):
 
         #Capture extra frame when running SEQ triggering as the SEQ trigger signal on X0 may not align exactly before the first captured segment trigger...
         if self.enable_TS_SEQ_trig():
-            total_frames = (self.NumRepetitions+1)*self.NumSegments
+            total_frames = (self.NumRepetitions+2)*self.NumSegments
         else:
-            total_frames = self.NumRepetitions*self.NumSegments
+            total_frames = (self.NumRepetitions+1)*self.NumSegments
 
         if cur_processor == None:
             if self.num_channels == 1:
                 final_arrs = [np.zeros(total_frames * self.NumSamples)]
             else:
                 final_arrs = [np.zeros(total_frames * self.NumSamples), np.zeros(total_frames * self.NumSamples)]
+            #
+            final_arrs[0][:] = np.nan
             cur_ind = 0
             for cur_block in self.multiple_trigger_fifo_acquisition(total_frames, self.NumSamples, 1, self.NumSegments, notify_page_size_bytes=4096):
                 if self.num_channels == 1:
                     blk_size = cur_block.size
-                    final_arrs[0][(cur_ind*blk_size):((cur_ind+1)*blk_size)] = deepcopy(cur_block)
+                    end_pt = min( blk_size, final_arrs[0].size - cur_ind)
+                    final_arrs[0][cur_ind:cur_ind+end_pt] = deepcopy(cur_block[:end_pt])
                 else:
                     blk_size = int(cur_block.size/2)
-                    final_arrs[0][(cur_ind*blk_size):((cur_ind+1)*blk_size)] = deepcopy(cur_block[::2])
-                    final_arrs[1][(cur_ind*blk_size):((cur_ind+1)*blk_size)] = deepcopy(cur_block[1::2])
-                cur_ind += 1
+                    end_pt = min( blk_size, final_arrs[0].size - cur_ind)
+                    final_arrs[0][cur_ind:cur_ind+end_pt] = deepcopy(cur_block[:2*end_pt:2])
+                    final_arrs[1][cur_ind:cur_ind+end_pt] = deepcopy(cur_block[1:2*end_pt:2])
+                cur_ind += end_pt
+            #
             total_num_data = self.NumRepetitions * self.NumSegments * self.NumSamples   #The trimmed indexing is required when using SEQ trigger mode in which the data will be taken in excess...
             #TODO: Investigate the impact of multiplying by mVrange/1000/ADC_to_voltage() to get the voltage - may have a slight performance impact?
             return {
@@ -219,57 +224,72 @@ class ACQ_M4i_Digitiser(M4i):
 # from sqdtoolz.HAL.Processors.CPU.CPU_DDC import*
 # from sqdtoolz.HAL.Processors.CPU.CPU_FIR import*
 # from sqdtoolz.HAL.Processors.CPU.CPU_Mean import*
-# import matplotlib.pyplot as plt
-# import time
+import matplotlib.pyplot as plt
+import time
+#import pdb
+def runme():
+    new_digi = ACQ_M4i_Digitiser("test")
+    new_digi._set_channels(2)
+    new_digi.segments(4)#3 * (2**26))
+    new_digi.samples(2**13)#2**8+2**7)
+    new_digi.NumRepetitions = 2
+
+    # term = new_digi._param32bit(30130)
+    # term = new_digi.termination_1()
+    # new_digi.snapshot()
+
+
+    # myProc = ProcessorCPU()
+    # myProc.add_stage(CPU_DDC([100e6]))
+    # myProc.add_stage(CPU_FIR([{'Type' : 'low', 'Taps' : 40, 'fc' : 25e6, 'Win' : 'hamming'}]*2))
+    # myProc.add_stage(CPU_Mean('sample'))
+    # new_digi._set_channels(2)
+    # new_digi.pretrigger_memory_size(0)
+    # for m in range(20):
+    #     a = new_digi.get_data()#(data_processor=myProc)
+    #     print(new_digi.get_error_info32bit())
+    #     print(a['data']['ch0'].shape)
+    a = new_digi.get_data()#(data_processor=myProc)
+    print('we made it!')
+    # np.savetxt('sample.txt', np.ndarray.flatten(a['data']['ch0'].astype(np.float32)+np.float32(4000*1)))
+    # time.sleep(5)
+    print('we wrote it!')
+    # gc.collect()
+    fig, axs = plt.subplots(2)
+    for r in range(2):#acq_module.NumRepetitions):
+        for s in range(1):
+            axs[0].plot(a['data']['ch0'][r][s].astype(np.float32)+np.float32(4000*r))
+            axs[0].plot(a['data']['ch1'][r][s].astype(np.float32)+np.float32(4000*r))
+            # axs[0].plot(np.ones(a['data']['ch0'][r][s].size))
+            # axs[1].plot(np.ones(512))
+    # plt.plot(leData[0][0])
+    # plt.show()
+    print('we plotted it!')
+    # input('wait')
     
-# def runme():
-#     new_digi = ACQ_M4i_Digitiser("test")
-#     new_digi.segments(1)#3 * (2**26))
-#     new_digi.samples(512)#2**8+2**7)
-#     new_digi.NumRepetitions = 1000
 
-#     # term = new_digi._param32bit(30130)
-#     # term = new_digi.termination_1()
-#     # new_digi.snapshot()
+    new_digi.samples(96)#2**8+2**7)
+    b = new_digi.get_data()#(data_processor=myProc)
+    print('we made it!')
+    # time.sleep(2)
+    # np.savetxt('sample.txt', np.ndarray.flatten(a['data']['ch0'].astype(np.float32)+np.float32(4000*1)))
+    print('we wrote it!')
+    # gc.collect()
+    for r in range(1):#acq_module.NumRepetitions):
+        for s in range(new_digi.NumSegments):
+            axs[1].plot(b['data']['ch0'][r][s].astype(np.float32)+np.float32(4000*r))
+            # axs[1].plot(np.ones(512))
 
+    # plt.plot(leData[0][0])
+    plt.show()
+    
+    # # fig.show()
+    # #a = [print(np.array(x)) for x in new_digi.multiple_trigger_fifo_acquisition(3*2**26,384,2**11)]
 
-#     myProc = ProcessorCPU()
-#     myProc.add_stage(CPU_DDC([100e6]))
-#     myProc.add_stage(CPU_FIR([{'Type' : 'low', 'Taps' : 40, 'fc' : 25e6, 'Win' : 'hamming'}]*2))
-#     myProc.add_stage(CPU_Mean('sample'))
-#     # new_digi._set_channels(2)
-#     # new_digi.pretrigger_memory_size(0)
-#     # for m in range(20):
-#     #     a = new_digi.get_data()#(data_processor=myProc)
-#     #     print(a['data']['ch0'].shape)
-#     a = new_digi.get_data()#(data_processor=myProc)
-#     print('we made it!')
-#     # time.sleep(3)
+    # # assert (num_of_acquisitions*self.samples.get()%4096 == 0) or (num_of_acquisitions*self.samples.get() in [2**4, 2**5, 2**6, 2**7, 2**8, 2**9, 2**10, 2**11]), "The number of total samples requested to the card is not valid.\nThis must be 16, 32, 64, 128, 256, 512, 1k ,2k or any multiple of 4k.\nThe easiest way to ensure this is to use powers of 2 for averages, samples and segments, probably in that order of priority."
+    # s=0
+    input("done")
+    
 
-#     fig, axs = plt.subplots(2)
-
-#     for r in range(1):#acq_module.NumRepetitions):
-#         for s in range(new_digi.NumSegments):
-#             axs[0].plot(a['data']['ch0'][r][s].astype(np.float32)+np.float32(4000*r))
-#     # plt.plot(leData[0][0])
-#     # plt.show()
-
-#     # input('wait')
-#     new_digi.samples(96)#2**8+2**7)
-#     b = new_digi.get_data()#(data_processor=myProc)
-#     print('we made it!')
-#     # time.sleep(2)
-#     for r in range(1):#acq_module.NumRepetitions):
-#         for s in range(new_digi.NumSegments):
-#             axs[1].plot(b['data']['ch0'][r][s].astype(np.float32)+np.float32(4000*r))
-#     # plt.plot(leData[0][0])
-#     # plt.show()
-#     fig.show()
-#     #a = [print(np.array(x)) for x in new_digi.multiple_trigger_fifo_acquisition(3*2**26,384,2**11)]
-
-#     # assert (num_of_acquisitions*self.samples.get()%4096 == 0) or (num_of_acquisitions*self.samples.get() in [2**4, 2**5, 2**6, 2**7, 2**8, 2**9, 2**10, 2**11]), "The number of total samples requested to the card is not valid.\nThis must be 16, 32, 64, 128, 256, 512, 1k ,2k or any multiple of 4k.\nThe easiest way to ensure this is to use powers of 2 for averages, samples and segments, probably in that order of priority."
-#     s=0
-#     input("done")
-
-# if __name__ == '__main__':
-#     runme()
+if __name__ == '__main__':
+    runme()

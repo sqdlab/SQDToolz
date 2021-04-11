@@ -57,8 +57,8 @@ awg_wfm_q.get_output_channel(0).marker(1).set_markers_to_segments(read_segs)
 awg_wfm_q.get_output_channel(1).marker(0).set_markers_to_segments(['SEQPAD', 'init0'])
 awg_wfm_q.AutoCompression = 'None'#'Basic'
 
-awg_wfm_q.plot_waveforms(True).show()
-input('Press ENTER')
+# awg_wfm_q.plot_waveforms(True).show()
+# input('Press ENTER')
 
 # awg_wfm_q2 = WaveformAWG("Waveform 2", [(instr_Agi1, 'ch2')], 1.25e9)
 # read_segs = []
@@ -94,7 +94,7 @@ expConfig = ExperimentConfiguration(10e-6, [ddg_module], [], acq_module, [freq_m
 
 leData = expConfig.get_data()
 # leData2 = expConfig.get_data()
-for r in range(1):#acq_module.NumRepetitions):
+for r in range(5):#acq_module.NumRepetitions):
     for s in range(acq_module.NumSegments):
         arr = leData['data']['ch0'][r][s]+4000*r
         plt.plot(arr.tolist())

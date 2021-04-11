@@ -200,30 +200,36 @@ class ACQ_M4i_Digitiser(M4i):
             #Gather data and either pass it to the data-processor or just collate it under final_arr - note that it is sent to the processor as properly grouped under the ACQ
             #data format specification.
             cache_array = []
-            for cur_block in self.multiple_trigger_fifo_acquisition(total_frames, self.NumSamples, 1, self.NumSegments):
+            for cur_block in self.multiple_trigger_fifo_acquisition(total_frames, self.NumSamples, 1, self.NumSegments, notify_page_size_bytes=4096):
                 if len(cache_array) > 0:
                     arr_blk = np.concatenate((cache_array, np.array(cur_block)))
                 else:
                     arr_blk = np.array(cur_block)
 
-                num_reps = int(arr_blk.shape[0] / self.NumSegments)
-                cache_array = arr_blk[(num_reps*self.NumSegments):]
-                arr_blk = arr_blk[0:(num_reps*self.NumSegments)]
-
-                blocksize, samples, channels = arr_blk.shape
+                if self.num_channels == 1:
+                    num_reps = int( arr_blk.size / (self.NumSegments*self.NumSamples) )
+                    cache_array = arr_blk[(num_reps*self.NumSegments*self.NumSamples):]
+                    arr_blk = [arr_blk[0:(num_reps*self.NumSegments*self.NumSamples)].reshape(num_reps, self.NumSegments, self.NumSamples)]
+                else:
+                    num_reps = int( arr_blk.size / (self.NumSegments*self.NumSamples*2) )
+                    cache_array = arr_blk[(num_reps*self.NumSegments*self.NumSamples*2):]
+                    arr_blk = [
+                        arr_blk[0:(num_reps*self.NumSegments*self.NumSamples*2):2].reshape(num_reps, self.NumSegments, self.NumSamples),
+                        arr_blk[1:(num_reps*self.NumSegments*self.NumSamples*2):2].reshape(num_reps, self.NumSegments, self.NumSamples)
+                    ]
 
                 cur_processor.push_data({
                     'parameters' : ['repetition', 'segment', 'sample'],
-                    'data' : { f'ch{m}' : arr_blk[:,:,m].reshape(num_reps, self.NumSegments, samples) for m in range(self.num_channels) },
+                    'data' : { f'ch{m}' : arr_blk[m] for m in range(self.num_channels) },
                     'misc' : {'SampleRates' : [self.sample_rate.get()]*self.num_channels}
                 })
         
             return cur_processor.get_all_data()
 
-# from sqdtoolz.HAL.Processors.ProcessorCPU import*
-# from sqdtoolz.HAL.Processors.CPU.CPU_DDC import*
-# from sqdtoolz.HAL.Processors.CPU.CPU_FIR import*
-# from sqdtoolz.HAL.Processors.CPU.CPU_Mean import*
+from sqdtoolz.HAL.Processors.ProcessorCPU import*
+from sqdtoolz.HAL.Processors.CPU.CPU_DDC import*
+from sqdtoolz.HAL.Processors.CPU.CPU_FIR import*
+from sqdtoolz.HAL.Processors.CPU.CPU_Mean import*
 import matplotlib.pyplot as plt
 import time
 #import pdb
@@ -239,9 +245,9 @@ def runme():
     # new_digi.snapshot()
 
 
-    # myProc = ProcessorCPU()
-    # myProc.add_stage(CPU_DDC([100e6]))
-    # myProc.add_stage(CPU_FIR([{'Type' : 'low', 'Taps' : 40, 'fc' : 25e6, 'Win' : 'hamming'}]*2))
+    myProc = ProcessorCPU()
+    myProc.add_stage(CPU_DDC([100e6]*2))
+    myProc.add_stage(CPU_FIR([{'Type' : 'low', 'Taps' : 40, 'fc' : 25e6, 'Win' : 'hamming'}]*4))
     # myProc.add_stage(CPU_Mean('sample'))
     # new_digi._set_channels(2)
     # new_digi.pretrigger_memory_size(0)
@@ -249,7 +255,7 @@ def runme():
     #     a = new_digi.get_data()#(data_processor=myProc)
     #     print(new_digi.get_error_info32bit())
     #     print(a['data']['ch0'].shape)
-    a = new_digi.get_data()#(data_processor=myProc)
+    a = new_digi.get_data(data_processor=myProc)
     print('we made it!')
     # np.savetxt('sample.txt', np.ndarray.flatten(a['data']['ch0'].astype(np.float32)+np.float32(4000*1)))
     # time.sleep(5)
@@ -258,8 +264,9 @@ def runme():
     fig, axs = plt.subplots(2)
     for r in range(2):#acq_module.NumRepetitions):
         for s in range(1):
-            axs[0].plot(a['data']['ch0'][r][s].astype(np.float32)+np.float32(4000*r))
-            axs[0].plot(a['data']['ch1'][r][s].astype(np.float32)+np.float32(4000*r))
+            axs[0].plot(a['data']['ch0_I'][r][s].astype(np.float32)+np.float32(4000*r))
+            axs[0].plot(a['data']['ch1_I'][r][s].astype(np.float32)+np.float32(4000*r))
+            #
             # axs[0].plot(np.ones(a['data']['ch0'][r][s].size))
             # axs[1].plot(np.ones(512))
     # plt.plot(leData[0][0])

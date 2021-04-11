@@ -231,7 +231,7 @@ def runme():
     new_digi = ACQ_M4i_Digitiser("test")
     new_digi._set_channels(2)
     new_digi.segments(4)#3 * (2**26))
-    new_digi.samples(2**13)#2**8+2**7)
+    new_digi.samples(384)#(2**13)#2**8+2**7)
     new_digi.NumRepetitions = 2
 
     # term = new_digi._param32bit(30130)
@@ -268,7 +268,7 @@ def runme():
     # input('wait')
     
 
-    new_digi.samples(96)#2**8+2**7)
+    new_digi.samples(496)#2**8+2**7)
     b = new_digi.get_data()#(data_processor=myProc)
     print('we made it!')
     # time.sleep(2)

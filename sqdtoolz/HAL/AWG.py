@@ -204,14 +204,20 @@ class WaveformAWG:
             ret_list.append((cur_awg_chan._instr_awg.name + ":" + cur_awg_chan._channel_name, seg_dicts))
         return ret_list
 
-    def plot_waveforms(self):
+    def plot_waveforms(self, overlap=False):
         final_wfms = self._assemble_waveform_raw()
         fig = plt.figure()
-        fig, axs = plt.subplots(len(final_wfms))
-        fig.suptitle('AWG Waveforms')   #TODO: Add a more sensible title...
-        t_vals = np.arange(final_wfms[0].size) / self._sample_rate
-        for ind, cur_wfm in enumerate(final_wfms):
-            axs[ind].plot(t_vals, cur_wfm)
+        if overlap:
+            fig, axs = plt.subplots(1)
+            t_vals = np.arange(final_wfms[0].size) / self._sample_rate      
+            for ind, cur_wfm in enumerate(final_wfms):
+                axs.plot(t_vals, cur_wfm)
+        else:
+            fig, axs = plt.subplots(len(final_wfms))
+            fig.suptitle('AWG Waveforms')   #TODO: Add a more sensible title...
+            t_vals = np.arange(final_wfms[0].size) / self._sample_rate
+            for ind, cur_wfm in enumerate(final_wfms):
+                axs[ind].plot(t_vals, cur_wfm)
         return fig
 
     def prepare_AWG_Waveforms(self):

@@ -827,9 +827,6 @@ class M4i(Instrument):
 
         return voltages
 
-    def initialise_time_stamp_mode(self):
-        self._set_param32bit(pyspcm.SPC_TIMESTAMP_CMD, pyspcm.SPC_TSMODE_STARTRESET | pyspcm.SPC_TSCNT_REFCLOCKPOS)   #i.e. with reset X0 as the reference reset clock used for sequence triggering
-
     def multiple_trigger_fifo_acquisition(self, segments, num_samples, blocksize, segmentsPerSEQ=0, posttrigger=None, notify_page_size_bytes = 4096):
         '''
         Multiple recording acquisition with background DMA data transfer.
@@ -885,11 +882,17 @@ class M4i(Instrument):
 
         first_acq = False
         if self.enable_TS_SEQ_trig():
-            time_buffers = ct.create_string_buffer(4096*2)
+            #Initialise Time-Stamp mode...
+            self._set_param32bit(pyspcm.SPC_TIMESTAMP_CMD, pyspcm.SPC_TSMODE_STARTRESET | pyspcm.SPC_TSCNT_REFCLOCKPOS)   #i.e. with reset X0 as the reference reset clock used for sequence triggering
+
+            qwBufferSizeTS = pyspcm.uint64 (MEGA_B(1))
+            #TODO: Try to make dynamic via: (segmentsPerSEQ+1)*16 #Accounting for the 64-bit time-stamp value (allocating 2 blocks' worth - assuming that a block holds one full repetition)
+
+            time_buffers = ct.create_string_buffer(qwBufferSizeTS.value)
             #Notify size of 4096 is ignored in polling-mode, but needs to be set to 4k...
             self._def_transfer64bit(
-                pyspcm.SPCM_BUF_TIMESTAMP, pyspcm.SPCM_DIR_CARDTOPC, 4096, ct.byref(time_buffers), 
-                0, (segmentsPerSEQ+1)*16 #Accounting for the 64-bit time-stamp value (allocating 2 blocks' worth - assuming that a block holds one full repetition)
+                pyspcm.SPCM_BUF_TIMESTAMP, pyspcm.SPCM_DIR_CARDTOPC, 4096, time_buffers, 
+                0, qwBufferSizeTS
             )
             pllData = ct.cast (time_buffers, pyspcm.ptr64)
             first_acq = True
@@ -906,8 +909,6 @@ class M4i(Instrument):
                 print('Could not start DMA transfer on M4i Digitiser card')
                 spcm_vClose (self.hCard)
             
-            ts_index = 0
-            
             lStatus = pyspcm.int32 ()
             lAvailUser = pyspcm.int32 ()
             lPCPos = pyspcm.int32 ()
@@ -915,6 +916,13 @@ class M4i(Instrument):
             qwTotalMem = pyspcm.uint64 (0)
             lSegmentIndex = pyspcm.uint32 (0)
             lSegmentCnt = pyspcm.uint32 (0)
+            #
+            #Timestamp-specific variables
+            lAvailUserTS = pyspcm.int32 ()
+            lPCPosTS = pyspcm.int32 ()
+            lBytesPerTS = 16        #For M4i models
+            ts_index = 0
+            #
             while qwTotalMem.value < segments*num_samples*numch:
                 dwError = pyspcm.spcm_dwSetParam_i32 (self.hCard, pyspcm.SPC_M2CMD, pyspcm.M2CMD_DATA_WAITDMA)
                 if dwError != ERR_OK:
@@ -926,13 +934,13 @@ class M4i(Instrument):
                     pyspcm.spcm_dwGetParam_i32 (self.hCard, pyspcm.SPC_DATA_AVAIL_USER_LEN, pyspcm.byref (lAvailUser))
                     pyspcm.spcm_dwGetParam_i32 (self.hCard, pyspcm.SPC_DATA_AVAIL_USER_POS, pyspcm.byref (lPCPos))
 
+                    data_arr = []
                     if lAvailUser.value >= lNotifySize.value:
                         qwTotalMem.value += lNotifySize.value
                         
                         # this is the point to do anything with the data
                         # e.g. calculate minimum and maximum of the acquired data
                         pnData = ct.cast(pvBuffer, pyspcm.ptr16) # cast to pointer to 16bit integer
-                        data_arr = []
                         for i in range(lNotifySize.value):
                             data_arr += [pnData[i]]
 
@@ -942,32 +950,57 @@ class M4i(Instrument):
                             if (lSegmentIndex.value == 0):
                                 lSegmentCnt.value += 1
 
-                        yield np.array(data_arr)
-                        pyspcm.spcm_dwSetParam_i32(self.hCard, pyspcm.SPC_DATA_AVAIL_CARD_LEN, lNotifySize)        
-                        
-                    # spcm_dwGetParam_i32 (self.hCard, SPC_TS_AVAIL_USER_LEN, byref (lAvailUserTS))
+                        pyspcm.spcm_dwSetParam_i32(self.hCard, pyspcm.SPC_DATA_AVAIL_CARD_LEN, lNotifySize)
                     
-                    # # read timestamp value (1 timestamp = 8 bytes (M2i, M3i) or 16 byte (M4i))
-                    # if (lAvailUserTS.value >= lBytesPerTS):
+                    if ts_index > 0:
+                        #If the time-stamp index is still beyond the current set of sampled waveform points, then don't return the array and just update the time-stamp index...
+                        if ts_index > len(data_arr):
+                            ts_index -= len(data_arr)
+                            del data_arr
+                            data_arr = []
+                    elif first_acq:
+                        if self.enable_TS_SEQ_trig():
+                            ts_vals = []
+                            ts_times = []
+                            pyspcm.spcm_dwGetParam_i32(self.hCard, pyspcm.SPC_TS_AVAIL_USER_LEN, pyspcm.byref(lAvailUserTS))
+                            # read timestamp value (1 timestamp = 8 bytes (M2i, M3i) or 16 byte (M4i))
+                            if (lAvailUserTS.value >= lBytesPerTS):
+                                pyspcm.spcm_dwGetParam_i32 (self.hCard, pyspcm.SPC_TS_AVAIL_USER_POS, pyspcm.byref(lPCPosTS))
+                                if ((lPCPosTS.value + lAvailUserTS.value) >= qwBufferSizeTS.value):
+                                    lAvailUserTS.value = qwBufferSizeTS.value - lPCPosTS.value
+                                for i in range (0, int (lAvailUserTS.value / lBytesPerTS), 1):
+                                    # calculate current timestamp buffer index
+                                    lIndex = int (lPCPosTS.value / 8) + i * int (lBytesPerTS / 8)
+                                    # calculate timestamp value
+                                    timestampVal = pllData[lIndex] #/ llSamplingrate.value
+                                    ts_times += [timestampVal & 0xFFFFFFFFFF]
+                                    ts_vals += [(timestampVal & 0xFFFFF0000000000)>>40]
+                                pyspcm.spcm_dwSetParam_i32 (self.hCard, pyspcm.SPC_TS_AVAIL_CARD_LEN, lAvailUserTS.value)
+                        first_ind = next((i for i, x in enumerate(ts_vals) if x), None)
+                        if first_ind != None:
+                            #This time-stamp capture found the first SEQ trigger - great, now let's set that as the filtering index...
+                            first_ind = first_ind*num_samples*numch
+                            if first_ind > len(data_arr):
+                                #The slicing index falls beyond the current set of sampled waveform points in the buffer - so it'll fall in a future iteration...
+                                ts_index = first_ind - len(data_arr)
+                                del data_arr
+                                data_arr = []
+                            else:
+                                ts_index = first_ind
+                                #assert first_ind != None, "The SEQ trigger has not been captured - check that it's connected to input X0..."
+                                first_acq = False
+                        else:
+                            #The slicing index falls beyond the current set of sampled time-stamps - so it'll fall in a future iteration... Only a problem if beyond 1024 segments per repetition...
+                            del data_arr
+                            data_arr = []
 
-                    #     spcm_dwGetParam_i32 (hCard, SPC_TS_AVAIL_USER_POS, byref (lPCPosTS))
-                        
-                    #     if ((lPCPosTS.value + lAvailUserTS.value) >= qwBufferSizeTS.value):
-                    #         lAvailUserTS.value = qwBufferSizeTS.value - lPCPosTS.value
-
-                    #     for i in range (0, int (lAvailUserTS.value / lBytesPerTS), 1):
-
-                    #         # calculate current timestamp buffer index
-                    #         lIndex = int (lPCPosTS.value / 8) + i * int (lBytesPerTS / 8)
-
-                    #         # calculate timestamp value
-                    #         timestampVal = pllData[lIndex] / llSamplingrate.value
-
-                    #         # write timestamp value to file
-                    #         fileTS.write (str (timestampVal) + "\n")
-                            
-                    #     spcm_dwSetParam_i32 (hCard, SPC_TS_AVAIL_CARD_LEN, lAvailUserTS.value)
-
+                    #Return the data if relevant...
+                    if len(data_arr) > 0:
+                        if ts_index > 0:
+                            yield np.array(data_arr[ts_index:])
+                            ts_index = 0
+                        else:
+                            yield np.array(data_arr)
         finally:
             # stop transfer before invalidating buffer
             self._stop_acquisition()

@@ -39,6 +39,10 @@ class CPU_FIR(ProcNodeCPU):
                 myFilt_vals = np.array(scipy.signal.firwin(self._fir_specs[ch_ind]['Taps'], freq_cutoff_norm, window=self._fir_specs[ch_ind]['Win']))
             else:
                 myFilt_vals = 1.0 - np.array(scipy.signal.firwin(self._fir_specs[ch_ind]['Taps'], freq_cutoff_norm, window=self._fir_specs[ch_ind]['Win']))
-            data_pkt['data'][cur_ch] = scipy.ndimage.convolve1d( data_pkt['data'][cur_ch] , myFilt_vals)
+            
+            param_slicer = [np.s_[0:]]*len(data_pkt['data'][cur_ch].shape)
+            param_slicer[-1] = np.s_[int(self._fir_specs[ch_ind]['Taps']):]
+            param_slicer = tuple(x for x in param_slicer)
+            data_pkt['data'][cur_ch] = scipy.ndimage.convolve1d( data_pkt['data'][cur_ch] , myFilt_vals)[param_slicer]
 
         return data_pkt

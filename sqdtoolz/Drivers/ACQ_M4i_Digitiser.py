@@ -167,15 +167,17 @@ class ACQ_M4i_Digitiser(M4i):
         if self.enable_TS_SEQ_trig():
             total_frames = (self.NumRepetitions+2)*self.NumSegments
         else:
-            total_frames = (self.NumRepetitions+1)*self.NumSegments
+            total_frames = (self.NumRepetitions)*self.NumSegments
 
         if cur_processor == None:
             if self.num_channels == 1:
                 final_arrs = [np.zeros(total_frames * self.NumSamples)]
+                final_arrs[0][:] = np.nan
             else:
                 final_arrs = [np.zeros(total_frames * self.NumSamples), np.zeros(total_frames * self.NumSamples)]
+                final_arrs[0][:] = np.nan
+                final_arrs[1][:] = np.nan
             #
-            final_arrs[0][:] = np.nan
             cur_ind = 0
             for cur_block in self.multiple_trigger_fifo_acquisition(total_frames, self.NumSamples, 1, self.NumSegments, notify_page_size_bytes=4096):
                 if self.num_channels == 1:
@@ -209,10 +211,14 @@ class ACQ_M4i_Digitiser(M4i):
                 if self.num_channels == 1:
                     num_reps = int( arr_blk.size / (self.NumSegments*self.NumSamples) )
                     cache_array = arr_blk[(num_reps*self.NumSegments*self.NumSamples):]
+                    if num_reps == 0:
+                        continue
                     arr_blk = [arr_blk[0:(num_reps*self.NumSegments*self.NumSamples)].reshape(num_reps, self.NumSegments, self.NumSamples)]
                 else:
                     num_reps = int( arr_blk.size / (self.NumSegments*self.NumSamples*2) )
                     cache_array = arr_blk[(num_reps*self.NumSegments*self.NumSamples*2):]
+                    if num_reps == 0:
+                        continue
                     arr_blk = [
                         arr_blk[0:(num_reps*self.NumSegments*self.NumSamples*2):2].reshape(num_reps, self.NumSegments, self.NumSamples),
                         arr_blk[1:(num_reps*self.NumSegments*self.NumSamples*2):2].reshape(num_reps, self.NumSegments, self.NumSamples)
@@ -220,7 +226,7 @@ class ACQ_M4i_Digitiser(M4i):
 
                 cur_processor.push_data({
                     'parameters' : ['repetition', 'segment', 'sample'],
-                    'data' : { f'ch{m}' : arr_blk[m] for m in range(self.num_channels) },
+                    'data' : { f'ch{m}' : arr_blk[m].astype(dtype=np.float64) for m in range(self.num_channels) },
                     'misc' : {'SampleRates' : [self.sample_rate.get()]*self.num_channels}
                 })
         
@@ -232,13 +238,16 @@ from sqdtoolz.HAL.Processors.CPU.CPU_FIR import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Mean import*
 import matplotlib.pyplot as plt
 import time
+
+import scipy.fftpack
+
 #import pdb
 def runme():
     new_digi = ACQ_M4i_Digitiser("test")
-    new_digi._set_channels(2)
-    new_digi.segments(4)#3 * (2**26))
-    new_digi.samples(384)#(2**13)#2**8+2**7)
-    new_digi.NumRepetitions = 2
+    new_digi._set_channels(1)
+    new_digi.segments(1)#3 * (2**26))
+    new_digi.samples(2**19)#(2**13)#2**8+2**7)
+    new_digi.NumRepetitions = 1
 
     # term = new_digi._param32bit(30130)
     # term = new_digi.termination_1()
@@ -246,16 +255,37 @@ def runme():
 
 
     myProc = ProcessorCPU()
-    myProc.add_stage(CPU_DDC([100e6]*2))
-    myProc.add_stage(CPU_FIR([{'Type' : 'low', 'Taps' : 40, 'fc' : 25e6, 'Win' : 'hamming'}]*4))
+    myProc.add_stage(CPU_DDC([25e6]*2))
+    # myProc.add_stage(CPU_FIR([{'Type' : 'low', 'Taps' : 40, 'fc' : 25e6, 'Win' : 'hamming'}]*4))
     # myProc.add_stage(CPU_Mean('sample'))
+    # myProc.add_stage(CPU_Mean('segment'))
+    # myProc.add_stage_end(CPU_Mean('repetition'))
+
     # new_digi._set_channels(2)
     # new_digi.pretrigger_memory_size(0)
     # for m in range(20):
     #     a = new_digi.get_data()#(data_processor=myProc)
     #     print(new_digi.get_error_info32bit())
     #     print(a['data']['ch0'].shape)
-    a = new_digi.get_data(data_processor=myProc)
+    cur_time = time.time()
+    a = new_digi.get_data(data_processor=None)
+    cur_time = time.time() - cur_time
+    plt.plot(a['data']['ch0'][0][0])
+    plt.plot(a['data']['ch0'][0][0] * np.cos(2*np.pi*25e6*np.arange(a['data']['ch0'][0][0].size)/500e6))
+    # plt.plot(a['data']['ch0_I'][0][0])
+    # plt.plot(a['data']['ch0_Q'][0][0])
+
+
+    # dataVals = a['data']['ch0'][0][0]
+    # yf = scipy.fftpack.fft(dataVals)
+    # N = dataVals.size
+    # T = 1.0 / 500e6
+    # x = np.linspace(0.0, N*T, N)
+    # xf = np.linspace(0.0, 1.0/(2.0*T), int(N/2))
+    # plt.plot(xf, 2.0/N * np.abs(yf[:N//2]))
+
+    plt.show()
+    input('Press ENTER')
     print('we made it!')
     # np.savetxt('sample.txt', np.ndarray.flatten(a['data']['ch0'].astype(np.float32)+np.float32(4000*1)))
     # time.sleep(5)

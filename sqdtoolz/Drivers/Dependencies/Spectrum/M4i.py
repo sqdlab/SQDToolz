@@ -875,7 +875,7 @@ class M4i(Instrument):
 
         # setup software buffer(s)
         qwBufferSize = pyspcm.uint64 (pyspcm.MEGA_B(4))
-        pvBuffer = ct.create_string_buffer(qwBufferSize.value)
+        pvBuffer = pyspcm.pvAllocMemPageAligned(qwBufferSize.value)
         lNotifySize = pyspcm.int32 (pyspcm.KILO_B(8)) 
         #Setup H/W buffer
         pyspcm.spcm_dwDefTransfer_i64(self.hCard, pyspcm.SPCM_BUF_DATA, pyspcm.SPCM_DIR_CARDTOPC, lNotifySize, pvBuffer, pyspcm.uint64 (0), qwBufferSize)
@@ -923,7 +923,8 @@ class M4i(Instrument):
             lBytesPerTS = 16        #For M4i models
             ts_index = 0
             #
-            while qwTotalMem.value < segments*num_samples*numch:
+            #while qwTotalMem.value < 2*segments*num_samples*numch:  #2 Bytes per sample...
+            while qwTotalMem.value < 2*segments*num_samples*numch:
                 dwError = pyspcm.spcm_dwSetParam_i32 (self.hCard, pyspcm.SPC_M2CMD, pyspcm.M2CMD_DATA_WAITDMA)
                 if dwError != ERR_OK:
                     assert dwError == ERR_TIMEOUT, "... Timeout\n"
@@ -938,10 +939,12 @@ class M4i(Instrument):
                     if lAvailUser.value >= lNotifySize.value:
                         qwTotalMem.value += lNotifySize.value
                         
-                        # this is the point to do anything with the data
+                        # thi`s is the point to do anything with the data
                         # e.g. calculate minimum and maximum of the acquired data
-                        pnData = ct.cast(pvBuffer, pyspcm.ptr16) # cast to pointer to 16bit integer
-                        for i in range(lNotifySize.value):
+                        # pnData = ct.cast(pvBuffer, pyspcm.ptr16) # cast to pointer to 16bit integer
+                        pnData = ct.cast(ct.addressof(pvBuffer) + lPCPos.value, pyspcm.ptr16)
+                        lNumSamples = int(lNotifySize.value / 2) # two bytes per sample
+                        for i in range (0, lNumSamples, 1):
                             data_arr += [pnData[i]]
 
                             lSegmentIndex.value += 1

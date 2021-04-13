@@ -30,16 +30,16 @@ class ProcessorCPU(ACQProcessor):
     def push_data(self, data_pkt):
         self.cur_data_queue.put(data_pkt)
         #Start a new thread - otherwise, the thread will automatically check and pop the new array for processing
-        if self.cur_async_handle == None:
-            self.cur_async_handle = self.tp_CPU.apply_async(self._process_all)
-        elif self.cur_async_handle.ready():
-            self.cur_async_handle = self.tp_CPU.apply_async(self._process_all)
+        # if self.cur_async_handle == None:
+        #     self.cur_async_handle = self.tp_CPU.apply_async(self._process_all)
+        # elif self.cur_async_handle.ready():
+        #     self.cur_async_handle = self.tp_CPU.apply_async(self._process_all)
         # self._process_all()
 
     def get_all_data(self):
         #Wait until ready
-        while not self.ready():
-            continue
+        # while not self.ready():
+        #     continue
         #Empty the queue just in case...
         self._process_all()
 

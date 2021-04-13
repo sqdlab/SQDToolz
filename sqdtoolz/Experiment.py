@@ -29,23 +29,30 @@ class Experiment:
     def _run(self, file_path, sweep_vars=[]):
         data_file = FileIOWriter(file_path + 'data.h5')
         
-        sweep_arrays = [x[1] for x in sweep_vars]
-        sweep_grids = np.meshgrid(*sweep_arrays)
-        sweep_grids = np.array(sweep_grids).T.reshape(-1,len(sweep_arrays))
-        
-        data_all = []
-        #sweep_vars is given as a list of tuples formatted as (parameter, sweep-values in an numpy-array)
-        for cur_coord in sweep_grids:
-            #Set the values
-            for ind, cur_val in enumerate(cur_coord):
-                sweep_vars[ind][0].set_raw(cur_val)
-            #Now prepare the instrument
-            # self._expt_config.check_conformance() #TODO: Write this
+
+        if len(sweep_vars) == 0:
             self._expt_config.prepare_instruments()
             data = self._expt_config.get_data()
             data_file.push_datapkt(data, sweep_vars)
-            #TODO: Add in a preprocessor?
-            # data_all += [np.mean(data[0][0])]
+        else:
+            sweep_arrays = [x[1] for x in sweep_vars]
+            sweep_grids = np.meshgrid(*sweep_arrays)
+            sweep_grids = np.array(sweep_grids).T.reshape(-1,len(sweep_arrays))
+            
+            data_all = []
+            #sweep_vars is given as a list of tuples formatted as (parameter, sweep-values in an numpy-array)
+            for cur_coord in sweep_grids:
+                #Set the values
+                for ind, cur_val in enumerate(cur_coord):
+                    sweep_vars[ind][0].set_raw(cur_val)
+                #Now prepare the instrument
+                # self._expt_config.check_conformance() #TODO: Write this
+                self._expt_config.prepare_instruments()
+                time.sleep(0.1)
+                data = self._expt_config.get_data()
+                data_file.push_datapkt(data, sweep_vars)
+                #TODO: Add in a preprocessor?
+                # data_all += [np.mean(data[0][0])]
         
         #data_all = np.concatenate(data_all)
         # data_final = np.c_[sweep_grids, np.real(np.array(data_all))]

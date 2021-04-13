@@ -61,8 +61,17 @@ class ProcessorGPU(ACQProcessor):
         
         #Concatenate the individual data packets
         ret_data = self.cur_data_processed[0]
+        #Loop through each channel
         for cur_ch in ret_data['data'].keys():
-            ret_data['data'][cur_ch] = np.concatenate( [cur_data['data'][cur_ch] for cur_data in self.cur_data_processed] )
+            #For each channel, take the associated data array from each cached processed data
+            dataarrays = [cur_data['data'][cur_ch] for cur_data in self.cur_data_processed]
+            #Concatenate the data arrays while checking if the result is a singleton...
+            if type(dataarrays[0]) is np.ndarray and dataarrays[0].size > 1:
+                ret_data['data'][cur_ch] = np.concatenate( dataarrays )
+            else:
+                assert len(dataarrays) == 1, "There is some operation (e.g. average across all repetitions) that produces a singleton. Processing is pipelined and not global. Ensure that such operations are added using add_stage_end instead of add_stage."
+                #Should only arrive here if it happens to be one repetition for example (i.e. on passing through all packets, it is still a single singleton)
+                ret_data['data'][cur_ch] = dataarrays[0]
 
         if len(self.cur_data_processed) > 1:
             for cur_arr in self.cur_data_processed[1:]:

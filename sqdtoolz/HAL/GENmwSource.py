@@ -38,7 +38,7 @@ class GENmwSource(GEN):
         
     @property
     def Mode(self):
-        return self._instr_freq.Phase
+        return self._instr_freq.Mode
     @Mode.setter
     def Mode(self, new_mode):
         assert new_mode == 'Continuous' or new_mode == 'PulseModulated', "MW source output mode must either be Continuous or PulseModulated."

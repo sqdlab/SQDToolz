@@ -26,7 +26,10 @@ class Experiment:
     def _post_process(self, data):
         pass
 
-    def _run(self, file_path, sweep_vars=[]):
+    def _run(self, file_path, sweep_vars=[], **kwargs):
+        delay = kwargs.get('delay', 0.0)
+        ping_iteration = kwargs.get('ping_iteration')
+
         data_file = FileIOWriter(file_path + 'data.h5')
         
 
@@ -41,16 +44,17 @@ class Experiment:
             
             data_all = []
             #sweep_vars is given as a list of tuples formatted as (parameter, sweep-values in an numpy-array)
-            for cur_coord in sweep_grids:
+            for ind_coord, cur_coord in enumerate(sweep_grids):
                 #Set the values
                 for ind, cur_val in enumerate(cur_coord):
                     sweep_vars[ind][0].set_raw(cur_val)
                 #Now prepare the instrument
                 # self._expt_config.check_conformance() #TODO: Write this
                 self._expt_config.prepare_instruments()
-                time.sleep(0.1)
+                time.sleep(delay)
                 data = self._expt_config.get_data()
                 data_file.push_datapkt(data, sweep_vars)
+                ping_iteration((ind_coord+1)/sweep_grids.shape[0])
                 #TODO: Add in a preprocessor?
                 # data_all += [np.mean(data[0][0])]
         

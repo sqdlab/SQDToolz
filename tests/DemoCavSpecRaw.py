@@ -63,5 +63,5 @@ myProc.add_stage_end(CPU_Mean('repetition'))
 acq_module.set_data_processor(myProc)
 
 new_exp = Experiment("cav_exp", exp_config)
-leData = new_lab.run_single(new_exp, [(param_cav_freq, np.linspace(100e9,500e9,5))])
+leData = new_lab.run_single(new_exp, [(param_cav_freq, np.linspace(100e9,500e9,500))])
 a=0

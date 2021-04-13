@@ -4,6 +4,8 @@ from datetime import datetime
 from pathlib import Path
 import json
 import os
+import time
+import numpy as np
 
 class Laboratory:
     def __init__(self, instr_config_file, save_dir):
@@ -57,7 +59,9 @@ class Laboratory:
         self._group_dir['Dir'] = ""
         self._group_dir['InitDir'] = ""
 
-    def run_single(self, expt_obj, sweep_vars=[]):
+    def run_single(self, expt_obj, sweep_vars=[], **kwargs):
+        delay = kwargs.get('delay', 0.0)
+
         #Get time-stamp
         if self._group_dir['Dir'] == "":
             folder_time_stamp = datetime.now().strftime(f"%Y-%m-%d/%H%M%S-" + expt_obj.Name + "/")
@@ -70,7 +74,9 @@ class Laboratory:
         Path(cur_exp_path).mkdir(parents=True, exist_ok=True)
 
         #TODO: Write the sweeping code to appropriately nest folders or perform data-passing
-        ret_vals = expt_obj._run(cur_exp_path, sweep_vars)
+        self._time_stamp_begin = time.time()
+        self._time_stamps = [(0,0),]
+        ret_vals = expt_obj._run(cur_exp_path, sweep_vars, ping_iteration=self._update_progress_bar, delay=delay)
         #TODO: Add flag to get/save for live-plotting
         #Save experiment configurations
         expt_obj.save_config(cur_exp_path)
@@ -85,3 +91,65 @@ class Laboratory:
         expt_obj._post_process(ret_vals)
 
         return ret_vals
+
+    @staticmethod
+    def _printProgressBar(iteration, total, prefix = '', suffix = '', decimals = 1, length = 50, fill = '█', printEnd = "\r"):
+        """
+        Call in a loop to create terminal progress bar
+        @params:
+            iteration   - Required  : current iteration (Int)
+            total       - Required  : total iterations (Int)
+            prefix      - Optional  : prefix string (Str)
+            suffix      - Optional  : suffix string (Str)
+            decimals    - Optional  : positive number of decimals in percent complete (Int)
+            length      - Optional  : character length of bar (Int)
+            fill        - Optional  : bar fill character (Str)
+            printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
+
+        Taken from: https://stackoverflow.com/questions/3173320/text-progress-bar-in-the-console
+        """
+        percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+        filledLength = int(length * iteration // total)
+        bar = fill * filledLength + '-' * (length - filledLength)
+        print(f'\r{prefix} |{bar}| {percent}% {suffix}', end = printEnd)
+        # Print New Line on Complete
+        if iteration == total: 
+            print()
+
+    def _update_progress_bar(self, val_pct):
+        self._time_stamps += [(val_pct, time.time())]
+
+        ts = np.array([x[1] for x in self._time_stamps])
+        pcts = np.array([x[0] for x in self._time_stamps])
+        
+        dTs = ts - self._time_stamp_begin
+        dTs[0] = 0
+        dTs = dTs[1:]-dTs[:-1]
+        #
+        dPcts = pcts[1:]-pcts[:-1]
+        #
+        dTbydPs = dTs/dPcts
+
+        #Take an exponential distribution of the dT/dP (i.e. recent ones have a higher weighting) when taking the average: <dT/dP>
+        self._time_stamps[-1][0]
+        init_weight = 0.5
+        
+        if val_pct > 0:
+            total_weight = np.sum(0.5*np.exp(-pcts[1:] * np.log(init_weight)/val_pct))
+            average_weight = np.sum(dTbydPs * 0.5*np.exp(-pcts[1:] * np.log(init_weight)/val_pct) / total_weight)
+            #
+            time_left = average_weight*(1-val_pct)
+            if time_left > 60:
+                time_left = f"Est. time left: {(time_left/60.0):.2f}mins"
+            else:
+                time_left = f"Est. time left: {time_left:.2f}s"
+        else:
+            time_left = ""
+
+        total_time = ts[-1] - self._time_stamp_begin
+        if total_time > 60:
+            total_time = f"Total time: {(total_time/60.0):.2f}mins"
+        else:
+            total_time = f"Total time: {total_time:.2f}s"
+        
+        self._printProgressBar(int(val_pct*100), 100, suffix=f"{total_time}, {time_left}")

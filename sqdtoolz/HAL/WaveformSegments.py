@@ -168,6 +168,13 @@ class WFS_Gaussian(WaveformSegmentBase):
     def Duration(self, len_seconds):
         self._duration = len_seconds
 
+    @property
+    def Amplitude(self):
+        return self._amplitude
+    @Amplitude.setter
+    def Amplitude(self, ampl_val):
+        self._amplitude = ampl_val
+
     def _gauss(x):
         return np.exp(-x*x / (2*self._sigma*self._sigma))
 

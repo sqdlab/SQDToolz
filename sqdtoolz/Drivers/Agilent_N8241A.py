@@ -1561,11 +1561,16 @@ class Agilent_N8241A(Instrument):
         #Since the channels cannot be independently programmed, this function must be called after programming both channels (i.e. calling prepare_waveform_memory).
         #Just be aware of this during debugging.
 
-        if len(self._seq_wfms[chan_id]) > 0:
+        if len(self._seq_wfms['ch1']) > 0:
             #TODO: Implement the update-flag discriminator here... (If it's even possible with this AWG?)
-            for cur_wgm_handle in self._seq_wfms_ch1:
+            for cur_wgm_handle in self._seq_wfms['ch1']:
                 self.clear_arb_waveform(cur_wgm_handle)
-        self._seq_wfms[chan_id] = []
+        self._seq_wfms['ch1'] = []
+        if len(self._seq_wfms['ch2']) > 0:
+            #TODO: Implement the update-flag discriminator here... (If it's even possible with this AWG?)
+            for cur_wgm_handle in self._seq_wfms['ch2']:
+                self.clear_arb_waveform(cur_wgm_handle)
+        self._seq_wfms['ch2'] = []
 
         if self._seq_mode:
             self._program_channels_sequence()
@@ -1743,16 +1748,16 @@ class Agilent_N8241A(Instrument):
         #Program the channels
         if chan_id == 'ch1':
             if len(mkr_data) == 2:
-                self._seq_wfms['ch1'] = self.create_arb_waveform_with_markers(wfm_data / self.ch1.gain(), mkr_data_reduced)
+                self._seq_wfms['ch1'] = [self.create_arb_waveform_with_markers(wfm_data / self.ch1.gain(), mkr_data_reduced)]
             else:
-                self._seq_wfms['ch1'] = self.create_arb_waveform(wfm_data / self.ch1.gain())
-            self.configure_arb_waveform(1, self._seq_wfms['ch1'], self.ch1.gain(), 0.0)
+                self._seq_wfms['ch1'] = [self.create_arb_waveform(wfm_data / self.ch1.gain())]
+            self.configure_arb_waveform(1, self._seq_wfms['ch1'][0], self.ch1.gain(), 0.0)
         elif chan_id == 'ch2':
             if len(mkr_data) == 2:
-                self._seq_wfms['ch2'] = self.create_arb_waveform_with_markers(wfm_data / self.ch2.gain(), mkr_data_reduced)
+                self._seq_wfms['ch2'] = [self.create_arb_waveform_with_markers(wfm_data / self.ch2.gain(), mkr_data_reduced)]
             else:
-                self._seq_wfms['ch2'] = self.create_arb_waveform(wfm_data / self.ch2.gain())
-            self.configure_arb_waveform(2, self._seq_wfms['ch2'], self.ch2.gain(), 0.0)
+                self._seq_wfms['ch2'] = [self.create_arb_waveform(wfm_data / self.ch2.gain())]
+            self.configure_arb_waveform(2, self._seq_wfms['ch2'][0], self.ch2.gain(), 0.0)
         #Not required for Independent mode, but it is required for Master/Slave mode
         self.run()
     

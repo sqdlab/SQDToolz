@@ -1,11 +1,11 @@
+from sqdtoolz.HAL.TriggerPulse import*
 import numpy as np
-from scipy import signal
 from sqdtoolz.HAL.AWGOutputChannel import*
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 from sqdtoolz.HAL.WaveformSegments import*
 
-class WaveformAWG:
+class WaveformAWG(TriggerOutputCompatible, TriggerInputCompatible):
     def __init__(self, name, awg_channel_tuples, sample_rate, global_factor = 1.0, **kwargs):
         self._name = name
 
@@ -108,23 +108,32 @@ class WaveformAWG:
             final_wfms[cur_ch] *= self._global_factor
         return final_wfms
 
-    def _get_trigger_output_by_id(self, trigID, ch_ID):
-        '''
-        Some objects may have a hierarchy of trigger outputs - it's best to categorise them via some unique ID which can be referenced easily.
-
-        Inputs:
-            - trigID - unique ID of the trigger (e.g. a string)
-            - ch_ID - auxiliary ID (e.g. channel name)
-        
-        Returns a TriggerType object representing an output trigger.
-        '''
+    def _get_trigger_output_by_id(self, outputID):
         #Doing it this way as the naming scheme may change in the future - just flatten list and find the marker object...
         cur_obj = None
-        assert type(ch_ID) is int, "ch_ID must be the channel index."
+        assert type(outputID) is list or type(outputID) is tuple, "ch_ID must be a list/tuple of 2 elements (channel index and marker index)."
+        assert len(outputID) == 2, "ch_ID must be a list/tuple of 2 elements (channel index and marker index)."
+        ch_ID = outputID[0]
+        mkr_ID = outputID[1]
         assert ch_ID >= 0 and ch_ID < len(self._awg_chan_list), "ch_ID must be a valid channel index."
-        cur_obj = next((x for x in self.get_output_channel(ch_ID)._awg_mark_list if x.name == trigID), None)
-        assert cur_obj != None, f"The trigger output of ID {trigID} does not exist."
+        cur_obj = next((x for x in self.get_output_channel(ch_ID)._awg_mark_list if x.name == mkr_ID), None)
+        assert cur_obj != None, f"The trigger output of ID {mkr_ID} does not exist."
         return cur_obj
+    def _get_all_trigger_outputs(self):
+        mkr_output_ids = []
+        for chan_ind, cur_chan in enumerate(self._awg_chan_list):
+            mkr_output_ids += [(chan_ind, cur_chan.num_markers)]
+        return mkr_output_ids
+        #TODO: Consider additional trigger outputs (e.g. AUX)?
+
+    def _get_all_trigger_inputs(self):
+        trig_inp_objs = []
+        for cur_chan in self._awg_chan_list:
+            trig_inp_objs += [cur_chan]
+            trig_inp_objs += cur_chan.get_all_markers()
+        return trig_inp_objs
+        
+
 
     def _get_current_config(self):
         retDict = {
@@ -176,33 +185,6 @@ class WaveformAWG:
             assert cur_wfm_type in globals(), cur_wfm_type + " is not in the current namespace. If the class does not exist in WaveformSegments include wherever it lives by importing it in AWG.py."
             cur_wfm_type = globals()[cur_wfm_type]
             self._wfm_segment_list.append(cur_wfm_type.fromConfigDict(cur_wfm))
-
-    def _get_waveform_plot_segments(self, waveform_index = 0, resolution = 21):
-        ret_list = []
-        for cur_ch_index, cur_awg_chan in enumerate(self._awg_chan_list):
-            seg_dicts = []
-            t0 = 0
-            for cur_wfm_seg in self._wfm_segment_list:
-                cur_dict = {}
-                cur_dict['duration'] = cur_wfm_seg.Duration
-                #TODO: Use _get_waveform to yield the unmodified waveform (i.e. just envelope) if some flag is set
-                cur_y = cur_wfm_seg.get_waveform(self._sample_rate, t0, cur_ch_index)
-                t0 += cur_wfm_seg.NumPts(self._sample_rate) / self._sample_rate
-                #Skip this segment if it's empty...
-                if cur_y.size == 0:
-                    continue
-                #Stretch the plot to occupy the range: [0,1]
-                min_y = np.min(cur_y)
-                if (min_y < 0):
-                    cur_y -= min_y
-                max_y = np.max(cur_y)
-                if (max_y > 0):
-                    cur_y /= max_y
-                #Downsample the points if necessary to speed up plotting...
-                cur_dict['yPoints'] = signal.resample(cur_y, resolution)
-                seg_dicts.append(cur_dict)
-            ret_list.append((cur_awg_chan._instr_awg.name + ":" + cur_awg_chan._channel_name, seg_dicts))
-        return ret_list
 
     def plot_waveforms(self, overlap=False):
         final_wfms = self._assemble_waveform_raw()

@@ -1,6 +1,6 @@
 from sqdtoolz.HAL.TriggerPulse import*
 
-class DDG:
+class DDG(TriggerOutputCompatible):
     '''
     Class to handle interfacing with digital delay generators.
     '''
@@ -28,14 +28,10 @@ class DDG:
         assert outputID in self._output_trigs, "Trigger output " + str(outputID) + " does not exist in " + self._name
         return self._output_trigs[outputID]
 
-    def _get_trigger_output_by_id(self, outputID, ch_ID):
+    def _get_trigger_output_by_id(self, outputID):
         return self.get_trigger_output(outputID)
-
-    def get_trigger_source(self):
-        '''
-        Get the Trigger object corresponding to the trigger source.
-        '''
-        return None
+    def _get_all_trigger_outputs(self):
+        return list(self._output_trigs.keys())
 
     def get_all_outputs(self):
         return [self._output_trigs[x] for x in self._output_trigs]

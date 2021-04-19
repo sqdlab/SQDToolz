@@ -133,6 +133,13 @@ class WFS_Constant(WaveformSegmentBase):
     def Duration(self, len_seconds):
         self._duration = len_seconds
 
+    @property
+    def Value(self):
+        return self._value
+    @Value.setter
+    def Value(self, const_val):
+        self._value = const_val
+
     def _get_waveform(self, fs, t0_ind, ch_index):
         return np.zeros(round(self.NumPts(fs))) + self._value
 

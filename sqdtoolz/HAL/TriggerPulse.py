@@ -1,18 +1,53 @@
+import numpy as np
 
-class TriggerType:
+class TriggerOutputCompatible:
+    def __init__(self):
+        pass
+
+    def _get_trigger_output_by_id(self, outputID):
+        raise NotImplementedError()
+
+    def _get_all_trigger_outputs(self):
+        raise NotImplementedError()
+
+class TriggerOutput:
     def __init__(self):
         pass
 
     def get_trigger_times(self, input_trig_pol=1):
-        assert False, "The class implementing a TriggerType must implement the get_trigger_times function."
+        raise NotImplementedError()
 
-    def get_trigger_params(self):
-        assert False, "The class implementing a TriggerType must implement the get_trigger_params function."
+    def get_trigger_id(self):
+        raise NotImplementedError()
 
     def _get_parent_HAL(self):
-        assert False, "The class implementing a TriggerType must implement the _get_parent_HAL function."
+        raise NotImplementedError()
 
-class Trigger(TriggerType):
+class TriggerInputCompatible:
+    def __init__(self):
+        pass
+
+    def _get_all_trigger_inputs(self):
+        raise NotImplementedError()
+
+class TriggerInput:
+    def __init__(self):
+        pass
+
+    def _get_instr_trig_src(self):
+        '''
+        Used by TimingConfiguration to backtrack through all interdependent trigger sources (i.e. traversing up the tree)
+        '''
+        raise NotImplementedError()
+    
+    def _get_instr_input_trig_edge(self):
+        raise NotImplementedError()
+    
+    def _get_timing_diagram_info(self):
+        raise NotImplementedError()
+
+
+class Trigger(TriggerOutput):
     def __init__(self, parent, name, instr_trig_output_channel):
         '''
         Initialises a Trigger object that can be used to build triggering relationships between instruments (that is,
@@ -28,7 +63,7 @@ class Trigger(TriggerType):
         self._parent = parent
 
     @property
-    def name(self):
+    def Name(self):
         return self._name
 
     @property
@@ -74,14 +109,14 @@ class Trigger(TriggerType):
     def get_trigger_times(self, input_trig_pol=1):
         if input_trig_pol == 0:
             if self.TrigPolarity == 0:
-                return [self.TrigPulseDelay]
+                return ([self.TrigPulseDelay], np.array([[self.TrigPulseDelay, self.TrigPulseDelay+self.TrigPulseLength]]) )
             else:
-                return [self.TrigPulseDelay + self.TrigPulseLength]
+                return ([self.TrigPulseDelay + self.TrigPulseLength], np.array([[0.0, self.TrigPulseDelay]]) )
         elif input_trig_pol == 1:
             if self.TrigPolarity == 0:
-                return [self.TrigPulseDelay + self.TrigPulseLength]
+                return ([self.TrigPulseDelay + self.TrigPulseLength], np.array([[0.0, self.TrigPulseDelay]]) )
             else:
-                return [self.TrigPulseDelay]
+                return ([self.TrigPulseDelay], np.array([[self.TrigPulseDelay, self.TrigPulseDelay+self.TrigPulseLength]]) )
         else:
             assert False, "Trigger polarity must be 0 or 1 for negative or positive edge/polarity."
 
@@ -106,15 +141,17 @@ class Trigger(TriggerType):
         self.TrigPolarity = dict_config['TrigPolarity']
         self.TrigEnable = dict_config['TrigEnable']
 
-    def get_trigger_params(self):
-        return {
-                'TriggerHAL' : self._parent.Name,
-                'TriggerID' : self.name,
-                'TriggerCH' : 0,  #Defaults to 0
-            }
+    def get_trigger_id(self):
+        return self.name
 
     def _get_parent_HAL(self):
         return self._parent
+
+    def _get_timing_diagram_info(self):
+        pulseData = [(0.0, 1-self.TrigPolarity)]
+        pulseData += [(self.TrigPulseDelay, self.TrigPolarity)]
+        pulseData += [(self.TrigPulseDelay+self.TrigPulseLength, 1-self.TrigPolarity)]
+        return {'Type' : 'DigitalEdges', 'Period' : self.TrigPulseLength + self.TrigPulseDelay, 'Data' : pulseData, 'TriggerType' : 'Edge'}
 
 class SyncTriggerPulse:
     def __init__(self, trig_len, enableGet, enableSet, trig_pol = 1, trigOutputDelay = 0.0):

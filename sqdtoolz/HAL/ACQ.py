@@ -1,5 +1,6 @@
+from sqdtoolz.HAL.TriggerPulse import*
 
-class ACQ:
+class ACQ(TriggerInputCompatible, TriggerInput):
     def __init__(self, instr_acq):
         self._instr_acq = instr_acq
         self._trig_src_obj = None
@@ -7,7 +8,7 @@ class ACQ:
         self.data_processor = None
 
     @property
-    def name(self):
+    def Name(self):
         return self._name
 
     @property
@@ -45,6 +46,17 @@ class ACQ:
     def InputTriggerEdge(self, pol):
         self._instr_acq.TriggerInputEdge = pol
 
+    def _get_all_trigger_inputs(self):
+        return [self]
+    def _get_instr_trig_src(self):
+        return self._trig_src_obj
+    def _get_instr_input_trig_edge(self):
+        return self.InputTriggerEdge
+    def _get_timing_diagram_info(self):
+        return {'Type' : 'BlockShaded', 'Period' : self.NumSamples / self.SampleRate, 'TriggerType' : 'Edge'}
+    def _get_parent_HAL(self):
+        return self
+
     def set_data_processor(self, proc_obj):
         self.data_processor = proc_obj
 
@@ -68,10 +80,6 @@ class ACQ:
 
     def _get_trigger_sources(self):
         return [self._trig_src_obj]
-
-    def _get_acq_window_len(self, segment_index = 0):
-        return self.NumSamples / self.SampleRate
-
     def _get_current_config(self):
         return {
             'instrument' : self.name,

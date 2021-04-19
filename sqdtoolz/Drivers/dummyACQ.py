@@ -14,7 +14,7 @@ class DummyACQ(Instrument):
         self._num_samples = 10
         self._num_segs = 1
         self._num_reps = 1
-        self._sample_rate = 10e9
+        self._sample_rate = 1e9
         self._trigger_edge = 1
 
     @property

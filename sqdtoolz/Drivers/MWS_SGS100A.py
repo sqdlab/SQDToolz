@@ -68,6 +68,14 @@ class MWS_SGS100A_Channel(InstrumentChannel):
         self.phase(val)
 
     @property
+    def TriggerInputEdge(self):
+        return 1
+    @TriggerInputEdge.setter
+    def TriggerInputEdge(self, val):
+        #TODO: Figure out whether the gated polarity can be set...
+        pass
+
+    @property
     def Mode(self):
         return self._mode
     @Mode.setter

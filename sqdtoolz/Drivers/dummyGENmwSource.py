@@ -20,6 +20,8 @@ class DummyGENmwSrcChannel(InstrumentChannel):
                            get_cmd=lambda : self._phase,
                            set_cmd=self._set_phase)
 
+        self._pulse_mod_edge = 1
+
     def _set_power(self, val):
         self._power = val
     def _set_frequency(self, val):
@@ -54,6 +56,13 @@ class DummyGENmwSrcChannel(InstrumentChannel):
     @Phase.setter
     def Phase(self, val):
         self.phase(val)
+
+    @property
+    def TriggerInputEdge(self):
+        return self._pulse_mod_edge
+    @TriggerInputEdge.setter
+    def TriggerInputEdge(self, val):
+        self._pulse_mod_edge = val
 
     @property
     def Mode(self):

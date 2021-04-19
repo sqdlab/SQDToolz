@@ -102,6 +102,14 @@ class MWS_WFSynthHDProV2_Channel(InstrumentChannel):
     def Phase(self, val):
         self.phase(val)
 
+    @property
+    def TriggerInputEdge(self):
+        return 1
+    @TriggerInputEdge.setter
+    def TriggerInputEdge(self, val):
+        #TODO: Figure out whether the gated polarity can be set...
+        pass
+
     #!!!!!!!!!!!!!!!!!!!!!
     #!!!!!!!!!NOTE!!!!!!!!
     #The modulation is locked to both channels - so it's not a channel-dependent parameter and will do it for both

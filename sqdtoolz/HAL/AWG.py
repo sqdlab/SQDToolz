@@ -9,21 +9,37 @@ from sqdtoolz.HAL.WaveformSegments import*
 class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
     def __init__(self, hal_name, lab, awg_channel_tuples, sample_rate, global_factor = 1.0, **kwargs):
         HALbase.__init__(self, hal_name)
-        lab._register_HAL(self)
-        #
-        #awg_channel_tuples is given as (instr_AWG_name, channel_name)
-        self._awg_chan_list = []
-        #TODO: Check that awg_channel_tuples is a list!
-        for ch_index, cur_ch_tupl in enumerate(awg_channel_tuples):
-            assert len(cur_ch_tupl) == 2, "The list awg_channel_tuples must contain tuples of form (instr_AWG_name, channel_name)."
-            cur_awg_name, cur_ch_name = cur_ch_tupl            
-            self._awg_chan_list.append(AWGOutputChannel(lab._get_instrument(cur_awg_name), cur_ch_name, ch_index, self))
-            
-        self._sample_rate = sample_rate
-        self._global_factor = global_factor
-        self._wfm_segment_list = []
-        self._auto_comp = 'None'
-        self._auto_comp_algos = ['None', 'Basic']
+        if lab._register_HAL(self):
+            #
+            #awg_channel_tuples is given as (instr_AWG_name, channel_name)
+            self._awg_chan_list = []
+            #TODO: Check that awg_channel_tuples is a list!
+            for ch_index, cur_ch_tupl in enumerate(awg_channel_tuples):
+                assert len(cur_ch_tupl) == 2, "The list awg_channel_tuples must contain tuples of form (instr_AWG_name, channel_name)."
+                cur_awg_name, cur_ch_name = cur_ch_tupl            
+                self._awg_chan_list.append(AWGOutputChannel(lab._get_instrument(cur_awg_name), cur_ch_name, ch_index, self))
+                
+            self._sample_rate = sample_rate
+            self._global_factor = global_factor
+            self._wfm_segment_list = []
+            self._auto_comp = 'None'
+            self._auto_comp_algos = ['None', 'Basic']
+        else:
+            assert len(awg_channel_tuples) == len(self._awg_chan_list), "Cannot reinstantiate a waveform by the same name, but different channel configurations."
+            for ch_index, cur_ch_tupl in enumerate(awg_channel_tuples):
+                assert cur_ch_tupl[0] == self._awg_chan_list[ch_index]._instr_awg.name, "Cannot reinstantiate a waveform by the same name, but different channel configurations."
+                assert cur_ch_tupl[1] == self._awg_chan_list[ch_index]._channel_name, "Cannot reinstantiate a waveform by the same name, but different channel configurations."
+            self._sample_rate = sample_rate
+            self._global_factor = global_factor
+            self._wfm_segment_list = []
+
+    def __new__(cls, hal_name, lab, awg_channel_tuples, sample_rate, global_factor = 1.0, **kwargs):
+        prev_exists = lab.get_HAL(hal_name)
+        if prev_exists:
+            assert isinstance(prev_exists, WaveformAWG), "A different HAL type already exists by this name."
+            return prev_exists
+        else:
+            return super(WaveformAWG, cls).__new__(cls)
 
     @property
     def AutoCompression(self):

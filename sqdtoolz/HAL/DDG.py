@@ -5,18 +5,25 @@ class DDG(TriggerOutputCompatible, HALbase):
     '''
     Class to handle interfacing with digital delay generators.
     '''
-
     def __init__(self, hal_name, lab, instr_ddg_name):
         HALbase.__init__(self, hal_name)
-        lab._register_HAL(self)
-        #
-        self._instr_ddg = lab._get_instrument(instr_ddg_name)
-        #Assemble the Trigger objects
-        instTrigSrcs = self._instr_ddg.get_all_trigger_sources()
-        self._output_trigs = {}
-        for cur_output_src in instTrigSrcs:
-            cur_trig_name = cur_output_src[0]
-            self._output_trigs[cur_trig_name] = Trigger(self, cur_trig_name, cur_output_src[1])
+        if lab._register_HAL(self):
+            #Only initialise if it's a new instance
+            self._instr_ddg = lab._get_instrument(instr_ddg_name)
+            #Assemble the Trigger objects
+            instTrigSrcs = self._instr_ddg.get_all_trigger_sources()
+            self._output_trigs = {}
+            for cur_output_src in instTrigSrcs:
+                cur_trig_name = cur_output_src[0]
+                self._output_trigs[cur_trig_name] = Trigger(self, cur_trig_name, cur_output_src[1])
+
+    def __new__(cls, hal_name, lab, instr_ddg_name):
+        prev_exists = lab.get_HAL(hal_name)
+        if prev_exists:
+            assert isinstance(prev_exists, DDG), "A different HAL type already exists by this name."
+            return prev_exists
+        else:
+            return super(DDG, cls).__new__(cls)
 
     def get_trigger_output(self, outputID):
         '''

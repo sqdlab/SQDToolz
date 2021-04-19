@@ -68,13 +68,19 @@ class Laboratory:
             assert instrID in self._station.components, f"Instrument by the name {instrID} has not been loaded. Call activate_instrument on it first."
             return self._station.components[instrID]
     def _register_HAL(self, hal_obj):
-        assert isinstance(hal_obj, HALbase), "Supplied HAL object must be a valid HAL object implementing HALbase"
-        assert not (hal_obj.Name in self._hal_objs), f"Supplied HAL object with the name {hal_obj.Name} already exists in the Laboratory object."
-        self._hal_objs[hal_obj.Name] = hal_obj
+        # assert isinstance(hal_obj, HALbase), "Supplied HAL object must be a valid HAL object implementing HALbase"
+        # assert not (hal_obj.Name in self._hal_objs), f"Supplied HAL object with the name {hal_obj.Name} already exists in the Laboratory object."
+        if not (hal_obj.Name in self._hal_objs):
+            self._hal_objs[hal_obj.Name] = hal_obj
+            return True
+        return False
 
     def get_HAL(self, hal_ID):
-        assert hal_ID in self._hal_objs, f"HAL object {hal_ID} does not exist."
-        return self._hal_objs[hal_ID]
+        # assert hal_ID in self._hal_objs, f"HAL object {hal_ID} does not exist."
+        if hal_ID in self._hal_objs:
+            return self._hal_objs[hal_ID]
+        else:
+            return None
 
     def group_open(self, group_name):
         self._group_dir['Dir'] = group_name

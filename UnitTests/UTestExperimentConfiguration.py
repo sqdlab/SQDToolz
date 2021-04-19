@@ -29,7 +29,57 @@ hal_ddg = DDG("ddg", new_lab, 'virDDG', )
 awg_wfm = WaveformAWG("Wfm1", new_lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9)
 awg_wfm2 = WaveformAWG("Wfm2", new_lab, [('virAWG', 'CH3'), ('virAWG', 'CH4')], 1e9)
 hal_mw = GENmwSource("MW-Src", new_lab, 'virMWS', 'CH1')
+
+#Test reinstantiation does not create something new
+hal_ddg.hidden = 'hello'
+assert hal_ddg.hidden == 'hello', "Could not plant hidden attribute"
+hal_ddg = DDG("ddg", new_lab, 'virDDG')
+assert hal_ddg.hidden == 'hello', "Reinstantiation is creating a new object..."
 #
+hal_acq.hidden = 'hello'
+assert hal_acq.hidden == 'hello', "Could not plant hidden attribute"
+hal_acq = ACQ("dum_acq", new_lab, 'virACQ')
+assert hal_acq.hidden == 'hello', "Reinstantiation is creating a new object..."
+#
+awg_wfm.hidden = 'hello'
+assert awg_wfm.hidden == 'hello', "Could not plant hidden attribute"
+awg_wfm = WaveformAWG("Wfm1", new_lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9)
+assert awg_wfm.hidden == 'hello', "Reinstantiation is creating a new object..."
+assert_found = False
+try:
+    WaveformAWG("Wfm1", new_lab, [('virAWG', 'CH4'), ('virAWG', 'CH2')], 1e9)
+except AssertionError:
+    assert_found = True
+    # assert arr_act.size == 0, "There are erroneous trigger edges found in the current configuration."
+assert assert_found, "Reinstantiation was possible with a different channel configuration..."
+assert_found = False
+try:
+    WaveformAWG("Wfm1", new_lab, [('viruAWG', 'CH1'), ('virAWG', 'CH2')], 1e9)
+except AssertionError:
+    assert_found = True
+    # assert arr_act.size == 0, "There are erroneous trigger edges found in the current configuration."
+assert assert_found, "Reinstantiation was possible with a different channel configuration..."
+assert_found = False
+try:
+    WaveformAWG("Wfm1", new_lab, [('virAWG', 'CH4')], 1e9)
+except AssertionError:
+    assert_found = True
+    # assert arr_act.size == 0, "There are erroneous trigger edges found in the current configuration."
+assert assert_found, "Reinstantiation was possible with a different channel configuration..."
+#
+hal_mw.hidden = 'hello'
+assert hal_mw.hidden == 'hello', "Could not plant hidden attribute"
+hal_mw = GENmwSource("MW-Src", new_lab, 'virMWS', 'CH1')
+assert hal_mw.hidden == 'hello', "Reinstantiation is creating a new object..."
+assert_found = False
+try:
+    GENmwSource("MW-Src", new_lab, 'virMWS', 'CH2')
+except AssertionError:
+    assert_found = True
+    # assert arr_act.size == 0, "There are erroneous trigger edges found in the current configuration."
+assert assert_found, "Reinstantiation was possible with a different channel configuration..."
+
+
 #Test the set_acq_params function
 hal_acq.set_acq_params(10,2,30)
 assert hal_acq.NumRepetitions == 10, "ACQ HAL did not properly enter the number of repetitions."

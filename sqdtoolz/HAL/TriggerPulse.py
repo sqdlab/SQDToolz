@@ -22,6 +22,9 @@ class TriggerOutput:
 
     def _get_parent_HAL(self):
         raise NotImplementedError()
+    
+    def _get_timing_diagram_info(self):
+        raise NotImplementedError()
 
 class TriggerInputCompatible:
     def __init__(self):
@@ -46,6 +49,26 @@ class TriggerInput:
     def _get_timing_diagram_info(self):
         raise NotImplementedError()
 
+    def _get_trig_src_params_dict(self):
+        trig_src = self._get_instr_trig_src()
+        if trig_src:
+            return {
+                    'TriggerHAL' : trig_src._get_parent_HAL().Name,
+                    'TriggerID' : trig_src.get_trigger_id()
+                }
+        else:
+            return {
+                'TriggerHAL' : ""
+            }
+
+    @staticmethod
+    def process_trigger_source(dict_trig_src, lab):
+        if 'TriggerHAL' in dict_trig_src and dict_trig_src['TriggerHAL'] != "":
+            hal_obj_trig_output_compatible = lab.get_HAL(dict_trig_src['TriggerHAL'])
+            assert 'TriggerID' in dict_trig_src, "The trigger source dictionary does not have the key \'TriggerID\'"
+            return hal_obj_trig_output_compatible._get_trigger_output_by_id(dict_trig_src['TriggerID'])
+        else:
+            return None
 
 class Trigger(TriggerOutput):
     def __init__(self, parent, name, instr_trig_output_channel):
@@ -121,7 +144,7 @@ class Trigger(TriggerOutput):
             assert False, "Trigger polarity must be 0 or 1 for negative or positive edge/polarity."
 
     def _get_current_config(self):
-        return {self.name : {
+        return {self.Name : {
             'TrigPulseDelay'  : self.TrigPulseDelay,
             'TrigPulseLength' : self.TrigPulseLength,
             'TrigPolarity'  : self.TrigPolarity,
@@ -142,7 +165,7 @@ class Trigger(TriggerOutput):
         self.TrigEnable = dict_config['TrigEnable']
 
     def get_trigger_id(self):
-        return self.name
+        return self.Name
 
     def _get_parent_HAL(self):
         return self._parent

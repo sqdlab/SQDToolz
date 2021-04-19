@@ -10,7 +10,7 @@ new_exp = Experiment(instr_config_file = "tests\\BenchTest.yaml", save_dir = "",
 # new_exp.add_instrument(instr_ddg)
 
 #Ideally, the length and polarity are set to default values in the drivers via the YAML file - i.e. just set TrigPulseDelay
-ddg_module = DDG(new_exp.station.load_pulser())
+ddg_module = DDG(new_exp._station.load_pulser())
 ddg_module.get_trigger_output('AB').TrigPulseLength = 50e-9
 ddg_module.get_trigger_output('AB').TrigPolarity = 1
 ddg_module.get_trigger_output('AB').TrigPulseDelay = 10e-9
@@ -22,7 +22,7 @@ ddg_module.get_trigger_output('EF').TrigPulseDelay = 250e-9
 ddg_module.get_trigger_output('EF').TrigPolarity = 0
 
 
-acq_module = ACQ(new_exp.station.load_fpgaACQ())
+acq_module = ACQ(new_exp._station.load_fpgaACQ())
 acq_module.NumSamples = 50
 acq_module.NumSegments = 1
 # acq_module.SampleRate = 1e9

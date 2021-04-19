@@ -1,3 +1,4 @@
+from sqdtoolz.HAL.HALbase import*
 from sqdtoolz.HAL.TriggerPulse import*
 import numpy as np
 from sqdtoolz.HAL.AWGOutputChannel import*
@@ -5,27 +6,24 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 from sqdtoolz.HAL.WaveformSegments import*
 
-class WaveformAWG(TriggerOutputCompatible, TriggerInputCompatible):
-    def __init__(self, name, awg_channel_tuples, sample_rate, global_factor = 1.0, **kwargs):
-        self._name = name
-
-        #awg_channel_tuples is given as (instr_AWG, channel_name)
+class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
+    def __init__(self, hal_name, lab, awg_channel_tuples, sample_rate, global_factor = 1.0, **kwargs):
+        HALbase.__init__(self, hal_name)
+        lab._register_HAL(self)
+        #
+        #awg_channel_tuples is given as (instr_AWG_name, channel_name)
         self._awg_chan_list = []
         #TODO: Check that awg_channel_tuples is a list!
         for ch_index, cur_ch_tupl in enumerate(awg_channel_tuples):
-            assert len(cur_ch_tupl) == 2, "The list awg_channel_tuples must contain tuples of form (instr_AWG, channel_name)."
-            cur_awg, cur_ch_name = cur_ch_tupl
-            self._awg_chan_list.append(AWGOutputChannel(cur_ch_tupl[0], cur_ch_tupl[1], ch_index, self))
+            assert len(cur_ch_tupl) == 2, "The list awg_channel_tuples must contain tuples of form (instr_AWG_name, channel_name)."
+            cur_awg_name, cur_ch_name = cur_ch_tupl            
+            self._awg_chan_list.append(AWGOutputChannel(lab._get_instrument(cur_awg_name), cur_ch_name, ch_index, self))
             
         self._sample_rate = sample_rate
         self._global_factor = global_factor
         self._wfm_segment_list = []
         self._auto_comp = 'None'
         self._auto_comp_algos = ['None', 'Basic']
-
-    @property
-    def Name(self):
-        return self._name
 
     @property
     def AutoCompression(self):
@@ -116,7 +114,7 @@ class WaveformAWG(TriggerOutputCompatible, TriggerInputCompatible):
         ch_ID = outputID[0]
         mkr_ID = outputID[1]
         assert ch_ID >= 0 and ch_ID < len(self._awg_chan_list), "ch_ID must be a valid channel index."
-        cur_obj = next((x for x in self.get_output_channel(ch_ID)._awg_mark_list if x.name == mkr_ID), None)
+        cur_obj = next((x for x in self.get_output_channel(ch_ID)._awg_mark_list if x._ch_index == mkr_ID), None)
         assert cur_obj != None, f"The trigger output of ID {mkr_ID} does not exist."
         return cur_obj
     def _get_all_trigger_outputs(self):
@@ -132,15 +130,13 @@ class WaveformAWG(TriggerOutputCompatible, TriggerInputCompatible):
             trig_inp_objs += [cur_chan]
             trig_inp_objs += cur_chan.get_all_markers()
         return trig_inp_objs
-        
 
 
     def _get_current_config(self):
         retDict = {
+            'Name' : self.Name,
             'instrument' : [(x._instr_awg.name, x.Name) for x in self._awg_chan_list],
             'type' : 'AWG',
-            'Name' : self.Name,
-            'waveformType' : type(self).__name__,
             'SampleRate' : self.SampleRate,
             'global_factor' : self._global_factor,
             'OutputChannels' : [x._get_current_config() for x in self._awg_chan_list]
@@ -152,18 +148,13 @@ class WaveformAWG(TriggerOutputCompatible, TriggerInputCompatible):
         #Write down the waveform-segment data - can be overwritten by the daughter class for a different format if required/desired...
         return [x._get_current_config() for x in self._wfm_segment_list]
     
-    def _set_current_config(self, dict_config, instr_obj = None):
+    def _set_current_config(self, dict_config, lab):
         assert dict_config['type'] == 'AWG', 'Cannot set configuration to a AWG with a configuration that is of type ' + dict_config['type']
-        assert dict_config['waveformType'] == type(self).__name__, 'Waveform type given in the configuration does not match the current waveform object type.'
-        
-        #TODO: Need to modify this for AWG channel lists?
-        if (instr_obj != None):
-            self._instr_ddg = instr_obj
         
         self._sample_rate = dict_config['SampleRate']
         self._global_factor = dict_config['global_factor']
         for ind, cur_ch_output in enumerate(dict_config['OutputChannels']):
-            self._awg_chan_list[ind]._set_current_config(cur_ch_output)
+            self._awg_chan_list[ind]._set_current_config(cur_ch_output, lab)
 
         self._set_current_config_waveforms(dict_config['WaveformSegments'])
 

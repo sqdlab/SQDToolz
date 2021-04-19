@@ -25,11 +25,11 @@ new_lab = Laboratory(instr_config_file = "tests\\M4iTest.yaml", save_dir = "mySa
 # - Also using an external 10MHz reference on the AWG...
 
 #Sample Clock
-freq_module = GENmwSource(new_lab.station.load_SGS100A().get_output('RFOUT'))
+freq_module = GENmwSource(new_lab._station.load_SGS100A().get_output('RFOUT'))
 freq_module.Output = True
 
 #Ideally, the length and polarity are set to default values in the drivers via the YAML file - i.e. just set TrigPulseDelay
-instr_ddg = new_lab.station.load_pulser()
+instr_ddg = new_lab._station.load_pulser()
 ddg_module = DDG(instr_ddg)
 ddg_module.get_trigger_output('AB').TrigPulseLength = 500e-9
 ddg_module.get_trigger_output('AB').TrigPolarity = 1
@@ -38,7 +38,7 @@ instr_ddg.trigger_rate(100e3)
 
 mod_freq_qubit = WM_SinusoidalIQ("QubitFreqMod", 100e6)
 
-instr_Agi1 = new_lab.station.load_Agi1()
+instr_Agi1 = new_lab._station.load_Agi1()
 awg_wfm_q = WaveformAWG("Waveform 1", [(instr_Agi1, 'ch1'),(instr_Agi1, 'ch2')], 1.25e9)
 awg_wfm_q.add_waveform_segment(WFS_Gaussian("init", mod_freq_qubit, 512e-9, 0.5))
 awg_wfm_q.add_waveform_segment(WFS_Constant("zero1", None, 512e-9, 0.25))
@@ -50,7 +50,7 @@ awg_wfm_q.program_AWG()
 
 awg_wfm_q.get_output_channel(0).Output = True
 
-instr_Agi2 = new_lab.station.load_Agi2()
+instr_Agi2 = new_lab._station.load_Agi2()
 awg_wfm_q2 = WaveformAWG("Waveform 2", [(instr_Agi2, 'ch1'),(instr_Agi2, 'ch2')], 1.25e9)
 awg_wfm_q2.add_waveform_segment(WFS_Gaussian("init", None, 512e-9, 0.5))
 awg_wfm_q2.add_waveform_segment(WFS_Constant("zero1", mod_freq_qubit, 512e-9, 0.25))
@@ -62,7 +62,7 @@ awg_wfm_q2.program_AWG()
 
 #CONNECTED CHANNEL 1 of Agi1 to Input 0 of digitizer and MARKER 2 of Agi1 to Input Trg0 of digitizer
 
-acq_module = ACQ(new_lab.station.load_M4iDigitizer())
+acq_module = ACQ(new_lab._station.load_M4iDigitizer())
 acq_module.NumSamples = 256
 acq_module.NumSegments = 1
 acq_module.SampleRate = 500e6

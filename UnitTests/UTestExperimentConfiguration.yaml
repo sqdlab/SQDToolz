@@ -1,0 +1,13 @@
+instruments:
+  virACQ:
+    driver: sqdtoolz.Drivers.dummyACQ
+    type: DummyACQ
+  virDDG:
+    driver: sqdtoolz.Drivers.dummyDDG
+    type: DummyDDG
+  virAWG:
+    driver: sqdtoolz.Drivers.dummyAWG
+    type: DummyAWG
+  virMWS:
+    driver: sqdtoolz.Drivers.dummyGENmwSource
+    type: DummyGENmwSrc

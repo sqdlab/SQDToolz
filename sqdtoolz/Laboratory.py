@@ -1,5 +1,6 @@
 import qcodes as qc
 from sqdtoolz.Parameter import*
+from sqdtoolz.HAL.HALbase import*
 from datetime import datetime
 from pathlib import Path
 import json
@@ -11,14 +12,16 @@ class Laboratory:
     def __init__(self, instr_config_file, save_dir):
         self._params = {}
         if instr_config_file == "":
-            self.station = qc.Station()
+            self._station = qc.Station()
         else:
-            self.station = qc.Station(config_file=instr_config_file)
+            self._station = qc.Station(config_file=instr_config_file)
         #TODO: Add initialiser for load last file in save_dir thing...
 
         #Convert Windows backslashes into forward slashes (should be compatible with MAC/Linux then...)
         self._save_dir = save_dir.replace('\\','/')
         self._group_dir = {'Dir':"", 'InitDir':""}
+
+        self._hal_objs = {}
 
     def update_config_from_last_expt(self):
         #TODO: Stress test this with say 100000 directories
@@ -45,12 +48,33 @@ class Laboratory:
         return self._params[param_name]
 
     def add_instrument(self, instrObj):
-        self.station.add_component(instrObj)
+        self._station.add_component(instrObj)
 
-    def get_instrument(self, instrID):
-        assert instrID in self.station.components, f"Instrument by the name {instrID} has not been loaded."
-        return self.station.components[instrID]
-    
+    def activate_instrument(self, instrID):
+        assert not (instrID in self._station.components), f"Instrument by the name {instrID} has already been loaded."
+        self._station.load_instrument(instrID)
+
+    def _get_instrument(self, instrID):
+        if type(instrID) is list:
+            assert instrID[0] in self._station.components, f"Instrument by the name {instrID[0]} has not been loaded. Call activate_instrument on it first."
+            cur_instr_obj = self._station.components[instrID[0]]
+            #Go through each submodule...
+            for m in range(1, len(instrID)):
+                assert instrID[m] in cur_instr_obj.submodules, f"The submodule {instrID[m]} does not exist."
+                cur_instr_obj = cur_instr_obj.submodules(instrID[m])
+            return cur_instr_obj
+        else:
+            assert instrID in self._station.components, f"Instrument by the name {instrID} has not been loaded. Call activate_instrument on it first."
+            return self._station.components[instrID]
+    def _register_HAL(self, hal_obj):
+        assert isinstance(hal_obj, HALbase), "Supplied HAL object must be a valid HAL object implementing HALbase"
+        assert not (hal_obj.Name in self._hal_objs), f"Supplied HAL object with the name {hal_obj.Name} already exists in the Laboratory object."
+        self._hal_objs[hal_obj.Name] = hal_obj
+
+    def get_HAL(self, hal_ID):
+        assert hal_ID in self._hal_objs, f"HAL object {hal_ID} does not exist."
+        return self._hal_objs[hal_ID]
+
     def group_open(self, group_name):
         self._group_dir['Dir'] = group_name
         self._group_dir['InitDir'] = ""
@@ -82,7 +106,7 @@ class Laboratory:
         expt_obj.save_config(cur_exp_path)
         #Save instrument configurations (QCoDeS)
         with open(cur_exp_path + 'instrument_configuration.txt', 'w') as outfile:
-            json.dump(self.station.snapshot_base(), outfile, indent=4)
+            json.dump(self._station.snapshot_base(), outfile, indent=4)
         #Save Laboratory Parameters
         param_dict = {k:v.get_raw() for (k,v) in self._params.items()}
         with open(cur_exp_path + 'laboratory_parameters.txt', 'w') as outfile:

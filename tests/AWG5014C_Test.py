@@ -10,7 +10,7 @@ from sqdtoolz.HAL.WaveformModulations import*
 
 new_lab = Laboratory(instr_config_file = "tests\\AWG5014C_Test.yaml", save_dir = "mySaves\\")
 
-instrAWG = new_lab.station.load_awg5014C()
+instrAWG = new_lab._station.load_awg5014C()
 # ch1 = instrAWG.get_output_channel('CH1')
 # ch1.output
 

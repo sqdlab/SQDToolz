@@ -6,7 +6,7 @@ from sqdtoolz.Laboratory import*
 
 new_lab = Laboratory(instr_config_file = "tests\\SIM928.yaml", save_dir = "mySaves\\")
 
-instr_sim928 = new_lab.station.load_sim_rack928()
+instr_sim928 = new_lab._station.load_sim_rack928()
 
 volt_module = GENvoltSource(instr_sim928.get_output(3))
 

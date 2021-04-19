@@ -16,7 +16,7 @@ new_lab = Laboratory(instr_config_file = "tests\\TaborTest.yaml", save_dir = "my
 # new_exp.add_instrument(instr_ddg)
 
 #Ideally, the length and polarity are set to default values in the drivers via the YAML file - i.e. just set TrigPulseDelay
-ddg_module = DDG(new_lab.station.load_pulser())
+ddg_module = DDG(new_lab._station.load_pulser())
 ddg_module.get_trigger_output('AB').TrigPulseLength = 500e-9
 ddg_module.get_trigger_output('AB').TrigPolarity = 1
 ddg_module.get_trigger_output('AB').TrigPulseDelay = 0e-9
@@ -28,9 +28,9 @@ ddg_module.get_trigger_output('EF').TrigPulseDelay = 10e-9
 ddg_module.get_trigger_output('EF').TrigPolarity = 0
 # awg.set_trigger_source(ddg_module.get_trigger_source('A'))
 
-new_lab.station.load_pulser().trigger_rate(300e3)
+new_lab._station.load_pulser().trigger_rate(300e3)
 
-inst_tabor = new_lab.station.load_TaborAWG()
+inst_tabor = new_lab._station.load_TaborAWG()
 
 mod_freq_qubit = WM_SinusoidalIQ("QubitFreqMod", 10e6)
 

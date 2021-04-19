@@ -17,7 +17,7 @@ class AWGOutputChannel(TriggerInput):
         self.num_markers = self._instr_awg.num_supported_markers(channel_name)
         if self.num_markers > 0:
             for ind in range(1, self.num_markers+1):
-                self._awg_mark_list.append(AWGOutputMarker(parent_awg_waveform, self, f'{channel_name}_mkr{ind}', ch_index))
+                self._awg_mark_list.append(AWGOutputMarker(parent_awg_waveform, self, f'{channel_name}_mkr{ind}', ind-1))
         self._parent_waveform_obj = parent_awg_waveform
 
     @property
@@ -117,15 +117,18 @@ class AWGOutputChannel(TriggerInput):
             'Markers' : [x._get_current_config() for x in self._awg_mark_list]
             }
         if self._trig_src_obj:
-            retDict['TriggerSource'] = self._trig_src_obj.get_trigger_params()
+            retDict['TriggerSource'] = self._get_trig_src_params_dict()
         return retDict
 
-    def _set_current_config(self, dict_config):
+    def _set_current_config(self, dict_config, lab):
         self._channel_name = dict_config['Name']
         self.Amplitude = dict_config['Amplitude']
         self.Offset = dict_config['Offset']
-        self.Output = dict_config['Output']
-        self.InputTriggerEdge = dict_config['InputTriggerEdge']
+        self.Output = dict_config['Output']       
+        #
+        trig_src_obj = TriggerInput.process_trigger_source(dict_config['TriggerSource'], lab)
+        self.set_trigger_source(trig_src_obj, dict_config['InputTriggerEdge'])
+        #
         for ind, cur_mark_dict in enumerate(dict_config['Markers']):
             self._awg_mark_list[ind]._set_current_config(cur_mark_dict)
 
@@ -259,6 +262,8 @@ class AWGOutputMarker(TriggerOutput, TriggerInput):
                 final_wfm[start_pt:end_pt+1] = self._marker_pol
             return final_wfm
 
+    def get_trigger_id(self):
+        return [self._awg_output_ch._ch_index, self._ch_index]
     def _get_instr_trig_src(self):
         '''
         Used by TimingConfiguration to backtrack through all interdependent trigger sources (i.e. traversing up the tree)
@@ -318,13 +323,6 @@ class AWGOutputMarker(TriggerOutput, TriggerInput):
             if segs.size > 0 and np.abs(segs[0,0] - segs[0,1]) < 1e-16:
                 segs = segs[1:,:]
             return (times.tolist(), segs)
-
-    def get_trigger_params(self):
-        return {
-                'TriggerHAL' : self._parent_waveform_obj.Name,
-                'TriggerID' : self.name,
-                'TriggerCH' : self._ch_index
-            }
 
     def _get_parent_HAL(self):
         return self._parent_waveform_obj

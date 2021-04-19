@@ -1,12 +1,12 @@
-from sqdtoolz.HAL.GEN import GEN
+from sqdtoolz.HAL.HALbase import*
 from sqdtoolz.HAL.TriggerPulse import*
 
-class GENmwSource(GEN, TriggerInputCompatible, TriggerInput):
-    def __init__(self, instr_gen_freq_src_channel):
-        '''
-        '''
-        super().__init__(instr_gen_freq_src_channel.name)
-        self._instr_mw_output = instr_gen_freq_src_channel
+class GENmwSource(HALbase, TriggerInputCompatible, TriggerInput):
+    def __init__(self, hal_name, lab, instr_mw_src_name, instr_mw_src_channel):
+        HALbase.__init__(self, hal_name)
+        lab._register_HAL(self)
+        #
+        self._instr_mw_output = lab._get_instrument(instr_mw_src_name).get_output(instr_mw_src_channel)
         self._trig_src_obj = None
 
     @property
@@ -64,3 +64,26 @@ class GENmwSource(GEN, TriggerInputCompatible, TriggerInput):
 
     def _get_all_trigger_inputs(self):
         return [self]
+
+    def _get_current_config(self):
+        ret_dict = {
+            'Name' : self.Name,
+            'instrument' : self._instr_mw_output.name,
+            'type' : 'GENmwSource',
+            'TriggerSource' : self._get_trig_src_params_dict(),
+            'InputTriggerEdge' : self._instr_mw_output.TriggerInputEdge
+            }
+        self.pack_properties_to_dict(['Power', 'Frequency', 'Phase', 'Mode'], ret_dict)
+        return ret_dict
+
+    def _set_current_config(self, dict_config, lab):
+        assert dict_config['type'] == 'GENmwSource', 'Cannot set configuration to a MW-Source with a configuration that is of type ' + dict_config['type']
+        self._channel_name = dict_config['Name']
+        self.Power = dict_config['Power']
+        self.Frequency = dict_config['Frequency']
+        self.Phase = dict_config['Phase']
+        self.Mode = dict_config['Mode']       
+        #
+        trig_src_obj = TriggerInput.process_trigger_source(dict_config['TriggerSource'], lab)
+        self.set_trigger_source(trig_src_obj)
+        self._instr_mw_output.TriggerInputEdge = dict_config['InputTriggerEdge']

@@ -124,7 +124,7 @@ class WFS_Constant(WaveformSegmentBase):
         for cur_key in ["Name", "Duration", "Value"]:
             assert cur_key in config_dict, "Configuration dictionary does not have the key: " + cur_key
         #TODO: Fix the functionality here.
-        return cls(config_dict["Name"], config_dict["Duration"], config_dict["Value"])
+        return cls(config_dict["Name"], None, config_dict["Duration"], config_dict["Value"])
 
     @property
     def Duration(self):
@@ -166,7 +166,7 @@ class WFS_Gaussian(WaveformSegmentBase):
         for cur_key in ["Name", "Duration", "Amplitude", "Num SD"]:
             assert cur_key in config_dict, "Configuration dictionary does not have the key: " + cur_key
 
-        return cls(config_dict["Name"], config_dict["Duration"], config_dict["Amplitude"], config_dict["Num SD"])
+        return cls(config_dict["Name"], None, config_dict["Duration"], config_dict["Amplitude"], config_dict["Num SD"])
    
     @property
     def Duration(self):

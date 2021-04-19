@@ -1,15 +1,14 @@
 from sqdtoolz.HAL.TriggerPulse import*
+from sqdtoolz.HAL.HALbase import*
 
-class ACQ(TriggerInputCompatible, TriggerInput):
-    def __init__(self, instr_acq):
-        self._instr_acq = instr_acq
+class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
+    def __init__(self, hal_name, lab, instr_acq_name):
+        HALbase.__init__(self, hal_name)
+        lab._register_HAL(self)
+        #
+        self._instr_acq = lab._get_instrument(instr_acq_name)
         self._trig_src_obj = None
-        self._name = instr_acq.name
         self.data_processor = None
-
-    @property
-    def Name(self):
-        return self._name
 
     @property
     def NumSamples(self):
@@ -80,22 +79,25 @@ class ACQ(TriggerInputCompatible, TriggerInput):
 
     def _get_trigger_sources(self):
         return [self._trig_src_obj]
-    def _get_current_config(self):
-        return {
-            'instrument' : self.name,
-            'type' : 'ACQ',
-            'NumSamples' : self.NumSamples,
-            'SampleRate' : self.SampleRate,
-            'InputTriggerEdge' : self.InputTriggerEdge,
-            'TriggerSource' : self._trig_src_obj.get_trigger_params()
-            }
 
-    def _set_current_config(self, dict_config, instr_obj = None):
+    def _get_current_config(self):
+        ret_dict = {
+            'Name' : self.Name,
+            'instrument' : self._instr_acq.name,
+            'type' : 'ACQ',
+            'TriggerSource' : self._get_trig_src_params_dict()
+            }
+        self.pack_properties_to_dict(['NumSamples', 'NumSegments', 'NumRepetitions', 'SampleRate', 'InputTriggerEdge'], ret_dict)
+        return ret_dict
+
+    def _set_current_config(self, dict_config, lab):
         assert dict_config['type'] == 'ACQ', 'Cannot set configuration to a ACQ with a configuration that is of type ' + dict_config['type']
-        if (instr_obj != None):
-            self._instr_acq = instr_obj
         self.NumSamples = dict_config['NumSamples']
+        self.NumSegments = dict_config['NumSegments']
+        self.NumRepetitions = dict_config['NumRepetitions']
         self.SampleRate = dict_config['SampleRate']
         self.InputTriggerEdge = dict_config['InputTriggerEdge']
+        trig_src_obj = TriggerInput.process_trigger_source(dict_config['TriggerSource'], lab)
+        self.set_trigger_source(trig_src_obj)
 
     

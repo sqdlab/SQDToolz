@@ -1,25 +1,22 @@
 from sqdtoolz.HAL.TriggerPulse import*
+from sqdtoolz.HAL.HALbase import*
 
-class DDG(TriggerOutputCompatible):
+class DDG(TriggerOutputCompatible, HALbase):
     '''
     Class to handle interfacing with digital delay generators.
     '''
 
-    def __init__(self, instr_ddg):
-        '''
-        '''
-        self._instr_ddg = instr_ddg
-        self._name = instr_ddg.name
+    def __init__(self, hal_name, lab, instr_ddg_name):
+        HALbase.__init__(self, hal_name)
+        lab._register_HAL(self)
+        #
+        self._instr_ddg = lab._get_instrument(instr_ddg_name)
         #Assemble the Trigger objects
         instTrigSrcs = self._instr_ddg.get_all_trigger_sources()
         self._output_trigs = {}
         for cur_output_src in instTrigSrcs:
             cur_trig_name = cur_output_src[0]
             self._output_trigs[cur_trig_name] = Trigger(self, cur_trig_name, cur_output_src[1])
-
-    @property
-    def Name(self):
-        return self._name
 
     def get_trigger_output(self, outputID):
         '''
@@ -52,15 +49,14 @@ class DDG(TriggerOutputCompatible):
         for cur_trig in trigObjs:
             trigDict = {**trigDict, **cur_trig._get_current_config()}
         retDict = {
-            'instrument' : self.Name,
+            'Name' : self.Name,
+            'instrument' : self._instr_ddg.name,
             'type' : 'DDG',
             'triggers' : trigDict
             }
         return retDict
 
-    def _set_current_config(self, dict_config, instr_obj = None):
+    def _set_current_config(self, dict_config, lab):
         assert dict_config['type'] == 'DDG', 'Cannot set configuration to a DDG with a configuration that is of type ' + dict_config['type']
-        if (instr_obj != None):
-            self._instr_ddg = instr_obj
         for cur_trig_name in dict_config['triggers']:
             self.get_trigger_output(cur_trig_name)._set_current_config(dict_config['triggers'][cur_trig_name])

@@ -41,19 +41,8 @@ class ExperimentConfiguration:
     def save_config(self, file_name = ''):
         #Prepare the dictionary of HAL configurations
         retVal = []
-        #Get the dictionaries for the DDGs
-        for cur_ddg in self._list_DDGs:
-            retVal.append(cur_ddg._get_current_config())
-        #Get the dictionaries for the AWGs
-        for cur_awg in self._list_AWGs:
-            retVal.append(cur_awg._get_current_config())
-        #Get the dictionaries and triggers for ACQ
-        if (self._instr_ACQ):
-            cur_acq = self._instr_ACQ
-            retVal.append(cur_acq._get_current_config())
-        #Get the dictionaries for generic HALs
-        for cur_gen in self._list_GENs:
-            retVal.append(cur_gen._get_current_config())
+        for cur_hal in self._list_HALs + [self._hal_ACQ]:
+            retVal.append(cur_hal._get_current_config())
         
         #Save to file if necessary
         if (file_name != ''):
@@ -61,51 +50,15 @@ class ExperimentConfiguration:
                 json.dump(retVal, outfile, indent=4)
         return retVal
 
-    def update_config(self, conf):
-        #
-        #Load the module parameters
-        #
-        trig_relations = []
+    def update_config(self, conf, lab):
         for cur_dict in conf:
-            #Sort through each entry in the list of dictionaries and parse depending on their type (e.g. DDG, ACQ, AWG etc...)
-            if cur_dict['type'] == 'DDG':
-                #Find the corresponding DDG in the current list of registered DDG Modules and set its configuration parameters
-                for cur_ddg in self._list_DDGs:
-                    if cur_ddg.Name == cur_dict['instrument']:
-                        cur_ddg._set_current_config(cur_dict)
-                        break
-                    #TODO: Consider adding input-trigger support for DDGs
-            elif cur_dict['type'] == 'ACQ':
-                cur_acq = self._instr_ACQ
-                cur_acq._set_current_config(cur_dict)
-                #After setting the parameters, write down the current device and its trigger relation (i.e. the source and ID)
-                if 'TriggerSource' in cur_dict:
-                    trig_relations.append( (cur_acq, cur_dict['TriggerSource']) )
-            elif cur_dict['type'] == 'AWG':
-                for cur_awg in self._list_AWGs:
-                    if cur_awg.Name == cur_dict['Name']:
-                        cur_awg._set_current_config(cur_dict)
-                        for ind, cur_output_dict in enumerate(cur_dict['OutputChannels']):
-                            if 'TriggerSource' in cur_output_dict:
-                                trig_relations.append( (cur_awg.get_output_channel(ind), cur_output_dict['TriggerSource']) )
-                        break
-        #
-        #Settle the triggers
-        #
-        possible_trig_sources = self._list_DDGs + self._list_AWGs
-        for cur_trig_rel in trig_relations:
-            cur_dest_obj = cur_trig_rel[0]
-            cur_trig_dict = cur_trig_rel[1]
-            cur_src_name = cur_trig_dict['TriggerHAL']
-            cur_src = None
-            #For the current trigger relation, find its source by using the HAL module name (i.e. H/W instrument name
-            for cand_src in possible_trig_sources:
-                if cand_src.Name == cur_src_name:
-                    cur_src = cand_src
+            found_hal = False
+            for cur_hal in self._list_HALs + [self._hal_ACQ]:
+                if cur_hal.Name == cur_dict['Name']:
+                    found_hal = True
+                    cur_hal._set_current_config(cur_dict, lab)
                     break
-            assert cur_src != None, "Trigger source could not be found for instrument " + cur_dest_obj.name + " sourcing from an unknown module " + cur_src_name
-            #Set the trigger source on the destination object (AWGs and ACQ modules have the set_trigger_source function implemented by default)
-            cur_dest_obj.set_trigger_source(cur_src._get_trigger_output_by_id(cur_trig_dict['TriggerID'], cur_trig_dict['TriggerCH']))
+            assert found_hal, f"HAL object {cur_dict['Name']} does not exist in the current ExperimentConfiguration object."
 
     def init_instrument_relations(self):
         #Settle trigger relations in case they have changed in a previous configuration...

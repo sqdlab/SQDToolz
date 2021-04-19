@@ -7,13 +7,13 @@ from sqdtoolz.Laboratory import*
 new_lab = Laboratory(instr_config_file = "tests\\WFSynthHDProV2_Test.yaml", save_dir = "mySaves\\")
 
 #Ideally, the length and polarity are set to default values in the drivers via the YAML file - i.e. just set TrigPulseDelay
-ddg_module = DDG(new_lab.station.load_pulser())
+ddg_module = DDG(new_lab._station.load_pulser())
 ddg_module.get_trigger_output('AB').TrigPulseLength = 500e-9
 ddg_module.get_trigger_output('AB').TrigPolarity = 1
 ddg_module.get_trigger_output('AB').TrigPulseDelay = 10e-9
-new_lab.station.load_pulser().trigger_rate(500e3)
+new_lab._station.load_pulser().trigger_rate(500e3)
 
-instr_freq = new_lab.station.load_MWS_Windfreak()
+instr_freq = new_lab._station.load_MWS_Windfreak()
 freq_module = GENmwSource(instr_freq.get_output('RFoutA'))
 freq_module2 = GENmwSource(instr_freq.get_output('RFoutB'))
 

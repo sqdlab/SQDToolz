@@ -45,8 +45,8 @@ for m in range(4):
 # awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments(["init0","init2"])
 awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments([read_segs[0]])
 awg_wfm_q.AutoCompression = 'Basic'#'Basic'
-awg_wfm_q.prepare_AWG_Waveforms()
-awg_wfm_q.program_AWG_Waveforms()
+awg_wfm_q.prepare_initial()
+awg_wfm_q.prepare_final()
 
 awg_wfm_q.get_output_channel(0).Output = True
 awg_wfm_q.get_output_channel(1).Output = True
@@ -87,7 +87,7 @@ awg_wfm_A.add_waveform_segment(WFS_Gaussian("init4", None, 2048e-9, 0.0))
 awg_wfm_A.get_output_channel(0).marker(0).set_markers_to_segments(["init"])
 awg_wfm_A.get_output_channel(0).marker(1).set_markers_to_segments(["zero1"])
 awg_wfm_A.AutoCompression = 'Basic'
-awg_wfm_A.prepare_AWG_Waveforms()
+awg_wfm_A.prepare_initial()
 
 awg_wfm_B = WaveformAWG("Waveform CH2", [(inst_tabor.AWG, 'CH2')], 1e9)
 awg_wfm_B.add_waveform_segment(WFS_Gaussian("init", None, 512e-9, -0.5))
@@ -96,10 +96,10 @@ awg_wfm_B.add_waveform_segment(WFS_Gaussian("init2", None, 512e-9, 0.0))
 awg_wfm_B.add_waveform_segment(WFS_Constant("zero2", None, 512e-9, 0.0))
 awg_wfm_B.get_output_channel(0).marker(0).set_markers_to_segments(["init","init2"])
 awg_wfm_B.get_output_channel(0).marker(1).set_markers_to_segments(["zero1","zero2"])
-awg_wfm_B.prepare_AWG_Waveforms()
+awg_wfm_B.prepare_initial()
 
-awg_wfm_A.program_AWG_Waveforms()
-awg_wfm_B.program_AWG_Waveforms()
+awg_wfm_A.prepare_final()
+awg_wfm_B.prepare_final()
 
 inst_tabor.AWG._get_channel_output('CH1').Output = True
 inst_tabor.AWG._get_channel_output('CH2').Output = True

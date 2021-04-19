@@ -51,8 +51,9 @@ class Laboratory:
         self._station.add_component(instrObj)
 
     def activate_instrument(self, instrID):
-        assert not (instrID in self._station.components), f"Instrument by the name {instrID} has already been loaded."
-        self._station.load_instrument(instrID)
+        # assert not (instrID in self._station.components), f"Instrument by the name {instrID} has already been loaded."
+        if not (instrID in self._station.components):
+            self._station.load_instrument(instrID)
 
     def _get_instrument(self, instrID):
         if type(instrID) is list:

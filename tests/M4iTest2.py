@@ -70,10 +70,10 @@ awg_wfm_q.AutoCompression = 'None'#'Basic'
 #     awg_wfm_q2.add_waveform_segment(WFS_Constant(f"zero2{m}", None, 512e-9, 0.0))
 #     read_segs += [f"init{m}"]
 
-awg_wfm_q.prepare_AWG_Waveforms()
-# awg_wfm_q2.prepare_AWG_Waveforms()
-awg_wfm_q.program_AWG_Waveforms()
-# awg_wfm_q2.program_AWG_Waveforms()
+awg_wfm_q.prepare_initial()
+# awg_wfm_q2.prepare_initial()
+awg_wfm_q.prepare_final()
+# awg_wfm_q2.prepare_final()
 awg_wfm_q.get_output_channel(0).Output = True
 
 #CONNECTED CHANNEL 1 of Agi1 to Input 0 of digitizer and MARKER 2 of Agi1 to Input Trg0 of digitizer

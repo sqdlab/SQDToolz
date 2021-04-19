@@ -68,15 +68,16 @@ class ExperimentConfiguration:
 
     def prepare_instruments(self):
         #TODO: Write rest of this with error checking
-        for cur_awg in self._list_AWGs:
-            #TODO: Write concurrence/change checks to better optimise AwG...
-            cur_awg.prepare_AWG_Waveforms()
-        for cur_awg in self._list_AWGs:
-            cur_awg.program_AWG_Waveforms()
+        list_hals = self._list_HALs + [self._hal_ACQ]
+        for cur_hal in list_hals:
+            #TODO: Write concurrence/change checks to better optimise AWG...
+            cur_hal.prepare_initial()
+        for cur_hal in list_hals:
+            cur_hal.prepare_final()
 
     def get_data(self):
         #TODO: Pack the data appropriately if using multiple ACQ objects (coordinating their starts/finishes perhaps?)
-        cur_acq = self._instr_ACQ
+        cur_acq = self._hal_ACQ
         return cur_acq.get_data()
 
     def get_trigger_edges(self, obj_trigger_input):

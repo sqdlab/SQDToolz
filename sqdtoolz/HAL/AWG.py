@@ -193,7 +193,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
                 axs[ind].plot(t_vals, cur_wfm)
         return fig
 
-    def prepare_AWG_Waveforms(self):
+    def prepare_initial(self):
         #Prepare the waveform
         final_wfms = self._assemble_waveform_raw()
 
@@ -219,7 +219,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
             cur_awg_chan._instr_awg.prepare_waveform_memory(cur_awg_chan._instr_awg_chan.short_name, seg_lens, raw_data=dict_wfm_data)
             self.cur_wfms_to_commit.append(dict_wfm_data)
 
-    def program_AWG_Waveforms(self):
+    def prepare_final(self):
         for ind, cur_awg_chan in enumerate(self._awg_chan_list):
             cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.short_name, self.cur_wfms_to_commit[ind])                
 

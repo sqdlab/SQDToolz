@@ -16,3 +16,9 @@ class HALbase:
     def pack_properties_to_dict(self, list_prop_names, ret_dict):
         for cur_prop in list_prop_names:
             ret_dict[cur_prop] = getattr(self, cur_prop)
+
+    def prepare_initial(self):
+        pass
+
+    def prepare_final(self):
+        pass

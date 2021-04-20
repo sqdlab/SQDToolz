@@ -107,13 +107,13 @@ class Laboratory:
         #TODO: Write the sweeping code to appropriately nest folders or perform data-passing
         self._time_stamp_begin = time.time()
         self._time_stamps = [(0,0),]
+        self._prog_bar_str = ''
         ret_vals = expt_obj._run(cur_exp_path, sweep_vars, ping_iteration=self._update_progress_bar, delay=delay)
         #TODO: Add flag to get/save for live-plotting
         #Save experiment configurations
         expt_obj.save_config(cur_exp_path)
         #Save instrument configurations (QCoDeS)
-        with open(cur_exp_path + 'instrument_configuration.txt', 'w') as outfile:
-            json.dump(self._station.snapshot_base(), outfile, indent=4)
+        self._save_instrument_config(cur_exp_path)
         #Save Laboratory Parameters
         param_dict = {k:v.get_raw() for (k,v) in self._params.items()}
         with open(cur_exp_path + 'laboratory_parameters.txt', 'w') as outfile:
@@ -123,8 +123,27 @@ class Laboratory:
 
         return ret_vals
 
+    def _save_instrument_config(self, cur_exp_path):
+        #Sometimes the configuration parameters use byte-values; those bytes need to be converted into strings
+        #Code taken from: https://stackoverflow.com/questions/57014259/json-dumps-on-dictionary-with-bytes-for-keys
+        def decode_dict(d):
+            result = {}
+            for key, value in d.items():
+                if isinstance(key, bytes):
+                    key = key.decode()
+                if isinstance(value, bytes):
+                    value = value.decode()
+                elif isinstance(value, dict):
+                    value = decode_dict(value)
+                result.update({key: value})
+            return result
+        with open(cur_exp_path + 'instrument_configuration.txt', 'w') as outfile:
+            raw_snapshot = self._station.snapshot_base()
+            json.dump(decode_dict(raw_snapshot), outfile, indent=4)
+
+
     @staticmethod
-    def _printProgressBar(iteration, total, prefix = '', suffix = '', decimals = 1, length = 50, fill = '█', printEnd = "\r"):
+    def _printProgressBar(iteration, total, prefix = '', suffix = '', decimals = 1, length = 50, fill = '█', printEnd = "\r", prev_str=''):
         """
         Call in a loop to create terminal progress bar
         @params:
@@ -137,15 +156,20 @@ class Laboratory:
             fill        - Optional  : bar fill character (Str)
             printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
 
-        Taken from: https://stackoverflow.com/questions/3173320/text-progress-bar-in-the-console
+        Adapted from: https://stackoverflow.com/questions/3173320/text-progress-bar-in-the-console
         """
         percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
         filledLength = int(length * iteration // total)
         bar = fill * filledLength + '-' * (length - filledLength)
-        print(f'\r{prefix} |{bar}| {percent}% {suffix}', end = printEnd)
+        #The \033[K%s is to erase the entire line instead of leaving stuff behind when the string gets smaller... Except that doesn't work in Jupyter
+        #https://github.com/jupyter/notebook/issues/4749 - so back to using the manual erasure...
+        print(' '*len(prev_str), end = printEnd)
+        ret_str = f'\033[K%s\r{prefix} |{bar}| {percent}% {suffix}'
+        print(ret_str, end = printEnd)
         # Print New Line on Complete
         if iteration == total: 
             print()
+        return ret_str
 
     def _update_progress_bar(self, val_pct):
         self._time_stamps += [(val_pct, time.time())]
@@ -183,4 +207,4 @@ class Laboratory:
         else:
             total_time = f"Total time: {total_time:.2f}s"
         
-        self._printProgressBar(int(val_pct*100), 100, suffix=f"{total_time}, {time_left}")
+        self._prog_bar_str = self._printProgressBar(int(val_pct*100), 100, suffix=f"{total_time}, {time_left}", prev_str=self._prog_bar_str)

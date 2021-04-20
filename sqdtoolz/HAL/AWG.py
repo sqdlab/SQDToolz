@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from sqdtoolz.HAL.WaveformSegments import*
 
 class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
-    def __init__(self, hal_name, lab, awg_channel_tuples, sample_rate, global_factor = 1.0, **kwargs):
+    def __init__(self, hal_name, lab, awg_channel_tuples, sample_rate, total_time=-1, global_factor = 1.0, **kwargs):
         HALbase.__init__(self, hal_name)
         if lab._register_HAL(self):
             #
@@ -24,6 +24,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
             self._wfm_segment_list = []
             self._auto_comp = 'None'
             self._auto_comp_algos = ['None', 'Basic']
+            self._total_time = total_time
         else:
             assert len(awg_channel_tuples) == len(self._awg_chan_list), "Cannot reinstantiate a waveform by the same name, but different channel configurations."
             for ch_index, cur_ch_tupl in enumerate(awg_channel_tuples):
@@ -32,8 +33,9 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
             self._sample_rate = sample_rate
             self._global_factor = global_factor
             self._wfm_segment_list = []
+            self._total_time = total_time
 
-    def __new__(cls, hal_name, lab, awg_channel_tuples, sample_rate, global_factor = 1.0, **kwargs):
+    def __new__(cls, hal_name, lab, awg_channel_tuples, sample_rate, total_time=-1, global_factor = 1.0, **kwargs):
         prev_exists = lab.get_HAL(hal_name)
         if prev_exists:
             assert isinstance(prev_exists, WaveformAWG), "A different HAL type already exists by this name."
@@ -108,6 +110,23 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
         return (int(cur_ind), int(cur_ind + cur_seg.NumPts(self._sample_rate) - 1))
 
     def _assemble_waveform_raw(self):
+        #First settle the elastic time-segment if it exists
+        elastic_segs = []
+        for ind_wfm, cur_wfm_seg in enumerate(self._wfm_segment_list):
+            if cur_wfm_seg.Duration == -1:
+                elastic_segs += [ind_wfm]
+        assert len(elastic_segs) <= 1, "There are too many elastic waveform segments (cannot be above 1)."
+        if self._total_time == -1:
+            assert len(elastic_segs) == 0, "If the total waveform length is unbound, the number of elastic segments must be zero."
+        if self._total_time > 0 and len(elastic_segs) == 0:
+            assert sum([x.Duration for x in self._wfm_segs]) == self._total_time, "Sum of waveform segment durations do not match the total specified waveform group time. Consider making one of the segments elastic by setting its duration to be -1."
+        #Get the elastic segment index
+        if len(elastic_segs) > 0:
+            elas_seg_ind = elastic_segs[0]
+            self._wfm_segment_list[elas_seg_ind].Duration = self._total_time - (sum([x.Duration for x in self._wfm_segment_list])+1)    #Negate the -1 segment
+        else:
+            elas_seg_ind = -1
+
         num_chnls = len(self._awg_chan_list)
         final_wfms = [np.array([])]*num_chnls
         #Assemble each channel separately
@@ -120,6 +139,11 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
                 t0 += final_wfms[cur_ch].size
             #Scale the waveform via the global scale-factor...
             final_wfms[cur_ch] *= self._global_factor
+        
+        #Reset segment to be elastic
+        if elas_seg_ind != -1:
+            self._wfm_segment_list[elas_seg_ind].Duration = -1
+    
         return final_wfms
 
     def _get_trigger_output_by_id(self, outputID):

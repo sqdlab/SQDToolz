@@ -1,9 +1,10 @@
 import numpy as np
 
 class WaveformSegmentBase:
-    def __init__(self, name, mod_func):
+    def __init__(self, name, mod_func, duration):
         self._name = name
         self._mod_func = mod_func
+        self._duration = duration
 
     @property
     def Name(self):
@@ -11,6 +12,13 @@ class WaveformSegmentBase:
 
     def NumPts(self, fs):
         return self.Duration*fs
+
+    @property
+    def Duration(self):
+        return self._duration
+    @Duration.setter
+    def Duration(self, len_seconds):
+        self._duration = len_seconds
 
     def get_waveform(self, fs, t0_ind, ch_index):
         '''
@@ -58,7 +66,7 @@ class WaveformSegmentBase:
         
 class WFS_Group(WaveformSegmentBase):
     def __init__(self, name, wfm_segs, time_len=-1, mod_func=None):
-        super().__init__(name, mod_func)
+        super().__init__(name, mod_func, time_len)
         self._abs_time = time_len   #_abs_time is the total absolute time (if -1, the duration is the sum of the individual time segment durations)
         self._wfm_segs = wfm_segs
         self._validate_wfm_segs()
@@ -86,9 +94,9 @@ class WFS_Group(WaveformSegmentBase):
         
         #Return the elastic segment index
         if len(elastic_segs) > 0:
-            return -1
-        else:
             return elastic_segs[0]
+        else:
+            return -1
 
     def _get_waveform(self, fs, t0_ind, ch_index):
         elas_seg_ind = self._validate_wfm_segs()
@@ -113,8 +121,7 @@ class WFS_Group(WaveformSegmentBase):
 
 class WFS_Constant(WaveformSegmentBase):
     def __init__(self, name, mod_func, time_len, value=0.0):
-        super().__init__(name, mod_func)
-        self._duration = time_len
+        super().__init__(name, mod_func, time_len)
         self._value = value
 
     @classmethod
@@ -125,13 +132,6 @@ class WFS_Constant(WaveformSegmentBase):
             assert cur_key in config_dict, "Configuration dictionary does not have the key: " + cur_key
         #TODO: Fix the functionality here.
         return cls(config_dict["Name"], None, config_dict["Duration"], config_dict["Value"])
-
-    @property
-    def Duration(self):
-        return self._duration
-    @Duration.setter
-    def Duration(self, len_seconds):
-        self._duration = len_seconds
 
     @property
     def Value(self):
@@ -147,15 +147,14 @@ class WFS_Constant(WaveformSegmentBase):
         cur_dict = WaveformSegmentBase._get_current_config(self)
         cur_dict['type'] = 'WFS_Constant'
         cur_dict['type'] = 'WFS_Constant'
-        cur_dict['Duration'] = self._duration
+        cur_dict['Duration'] = self.Duration
         cur_dict['Value'] = self._value
         return cur_dict
 
 class WFS_Gaussian(WaveformSegmentBase):
     def __init__(self, name, mod_func, time_len, amplitude, num_sd=1.96):
-        super().__init__(name, mod_func)
+        super().__init__(name, mod_func, time_len)
         #TODO: Add in a classmethod to use sigma and truncate...
-        self._duration = time_len
         self._amplitude = amplitude
         self._num_sd = num_sd
 
@@ -167,13 +166,6 @@ class WFS_Gaussian(WaveformSegmentBase):
             assert cur_key in config_dict, "Configuration dictionary does not have the key: " + cur_key
 
         return cls(config_dict["Name"], None, config_dict["Duration"], config_dict["Amplitude"], config_dict["Num SD"])
-   
-    @property
-    def Duration(self):
-        return self._duration
-    @Duration.setter
-    def Duration(self, len_seconds):
-        self._duration = len_seconds
 
     @property
     def Amplitude(self):
@@ -202,7 +194,7 @@ class WFS_Gaussian(WaveformSegmentBase):
     def _get_current_config(self):
         cur_dict = WaveformSegmentBase._get_current_config(self)
         cur_dict['type'] = 'WFS_Gaussian'
-        cur_dict['Duration'] = self._duration
+        cur_dict['Duration'] = self.Duration
         cur_dict['Amplitude'] = self._amplitude
         cur_dict['Num SD'] = self._num_sd
         return cur_dict

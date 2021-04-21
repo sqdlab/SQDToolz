@@ -64,12 +64,19 @@ class AWGOutputChannel(TriggerInput):
         sample_rate = self._parent_waveform_obj.SampleRate
         seg_dicts = []
         t0 = 0
-        for cur_wfm_seg in self._parent_waveform_obj._wfm_segment_list:
+        elas_seg_ind, elastic_time = self._parent_waveform_obj._get_elastic_time_seg_params()
+        for m, cur_wfm_seg in enumerate(self._parent_waveform_obj._wfm_segment_list):
             cur_dict = {}
-            cur_dict['Duration'] = cur_wfm_seg.Duration
+            if elas_seg_ind == m:
+                cur_dict['Duration'] = elastic_time
+                cur_wfm_seg.Duration = elastic_time
+            else:
+                cur_dict['Duration'] = cur_wfm_seg.Duration
             #TODO: Use _get_waveform to yield the unmodified waveform (i.e. just envelope) if some flag is set
             cur_y = cur_wfm_seg.get_waveform(sample_rate, t0, self._ch_index)
             t0 += cur_wfm_seg.NumPts(sample_rate) / sample_rate
+            if elas_seg_ind == m:
+                cur_wfm_seg.Duration = -1
             #Skip this segment if it's empty...
             if cur_y.size == 0:
                 continue

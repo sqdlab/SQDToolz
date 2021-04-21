@@ -43,14 +43,14 @@ class Laboratory:
     def cold_reload_last_configuration(self):
         dirs = [x[0] for x in os.walk(self._save_dir)]  #Walk gives a tuple: (dirpath, dirnames, filenames)
         last_dir = dirs[-1].replace('\\','/')
-        if os.path.isfile(last_dir + "/experiment_configuration.txt"):
-            with open(last_dir + "/experiment_configuration.txt") as json_file:
-                data = json.load(json_file)
-                self.cold_reload_configuration(data)
         if os.path.isfile(last_dir + "/laboratory_configuration.txt"):
             with open(last_dir + "/laboratory_configuration.txt") as json_file:
                 data = json.load(json_file)
                 self.cold_reload_instruments(data)
+        if os.path.isfile(last_dir + "/experiment_configuration.txt"):
+            with open(last_dir + "/experiment_configuration.txt") as json_file:
+                data = json.load(json_file)
+                self.cold_reload_configuration(data)
 
     def cold_reload_configuration(self, config_dict):
         for dict_cur_hal in config_dict:

@@ -81,6 +81,9 @@ class DG645Channel(InstrumentChannel):
     @property
     def TrigEnable(self):
         return True     #Not implementing any output enable/disable...
+    @TrigEnable.setter
+    def TrigEnable(self, val):
+        pass     #Not implementing any output enable/disable...
 
     @property
     def TrigPulseLength(self):
@@ -183,6 +186,13 @@ class DG645(VisaInstrument):
         self.trigger_rate(5e6)
         # Show IDN
         #self.connect_message()
+
+    @property
+    def RepetitionTime(self):
+        return 1/self.trigger_rate()
+    @RepetitionTime.setter
+    def RepetitionTime(self, val):
+        self.trigger_rate(1/val)
 
     def get_trigger_output(self, identifier):
         return self._trig_sources[identifier]

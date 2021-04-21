@@ -77,6 +77,15 @@ class DummyDDG(Instrument):
             self.add_submodule(ch_name, cur_channel)
             self._trig_sources[ch_name] = cur_channel
 
+        self._rep_time = 100e-9
+
+    @property
+    def RepetitionTime(self):
+        return self._rep_time
+    @RepetitionTime.setter
+    def RepetitionTime(self, val):
+        self._rep_time = val
+
     def get_trigger_output(self, identifier):
         return self._trig_sources[identifier]
 

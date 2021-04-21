@@ -103,6 +103,10 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
         full_len = 0
         for cur_seg in self._wfm_segment_list:
             full_len += cur_seg.Duration
+        #If there is an elastic time-segment, then negate the -1 and add in the correct elastic time...
+        elas_seg_ind, elastic_time = self._get_elastic_time_seg_params()
+        if elas_seg_ind != -1:
+            full_len = full_len + 1 + elastic_time
         return full_len
 
     @property
@@ -114,18 +118,23 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
         return self.Duration * self._sample_rate
 
     def _get_index_points_for_segment(self, seg_name):
+        elas_seg_ind, elastic_time = self._get_elastic_time_seg_params()
+
         the_seg = None
         cur_ind = 0
-        for cur_seg in self._wfm_segment_list:
+        for m, cur_seg in enumerate(self._wfm_segment_list):
+            if m == elas_seg_ind:
+                cur_len = elastic_time
+            else:
+                cur_len = cur_seg.NumPts(self._sample_rate)
             if cur_seg.Name == seg_name:
                 the_seg = seg_name
                 break
-            cur_ind += cur_seg.NumPts(self._sample_rate)
+            cur_ind += cur_len
         assert the_seg != None, "Waveform Segment of name " + seg_name + " is not present in the current list of added Waveform Segments."
-        return (int(cur_ind), int(cur_ind + cur_seg.NumPts(self._sample_rate) - 1))
+        return (int(cur_ind), int(cur_ind + cur_len - 1))
 
-    def _assemble_waveform_raw(self):
-        #First settle the elastic time-segment if it exists
+    def _get_elastic_time_seg_params(self):
         elastic_segs = []
         for ind_wfm, cur_wfm_seg in enumerate(self._wfm_segment_list):
             if cur_wfm_seg.Duration == -1:
@@ -134,13 +143,22 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
         if self._total_time == -1:
             assert len(elastic_segs) == 0, "If the total waveform length is unbound, the number of elastic segments must be zero."
         if self._total_time > 0 and len(elastic_segs) == 0:
-            assert sum([x.Duration for x in self._wfm_segs]) == self._total_time, "Sum of waveform segment durations do not match the total specified waveform group time. Consider making one of the segments elastic by setting its duration to be -1."
+            assert sum([x.Duration for x in self._wfm_segment_list]) == self._total_time, "Sum of waveform segment durations do not match the total specified waveform group time. Consider making one of the segments elastic by setting its duration to be -1."
         #Get the elastic segment index
         if len(elastic_segs) > 0:
             elas_seg_ind = elastic_segs[0]
-            self._wfm_segment_list[elas_seg_ind].Duration = self._total_time - (sum([x.Duration for x in self._wfm_segment_list])+1)    #Negate the -1 segment
+            elastic_time = self._total_time - (sum([x.Duration for x in self._wfm_segment_list])+1)    #Negate the -1 segment
         else:
             elas_seg_ind = -1
+            elastic_time = -1
+
+        return (elas_seg_ind, elastic_time)
+
+    def _assemble_waveform_raw(self):
+        #Temporarily set the Duration of Elastic time-segment...
+        elas_seg_ind, elastic_time = self._get_elastic_time_seg_params()
+        if elas_seg_ind != -1:
+            self._wfm_segment_list[elas_seg_ind].Duration = elastic_time
 
         num_chnls = len(self._awg_chan_list)
         final_wfms = [np.array([])]*num_chnls
@@ -159,7 +177,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
         if elas_seg_ind != -1:
             self._wfm_segment_list[elas_seg_ind].Duration = -1
     
-        return final_wfms
+        return (final_wfms, elas_seg_ind)
 
     def _get_trigger_output_by_id(self, outputID):
         #Doing it this way as the naming scheme may change in the future - just flatten list and find the marker object...
@@ -234,7 +252,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
             self._wfm_segment_list.append(cur_wfm_type.fromConfigDict(cur_wfm))
 
     def plot_waveforms(self, overlap=False):
-        final_wfms = self._assemble_waveform_raw()
+        final_wfms = self._assemble_waveform_raw()[0]
         fig = plt.figure()
         if overlap:
             fig, axs = plt.subplots(1)
@@ -251,7 +269,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
 
     def prepare_initial(self):
         #Prepare the waveform
-        final_wfms = self._assemble_waveform_raw()
+        final_wfms, elastic_ind = self._assemble_waveform_raw()
 
         self.cur_wfms_to_commit = []
         for ind, cur_awg_chan in enumerate(self._awg_chan_list):

@@ -32,6 +32,12 @@ class DDG(TriggerOutputCompatible, HALbase):
     def fromConfigDict(cls, config_dict, lab):
         return cls(config_dict["Name"], lab, config_dict["instrument"], init_dict = config_dict)
 
+    @property
+    def RepetitionTime(self):
+        return self._instr_ddg.RepetitionTime
+    @RepetitionTime.setter
+    def RepetitionTime(self, val):
+        self._instr_ddg.RepetitionTime = val
 
     def get_trigger_output(self, outputID):
         '''
@@ -67,6 +73,7 @@ class DDG(TriggerOutputCompatible, HALbase):
             'Name' : self.Name,
             'instrument' : self._instr_ddg.name,
             'type' : self.__class__.__name__,
+            'RepetitionTime' : self.RepetitionTime,
             'triggers' : trigDict
             }
         return retDict
@@ -75,3 +82,4 @@ class DDG(TriggerOutputCompatible, HALbase):
         assert dict_config['type'] == self.__class__.__name__, 'Cannot set configuration to a DDG with a configuration that is of type ' + dict_config['type']
         for cur_trig_name in dict_config['triggers']:
             self.get_trigger_output(cur_trig_name)._set_current_config(dict_config['triggers'][cur_trig_name])
+        self.RepetitionTime = dict_config['RepetitionTime']

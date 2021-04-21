@@ -67,7 +67,7 @@ class ExperimentConfiguration:
             cur_trig_rel[0].InputTriggerEdge = cur_trig_rel[2]
 
     def prepare_instruments(self):
-        for cur_hal in list_hals:
+        for cur_hal in self._list_HALs:
             if not cur_hal.ManualActivation:
                 cur_hal.activate()
 
@@ -80,7 +80,7 @@ class ExperimentConfiguration:
             cur_hal.prepare_final()
 
     def makesafe_instruments(self):
-        for cur_hal in list_hals:
+        for cur_hal in self._list_HALs:
             if not cur_hal.ManualActivation:
                 cur_hal.deactivate()
 

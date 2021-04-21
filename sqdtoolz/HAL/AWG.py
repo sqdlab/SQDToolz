@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from sqdtoolz.HAL.WaveformSegments import*
 
 class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
-    def __init__(self, hal_name, lab, awg_channel_tuples, sample_rate, total_time=-1, global_factor = 1.0, **kwargs):
+    def __init__(self, hal_name, lab, awg_channel_tuples, sample_rate, total_time=-1, global_factor = 1.0, init_dict = None):
         HALbase.__init__(self, hal_name)
         if lab._register_HAL(self):
             #
@@ -17,7 +17,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
             for ch_index, cur_ch_tupl in enumerate(awg_channel_tuples):
                 assert len(cur_ch_tupl) == 2, "The list awg_channel_tuples must contain tuples of form (instr_AWG_name, channel_name)."
                 cur_awg_name, cur_ch_name = cur_ch_tupl            
-                self._awg_chan_list.append(AWGOutputChannel(lab._get_instrument(cur_awg_name), cur_ch_name, ch_index, self))
+                self._awg_chan_list.append(AWGOutputChannel(lab, cur_awg_name, cur_ch_name, ch_index, self))
                 
             self._sample_rate = sample_rate
             self._global_factor = global_factor
@@ -34,14 +34,29 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
             self._global_factor = global_factor
             self._wfm_segment_list = []
             self._total_time = total_time
+        
+        if init_dict:
+            self._set_current_config(init_dict, lab)
 
-    def __new__(cls, hal_name, lab, awg_channel_tuples, sample_rate, total_time=-1, global_factor = 1.0, **kwargs):
-        prev_exists = lab.get_HAL(hal_name)
+    def __new__(cls, hal_name, lab, awg_channel_tuples, sample_rate, total_time=-1, global_factor = 1.0, init_dict = None):
+        prev_exists = lab.HAL(hal_name)
         if prev_exists:
             assert isinstance(prev_exists, WaveformAWG), "A different HAL type already exists by this name."
             return prev_exists
         else:
             return super(WaveformAWG, cls).__new__(cls)
+
+    @classmethod
+    def fromConfigDict(cls, config_dict, lab):
+        awg_channel_tuples = []
+        for cur_ch_dict in config_dict['OutputChannels']:
+            awg_channel_tuples += [(cur_ch_dict['InstrumentAWG'], cur_ch_dict['InstrumentChannel'])]
+        return cls(config_dict["Name"], lab,
+                    awg_channel_tuples,
+                    config_dict["SampleRate"],
+                    config_dict["TotalTime"],
+                    config_dict["global_factor"],
+                    init_dict = config_dict)
 
     @property
     def AutoCompression(self):
@@ -175,9 +190,9 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
     def _get_current_config(self):
         retDict = {
             'Name' : self.Name,
-            'instrument' : [(x._instr_awg.name, x.Name) for x in self._awg_chan_list],
-            'type' : 'AWG',
+            'type' : self.__class__.__name__,
             'SampleRate' : self.SampleRate,
+            'TotalTime' : self._total_time,
             'global_factor' : self._global_factor,
             'OutputChannels' : [x._get_current_config() for x in self._awg_chan_list]
             }
@@ -189,9 +204,10 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
         return [x._get_current_config() for x in self._wfm_segment_list]
     
     def _set_current_config(self, dict_config, lab):
-        assert dict_config['type'] == 'AWG', 'Cannot set configuration to a AWG with a configuration that is of type ' + dict_config['type']
+        assert dict_config['type'] == self.__class__.__name__, 'Cannot set configuration to a AWG with a configuration that is of type ' + dict_config['type']
         
         self._sample_rate = dict_config['SampleRate']
+        self._total_time = dict_config['TotalTime']
         self._global_factor = dict_config['global_factor']
         for ind, cur_ch_output in enumerate(dict_config['OutputChannels']):
             self._awg_chan_list[ind]._set_current_config(cur_ch_output, lab)

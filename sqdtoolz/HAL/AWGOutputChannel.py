@@ -3,10 +3,13 @@ import numpy as np
 from scipy import signal
 
 class AWGOutputChannel(TriggerInput):
-    def __init__(self, instr_awg, channel_name, ch_index, parent_awg_waveform):
-        self._instr_awg = instr_awg
+    def __init__(self, lab, instr_awg_name, channel_name, ch_index, parent_awg_waveform):
+        self._instr_awg_name = instr_awg_name
         self._channel_name = channel_name
         self._ch_index = ch_index
+
+        instr_awg = lab._get_instrument(instr_awg_name)
+        self._instr_awg = instr_awg
         self._instr_awg_chan = instr_awg._get_channel_output(channel_name)
         assert self._instr_awg_chan != None, "The channel name " + channel_name + " does not exist in the AWG instrument " + self._instr_awg.name
 
@@ -110,6 +113,8 @@ class AWGOutputChannel(TriggerInput):
     def _get_current_config(self):
         retDict = {
             'Name' : self.Name,
+            'InstrumentAWG' : self._instr_awg.name,
+            'InstrumentChannel' : self._channel_name,
             'Amplitude' : self.Amplitude,
             'Offset' : self.Offset,
             'Output' : self.Output,
@@ -121,6 +126,8 @@ class AWGOutputChannel(TriggerInput):
         return retDict
 
     def _set_current_config(self, dict_config, lab):
+        assert self._instr_awg.name == dict_config['InstrumentAWG'], "Instrument names do not match for this output-channel definition."
+        assert self._channel_name == dict_config['InstrumentChannel'], "Instrument channel names do not match for this output-channel definition."
         self._channel_name = dict_config['Name']
         self.Amplitude = dict_config['Amplitude']
         self.Offset = dict_config['Offset']

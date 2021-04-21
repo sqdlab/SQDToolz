@@ -64,7 +64,7 @@ class TriggerInput:
     @staticmethod
     def process_trigger_source(dict_trig_src, lab):
         if 'TriggerHAL' in dict_trig_src and dict_trig_src['TriggerHAL'] != "":
-            hal_obj_trig_output_compatible = lab.get_HAL(dict_trig_src['TriggerHAL'])
+            hal_obj_trig_output_compatible = lab.HAL(dict_trig_src['TriggerHAL'])
             assert 'TriggerID' in dict_trig_src, "The trigger source dictionary does not have the key \'TriggerID\'"
             return hal_obj_trig_output_compatible._get_trigger_output_by_id(dict_trig_src['TriggerID'])
         else:

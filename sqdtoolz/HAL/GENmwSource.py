@@ -2,7 +2,7 @@ from sqdtoolz.HAL.HALbase import*
 from sqdtoolz.HAL.TriggerPulse import*
 
 class GENmwSource(HALbase, TriggerInputCompatible, TriggerInput):
-    def __init__(self, hal_name, lab, instr_mw_src_name, instr_mw_src_channel):
+    def __init__(self, hal_name, lab, instr_mw_src_name, instr_mw_src_channel, init_dict = None):
         HALbase.__init__(self, hal_name)
         if lab._register_HAL(self):
             #
@@ -12,15 +12,22 @@ class GENmwSource(HALbase, TriggerInputCompatible, TriggerInput):
             self._trig_src_obj = None
         else:
             assert self._instr_mw_src_name == instr_mw_src_name, "Cannot reinstantiate a waveform by the same name, but different instrument configurations." 
-            assert self._instr_mw_src_channel == instr_mw_src_channel, "Cannot reinstantiate a waveform by the same name, but different channel configurations." 
+            assert self._instr_mw_src_channel == instr_mw_src_channel, "Cannot reinstantiate a waveform by the same name, but different channel configurations."
+        
+        if init_dict:
+            self._set_current_config(init_dict, lab)
 
-    def __new__(cls, hal_name, lab, instr_mw_src_name, instr_mw_src_channel):
-        prev_exists = lab.get_HAL(hal_name)
+    def __new__(cls, hal_name, lab, instr_mw_src_name, instr_mw_src_channel, init_dict = None):
+        prev_exists = lab.HAL(hal_name)
         if prev_exists:
             assert isinstance(prev_exists, GENmwSource), "A different HAL type already exists by this name."
             return prev_exists
         else:
             return super(GENmwSource, cls).__new__(cls)
+
+    @classmethod
+    def fromConfigDict(cls, config_dict, lab):
+        return cls(config_dict["Name"], lab, config_dict["instrument"], config_dict["InstrumentChannel"], init_dict = config_dict)
 
     @property
     def Output(self):
@@ -81,8 +88,9 @@ class GENmwSource(HALbase, TriggerInputCompatible, TriggerInput):
     def _get_current_config(self):
         ret_dict = {
             'Name' : self.Name,
-            'instrument' : self._instr_mw_output.name,
-            'type' : 'GENmwSource',
+            'instrument' : self._instr_mw_src_name,
+            'InstrumentChannel' : self._instr_mw_src_channel,
+            'type' : self.__class__.__name__,
             'TriggerSource' : self._get_trig_src_params_dict(),
             'InputTriggerEdge' : self._instr_mw_output.TriggerInputEdge
             }
@@ -90,7 +98,7 @@ class GENmwSource(HALbase, TriggerInputCompatible, TriggerInput):
         return ret_dict
 
     def _set_current_config(self, dict_config, lab):
-        assert dict_config['type'] == 'GENmwSource', 'Cannot set configuration to a MW-Source with a configuration that is of type ' + dict_config['type']
+        assert dict_config['type'] == self.__class__.__name__, 'Cannot set configuration to a MW-Source with a configuration that is of type ' + dict_config['type']
         self._channel_name = dict_config['Name']
         self.Power = dict_config['Power']
         self.Frequency = dict_config['Frequency']

@@ -5,7 +5,7 @@ class DDG(TriggerOutputCompatible, HALbase):
     '''
     Class to handle interfacing with digital delay generators.
     '''
-    def __init__(self, hal_name, lab, instr_ddg_name):
+    def __init__(self, hal_name, lab, instr_ddg_name, init_dict = None):
         HALbase.__init__(self, hal_name)
         if lab._register_HAL(self):
             #Only initialise if it's a new instance
@@ -16,14 +16,22 @@ class DDG(TriggerOutputCompatible, HALbase):
             for cur_output_src in instTrigSrcs:
                 cur_trig_name = cur_output_src[0]
                 self._output_trigs[cur_trig_name] = Trigger(self, cur_trig_name, cur_output_src[1])
+        
+        if init_dict:
+            self._set_current_config(init_dict, lab)
 
-    def __new__(cls, hal_name, lab, instr_ddg_name):
-        prev_exists = lab.get_HAL(hal_name)
+    def __new__(cls, hal_name, lab, instr_ddg_name, init_dict = None):
+        prev_exists = lab.HAL(hal_name)
         if prev_exists:
             assert isinstance(prev_exists, DDG), "A different HAL type already exists by this name."
             return prev_exists
         else:
             return super(DDG, cls).__new__(cls)
+
+    @classmethod
+    def fromConfigDict(cls, config_dict, lab):
+        return cls(config_dict["Name"], lab, config_dict["instrument"], init_dict = config_dict)
+
 
     def get_trigger_output(self, outputID):
         '''
@@ -58,12 +66,12 @@ class DDG(TriggerOutputCompatible, HALbase):
         retDict = {
             'Name' : self.Name,
             'instrument' : self._instr_ddg.name,
-            'type' : 'DDG',
+            'type' : self.__class__.__name__,
             'triggers' : trigDict
             }
         return retDict
 
     def _set_current_config(self, dict_config, lab):
-        assert dict_config['type'] == 'DDG', 'Cannot set configuration to a DDG with a configuration that is of type ' + dict_config['type']
+        assert dict_config['type'] == self.__class__.__name__, 'Cannot set configuration to a DDG with a configuration that is of type ' + dict_config['type']
         for cur_trig_name in dict_config['triggers']:
             self.get_trigger_output(cur_trig_name)._set_current_config(dict_config['triggers'][cur_trig_name])

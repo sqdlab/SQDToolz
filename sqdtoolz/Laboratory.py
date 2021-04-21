@@ -1,6 +1,11 @@
 import qcodes as qc
 from sqdtoolz.Parameter import*
 from sqdtoolz.HAL.HALbase import*
+from sqdtoolz.HAL.ACQ import*
+from sqdtoolz.HAL.AWG import*
+from sqdtoolz.HAL.DDG import*
+from sqdtoolz.HAL.GENmwSource import*
+from sqdtoolz.HAL.GENvoltSource import*
 from datetime import datetime
 from pathlib import Path
 import json
@@ -22,6 +27,7 @@ class Laboratory:
         self._group_dir = {'Dir':"", 'InitDir':""}
 
         self._hal_objs = {}
+        self._activated_instruments = []
 
     def update_config_from_last_expt(self):
         #TODO: Stress test this with say 100000 directories
@@ -33,6 +39,27 @@ class Laboratory:
                 for cur_param in data:
                     if cur_param in self._params:
                         self._params[cur_param].set_raw(data[cur_param])
+
+    def cold_reload_last_configuration(self):
+        dirs = [x[0] for x in os.walk(self._save_dir)]  #Walk gives a tuple: (dirpath, dirnames, filenames)
+        last_dir = dirs[-1].replace('\\','/')
+        if os.path.isfile(last_dir + "/experiment_configuration.txt"):
+            with open(last_dir + "/experiment_configuration.txt") as json_file:
+                data = json.load(json_file)
+                self.cold_reload_configuration(data)
+        if os.path.isfile(last_dir + "/laboratory_configuration.txt"):
+            with open(last_dir + "/laboratory_configuration.txt") as json_file:
+                data = json.load(json_file)
+                self.cold_reload_instruments(data)
+
+    def cold_reload_configuration(self, config_dict):
+        for dict_cur_hal in config_dict:
+            cur_class_name = dict_cur_hal['type']
+            globals()[cur_class_name].fromConfigDict(dict_cur_hal, self)
+    
+    def cold_reload_instruments(self, config_dict):
+        for cur_instr in config_dict['ActiveInstruments']:
+            self.activate_instrument(cur_instr)
 
     def add_parameter(self, param_name):
         self._params[param_name] = VariableInternal(param_name)
@@ -54,6 +81,7 @@ class Laboratory:
         # assert not (instrID in self._station.components), f"Instrument by the name {instrID} has already been loaded."
         if not (instrID in self._station.components):
             self._station.load_instrument(instrID)
+            self._activated_instruments += [instrID]
 
     def _get_instrument(self, instrID):
         if type(instrID) is list:
@@ -75,7 +103,7 @@ class Laboratory:
             return True
         return False
 
-    def get_HAL(self, hal_ID):
+    def HAL(self, hal_ID):
         # assert hal_ID in self._hal_objs, f"HAL object {hal_ID} does not exist."
         if hal_ID in self._hal_objs:
             return self._hal_objs[hal_ID]
@@ -111,9 +139,15 @@ class Laboratory:
         ret_vals = expt_obj._run(cur_exp_path, sweep_vars, ping_iteration=self._update_progress_bar, delay=delay)
         #TODO: Add flag to get/save for live-plotting
         #Save experiment configurations
-        expt_obj.save_config(cur_exp_path)
+        expt_obj.save_config(cur_exp_path, 'experiment_configuration')
         #Save instrument configurations (QCoDeS)
         self._save_instrument_config(cur_exp_path)
+        #Save Laboratory Configuration
+        param_dict = {
+                    'ActiveInstruments' : self._activated_instruments
+                    }
+        with open(cur_exp_path + 'laboratory_configuration.txt', 'w') as outfile:
+            json.dump(param_dict, outfile, indent=4)
         #Save Laboratory Parameters
         param_dict = {k:v.get_raw() for (k,v) in self._params.items()}
         with open(cur_exp_path + 'laboratory_parameters.txt', 'w') as outfile:
@@ -122,6 +156,13 @@ class Laboratory:
         expt_obj._post_process(ret_vals)
 
         return ret_vals
+
+    def _save_laboratory_config(self, cur_exp_path):
+        param_dict = {
+                    'ActiveInstruments' : self._activated_instruments
+                    }
+        with open(cur_exp_path + 'laboratory_configuration.txt', 'w') as outfile:
+            json.dump(param_dict, outfile, indent=4)
 
     def _save_instrument_config(self, cur_exp_path):
         #Sometimes the configuration parameters use byte-values; those bytes need to be converted into strings

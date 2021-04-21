@@ -69,11 +69,11 @@ class Experiment:
         #TODO: Should the return value be a list if there are a few saved files?
         return FileIOReader(file_path + 'data.h5')
 
-    def save_config(self, save_dir):
+    def save_config(self, save_dir, file_name):
         #Save the experiment configuration
-        with open(save_dir + 'experiment_configuration.txt', 'w') as outfile:
+        with open(save_dir + file_name + '.txt', 'w') as outfile:
             json.dump(self._expt_config.save_config(), outfile, indent=4)
         #Save a PNG of the Timing Plot
         lePlot = self._expt_config.plot()
-        lePlot.savefig(save_dir + 'experiment_configuration.png')
+        lePlot.savefig(save_dir + file_name + '.png')
         plt.close(lePlot)

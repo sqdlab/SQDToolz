@@ -7,13 +7,20 @@ class VariableBase:
     def Name(self):
         return self._name
 
+    @property
+    def Value(self):
+        return self.get_raw()
+    @Value.setter
+    def Value(self, val):
+        self.set_raw(val)
+
     def set_raw(self, value):
         """Set value of the parameter."""
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def get_raw(self):
         """Return value of the parameter."""
-        raise NotImplementedError
+        raise NotImplementedError()
 
 class VariableInternal(VariableBase):
     def __init__(self, name, init_val = 0.0):

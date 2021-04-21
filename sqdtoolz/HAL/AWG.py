@@ -34,6 +34,8 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
             self._global_factor = global_factor
             self._wfm_segment_list = []
             self._total_time = total_time
+        
+        self._cur_prog_waveforms = [None]*len(awg_channel_tuples)
 
     def __new__(cls, hal_name, lab, awg_channel_tuples, sample_rate, total_time=-1, global_factor = 1.0):
         prev_exists = lab.HAL(hal_name)
@@ -267,12 +269,29 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
         #Prepare the waveform
         final_wfms, elastic_ind = self._assemble_waveform_raw()
 
-        self.cur_wfms_to_commit = []
+        final_mkrs = []
         for ind, cur_awg_chan in enumerate(self._awg_chan_list):
             if len(cur_awg_chan._awg_mark_list) > 0:
                 mkr_list = [x._assemble_marker_raw() for x in cur_awg_chan._awg_mark_list]
             else:
                 mkr_list = [np.array([])]
+            final_mkrs += [mkr_list]
+
+        self._dont_reprogram = True
+        for m in range(len(self._cur_prog_waveforms)):
+            if self._cur_prog_waveforms[m] is not None:
+                if not self._check_changes_wfm_data(self._cur_prog_waveforms[m], final_wfms[m], final_mkrs[m]):
+                    self._dont_reprogram = False
+                    break
+            else:
+                self._dont_reprogram = False
+                break
+        if self._dont_reprogram:
+            return
+
+        self.cur_wfms_to_commit = []
+        for ind, cur_awg_chan in enumerate(self._awg_chan_list):
+            mkr_list = final_mkrs[ind]
                 
             dict_auto_comp = cur_awg_chan._instr_awg.AutoCompressionSupport
             if self.AutoCompression == 'None' or not dict_auto_comp['Supported'] or final_wfms[0].size < dict_auto_comp['MinSize']*2:
@@ -290,8 +309,23 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
             self.cur_wfms_to_commit.append(dict_wfm_data)
 
     def prepare_final(self):
-        for ind, cur_awg_chan in enumerate(self._awg_chan_list):
-            cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.short_name, self.cur_wfms_to_commit[ind])                
+        if not self._dont_reprogram:
+            for ind, cur_awg_chan in enumerate(self._awg_chan_list):
+                cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.short_name, self.cur_wfms_to_commit[ind])
+                self._cur_prog_waveforms[ind] = self.cur_wfms_to_commit[ind]
+
+    def _check_changes_wfm_data(self, dict_wfm_data, final_wfm, final_mkrs):
+        #Check waveform equality (works for sequenced/autocompressed version as well)
+        prog_wfm = np.concatenate([dict_wfm_data['waveforms'][x] for x in dict_wfm_data['seq_ids']])
+        if not np.array_equal(prog_wfm, final_wfm):
+            return False
+        #Check markers...
+        for m in range(len(final_mkrs)):
+            prog_mkrs = np.concatenate([dict_wfm_data['markers'][x][m] for x in dict_wfm_data['seq_ids']])
+            if not np.array_equal(prog_mkrs, final_mkrs[m]):
+                return False
+        return True
+        
 
     def _extract_marker_segments(self, mkr_list_overall, slice_start, slice_end):
         cur_mkrs = []

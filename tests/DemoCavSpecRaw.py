@@ -28,10 +28,10 @@ new_lab.add_instrument(instr_awg)
 instr_fsrc = DummyGENmwSrc('freq_src_instr')
 new_lab.add_instrument(instr_fsrc)
 
-ddg_module = DDG(instr_ddg)
-awg_wfm_q = WaveformAWG("Waveform 2 CH", [(instr_awg, 'CH3'),(instr_awg, 'CH4')], 1e9)
-acq_module = ACQ(instr_acq)
-freq_src_module = GENmwSource(instr_fsrc.get_output('CH1'))
+ddg_module = DDG('DDG', new_lab, 'ddg')
+awg_wfm_q = WaveformAWG("Waveform 2", new_lab, [('awg_test_instr', 'CH3'),('awg_test_instr', 'CH4')], 1e9)
+acq_module = ACQ('ACQ', new_lab, 'acq')
+freq_src_module = GENmwSource('MWS', new_lab, 'freq_src_instr', 'CH1')
 
 param_cav_freq = new_lab.add_parameter_property('Cavity Frequency', freq_src_module, 'Frequency')
 
@@ -44,13 +44,15 @@ acq_module.NumSamples = 100
 acq_module.NumSegments = 1
 acq_module.NumRepetitions = 200
 #Cement the parameters into the experiment configuration
-exp_config = ExperimentConfiguration(100e-9, [ddg_module], [awg_wfm_q], acq_module, [freq_src_module])
+exp_config = ExperimentConfiguration(100e-9, [ddg_module, awg_wfm_q, freq_src_module], acq_module)
 
 #Create a blank waveform with a marker to trigger the acquisition
-awg_wfm_q.add_waveform_segment(WFS_Gaussian("blank", None, 75e-9, 0.0))
+awg_wfm_q.add_waveform_segment(WFS_Gaussian("blank", None, 128e-9, 0.0))
+awg_wfm_q.add_waveform_segment(WFS_Constant("pad", None, 128e-9, 0.0))
 awg_wfm_q.get_output_channel().marker(0).set_markers_to_trigger()
 awg_wfm_q.get_output_channel().marker(0).TrigPulseDelay = 0e-9
 awg_wfm_q.get_output_channel().marker(0).TrigPulseLength = 30e-9
+# awg_wfm_q.AutoCompression = 'Basic'
 
 # exp_config.plot().show()
 # input('press <ENTER> to continue')
@@ -62,6 +64,9 @@ myProc.add_stage(CPU_Max('segment'))
 myProc.add_stage_end(CPU_Mean('repetition'))
 acq_module.set_data_processor(myProc)
 
+param_blank_amp = new_lab.add_parameter_property('Blank Amplitude', awg_wfm_q.get_waveform_segment("pad"), 'Value')
+
 new_exp = Experiment("cav_exp", exp_config)
 leData = new_lab.run_single(new_exp, [(param_cav_freq, np.linspace(100e9,500e9,500))])
+# leData = new_lab.run_single(new_exp, [(param_blank_amp, np.linspace(1,5,500))])
 a=0

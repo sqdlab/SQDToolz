@@ -82,7 +82,7 @@ class DummyAWG(Instrument):
 
     @property
     def AutoCompressionSupport(self):
-        return {'Supported' : False, 'MinSize' : 1024, 'Multiple' : 32}
+        return {'Supported' : True, 'MinSize' : 8, 'Multiple' : 8}
 
     @property
     def TriggerInputEdge(self):
@@ -105,4 +105,5 @@ class DummyAWG(Instrument):
 
     def program_channel(self, chan_id, dict_wfm_data):
         # print(dict_wfm_data['waveforms'][0])
+        print("Programmed Dummy AWG!")
         pass

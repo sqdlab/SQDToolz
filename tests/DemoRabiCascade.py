@@ -30,10 +30,10 @@ new_lab.add_instrument(instr_awg)
 instr_fsrc = DummyGENmwSrc('freq_src_instr')
 new_lab.add_instrument(instr_fsrc)
 
-ddg_module = DDG(instr_ddg)
-awg_wfm_q = WaveformAWG("Waveform 2", [(instr_awg, 'CH3'),(instr_awg, 'CH4')], 1e9)
-acq_module = ACQ(instr_acq)
-freq_src_module = GENmwSource(instr_fsrc.get_output('CH1'))
+ddg_module = DDG('DDG', new_lab, 'ddg')
+awg_wfm_q = WaveformAWG("Waveform 2", new_lab, [('awg_test_instr', 'CH3'),('awg_test_instr', 'CH4')], 1e9)
+acq_module = ACQ('ACQ', new_lab, 'acq')
+freq_src_module = GENmwSource('MWS', new_lab, 'freq_src_instr', 'CH1')
 
 mod_freq_qubit = WM_SinusoidalIQ("QubitFreqMod", 100e6)
 

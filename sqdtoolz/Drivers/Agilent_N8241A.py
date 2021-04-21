@@ -1587,7 +1587,7 @@ class Agilent_N8241A(Instrument):
 
         self.done_programming = True
         self._seq_mode = False
-        self._raw_wfm_data = {}
+        # self._raw_wfm_data = {}   #Pre-cache it so that if the data is unchanged, then it can be reused as channels must be programmed together on this special AWG...
 
     def _wfm_clog_memory(self):
         return self.create_arb_waveform_with_markers([0]*128, [0]*16)

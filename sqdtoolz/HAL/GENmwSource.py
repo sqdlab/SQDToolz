@@ -62,6 +62,12 @@ class GENmwSource(HALbase, TriggerInputCompatible, TriggerInput):
         assert new_mode == 'Continuous' or new_mode == 'PulseModulated', "MW source output mode must either be Continuous or PulseModulated."
         self._instr_mw_output.Mode = new_mode
 
+    def activate(self):
+        self.Output = True
+
+    def deactivate(self):
+        self.Output = False
+
     def set_trigger_source(self, trig_src_obj):
         #TODO: Consider error-checking here
         self._trig_src_obj = trig_src_obj

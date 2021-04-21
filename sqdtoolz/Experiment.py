@@ -63,6 +63,7 @@ class Experiment:
         # data_final = np.c_[data_final, np.imag(np.array(data_all))]
 
         data_file.close()
+        self._expt_config.makesafe_instruments()
 
         #TODO: think about different data-piece sizes: https://stackoverflow.com/questions/3386259/how-to-make-a-multidimension-numpy-array-with-a-varying-row-size
 

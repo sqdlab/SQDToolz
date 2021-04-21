@@ -67,6 +67,10 @@ class ExperimentConfiguration:
             cur_trig_rel[0].InputTriggerEdge = cur_trig_rel[2]
 
     def prepare_instruments(self):
+        for cur_hal in list_hals:
+            if not cur_hal.ManualActivation:
+                cur_hal.activate()
+
         #TODO: Write rest of this with error checking
         list_hals = self._list_HALs + [self._hal_ACQ]
         for cur_hal in list_hals:
@@ -74,6 +78,11 @@ class ExperimentConfiguration:
             cur_hal.prepare_initial()
         for cur_hal in list_hals:
             cur_hal.prepare_final()
+
+    def makesafe_instruments(self):
+        for cur_hal in list_hals:
+            if not cur_hal.ManualActivation:
+                cur_hal.deactivate()
 
     def get_data(self):
         #TODO: Pack the data appropriately if using multiple ACQ objects (coordinating their starts/finishes perhaps?)

@@ -265,6 +265,14 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
                 axs[ind].plot(t_vals, cur_wfm)
         return fig
 
+    def activate(self):
+        for cur_awg_chan in self._awg_chan_list:
+            cur_awg_chan.Output = True
+
+    def deactivate(self):
+        for cur_awg_chan in self._awg_chan_list:
+            cur_awg_chan.Output = False
+
     def prepare_initial(self):
         #Prepare the waveform
         final_wfms, elastic_ind = self._assemble_waveform_raw()

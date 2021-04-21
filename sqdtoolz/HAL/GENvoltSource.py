@@ -1,16 +1,13 @@
 from sqdtoolz.HAL.HALbase import*
 
 class GENvoltSource(HALbase):
-    def __init__(self, hal_name, lab, instr_gen_volt_src_channel, init_dict = None):
+    def __init__(self, hal_name, lab, instr_gen_volt_src_channel):
         HALbase.__init__(self, hal_name)
         if lab._register_HAL(self):
             #
             self._instr_volt = lab._get_instrument(instr_gen_volt_src_channel)
-        
-        if init_dict:
-            self._set_current_config(init_dict, lab)
 
-    def __new__(cls, hal_name, lab, instr_gen_volt_src_channel, init_dict = None):
+    def __new__(cls, hal_name, lab, instr_gen_volt_src_channel):
         prev_exists = lab.HAL(hal_name)
         if prev_exists:
             assert isinstance(prev_exists, GENvoltSource), "A different HAL type already exists by this name."
@@ -20,7 +17,7 @@ class GENvoltSource(HALbase):
 
     @classmethod
     def fromConfigDict(cls, config_dict, lab):
-        return cls(config_dict["Name"], lab, config_dict["instrument"], init_dict = config_dict)
+        return cls(config_dict["Name"], lab, config_dict["instrument"])
 
     @property
     def Output(self):

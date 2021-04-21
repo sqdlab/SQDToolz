@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from sqdtoolz.HAL.WaveformSegments import*
 
 class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
-    def __init__(self, hal_name, lab, awg_channel_tuples, sample_rate, total_time=-1, global_factor = 1.0, init_dict = None):
+    def __init__(self, hal_name, lab, awg_channel_tuples, sample_rate, total_time=-1, global_factor = 1.0):
         HALbase.__init__(self, hal_name)
         if lab._register_HAL(self):
             #
@@ -34,11 +34,8 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
             self._global_factor = global_factor
             self._wfm_segment_list = []
             self._total_time = total_time
-        
-        if init_dict:
-            self._set_current_config(init_dict, lab)
 
-    def __new__(cls, hal_name, lab, awg_channel_tuples, sample_rate, total_time=-1, global_factor = 1.0, init_dict = None):
+    def __new__(cls, hal_name, lab, awg_channel_tuples, sample_rate, total_time=-1, global_factor = 1.0):
         prev_exists = lab.HAL(hal_name)
         if prev_exists:
             assert isinstance(prev_exists, WaveformAWG), "A different HAL type already exists by this name."
@@ -55,8 +52,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
                     awg_channel_tuples,
                     config_dict["SampleRate"],
                     config_dict["TotalTime"],
-                    config_dict["global_factor"],
-                    init_dict = config_dict)
+                    config_dict["global_factor"])
 
     @property
     def AutoCompression(self):

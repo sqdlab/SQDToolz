@@ -2,7 +2,7 @@ from sqdtoolz.HAL.HALbase import*
 from sqdtoolz.HAL.TriggerPulse import*
 
 class GENmwSource(HALbase, TriggerInputCompatible, TriggerInput):
-    def __init__(self, hal_name, lab, instr_mw_src_name, instr_mw_src_channel, init_dict = None):
+    def __init__(self, hal_name, lab, instr_mw_src_name, instr_mw_src_channel):
         HALbase.__init__(self, hal_name)
         if lab._register_HAL(self):
             #
@@ -13,11 +13,8 @@ class GENmwSource(HALbase, TriggerInputCompatible, TriggerInput):
         else:
             assert self._instr_mw_src_name == instr_mw_src_name, "Cannot reinstantiate a waveform by the same name, but different instrument configurations." 
             assert self._instr_mw_src_channel == instr_mw_src_channel, "Cannot reinstantiate a waveform by the same name, but different channel configurations."
-        
-        if init_dict:
-            self._set_current_config(init_dict, lab)
 
-    def __new__(cls, hal_name, lab, instr_mw_src_name, instr_mw_src_channel, init_dict = None):
+    def __new__(cls, hal_name, lab, instr_mw_src_name, instr_mw_src_channel):
         prev_exists = lab.HAL(hal_name)
         if prev_exists:
             assert isinstance(prev_exists, GENmwSource), "A different HAL type already exists by this name."
@@ -27,7 +24,7 @@ class GENmwSource(HALbase, TriggerInputCompatible, TriggerInput):
 
     @classmethod
     def fromConfigDict(cls, config_dict, lab):
-        return cls(config_dict["Name"], lab, config_dict["instrument"], config_dict["InstrumentChannel"], init_dict = config_dict)
+        return cls(config_dict["Name"], lab, config_dict["instrument"], config_dict["InstrumentChannel"])
 
     @property
     def Output(self):

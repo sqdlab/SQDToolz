@@ -60,9 +60,15 @@ class Laboratory:
     def cold_reload_instruments(self, config_dict):
         for cur_instr in config_dict['ActiveInstruments']:
             self.activate_instrument(cur_instr)
+        #Create the HALs
         for dict_cur_hal in config_dict['HALs']:
             cur_class_name = dict_cur_hal['type']
             globals()[cur_class_name].fromConfigDict(dict_cur_hal, self)
+        #Load parameters (including trigger relationships) onto the HALs
+        for dict_cur_hal in config_dict['HALs']:
+            cur_hal_name = dict_cur_hal['Name']
+            self._hal_objs[cur_hal_name]._set_current_config(dict_cur_hal, self)
+
 
     def add_parameter(self, param_name):
         self._params[param_name] = VariableInternal(param_name)
@@ -146,11 +152,7 @@ class Laboratory:
         #Save instrument configurations (QCoDeS)
         self._save_instrument_config(cur_exp_path)
         #Save Laboratory Configuration
-        param_dict = {
-                    'ActiveInstruments' : self._activated_instruments
-                    }
-        with open(cur_exp_path + 'laboratory_configuration.txt', 'w') as outfile:
-            json.dump(param_dict, outfile, indent=4)
+        self._save_laboratory_config(cur_exp_path)
         #Save Laboratory Parameters
         param_dict = {k:v.get_raw() for (k,v) in self._params.items()}
         with open(cur_exp_path + 'laboratory_parameters.txt', 'w') as outfile:
@@ -164,7 +166,7 @@ class Laboratory:
         #Prepare the dictionary of HAL configurations
         dict_hals = []
         for cur_hal in self._hal_objs:
-            dict_hals.append(cur_hal._get_current_config())
+            dict_hals.append(self._hal_objs[cur_hal]._get_current_config())
 
         param_dict = {
                     'ActiveInstruments' : self._activated_instruments,

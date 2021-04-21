@@ -5,7 +5,7 @@ class DDG(TriggerOutputCompatible, HALbase):
     '''
     Class to handle interfacing with digital delay generators.
     '''
-    def __init__(self, hal_name, lab, instr_ddg_name, init_dict = None):
+    def __init__(self, hal_name, lab, instr_ddg_name):
         HALbase.__init__(self, hal_name)
         if lab._register_HAL(self):
             #Only initialise if it's a new instance
@@ -16,11 +16,8 @@ class DDG(TriggerOutputCompatible, HALbase):
             for cur_output_src in instTrigSrcs:
                 cur_trig_name = cur_output_src[0]
                 self._output_trigs[cur_trig_name] = Trigger(self, cur_trig_name, cur_output_src[1])
-        
-        if init_dict:
-            self._set_current_config(init_dict, lab)
 
-    def __new__(cls, hal_name, lab, instr_ddg_name, init_dict = None):
+    def __new__(cls, hal_name, lab, instr_ddg_name):
         prev_exists = lab.HAL(hal_name)
         if prev_exists:
             assert isinstance(prev_exists, DDG), "A different HAL type already exists by this name."
@@ -30,7 +27,7 @@ class DDG(TriggerOutputCompatible, HALbase):
 
     @classmethod
     def fromConfigDict(cls, config_dict, lab):
-        return cls(config_dict["Name"], lab, config_dict["instrument"], init_dict = config_dict)
+        return cls(config_dict["Name"], lab, config_dict["instrument"])
 
     @property
     def RepetitionTime(self):

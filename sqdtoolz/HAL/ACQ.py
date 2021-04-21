@@ -2,18 +2,15 @@ from sqdtoolz.HAL.TriggerPulse import*
 from sqdtoolz.HAL.HALbase import*
 
 class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
-    def __init__(self, hal_name, lab, instr_acq_name, init_dict = None):
+    def __init__(self, hal_name, lab, instr_acq_name):
         HALbase.__init__(self, hal_name)
         if lab._register_HAL(self):
             #
             self._instr_acq = lab._get_instrument(instr_acq_name)
             self._trig_src_obj = None
             self.data_processor = None
-        
-        if init_dict:
-            self._set_current_config(init_dict, lab)
 
-    def __new__(cls, hal_name, lab, instr_acq_name, init_dict = None):
+    def __new__(cls, hal_name, lab, instr_acq_name):
         prev_exists = lab.HAL(hal_name)
         if prev_exists:
             assert isinstance(prev_exists, ACQ), "A different HAL type already exists by this name."
@@ -23,7 +20,7 @@ class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
 
     @classmethod
     def fromConfigDict(cls, config_dict, lab):
-        return cls(config_dict["Name"], lab, config_dict["instrument"], init_dict = config_dict)
+        return cls(config_dict["Name"], lab, config_dict["instrument"])
 
     @property
     def NumSamples(self):

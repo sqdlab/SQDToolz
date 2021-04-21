@@ -385,6 +385,7 @@ expConfig = ExperimentConfiguration(1.0, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], h
 hal_acq.SampleRate = 500e6
 hal_acq.InputTriggerEdge = 1
 #
+hal_ddg.RepetitionTime = 83e-9
 hal_ddg.set_trigger_output_params('A', 50e-9)
 hal_ddg.get_trigger_output('B').TrigPulseLength = 100e-9
 hal_ddg.get_trigger_output('B').TrigPulseDelay = 50e-9
@@ -426,6 +427,7 @@ assert hal_acq.InputTriggerEdge == 1, "InputTriggerEdge incorrectly reloaded in 
 assert hal_acq.get_trigger_source() == awg_wfm.get_output_channel(0).marker(1), "Trigger source incorrectly reloaded in ACQ"
 #
 #Testing DDG
+hal_ddg.RepetitionTime = 53e-9
 hal_ddg.get_trigger_output('A').TrigPulseLength = 420e-9
 hal_ddg.get_trigger_output('B').TrigPulseLength = 6e-9
 hal_ddg.get_trigger_output('C').TrigPulseLength = 86e-9
@@ -435,6 +437,7 @@ hal_ddg.get_trigger_output('C').TrigPulseDelay = 49e-9
 hal_ddg.get_trigger_output('A').TrigPolarity = 0
 hal_ddg.get_trigger_output('B').TrigPolarity = 0
 hal_ddg.get_trigger_output('C').TrigPolarity = 1
+assert hal_ddg.RepetitionTime == 53e-9, "Property incorrectly set in DDG."
 assert hal_ddg.get_trigger_output('A').TrigPulseLength == 420e-9, "Property incorrectly set in DDG."
 assert hal_ddg.get_trigger_output('B').TrigPulseLength == 6e-9, "Property incorrectly set in DDG."
 assert hal_ddg.get_trigger_output('C').TrigPulseLength == 86e-9, "Property incorrectly set in DDG."
@@ -445,6 +448,7 @@ assert hal_ddg.get_trigger_output('A').TrigPolarity == 0, "Property incorrectly 
 assert hal_ddg.get_trigger_output('B').TrigPolarity == 0, "Property incorrectly set in DDG."
 assert hal_ddg.get_trigger_output('C').TrigPolarity == 1, "Property incorrectly set in DDG."
 expConfig.update_config(leConfig, new_lab)
+assert hal_ddg.RepetitionTime == 83e-9, "RepetitionTime incorrectly set in DDG."
 assert hal_ddg.get_trigger_output('A').TrigPulseLength == 10e-9, "TrigPulseLength incorrectly reloaded in DDG."
 assert hal_ddg.get_trigger_output('B').TrigPulseLength == 100e-9, "TrigPulseLength incorrectly reloaded in DDG."
 assert hal_ddg.get_trigger_output('C').TrigPulseLength == 400e-9, "TrigPulseLength incorrectly reloaded in DDG."

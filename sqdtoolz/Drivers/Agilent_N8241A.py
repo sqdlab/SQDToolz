@@ -295,7 +295,7 @@ class AGN_Channel(InstrumentChannel):
         
     @property
     def Output(self):
-        return self.output()
+        return (self.output() == 1)
     @Output.setter
     def Output(self, boolVal):
         self.output(boolVal)

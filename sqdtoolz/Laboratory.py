@@ -47,10 +47,10 @@ class Laboratory:
             with open(last_dir + "/laboratory_configuration.txt") as json_file:
                 data = json.load(json_file)
                 self.cold_reload_instruments(data)
-        if os.path.isfile(last_dir + "/experiment_configuration.txt"):
-            with open(last_dir + "/experiment_configuration.txt") as json_file:
-                data = json.load(json_file)
-                self.cold_reload_configuration(data)
+        # if os.path.isfile(last_dir + "/experiment_configuration.txt"):
+        #     with open(last_dir + "/experiment_configuration.txt") as json_file:
+        #         data = json.load(json_file)
+        #         self.cold_reload_configuration(data)
 
     def cold_reload_configuration(self, config_dict):
         for dict_cur_hal in config_dict:
@@ -60,6 +60,9 @@ class Laboratory:
     def cold_reload_instruments(self, config_dict):
         for cur_instr in config_dict['ActiveInstruments']:
             self.activate_instrument(cur_instr)
+        for dict_cur_hal in config_dict['HALs']:
+            cur_class_name = dict_cur_hal['type']
+            globals()[cur_class_name].fromConfigDict(dict_cur_hal, self)
 
     def add_parameter(self, param_name):
         self._params[param_name] = VariableInternal(param_name)
@@ -158,8 +161,14 @@ class Laboratory:
         return ret_vals
 
     def _save_laboratory_config(self, cur_exp_path):
+        #Prepare the dictionary of HAL configurations
+        dict_hals = []
+        for cur_hal in self._hal_objs:
+            dict_hals.append(cur_hal._get_current_config())
+
         param_dict = {
-                    'ActiveInstruments' : self._activated_instruments
+                    'ActiveInstruments' : self._activated_instruments,
+                    'HALs' : dict_hals
                     }
         with open(cur_exp_path + 'laboratory_configuration.txt', 'w') as outfile:
             json.dump(param_dict, outfile, indent=4)

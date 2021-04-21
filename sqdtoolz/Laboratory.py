@@ -154,12 +154,15 @@ class Laboratory:
         self._save_instrument_config(cur_exp_path)
         #Save Laboratory Configuration
         self._save_laboratory_config(cur_exp_path)
+
+        #Run postprocessing
+        expt_obj._post_process(ret_vals)
+        
         #Save Laboratory Parameters
         param_dict = {k:v.get_raw() for (k,v) in self._params.items()}
         with open(cur_exp_path + 'laboratory_parameters.txt', 'w') as outfile:
             json.dump(param_dict, outfile, indent=4)
         
-        expt_obj._post_process(ret_vals)
 
         return ret_vals
 

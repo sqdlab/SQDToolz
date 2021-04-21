@@ -12,12 +12,6 @@ class Experiment:
         '''
         self._name = name
         self._expt_config = expt_config
-        #List of digital delay generators
-        self._DDGs = []
-        #List of arbitrary waveform generators
-        self._AWGs = []
-        #List of acquisition devices
-        self._ACQs = []
 
     @property
     def Name(self):

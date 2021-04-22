@@ -6,7 +6,7 @@ class DFitPeakLorentzian:
     def __init__(self):
         pass
 
-    def get_fitted_plot(self, data_x, data_y, dip = False):
+    def get_fitted_plot(self, data_x, data_y, xLabel="", dip = False):
         def func(x, a, w, x0, c):
             return a * (0.5*w)**2/((x-x0)**2 + (0.5*w)**2) + c
 
@@ -34,6 +34,8 @@ class DFitPeakLorentzian:
         fig, axs = plt.subplots(1)
         axs.plot(data_x, data_y, 'kx')
         axs.plot(data_x, func(data_x, *popt), 'r-')
+        axs.set_xlabel(xLabel)
+        axs.set_ylabel('IQ Amplitude')
 
         datapkt = {
             'amplitude' : popt[0],

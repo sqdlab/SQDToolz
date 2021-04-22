@@ -6,6 +6,7 @@ class ExpPeakScouterIQ(Experiment):
         super().__init__(name, expt_config)
 
         self._iq_indices = iq_indices
+        self._is_trough = kwargs.get('is_trough', False)
         self._post_processor = kwargs.get('post_processor', None)
         self._param_centre = kwargs.get('param_centre', None)
         self._param_width = kwargs.get('param_width', None)
@@ -25,12 +26,12 @@ class ExpPeakScouterIQ(Experiment):
         assert self._cur_param_name in data.param_names, "Something went wrong and the sweeping parameter disappeared in the data processing?"
         cur_sweep_ind = data.param_names.index(self._cur_param_name)
 
-        arr = leData.get_numpy_array()
+        arr = data.get_numpy_array()
         data_x = data.param_vals[cur_sweep_ind]
         data_y = np.sqrt(arr[:,self._iq_indices[0]]**2 + arr[:,self._iq_indices[1]]**2)
 
         dfit = DFitPeakLorentzian()
-        dpkt = dfit.get_fitted_plot(data_x, data_y)
+        dpkt = dfit.get_fitted_plot(data_x, data_y, xLabel=self._cur_param_name, dip=self._is_trough)
 
         #Commit to parameters...
         if self._param_centre:

@@ -62,7 +62,7 @@ class VariableInternal(VariableBase):
 
     @classmethod
     def fromConfigDict(cls, name, config_dict, lab):
-        return cls(name, config_dict["Value"])
+        return cls(name, lab, config_dict["Value"])
 
     def get_raw(self):
         return self._val
@@ -93,7 +93,7 @@ class VariableProperty(VariableBase):
 
     @classmethod
     def fromConfigDict(cls, name, config_dict, lab):
-        return cls(name, lab, config_dict["ResList"], config_dict["Property"])
+        return cls(name, lab, lab._get_resolved_obj(config_dict["ResList"]), config_dict["Property"])   #TODO: Add custom flag to make this a bit less inefficient... Not that bad as it should only be used in cold-loading anyway...
 
     def get_raw(self):
         obj = self._lab._get_resolved_obj(self._obj_res_list)

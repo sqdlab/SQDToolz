@@ -124,7 +124,7 @@ old_obj_dur2 = new_lab.VAR("myDura2")
 old_obj_varS = new_lab.VAR("testSpace")
 #
 #
-#Reload configuration and variables
+#Check with a warm reload configuration and variables
 with open("UnitTests/laboratory_configuration2.txt") as json_file:
     data = json.load(json_file)
     new_lab.cold_reload_instruments(data)
@@ -149,5 +149,24 @@ assert old_obj_repT == new_lab.VAR("test RepTime"), "New variable object has bee
 assert old_obj_dur1 == new_lab.VAR("myDura1"), "New variable object has been created when updating from file."
 assert old_obj_dur2 == new_lab.VAR("myDura2"), "New variable object has been created when updating from file."
 assert old_obj_varS == new_lab.VAR("testSpace"), "New variable object has been created when updating from file."
+
+#Check again on a cold reload
+new_lab._station.close_all_registered_instruments()
+new_lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir')
+with open("UnitTests/laboratory_configuration2.txt") as json_file:
+    data = json.load(json_file)
+    new_lab.cold_reload_instruments(data)
+new_lab.update_variables_from_last_expt('UnitTests\\laboratory_parameters.txt')
+#
+#Check that the variables have been correctly reloaded...
+assert new_lab.VAR("myFreq").Value == 5, "Variable incorrectly reloaded."
+assert new_lab.VAR("test RepTime").Value == 99, "Variable incorrectly reloaded."
+assert new_lab.HAL("ddg").RepetitionTime == 99, "Variable incorrectly reloaded."
+assert new_lab.VAR("testAmpl").Value == 86, "Variable incorrectly reloaded."
+assert new_lab.HAL("Wfm1").get_waveform_segment('init0').Amplitude == 86, "Variable incorrectly reloaded."
+#
+assert new_lab.VAR("myDura1").Value == 2016, "Variable incorrectly reloaded"
+assert new_lab.VAR("myDura2").Value == 2016+3.1415926, "Variable incorrectly reloaded"
+assert new_lab.HAL("Wfm1").get_waveform_segment('init2').Duration == 2016+3.1415926, "Variable incorrectly reloaded"
 
 print("Laboratory Unit Tests completed successfully.")

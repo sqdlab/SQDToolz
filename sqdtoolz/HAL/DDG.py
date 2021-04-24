@@ -36,6 +36,12 @@ class DDG(TriggerOutputCompatible, HALbase):
     def RepetitionTime(self, val):
         self._instr_ddg.RepetitionTime = val
 
+    def _get_child(self, tuple_name_group):
+        cur_name, cur_type = tuple_name_group
+        if cur_name in self._output_trigs:
+            return self._output_trigs[cur_name]
+        return None
+
     def get_trigger_output(self, outputID):
         '''
         Returns a TriggerSource object 

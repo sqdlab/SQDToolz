@@ -64,14 +64,32 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
         assert algorithm in ['None', 'Basic'], f"Unknown algorithm for auto-compression. Allowed algorithms are: {self._auto_comp_algos}"
         self._auto_comp = algorithm
 
+    def _get_child(self, tuple_name_group):
+        cur_name, cur_type = tuple_name_group
+        if cur_type == 'w':
+            for cur_wfm in self._wfm_segment_list:
+                if cur_wfm.Name == cur_name:
+                    return cur_wfm
+            return None
+        elif cur_type == 'c':
+            for cur_ch in self._awg_chan_list:
+                if cur_ch.Name == cur_name:
+                    return cur_ch
+            return None
+        return None
+
     def clear_segments(self):
         self._wfm_segment_list.clear()
 
     def set_waveform_segments(self, wfm_segment_list):
         self._wfm_segment_list = wfm_segment_list[:]
+        #NOTE: THIS WORKS BECAUSE WAVEFORM SEGMENTS CANNOT BE SHARED ACROSS WAVEFORM HALS - THIS IS WHY IT'S a COPY [:] OPERATION!
+        for cur_wfm in self._wfm_segment_list:
+            cur_wfm.Parent = (self, 'w')
 
     def add_waveform_segment(self, wfm_segment):
         self._wfm_segment_list.append(wfm_segment)
+        wfm_segment.Parent = (self, 'w')
         
     def get_waveform_segment(self, wfm_segment_name):
         the_seg = None
@@ -247,7 +265,9 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
             cur_wfm_type = cur_wfm['type']
             assert cur_wfm_type in globals(), cur_wfm_type + " is not in the current namespace. If the class does not exist in WaveformSegments include wherever it lives by importing it in AWG.py."
             cur_wfm_type = globals()[cur_wfm_type]
-            self._wfm_segment_list.append(cur_wfm_type.fromConfigDict(cur_wfm))
+            new_wfm_seg = cur_wfm_type.fromConfigDict(cur_wfm)
+            new_wfm_seg.Parent = (self, 'w')
+            self._wfm_segment_list.append(new_wfm_seg)
 
     def plot_waveforms(self, overlap=False):
         final_wfms = self._assemble_waveform_raw()[0]

@@ -33,7 +33,7 @@ awg_wfm_q = WaveformAWG("Waveform 2", new_lab, [('awg_test_instr', 'CH3'),('awg_
 acq_module = ACQ('ACQ', new_lab, 'acq')
 freq_src_module = GENmwSource('MWS', new_lab, 'freq_src_instr', 'CH1')
 
-param_cav_freq = new_lab.add_parameter_property('Cavity Frequency', freq_src_module, 'Frequency')
+param_cav_freq = new_lab.add_variable_property('Cavity Frequency', freq_src_module, 'Frequency')
 
 #Setup the trigger and instrument relations
 ddg_module.set_trigger_output_params('A', 0.0, 50e-9)
@@ -64,7 +64,7 @@ myProc.add_stage(CPU_Max('segment'))
 myProc.add_stage_end(CPU_Mean('repetition'))
 acq_module.set_data_processor(myProc)
 
-param_blank_amp = new_lab.add_parameter_property('Blank Amplitude', awg_wfm_q.get_waveform_segment("pad"), 'Value')
+param_blank_amp = new_lab.add_variable_property('Blank Amplitude', awg_wfm_q.get_waveform_segment("pad"), 'Value')
 
 new_exp = Experiment("cav_exp", exp_config)
 leData = new_lab.run_single(new_exp, [(param_cav_freq, np.linspace(100e9,500e9,500))])

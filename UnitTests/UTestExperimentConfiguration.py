@@ -513,6 +513,6 @@ assert awg_wfm.get_waveform_segment('zero11').Value == 0.1, "Property incorrectl
 assert awg_wfm.get_waveform_segment('zero22').Duration == 77e-9*3, "Property incorrectly reloaded in AWG Waveform Segment."
 
 expConfig.save_config('UnitTests/next_test.txt')
-new_lab._save_laboratory_config('UnitTests/')
+new_lab.save_laboratory_config('UnitTests/')
 
 print("Experiment Configuration Unit Tests completed successfully.")

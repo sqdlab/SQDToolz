@@ -97,8 +97,8 @@ acq_module.InputTriggerEdge = 0
 
 # configTc = tc.save_config('tests\\test_time_config.json')
 
-my_param_hold = new_lab.add_parameter_property("len1", awg_wfm2.get_waveform_segment("hold"), 'Duration')
-my_param_read = new_lab.add_parameter_property("len2", awg_wfm2.get_waveform_segment("read"), 'Duration')
+my_param_hold = new_lab.add_variable_property("len1", awg_wfm2.get_waveform_segment("hold"), 'Duration')
+my_param_read = new_lab.add_variable_property("len2", awg_wfm2.get_waveform_segment("read"), 'Duration')
 # my_param.set_raw(90e-9)
 
 # lePlot = tc.plot().show()

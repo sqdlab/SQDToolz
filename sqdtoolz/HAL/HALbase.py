@@ -9,6 +9,13 @@ class HALbase:
         return self._name
 
     @property
+    def Parent(self):
+        return None
+
+    def _get_child(self, tuple_name_group):
+        raise NotImplementedError()
+
+    @property
     def ManualActivation(self):
         return self._man_activation
     @ManualActivation.setter

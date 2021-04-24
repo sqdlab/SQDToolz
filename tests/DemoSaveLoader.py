@@ -40,8 +40,8 @@ mod_freq_qubit = WM_SinusoidalIQ("QubitFreqMod", 100e6)
 #
 #Setup Parameters
 #
-param_cav_freq = new_lab.add_parameter_property('Cavity Frequency', freq_src_module, 'Frequency')
-param_rab_freq = new_lab.add_parameter('Rabi Frequency')
+param_cav_freq = new_lab.add_variable_property('Cavity Frequency', freq_src_module, 'Frequency')
+param_rab_freq = new_lab.add_variable('Rabi Frequency')
 
 #
 #Setup ExperimentConfiguration
@@ -56,5 +56,5 @@ acq_module.NumSamples = 100
 exp_config = ExpConfigIQpulseInSingleOut(2.5e-6, [ddg_module], [awg_wfm_q], acq_module, [freq_src_module], awg_wfm_q)
 
 print(param_rab_freq.get_raw())
-new_lab.update_config_from_last_expt()
+new_lab.update_variables_from_last_expt()
 print(param_rab_freq.get_raw())

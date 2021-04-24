@@ -32,7 +32,7 @@ awg_wfm_q = WaveformAWG("Waveform 2 CH", [(instr_awg, 'CH3'),(instr_awg, 'CH4')]
 acq_module = ACQ(instr_acq)
 freq_src_module = GENmwSource(instr_fsrc.get_output('CH1'))
 
-param_cav_freq = new_lab.add_parameter_property('Cavity Frequency', freq_src_module, 'Frequency')
+param_cav_freq = new_lab.add_variable_property('Cavity Frequency', freq_src_module, 'Frequency')
 
 #Setup the trigger and instrument relations
 ddg_module.set_trigger_output_params('A', 0.0, 50e-9)

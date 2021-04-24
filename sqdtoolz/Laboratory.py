@@ -15,7 +15,7 @@ import numpy as np
 
 class Laboratory:
     def __init__(self, instr_config_file, save_dir):
-        self._params = {}
+        self._variables = {}
         if instr_config_file == "":
             self._station = qc.Station()
         else:
@@ -29,16 +29,23 @@ class Laboratory:
         self._hal_objs = {}
         self._activated_instruments = []
 
-    def update_config_from_last_expt(self):
-        #TODO: Stress test this with say 100000 directories
-        dirs = [x[0] for x in os.walk(self._save_dir)]  #Walk gives a tuple: (dirpath, dirnames, filenames)
-        last_dir = dirs[-1].replace('\\','/')
-        if os.path.isfile(last_dir + "/laboratory_parameters.txt"):
-            with open(last_dir + "/laboratory_parameters.txt") as json_file:
-                data = json.load(json_file)
-                for cur_param in data:
-                    if cur_param in self._params:
-                        self._params[cur_param].set_raw(data[cur_param])
+    def update_variables_from_last_expt(self, file_name = ''):
+        if file_name == '':
+            #TODO: Stress test this with say 100000 directories
+            dirs = [x[0] for x in os.walk(self._save_dir)]  #Walk gives a tuple: (dirpath, dirnames, filenames)
+            last_dir = dirs[-1].replace('\\','/')
+            if os.path.isfile(last_dir + "/laboratory_parameters.txt"):
+                filepath = last_dir + "/laboratory_parameters.txt"
+        else:
+            filepath = file_name
+        with open(filepath) as json_file:
+            data = json.load(json_file)
+            for cur_key in data.keys():
+                cur_dict = data[cur_key]
+                if cur_key in self._variables.keys():
+                    self._variables[cur_key]._set_current_config(cur_dict)
+                else:
+                    self._variables[cur_key] = globals()[cur_dict['Type']].fromConfigDict(cur_key, cur_dict, self)
 
     def cold_reload_last_configuration(self):
         dirs = [x[0] for x in os.walk(self._save_dir)]  #Walk gives a tuple: (dirpath, dirnames, filenames)
@@ -47,6 +54,7 @@ class Laboratory:
             with open(last_dir + "/laboratory_configuration.txt") as json_file:
                 data = json.load(json_file)
                 self.cold_reload_instruments(data)
+        self.update_variables_from_last_expt()
         # if os.path.isfile(last_dir + "/experiment_configuration.txt"):
         #     with open(last_dir + "/experiment_configuration.txt") as json_file:
         #         data = json.load(json_file)
@@ -70,18 +78,50 @@ class Laboratory:
             self._hal_objs[cur_hal_name]._set_current_config(dict_cur_hal, self)
 
 
-    def add_parameter(self, param_name):
-        self._params[param_name] = VariableInternal(param_name)
-        return self._params[param_name]
+    def _resolve_sqdobj_tree(self, sqdObj):
+        resolution_tree = []
+        cur_obj = sqdObj
+        cur_parent = cur_obj.Parent  #Note that Parent is: (object reference to parent, metadata to find current object from parent object's POV)
+        while (type(cur_parent) is tuple and cur_parent[0] != None):
+            resolution_tree += [( cur_obj.Name, cur_parent[1] )]
+            cur_obj = cur_parent[0]
+            cur_parent = cur_obj.Parent
+        if isinstance(cur_obj, HALbase):
+            assert cur_obj.Name in self._hal_objs, f"It seems that {sqdObj.Name} is a part of some rogue unregistered HAL object."
+            resolution_tree += [(cur_obj.Name, 'HAL')]
+        return resolution_tree[::-1]
+
+    def _get_resolved_obj(self, res_list):
+        if res_list[0][1] == 'HAL':
+            ret_obj = self.HAL(res_list[0][0])
+        #
+        if len(res_list) > 0:
+            for m in range(1,len(res_list)):
+                ret_obj = ret_obj._get_child(res_list[m])
+        return ret_obj
+
+    def add_variable(self, param_name):
+        self._variables[param_name] = VariableInternal(param_name, self)
+        return self._variables[param_name]
 
     #TODO: combine with above
-    def add_parameter_property(self, param_name, sqdObj, prop_name):
-        self._params[param_name] = VariableProperty(param_name, sqdObj, prop_name)
-        return self._params[param_name]
+    def add_variable_property(self, param_name, sqdObj, prop_name):
+        res_list = self._resolve_sqdobj_tree(sqdObj)
+        self._variables[param_name] = VariableProperty(param_name, self, res_list, prop_name)
+        return self._variables[param_name]
 
-    def get_parameter(param_name):
-        assert param_name in self._params, f"Parameter name {param_name} does not exist."
-        return self._params[param_name]
+    def _register_VAR(self, hal_var):
+        if not (hal_var.Name in self._variables):
+            self._variables[hal_var.Name] = hal_var
+            return True
+        return False
+
+    def VAR(self, param_name):
+        #assert param_name in self._variables, f"Parameter name {param_name} does not exist."
+        if param_name in self._variables:
+            return self._variables[param_name]
+        else:
+            return None
 
     def add_instrument(self, instrObj):
         self._station.add_component(instrObj)
@@ -153,20 +193,26 @@ class Laboratory:
         #Save instrument configurations (QCoDeS)
         self._save_instrument_config(cur_exp_path)
         #Save Laboratory Configuration
-        self._save_laboratory_config(cur_exp_path)
+        self.save_laboratory_config(cur_exp_path)
 
         #Run postprocessing
         expt_obj._post_process(ret_vals)
         
         #Save Laboratory Parameters
-        param_dict = {k:v.get_raw() for (k,v) in self._params.items()}
-        with open(cur_exp_path + 'laboratory_parameters.txt', 'w') as outfile:
-            json.dump(param_dict, outfile, indent=4)
-        
+        self.save_variables(cur_exp_path)
 
         return ret_vals
 
-    def _save_laboratory_config(self, cur_exp_path):
+    def save_variables(self, cur_exp_path = '', file_name = 'laboratory_parameters.txt'):
+        param_dict = {k:v._get_current_config() for (k,v) in self._variables.items()}
+        with open(cur_exp_path + file_name, 'w') as outfile:
+            # json.dump(param_dict, outfile)
+            outfile.write(
+                '{\n' +
+                ',\n'.join(f"\"{x}\" : {json.dumps(param_dict[x])}" for x in param_dict.keys()) +
+                '\n}\n')
+
+    def save_laboratory_config(self, cur_exp_path, file_name = 'laboratory_configuration.txt'):
         #Prepare the dictionary of HAL configurations
         dict_hals = []
         for cur_hal in self._hal_objs:
@@ -176,8 +222,10 @@ class Laboratory:
                     'ActiveInstruments' : self._activated_instruments,
                     'HALs' : dict_hals
                     }
-        with open(cur_exp_path + 'laboratory_configuration.txt', 'w') as outfile:
-            json.dump(param_dict, outfile, indent=4)
+        if cur_exp_path != '':
+            with open(cur_exp_path + file_name, 'w') as outfile:
+                json.dump(param_dict, outfile, indent=4)
+        return param_dict
 
     def _save_instrument_config(self, cur_exp_path):
         #Sometimes the configuration parameters use byte-values; those bytes need to be converted into strings

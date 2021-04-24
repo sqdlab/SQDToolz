@@ -28,6 +28,17 @@ class AWGOutputChannel(TriggerInput):
         return self._channel_name
 
     @property
+    def Parent(self):
+        return (self._parent_waveform_obj, 'c')
+
+    def _get_child(self, tuple_name_group):
+        cur_name = tuple_name_group[0]
+        for cur_mkr in self._awg_mark_list:
+            if cur_mkr.Name == cur_name:
+                return cur_mkr
+        return None
+
+    @property
     def Amplitude(self):
         return self._instr_awg_chan.Amplitude
     @Amplitude.setter
@@ -164,7 +175,11 @@ class AWGOutputMarker(TriggerOutput, TriggerInput):
     def Name(self):
         #TODO: Look to make all name properties to start with capital letters...
         return self._name
-        
+
+    @property
+    def Parent(self):
+        return (self._awg_output_ch, None)
+
     def set_markers_to_segments(self, list_seg_names):
         self._marker_status = 'Segments'
         #Check the listed segments actually exist in the current list of WaveformSegment objects

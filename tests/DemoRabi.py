@@ -39,7 +39,7 @@ freq_src_module = GENmwSource(instr_fsrc.get_output('CH1'))
 
 mod_freq_qubit = WM_SinusoidalIQ("QubitFreqMod", 100e6)
 
-param_rab_freq = new_lab.add_parameter('Rabi Frequency')
+param_rab_freq = new_lab.add_variable('Rabi Frequency')
 
 #Setup the trigger and instrument relations
 ddg_module.set_trigger_output_params('A', 0.0, 50e-9)

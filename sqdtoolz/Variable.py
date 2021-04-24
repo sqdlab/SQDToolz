@@ -12,9 +12,9 @@ class VariableBase:
             name = args[0]
         assert isinstance(name, str) and name != '', "Name parameter was not passed or does not exist as the first argument in the variable class initialisation?"
         if len(args) < 2:
-            lab = kwargs,get('lab', None)
+            lab = kwargs.get('lab', None)
             if lab == None:
-                lab = kwargs,get('Lab', None)
+                lab = kwargs.get('Lab', None)
         else:
             lab = args[1]
         assert lab.__class__.__name__ == 'Laboratory' and lab != None, "Lab parameter was not passed or does not exist as the second argument in the variable class initialisation?"
@@ -93,7 +93,10 @@ class VariableProperty(VariableBase):
 
     @classmethod
     def fromConfigDict(cls, name, config_dict, lab):
-        return cls(name, lab, lab._get_resolved_obj(config_dict["ResList"]), config_dict["Property"])   #TODO: Add custom flag to make this a bit less inefficient... Not that bad as it should only be used in cold-loading anyway...
+        obj = lab._get_resolved_obj(config_dict["ResList"])
+        prop = config_dict["Property"]
+        setattr(obj, prop, config_dict["Value"])
+        return cls(name, lab, obj, prop)   #TODO: Add custom flag to make this a bit less inefficient... Not that bad as it should only be used in cold-loading anyway...
 
     def get_raw(self):
         obj = self._lab._get_resolved_obj(self._obj_res_list)

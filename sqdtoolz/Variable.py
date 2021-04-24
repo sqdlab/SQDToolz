@@ -21,7 +21,7 @@ class VariableBase:
 
         prev_exists = lab.VAR(name)
         if prev_exists:
-            assert isinstance(prev_exists, self.__class__), "A different VAR type already exists by this name."
+            assert isinstance(prev_exists, cls), f"A different VAR type ({prev_exists.__class__.__name__}) already exists by this name."
             return prev_exists
         else:
             return super(cls.__class__, cls).__new__(cls)
@@ -52,10 +52,13 @@ class VariableBase:
         raise NotImplementedError()
 
 class VariableInternal(VariableBase):
-    def __init__(self, name, lab, init_val = 0.0):
+    def __init__(self, name, lab, init_val = None):
         super().__init__(name)
-        self._val = init_val
-        lab._register_VAR(self)
+        if lab._register_VAR(self):
+            if init_val == None:
+                self._val = 0.0
+        if init_val != None:
+            self._val = init_val    #i.e override the value if reinitialised with an initial-value - otherwise, preserve previous instance's value...
 
     @classmethod
     def fromConfigDict(cls, name, config_dict, lab):

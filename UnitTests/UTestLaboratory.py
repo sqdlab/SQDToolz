@@ -57,6 +57,15 @@ new_lab.VAR('myFreq').Value = 5
 #Property variable
 VariableProperty('test RepTime', new_lab, new_lab.HAL("ddg"), 'RepetitionTime')
 new_lab.VAR('test RepTime').Value = 99
+#
+assert_found = False
+try:
+    VariableInternal('test RepTime', new_lab)
+except AssertionError:
+    assert_found = True
+    # assert arr_act.size == 0, "There are erroneous trigger edges found in the current configuration."
+assert assert_found, "Reinstantiation of a variable was possible with a different variable type..."
+#
 #Deeper property variable...
 VariableProperty('testAmpl', new_lab, new_lab.HAL("Wfm1").get_waveform_segment('init0'), 'Amplitude')
 new_lab.VAR('testAmpl').Value = 86
@@ -77,6 +86,15 @@ assert new_lab.VAR("testSpace").Value == 2016, "Property incorrectly set in spac
 assert new_lab.VAR("myDura1").Value == 2016, "Property incorrectly set in spaced-variable."
 assert new_lab.VAR("myDura2").Value == 2016+3.1415926, "Property incorrectly set in spaced-variable."
 assert new_lab.HAL("Wfm1").get_waveform_segment('init2').Duration == 2016+3.1415926, "Property incorrectly set in spaced-variable."
+#Quickly check reinitialisation behaviour...
+VariableInternal('myFreq', new_lab)
+assert new_lab.VAR("myFreq").Value == 5, "Property incorrectly set in variable on reinstantiation."
+VariableInternal('myFreq', new_lab, 7)
+assert new_lab.VAR("myFreq").Value == 7, "Property incorrectly set in variable on reinstantiation."
+VariableInternal('myFreq', new_lab, 5)
+assert new_lab.VAR("myFreq").Value == 5, "Property incorrectly set in variable on reinstantiation."
+VariableInternal('myFreq', new_lab)
+assert new_lab.VAR("myFreq").Value == 5, "Property incorrectly set in variable on reinstantiation."
 #
 #Save the variables to a file
 new_lab.save_laboratory_config('UnitTests/', 'laboratory_configuration2.txt')

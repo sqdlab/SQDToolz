@@ -11,7 +11,7 @@ from sqdtoolz.Drivers.dummyACQ import*
 from sqdtoolz.Drivers.dummyAWG import*
 from sqdtoolz.Drivers.dummyGENmwSource import*
 from sqdtoolz.ExperimentConfiguration import*
-from sqdtoolz.Parameter import*
+from sqdtoolz.Variable import*
 from sqdtoolz.Experiments.Experimental.ExperimentCavitySpectroscopy import*
 
 new_lab = Laboratory(instr_config_file = "", save_dir = "mySaves\\")

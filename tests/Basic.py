@@ -9,7 +9,7 @@ from sqdtoolz.Drivers.dummyDDG import*
 from sqdtoolz.Drivers.dummyACQ import*
 from sqdtoolz.Drivers.dummyAWG import*
 from sqdtoolz.ExperimentConfiguration import*
-from sqdtoolz.Parameter import*
+from sqdtoolz.Variable import*
 
 new_lab = Laboratory(instr_config_file = "", save_dir = "mySaves\\")
 

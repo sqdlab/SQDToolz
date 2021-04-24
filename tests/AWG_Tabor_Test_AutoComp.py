@@ -6,7 +6,7 @@ from sqdtoolz.ExperimentConfiguration import*
 from sqdtoolz.HAL.WaveformSegments import*
 from sqdtoolz.HAL.WaveformModulations import*
 import numpy as np
-from sqdtoolz.Parameter import*
+from sqdtoolz.Variable import*
 from sqdtoolz.Laboratory import*
 
 new_lab = Laboratory(instr_config_file = "tests\\TaborTest.yaml", save_dir = "mySaves\\")

@@ -6,7 +6,7 @@ from sqdtoolz.HAL.AWG import*
 from sqdtoolz.HAL.WaveformSegments import*
 from sqdtoolz.HAL.ACQ import*
 import numpy as np
-from sqdtoolz.Parameter import*
+from sqdtoolz.Variable import*
 
 new_exp = Experiment(instr_config_file = "tests\\BenchTest.yaml", save_dir = "", name="test")
 

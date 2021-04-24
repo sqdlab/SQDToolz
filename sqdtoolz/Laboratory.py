@@ -1,5 +1,5 @@
 import qcodes as qc
-from sqdtoolz.Parameter import*
+from sqdtoolz.Variable import*
 from sqdtoolz.HAL.HALbase import*
 from sqdtoolz.HAL.ACQ import*
 from sqdtoolz.HAL.AWG import*

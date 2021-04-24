@@ -11,7 +11,7 @@ from sqdtoolz.Drivers.dummyACQex import*
 from sqdtoolz.Drivers.dummyAWG import*
 from sqdtoolz.Drivers.dummyGENmwSource import*
 from sqdtoolz.ExperimentConfiguration import*
-from sqdtoolz.Parameter import*
+from sqdtoolz.Variable import*
 from sqdtoolz.HAL.Processors.ProcessorCPU import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Max import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Mean import*

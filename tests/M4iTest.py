@@ -9,10 +9,10 @@ from sqdtoolz.HAL.WaveformSegments import*
 from sqdtoolz.HAL.ACQ import*
 from sqdtoolz.HAL.GENmwSource import*
 import numpy as np
-from sqdtoolz.Parameter import*
+from sqdtoolz.Variable import*
 from sqdtoolz.HAL.WaveformSegments import*
 from sqdtoolz.HAL.WaveformModulations import*
-from sqdtoolz.Parameter import*
+from sqdtoolz.Variable import*
 
 
 new_lab = Laboratory(instr_config_file = "tests\\M4iTest.yaml", save_dir = "mySaves\\")

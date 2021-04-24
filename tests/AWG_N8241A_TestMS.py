@@ -8,7 +8,7 @@ from sqdtoolz.HAL.WaveformSegments import*
 from sqdtoolz.HAL.ACQ import*
 from sqdtoolz.HAL.GENmwSource import*
 import numpy as np
-from sqdtoolz.Parameter import*
+from sqdtoolz.Variable import*
 from sqdtoolz.HAL.WaveformSegments import*
 from sqdtoolz.HAL.WaveformModulations import*
 

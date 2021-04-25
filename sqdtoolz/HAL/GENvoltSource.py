@@ -7,14 +7,6 @@ class GENvoltSource(HALbase):
             #
             self._instr_volt = lab._get_instrument(instr_gen_volt_src_channel)
 
-    def __new__(cls, hal_name, lab, instr_gen_volt_src_channel):
-        prev_exists = lab.HAL(hal_name)
-        if prev_exists:
-            assert isinstance(prev_exists, GENvoltSource), "A different HAL type already exists by this name."
-            return prev_exists
-        else:
-            return super(GENvoltSource, cls).__new__(cls)
-
     @classmethod
     def fromConfigDict(cls, config_dict, lab):
         return cls(config_dict["Name"], lab, config_dict["instrument"])

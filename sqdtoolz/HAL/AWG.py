@@ -37,14 +37,6 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
         
         self._cur_prog_waveforms = [None]*len(awg_channel_tuples)
 
-    def __new__(cls, hal_name, lab, awg_channel_tuples, sample_rate, total_time=-1, global_factor = 1.0):
-        prev_exists = lab.HAL(hal_name)
-        if prev_exists:
-            assert isinstance(prev_exists, WaveformAWG), "A different HAL type already exists by this name."
-            return prev_exists
-        else:
-            return super(WaveformAWG, cls).__new__(cls)
-
     @classmethod
     def fromConfigDict(cls, config_dict, lab):
         awg_channel_tuples = []

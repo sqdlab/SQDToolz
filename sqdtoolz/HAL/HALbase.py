@@ -4,6 +4,27 @@ class HALbase:
         self._name = HAL_Name
         self._man_activation = False
 
+    def __new__(cls, *args, **kwargs):
+        if len(args) == 0:
+            hal_name = kwargs,get('hal_name', '')
+        else:
+            hal_name = args[0]
+        assert isinstance(hal_name, str) and hal_name != '', "Name parameter was not passed or does not exist as the first argument in the variable class initialisation?"
+        if len(args) < 2:
+            lab = kwargs.get('lab', None)
+            if lab == None:
+                lab = kwargs.get('Lab', None)
+        else:
+            lab = args[1]
+        assert lab.__class__.__name__ == 'Laboratory' and lab != None, "Lab parameter was not passed or does not exist as the second argument in the variable class initialisation?"
+
+        prev_exists = lab.HAL(hal_name)
+        if prev_exists:
+            assert isinstance(prev_exists, cls), f"A different HAL type ({prev_exists.__class__.__name__}) already exists by this name."
+            return prev_exists
+        else:
+            return super(cls.__class__, cls).__new__(cls)
+
     @property
     def Name(self):
         return self._name

@@ -10,14 +10,6 @@ class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
             self._trig_src_obj = None
             self.data_processor = None
 
-    def __new__(cls, hal_name, lab, instr_acq_name):
-        prev_exists = lab.HAL(hal_name)
-        if prev_exists:
-            assert isinstance(prev_exists, ACQ), "A different HAL type already exists by this name."
-            return prev_exists
-        else:
-            return super(ACQ, cls).__new__(cls)
-
     @classmethod
     def fromConfigDict(cls, config_dict, lab):
         return cls(config_dict["Name"], lab, config_dict["instrument"])

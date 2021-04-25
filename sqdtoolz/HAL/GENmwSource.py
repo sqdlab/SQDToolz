@@ -14,14 +14,6 @@ class GENmwSource(HALbase, TriggerInputCompatible, TriggerInput):
             assert self._instr_mw_src_name == instr_mw_src_name, "Cannot reinstantiate a waveform by the same name, but different instrument configurations." 
             assert self._instr_mw_src_channel == instr_mw_src_channel, "Cannot reinstantiate a waveform by the same name, but different channel configurations."
 
-    def __new__(cls, hal_name, lab, instr_mw_src_name, instr_mw_src_channel):
-        prev_exists = lab.HAL(hal_name)
-        if prev_exists:
-            assert isinstance(prev_exists, GENmwSource), "A different HAL type already exists by this name."
-            return prev_exists
-        else:
-            return super(GENmwSource, cls).__new__(cls)
-
     @classmethod
     def fromConfigDict(cls, config_dict, lab):
         return cls(config_dict["Name"], lab, config_dict["instrument"], config_dict["InstrumentChannel"])

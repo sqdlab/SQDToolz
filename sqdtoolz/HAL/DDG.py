@@ -17,14 +17,6 @@ class DDG(TriggerOutputCompatible, HALbase):
                 cur_trig_name = cur_output_src[0]
                 self._output_trigs[cur_trig_name] = Trigger(self, cur_trig_name, cur_output_src[1])
 
-    def __new__(cls, hal_name, lab, instr_ddg_name):
-        prev_exists = lab.HAL(hal_name)
-        if prev_exists:
-            assert isinstance(prev_exists, DDG), "A different HAL type already exists by this name."
-            return prev_exists
-        else:
-            return super(DDG, cls).__new__(cls)
-
     @classmethod
     def fromConfigDict(cls, config_dict, lab):
         return cls(config_dict["Name"], lab, config_dict["instrument"])

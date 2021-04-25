@@ -1,4 +1,4 @@
-from  sqdtoolz.HAL.ACQProcessor import ACQProcessor
+from  sqdtoolz.HAL.DataProcessor import DataProcessor
 from multiprocessing.pool import ThreadPool
 import queue
 import numpy as np
@@ -17,7 +17,7 @@ class ProcNodeCPU:
         raise NotImplementedError()
 
 
-class ProcessorCPU(ACQProcessor):
+class ProcessorCPU(DataProcessor):
     def __init__(self):
         self.tp_CPU = ThreadPool(processes=1)
         self.cur_async_handle = None

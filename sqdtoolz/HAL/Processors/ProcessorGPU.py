@@ -1,4 +1,4 @@
-from  sqdtoolz.HAL.ACQProcessor import ACQProcessor
+from  sqdtoolz.HAL.DataProcessor import DataProcessor
 from multiprocessing.pool import ThreadPool
 import queue
 import cupy as cp
@@ -31,7 +31,7 @@ class ProcNodeGPU:
         raise NotImplementedError()
 
 
-class ProcessorGPU(ACQProcessor):
+class ProcessorGPU(DataProcessor):
     def __init__(self):
         self.tp_GPU = ThreadPool(processes=1)
         self.cur_async_handle = None

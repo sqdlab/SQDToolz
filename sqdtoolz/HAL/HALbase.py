@@ -6,7 +6,7 @@ class HALbase:
 
     def __new__(cls, *args, **kwargs):
         if len(args) == 0:
-            hal_name = kwargs,get('hal_name', '')
+            hal_name = kwargs.get('hal_name', '')
         else:
             hal_name = args[0]
         assert isinstance(hal_name, str) and hal_name != '', "Parameter hal_name was not passed or does not exist as the first argument in the variable class initialisation?"

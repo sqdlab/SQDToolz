@@ -25,7 +25,8 @@ class Experiment:
         ping_iteration = kwargs.get('ping_iteration')
 
         data_file = FileIOWriter(file_path + 'data.h5')
-        
+
+        self._expt_config.init_instruments()
 
         if len(sweep_vars) == 0:
             self._expt_config.prepare_instruments()
@@ -65,9 +66,6 @@ class Experiment:
         return FileIOReader(file_path + 'data.h5')
 
     def save_config(self, save_dir, file_name):
-        #Save the experiment configuration
-        with open(save_dir + file_name + '.txt', 'w') as outfile:
-            json.dump(self._expt_config.save_config(), outfile, indent=4)
         #Save a PNG of the Timing Plot
         lePlot = self._expt_config.plot()
         lePlot.savefig(save_dir + file_name + '.png')

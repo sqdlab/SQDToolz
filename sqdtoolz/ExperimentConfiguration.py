@@ -5,13 +5,46 @@ import numpy as np
 import json
 
 class ExperimentConfiguration:
-    def __init__(self, duration, list_HALs, hal_ACQ):
+    def __init__(self, name, lab, duration, list_HALs, hal_ACQ):
+        self._name = name
+        #Just register it to the labotarory - doesn't matter if it already exists as everything here needs to be reinitialised
+        #to the new configuration anyway...
+        lab._register_CONFIG(self)
+
         self._total_time = duration
+
+        #Hard links are O.K. as the HAL objects won't get replaced on reinitialisation due to the design of __new__ in the Halbase
+        #class. In addition, cold-restarts should have the strings properly instantiating the HALs once anyway. Nonetheless, the
+        #update function will work with the laboratory class...
+        self._lab = lab
         self._list_HALs = list_HALs[:]
         self._hal_ACQ = hal_ACQ
+
+        self._settle_currently_used_processors()
         
-        #Trigger relations formatted as tuples of the form: destination HAL or channel-HAL object, source Trigger object, input polarity on destination HAL object
-        self._cur_trig_rels = self._get_current_trigger_relations()
+        self._init_config = self.save_config()
+
+    def __new__(cls, *args, **kwargs):
+        if len(args) == 0:
+            name = kwargs.get('name', '')
+        else:
+            name = args[0]
+        assert isinstance(name, str) and name != '', "Name parameter was not passed or does not exist as the first argument in the variable class initialisation?"
+        if len(args) < 2:
+            lab = kwargs.get('lab', None)
+        else:
+            lab = args[1]
+        assert lab.__class__.__name__ == 'Laboratory' and lab != None, "Lab parameter was not passed or does not exist as the second argument in the variable class initialisation?"
+
+        prev_exists = lab.CONFIG(name)
+        if prev_exists:
+            return prev_exists
+        else:
+            return super(cls.__class__, cls).__new__(cls)
+
+    @property
+    def Name(self):
+        return self._name
 
     @property
     def RepetitionTime(self):
@@ -20,51 +53,57 @@ class ExperimentConfiguration:
     def RepetitionTime(self, len_seconds):
         self._total_time = len_seconds
 
-    def _get_current_trigger_relations(self):
-        trig_src_list = [x for x in self._list_HALs if isinstance(x, TriggerOutputCompatible)]
-        trig_dest_list = [x for x in self._list_HALs + [self._hal_ACQ] if isinstance(x, TriggerInputCompatible)]
+    def _settle_currently_used_processors(self):
+        self._proc_configs = []
+        if self._hal_ACQ:
+            self._proc = self._hal_ACQ.data_processor
+            if self._proc:
+                self._proc_configs = [self._proc._get_current_config()]
 
-        def check_and_add_trig_src_to_list(cur_dest):
-            cur_trig_src = cur_dest._get_instr_trig_src()
-            if cur_trig_src:
-                #TODO: Make the TriggerOutput objects have a __str__ to get the actual trigger source as a string
-                assert cur_trig_src._get_parent_HAL() in trig_src_list, f"The trigger source \"{cur_trig_src._get_parent_HAL().Name}\" does not exist in the current ExperimentConfiguration!"
-                check_and_add_trig_src_to_list.trig_rels += [(cur_dest, cur_trig_src, cur_dest._get_instr_input_trig_edge())]
-        check_and_add_trig_src_to_list.trig_rels = []
-
-        for cur_dest_trig in trig_dest_list:
-            for cur_trig_input in cur_dest_trig._get_all_trigger_inputs():
-                check_and_add_trig_src_to_list(cur_trig_input)
-
-        return check_and_add_trig_src_to_list.trig_rels
+    def get_config(self):
+        return self._init_config
 
     def save_config(self, file_name = ''):
+        cur_config = {'HALs' : [], 'PROCs' : [], 'RepetitionTime' : self.RepetitionTime}
+
         #Prepare the dictionary of HAL configurations
-        retVal = []
         for cur_hal in self._list_HALs + [self._hal_ACQ]:
-            retVal.append(cur_hal._get_current_config())
-        
+            cur_config['HALs'].append(cur_hal._get_current_config())
+
+        for cur_proc in self._proc_configs:
+            cur_config['PROCs'].append(cur_proc._get_current_config())
+
         #Save to file if necessary
         if (file_name != ''):
             with open(file_name, 'w') as outfile:
-                json.dump(retVal, outfile, indent=4)
-        return retVal
+                json.dump(cur_config, outfile, indent=4)
+        return cur_config
 
-    def update_config(self, conf, lab):
-        for cur_dict in conf:
+    def update_config(self, conf):
+        #TODO: Check if these checks here are probably overkill and possibly obsolete?
+        for cur_dict in conf['HALs']:
             found_hal = False
             for cur_hal in self._list_HALs + [self._hal_ACQ]:
                 if cur_hal.Name == cur_dict['Name']:
                     found_hal = True
-                    cur_hal._set_current_config(cur_dict, lab)
+                    cur_hal._set_current_config(cur_dict, self._lab)
                     break
             assert found_hal, f"HAL object {cur_dict['Name']} does not exist in the current ExperimentConfiguration object."
+        self._settle_currently_used_processors()
+        for cur_dict in conf['PROCs']:
+            found_proc = False
+            for cur_proc in self._proc_configs:
+                if cur_proc.Name == cur_dict['Name']:
+                    found_proc = True
+                    cur_proc._set_current_config(cur_dict, self._lab)
+                    break
+            assert found_proc, f"PROC object {cur_dict['Name']} does not exist in the current ExperimentConfiguration object."
+        self.RepetitionTime = conf['RepetitionTime']
+        #
+        self._init_config = conf
 
-    def init_instrument_relations(self):
-        #Settle trigger relations in case they have changed in a previous configuration...
-        for cur_trig_rel in self._cur_trig_rels:
-            cur_trig_rel[0].set_trigger_source(cur_trig_rel[1])
-            cur_trig_rel[0].InputTriggerEdge = cur_trig_rel[2]
+    def init_instruments(self):
+        self.update_config(self._init_config)
 
     def prepare_instruments(self):
         for cur_hal in self._list_HALs:
@@ -269,7 +308,8 @@ class ExperimentConfiguration:
         ax.set_xlim((0, self._total_time*scale_fac))
         ax.set_ylim((-bar_width, num_channels + bar_width))
         
-        fig.suptitle('timing configuration in ' + plt_units)
+        fig.suptitle(f'Configuration: {self.Name}')
+        ax.set_xlabel(f'time ({plt_units})')
      
         ax.set_yticks(range(len(yticklabels)))
         ax.set_yticklabels(yticklabels, size=12)

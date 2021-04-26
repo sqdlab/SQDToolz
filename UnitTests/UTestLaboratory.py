@@ -7,6 +7,11 @@ with open("UnitTests/laboratory_configuration.txt") as json_file:
     data = json.load(json_file)
     new_lab.cold_reload_instruments(data)
 #
+with open("UnitTests/experiment_configuration.txt") as json_file:
+    data = json.load(json_file)
+    new_lab.cold_reload_experiment_configurations(data)
+new_lab.CONFIG('testConf').init_instruments()
+#
 #Check the parameters...
 #
 assert new_lab.HAL("dum_acq").NumRepetitions == 10, "NumRepetitions incorrectly reloaded into ACQ."
@@ -168,5 +173,7 @@ assert new_lab.HAL("Wfm1").get_waveform_segment('init0').Amplitude == 86, "Varia
 assert new_lab.VAR("myDura1").Value == 2016, "Variable incorrectly reloaded"
 assert new_lab.VAR("myDura2").Value == 2016+3.1415926, "Variable incorrectly reloaded"
 assert new_lab.HAL("Wfm1").get_waveform_segment('init2').Duration == 2016+3.1415926, "Variable incorrectly reloaded"
+
+
 
 print("Laboratory Unit Tests completed successfully.")

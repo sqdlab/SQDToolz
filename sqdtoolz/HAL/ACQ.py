@@ -85,11 +85,16 @@ class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
         return [self._trig_src_obj]
 
     def _get_current_config(self):
+        if self.data_processor:
+            proc_name = self.data_processor.Name
+        else:
+            proc_name = ''
         ret_dict = {
             'Name' : self.Name,
             'instrument' : self._instr_acq.name,
             'Type' : self.__class__.__name__,
-            'TriggerSource' : self._get_trig_src_params_dict()
+            'TriggerSource' : self._get_trig_src_params_dict(),
+            'Processor' : proc_name
             }
         self.pack_properties_to_dict(['NumSamples', 'NumSegments', 'NumRepetitions', 'SampleRate', 'InputTriggerEdge'], ret_dict)
         return ret_dict
@@ -103,5 +108,5 @@ class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
         self.InputTriggerEdge = dict_config['InputTriggerEdge']
         trig_src_obj = TriggerInput.process_trigger_source(dict_config['TriggerSource'], lab)
         self.set_trigger_source(trig_src_obj)
-
-    
+        if dict_config['Processor'] != '':
+            self.data_processor = lab.PROC(dict_config['Processor'])

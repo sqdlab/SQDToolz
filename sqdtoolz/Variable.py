@@ -5,9 +5,9 @@ class VariableBase:
 
     def __new__(cls, *args, **kwargs):
         if len(args) == 0:
-            name = kwargs,get('name', '')
+            name = kwargs.get('name', '')
             if name == '':
-                name = kwargs,get('Name', '')
+                name = kwargs.get('Name', '')
         else:
             name = args[0]
         assert isinstance(name, str) and name != '', "Name parameter was not passed or does not exist as the first argument in the variable class initialisation?"
@@ -100,11 +100,15 @@ class VariableProperty(VariableBase):
 
     def get_raw(self):
         obj = self._lab._get_resolved_obj(self._obj_res_list)
-        return getattr(obj, self._prop)
+        if obj != None:
+            return getattr(obj, self._prop)
+        else:
+            return None
 
     def set_raw(self, value):
         obj = self._lab._get_resolved_obj(self._obj_res_list)
-        setattr(obj, self._prop, value)
+        if obj != None:
+            setattr(obj, self._prop, value)
 
     def _get_current_config(self):
         return {

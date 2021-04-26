@@ -1,4 +1,5 @@
 import qcodes as qc
+from sqdtoolz.ExperimentConfiguration import*
 from sqdtoolz.Variable import*
 from sqdtoolz.HAL.HALbase import*
 from sqdtoolz.HAL.ACQ import*
@@ -29,6 +30,7 @@ class Laboratory:
 
         self._hal_objs = {}
         self._processors = {}
+        self._expt_configs = {}
         self._variables = {}
         self._activated_instruments = []
 
@@ -57,23 +59,39 @@ class Laboratory:
             with open(last_dir + "/laboratory_configuration.txt") as json_file:
                 data = json.load(json_file)
                 self.cold_reload_instruments(data)
+        self.cold_reload_experiment_configurations()
         self.update_variables_from_last_expt()
         # if os.path.isfile(last_dir + "/experiment_configuration.txt"):
         #     with open(last_dir + "/experiment_configuration.txt") as json_file:
         #         data = json.load(json_file)
         #         self.cold_reload_configuration(data)
 
-    def cold_reload_configuration(self, config_dict):
-        for dict_cur_hal in config_dict:
-            cur_class_name = dict_cur_hal['type']
-            globals()[cur_class_name].fromConfigDict(dict_cur_hal, self)
+    def cold_reload_configs(self, cur_exp_path, file_name = 'experiment_configuration.txt'):
+        dict_expt_configs = {x : self._expt_configs[x].get_config() for x in self._expt_configs}
+        with open(cur_exp_path + file_name, 'w') as outfile:
+            json.dump(dict_expt_configs, outfile, indent=4)
+
+    def cold_reload_experiment_configurations(self, config_dict):
+        for cur_expt_config in config_dict:
+            cur_keys = config_dict[cur_expt_config]['HALs']
+            cur_types = [x['Type'] for x in cur_keys]
+            cur_hals = [x['Name'] for x in cur_keys]
+            if 'ACQ' in cur_types:
+                ind = cur_types.index('ACQ')
+                cur_hals.pop(ind)
+                acq_obj = self.HAL(cur_keys[ind]['Name'])
+            else:
+                acq_obj = None
+            cur_hals = [self.HAL(x) for x in cur_hals]
+            new_expt_config = ExperimentConfiguration(cur_expt_config, self, 0, cur_hals, acq_obj)
+            new_expt_config.update_config(config_dict[cur_expt_config])
     
     def cold_reload_instruments(self, config_dict):
         for cur_instr in config_dict['ActiveInstruments']:
             self.activate_instrument(cur_instr)
         #Create the HALs
         for dict_cur_hal in config_dict['HALs']:
-            cur_class_name = dict_cur_hal['type']
+            cur_class_name = dict_cur_hal['Type']
             globals()[cur_class_name].fromConfigDict(dict_cur_hal, self)
         #Load parameters (including trigger relationships) onto the HALs
         for dict_cur_hal in config_dict['HALs']:
@@ -99,10 +117,16 @@ class Laboratory:
         return resolution_tree[::-1]
 
     def _get_resolved_obj(self, res_list):
+        ret_obj = None
         if res_list[0][1] == 'HAL':
             ret_obj = self.HAL(res_list[0][0])
         #
+        if ret_obj == None:
+            return None
+        
         if len(res_list) > 0:
+            if ret_obj == None:
+                return None
             for m in range(1,len(res_list)):
                 ret_obj = ret_obj._get_child(res_list[m])
         return ret_obj
@@ -127,6 +151,17 @@ class Laboratory:
     def PROC(self, proc_name):
         if proc_name in self._processors:
             return self._processors[proc_name]
+        else:
+            return None
+
+    def _register_CONFIG(self, expt_config):
+        if not (expt_config.Name in self._expt_configs):
+            self._expt_configs[expt_config.Name] = expt_config
+            return True
+        return False
+    def CONFIG(self, expt_config_name):
+        if expt_config_name in self._expt_configs:
+            return self._expt_configs[expt_config_name]
         else:
             return None
 
@@ -195,8 +230,12 @@ class Laboratory:
         self._prog_bar_str = ''
         ret_vals = expt_obj._run(cur_exp_path, sweep_vars, ping_iteration=self._update_progress_bar, delay=delay)
         #TODO: Add flag to get/save for live-plotting
-        #Save experiment configurations
+
+        #Save the experiment configuration
+        
+        #Save experiment-specific experiment-configuration data (i.e. timing diagram)
         expt_obj.save_config(cur_exp_path, 'experiment_configuration')
+
         #Save instrument configurations (QCoDeS)
         self._save_instrument_config(cur_exp_path)
         #Save Laboratory Configuration
@@ -218,6 +257,11 @@ class Laboratory:
                 '{\n' +
                 ',\n'.join(f"\"{x}\" : {json.dumps(param_dict[x])}" for x in param_dict.keys()) +
                 '\n}\n')
+
+    def save_experiment_configs(self, cur_exp_path, file_name = 'experiment_configuration.txt'):
+        dict_expt_configs = {x : self._expt_configs[x].get_config() for x in self._expt_configs}
+        with open(cur_exp_path + file_name, 'w') as outfile:
+            json.dump(dict_expt_configs, outfile, indent=4)
 
     def save_laboratory_config(self, cur_exp_path, file_name = 'laboratory_configuration.txt'):
         #Prepare the dictionary of HAL configurations

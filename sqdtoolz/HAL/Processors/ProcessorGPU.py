@@ -21,24 +21,48 @@ class ProcNodeGPU:
         else:
             return arr
 
-    def input_format(self):
-        raise NotImplementedError()
-
-    def output_format(self):
-        raise NotImplementedError()
-
     def process_data(self, data_pkt):
         raise NotImplementedError()
 
+    def _get_current_config(self):
+        raise NotImplementedError()
+
+from sqdtoolz.HAL.Processors.GPU.GPU_DDC import*
+from sqdtoolz.HAL.Processors.GPU.GPU_FIR import*
+from sqdtoolz.HAL.Processors.GPU.GPU_Integrate import*
+from sqdtoolz.HAL.Processors.GPU.GPU_Max import*
+from sqdtoolz.HAL.Processors.GPU.GPU_Mean import*
+
+
 
 class ProcessorGPU(DataProcessor):
-    def __init__(self):
+    def __init__(self, proc_name, lab, pipeline_main = [], pipeline_end = []):
+        super().__init__(proc_name, lab)
         self.tp_GPU = ThreadPool(processes=1)
         self.cur_async_handle = None
 
-        self.pipeline = []
+        self.pipeline = pipeline_main
+        self.pipeline_end = pipeline_end
         self.cur_data_queue = queue.Queue()
         self.cur_data_processed = []
+
+    @classmethod
+    def fromConfigDict(cls, config_dict, lab):
+        pipeline_main = []
+        for cur_proc in config_dict['Pipeline']:
+            cur_proc_type = cur_proc['Type']
+            assert cur_proc_type in globals(), cur_proc_type + " is not in the current namespace. Need to perhaps include this class in this file..."
+            cur_proc_type = globals()[cur_proc_type]
+            new_proc = cur_proc_type.fromConfigDict(cur_proc)
+            pipeline_main.append(new_proc)
+        pipeline_end = []
+        for cur_proc in config_dict['PipelineEnd']:
+            cur_proc_type = cur_proc['Type']
+            assert cur_proc_type in globals(), cur_proc_type + " is not in the current namespace. Need to perhaps include this class in this file..."
+            cur_proc_type = globals()[cur_proc_type]
+            new_proc = cur_proc_type.fromConfigDict(cur_proc)
+            pipeline_end.append(new_proc)
+        return cls(config_dict['Name'], lab, pipeline_main, pipeline_end)
 
     def push_data(self, data_pkt):
         self.cur_data_queue.put(data_pkt)
@@ -73,6 +97,15 @@ class ProcessorGPU(DataProcessor):
                 #Should only arrive here if it happens to be one repetition for example (i.e. on passing through all packets, it is still a single singleton)
                 ret_data['data'][cur_ch] = dataarrays[0]
 
+        #Run the processes that are to occur on the entire collated dataset
+        for cur_proc in self.pipeline_end:
+            ret_data = cur_proc.process_data(ret_data)
+        #Drain the GPU memory and transfer to CPU before processing next data packet...
+        for cur_ch in ret_data['data'].keys():
+            cp_arr = ret_data['data'].pop(cur_ch)
+            ret_data['data'][cur_ch] = cp.asnumpy(cp_arr)
+            del cp_arr
+
         if len(self.cur_data_processed) > 1:
             for cur_arr in self.cur_data_processed[1:]:
                 del cur_arr
@@ -104,56 +137,35 @@ class ProcessorGPU(DataProcessor):
 
     def reset_pipeline(self):
         self.pipeline.clear()
+        self.pipeline_end.clear()
 
     def add_stage(self, ProcNodeGPUobj):
         self.pipeline.append(ProcNodeGPUobj)
 
+    def add_stage_end(self, ProcNodeGPUobj):
+        self.pipeline_end.append(ProcNodeGPUobj)
 
-# from sqdtoolz.HAL.Processors.GPU.GPU_DDC import*
-# from sqdtoolz.HAL.Processors.GPU.GPU_FIR import*
-# from sqdtoolz.HAL.Processors.GPU.GPU_Mean import*
-# def runme():
-#     new_proc = ProcessorGPU()
-#     new_proc.add_stage(GPU_DDC([0.1]))
-#     new_proc.add_stage(GPU_FIR([{'Type' : 'low', 'Taps' : 40, 'fc' : 0.01, 'Win' : 'hamming'}]*2))
+    def _get_current_config(self):
+        return {
+            'Name' : self.Name,
+            'Type'  : self.__class__.__name__,
+            'Pipeline' : [x._get_current_config() for x in self.pipeline],
+            'PipelineEnd' : [x._get_current_config() for x in self.pipeline_end]
+        }
 
-#     data_size = 1024*1024*4
-#     omega = 2*np.pi*0.1
-#     data = np.exp(-(np.arange(data_size)-200.0)**2/10000)*np.sin(omega*np.arange(data_size)+1.5+1.5)
-#     num_reps = 3
-#     num_segs = 4
-#     raw_data = np.hstack([data]*(num_reps*num_segs)).reshape(num_reps,num_segs,data.size)
-
-#     cur_data = {
-#         'parameters' : ['repetition', 'segment', 'sample'],
-#         'data' : { 'ch1' : raw_data },
-#         'misc' : {'SampleRates' : [1]}
-#     }
-
-#     new_proc.push_data(cur_data)
-#     fin_data = new_proc.get_all_data()
-
-#     import matplotlib.pyplot as plt
-#     # print(dataIQ[-1])
-#     plt.plot(fin_data['data']['ch1_I'][0][0])
-#     plt.plot(fin_data['data']['ch1_Q'][0][0])
-#     plt.plot(data)
-#     plt.show()
-
-#     input('Press ENTER')
-
-#     cur_data = {
-#         'parameters' : ['repetition', 'segment', 'sample'],
-#         'data' : { 'ch1' : raw_data },
-#         'misc' : {'SampleRates' : [1]}
-#     }
-
-#     new_proc.add_stage(GPU_Mean('repetition'))
-#     new_proc.push_data(cur_data)
-#     fin_data = new_proc.get_all_data()
-
-#     input('Press ENTER')
-
-
-# if __name__ == '__main__':
-#     runme()
+    def _set_current_config(self, dict_config):
+        assert dict_config['Type'] == self.__class__.__name__, f"Dictionary specifies wrong processor class type ({self.__class__.__name__})."
+        #Delete everything...
+        self.reset_pipeline()
+        for cur_proc in dict_config['Pipeline']:
+            cur_proc_type = cur_proc['Type']
+            assert cur_proc_type in globals(), cur_proc_type + " is not in the current namespace. Need to perhaps include this class in this file..."
+            cur_proc_type = globals()[cur_proc_type]
+            new_proc = cur_proc_type.fromConfigDict(cur_proc)
+            self.pipeline.append(new_proc)
+        for cur_proc in dict_config['PipelineEnd']:
+            cur_proc_type = cur_proc['Type']
+            assert cur_proc_type in globals(), cur_proc_type + " is not in the current namespace. Need to perhaps include this class in this file..."
+            cur_proc_type = globals()[cur_proc_type]
+            new_proc = cur_proc_type.fromConfigDict(cur_proc)
+            self.pipeline_end.append(new_proc)

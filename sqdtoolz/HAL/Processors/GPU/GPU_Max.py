@@ -1,7 +1,7 @@
 from sqdtoolz.HAL.Processors.ProcessorGPU import*
 import cupy as cp
 
-class GPU_Mean(ProcNodeGPU):
+class GPU_Max(ProcNodeGPU):
     def __init__(self, index_parameter_name):
         '''
         General function that averages each channel across some parameter - e.g. over repetition or over all the samples. 
@@ -22,7 +22,7 @@ class GPU_Mean(ProcNodeGPU):
 
         #Process means on a per-channel basis
         for ch_ind, cur_ch in enumerate(data_pkt['data'].keys()):
-            data_pkt['data'][cur_ch] = cp.mean(data_pkt['data'][cur_ch], axis=axis_num)
+            data_pkt['data'][cur_ch] = cp.max(data_pkt['data'][cur_ch], axis=axis_num)
 
         #Remove the parameter as it no longer exists after the averaging...
         data_pkt['parameters'].pop(axis_num)

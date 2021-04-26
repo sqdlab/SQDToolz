@@ -216,7 +216,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
     def _get_current_config(self):
         retDict = {
             'Name' : self.Name,
-            'type' : self.__class__.__name__,
+            'Type' : self.__class__.__name__,
             'SampleRate' : self.SampleRate,
             'TotalTime' : self._total_time,
             'global_factor' : self._global_factor,
@@ -230,7 +230,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
         return [x._get_current_config() for x in self._wfm_segment_list]
     
     def _set_current_config(self, dict_config, lab):
-        assert dict_config['type'] == self.__class__.__name__, 'Cannot set configuration to a AWG with a configuration that is of type ' + dict_config['type']
+        assert dict_config['Type'] == self.__class__.__name__, 'Cannot set configuration to a AWG with a configuration that is of type ' + dict_config['Type']
         
         self._sample_rate = dict_config['SampleRate']
         self._total_time = dict_config['TotalTime']

@@ -67,14 +67,14 @@ class DDG(TriggerOutputCompatible, HALbase):
         retDict = {
             'Name' : self.Name,
             'instrument' : self._instr_ddg.name,
-            'type' : self.__class__.__name__,
+            'Type' : self.__class__.__name__,
             'RepetitionTime' : self.RepetitionTime,
             'triggers' : trigDict
             }
         return retDict
 
     def _set_current_config(self, dict_config, lab):
-        assert dict_config['type'] == self.__class__.__name__, 'Cannot set configuration to a DDG with a configuration that is of type ' + dict_config['type']
+        assert dict_config['Type'] == self.__class__.__name__, 'Cannot set configuration to a DDG with a configuration that is of type ' + dict_config['Type']
         for cur_trig_name in dict_config['triggers']:
             self.get_trigger_output(cur_trig_name)._set_current_config(dict_config['triggers'][cur_trig_name])
         self.RepetitionTime = dict_config['RepetitionTime']

@@ -6,6 +6,8 @@ from sqdtoolz.HAL.AWG import*
 from sqdtoolz.HAL.DDG import*
 from sqdtoolz.HAL.GENmwSource import*
 from sqdtoolz.HAL.GENvoltSource import*
+from sqdtoolz.HAL.Processors.ProcessorCPU import*
+from sqdtoolz.HAL.Processors.ProcessorGPU import*
 from datetime import datetime
 from pathlib import Path
 import json
@@ -15,7 +17,6 @@ import numpy as np
 
 class Laboratory:
     def __init__(self, instr_config_file, save_dir):
-        self._variables = {}
         if instr_config_file == "":
             self._station = qc.Station()
         else:
@@ -27,6 +28,8 @@ class Laboratory:
         self._group_dir = {'Dir':"", 'InitDir':""}
 
         self._hal_objs = {}
+        self._processors = {}
+        self._variables = {}
         self._activated_instruments = []
 
     def update_variables_from_last_expt(self, file_name = ''):
@@ -76,6 +79,10 @@ class Laboratory:
         for dict_cur_hal in config_dict['HALs']:
             cur_hal_name = dict_cur_hal['Name']
             self._hal_objs[cur_hal_name]._set_current_config(dict_cur_hal, self)
+        #Create and load the PROCs
+        for dict_cur_proc in config_dict['PROCs']:
+            cur_class_name = dict_cur_proc['Type']
+            globals()[cur_class_name].fromConfigDict(dict_cur_proc, self)
 
 
     def _resolve_sqdobj_tree(self, sqdObj):
@@ -100,26 +107,26 @@ class Laboratory:
                 ret_obj = ret_obj._get_child(res_list[m])
         return ret_obj
 
-    def add_variable(self, param_name):
-        self._variables[param_name] = VariableInternal(param_name, self)
-        return self._variables[param_name]
-
-    #TODO: combine with above
-    def add_variable_property(self, param_name, sqdObj, prop_name):
-        res_list = self._resolve_sqdobj_tree(sqdObj)
-        self._variables[param_name] = VariableProperty(param_name, self, res_list, prop_name)
-        return self._variables[param_name]
-
     def _register_VAR(self, hal_var):
         if not (hal_var.Name in self._variables):
             self._variables[hal_var.Name] = hal_var
             return True
         return False
-
     def VAR(self, param_name):
         #assert param_name in self._variables, f"Parameter name {param_name} does not exist."
         if param_name in self._variables:
             return self._variables[param_name]
+        else:
+            return None
+
+    def _register_PROC(self, proc):
+        if not (proc.Name in self._processors):
+            self._processors[proc.Name] = proc
+            return True
+        return False
+    def PROC(self, proc_name):
+        if proc_name in self._processors:
+            return self._processors[proc_name]
         else:
             return None
 
@@ -218,9 +225,15 @@ class Laboratory:
         for cur_hal in self._hal_objs:
             dict_hals.append(self._hal_objs[cur_hal]._get_current_config())
 
+        #Prepare the dictionary of PROC configurations
+        dict_procs = []
+        for cur_proc in self._processors:
+            dict_procs.append(self._processors[cur_proc]._get_current_config())
+
         param_dict = {
                     'ActiveInstruments' : self._activated_instruments,
-                    'HALs' : dict_hals
+                    'HALs' : dict_hals,
+                    'PROCs': dict_procs
                     }
         if cur_exp_path != '':
             with open(cur_exp_path + file_name, 'w') as outfile:

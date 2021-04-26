@@ -2,17 +2,15 @@ from sqdtoolz.HAL.Processors.ProcessorCPU import*
 import numpy as np
 
 class CPU_DDC(ProcNodeCPU):
-    def __init__(self, ddc_freqs = []):
+    def __init__(self, ddc_freqs):
         #DDC variables
         self._ddc_freqs = ddc_freqs
         #A data store of current cosine|sine CuPy arrays used for DDC with each entry formatted as: (num-samples, sample-rate, ddc-frequency, cosine-array, sine-array)
         self._ddc_cur_cossin_arrays = []
 
-    def input_format(self):
-        return ['repetition', 'segment', 'sample']
-
-    def output_format(self):
-        return ['repetition', 'segment', 'sample']
+    @classmethod
+    def fromConfigDict(cls, config_dict):
+        return cls(config_dict['Frequencies'])
 
     def process_data(self, data_pkt, **kwargs):
         assert 'misc' in data_pkt, "The data packet does not have miscellaneous data under the key 'misc'"
@@ -47,9 +45,15 @@ class CPU_DDC(ProcNodeCPU):
                 ddc_arr_ind = len(self._ddc_cur_cossin_arrays) - 1
             #Perform the actual DDC...
             cur_data_cpu = data_pkt['data'].pop(cur_ch)
-            data_pkt['data'][f'{cur_ch}_I'] = np.multiply(cur_data_cpu, self._ddc_cur_cossin_arrays[ddc_arr_ind][3])
-            data_pkt['data'][f'{cur_ch}_Q'] = np.multiply(cur_data_cpu, self._ddc_cur_cossin_arrays[ddc_arr_ind][4])
+            data_pkt['data'][f'{cur_ch}_I'] = 2.0*np.multiply(cur_data_cpu, self._ddc_cur_cossin_arrays[ddc_arr_ind][3])
+            data_pkt['data'][f'{cur_ch}_Q'] = 2.0*np.multiply(cur_data_cpu, self._ddc_cur_cossin_arrays[ddc_arr_ind][4])
             data_pkt['misc']['SampleRates'].insert(2*ch_ind+1, sample_rate)
             del cur_data_cpu    #Perhaps necessary - well it's no time for caution...
 
         return data_pkt
+
+    def _get_current_config(self):
+        return {
+            'Type'  : self.__class__.__name__,
+            'Frequencies' : self._ddc_freqs[:]
+        }

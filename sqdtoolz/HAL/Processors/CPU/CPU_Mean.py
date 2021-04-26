@@ -11,11 +11,9 @@ class CPU_Mean(ProcNodeCPU):
         '''
         self._param_name = index_parameter_name
 
-    def input_format(self):
-        return ['repetition', 'segment', 'sample']
-
-    def output_format(self):
-        return ['repetition', 'segment', 'sample']
+    @classmethod
+    def fromConfigDict(cls, config_dict):
+        return cls(config_dict['Parameter'])
 
     def process_data(self, data_pkt, **kwargs):
         assert self._param_name in data_pkt['parameters'], f"The indexing parameter '{self._param_name}' is not in the current dataset."
@@ -33,3 +31,9 @@ class CPU_Mean(ProcNodeCPU):
         data_pkt['parameters'].pop(axis_num)
 
         return data_pkt
+
+    def _get_current_config(self):
+        return {
+            'Type'  : self.__class__.__name__,
+            'Parameter' : self._param_name
+        }

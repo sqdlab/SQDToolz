@@ -88,14 +88,14 @@ class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
         ret_dict = {
             'Name' : self.Name,
             'instrument' : self._instr_acq.name,
-            'type' : self.__class__.__name__,
+            'Type' : self.__class__.__name__,
             'TriggerSource' : self._get_trig_src_params_dict()
             }
         self.pack_properties_to_dict(['NumSamples', 'NumSegments', 'NumRepetitions', 'SampleRate', 'InputTriggerEdge'], ret_dict)
         return ret_dict
 
     def _set_current_config(self, dict_config, lab):
-        assert dict_config['type'] == self.__class__.__name__, 'Cannot set configuration to a ACQ with a configuration that is of type ' + dict_config['type']
+        assert dict_config['Type'] == self.__class__.__name__, 'Cannot set configuration to a ACQ with a configuration that is of type ' + dict_config['Type']
         self.NumSamples = dict_config['NumSamples']
         self.NumSegments = dict_config['NumSegments']
         self.NumRepetitions = dict_config['NumRepetitions']

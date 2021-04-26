@@ -1,0 +1,49 @@
+{
+    "ActiveInstruments": [],
+    "HALs": [],
+    "PROCs": [
+        {
+            "Name": "cpu_test",
+            "Type": "ProcessorCPU",
+            "Pipeline": [
+                {
+                    "Type": "CPU_DDC",
+                    "Frequencies": [
+                        0.14
+                    ]
+                },
+                {
+                    "Type": "CPU_FIR",
+                    "FIRspecs": [
+                        {
+                            "Type": "low",
+                            "Taps": 40,
+                            "fc": 0.01,
+                            "Win": "hamming"
+                        },
+                        {
+                            "Type": "low",
+                            "Taps": 40,
+                            "fc": 0.01,
+                            "Win": "hamming"
+                        }
+                    ]
+                },
+                {
+                    "Type": "CPU_Max",
+                    "Parameter": "sample"
+                },
+                {
+                    "Type": "CPU_Mean",
+                    "Parameter": "segment"
+                }
+            ],
+            "PipelineEnd": [
+                {
+                    "Type": "CPU_Max",
+                    "Parameter": "repetition"
+                }
+            ]
+        }
+    ]
+}

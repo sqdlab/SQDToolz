@@ -3,17 +3,15 @@ import cupy as cp
 import numpy as np
 
 class GPU_DDC(ProcNodeGPU):
-    def __init__(self, ddc_freqs = []):
+    def __init__(self, ddc_freqs):
         #DDC variables
         self._ddc_freqs = ddc_freqs
         #A data store of current cosine|sine CuPy arrays used for DDC with each entry formatted as: (num-samples, sample-rate, ddc-frequency, cosine-array, sine-array)
         self._ddc_cur_cossin_arrays = []
 
-    def input_format(self):
-        return ['repetition', 'segment', 'sample']
-
-    def output_format(self):
-        return ['repetition', 'segment', 'sample']
+    @classmethod
+    def fromConfigDict(cls, config_dict):
+        return cls(config_dict['Frequencies'])
 
     def process_data(self, data_pkt):
         assert 'misc' in data_pkt, "The data packet does not have miscellaneous data under the key 'misc'"
@@ -48,9 +46,15 @@ class GPU_DDC(ProcNodeGPU):
                 ddc_arr_ind = len(self._ddc_cur_cossin_arrays) - 1
             #Perform the actual DDC...
             cur_data_gpu = ProcNodeGPU.check_conv_to_cupy_array(data_pkt['data'].pop(cur_ch))
-            data_pkt['data'][f'{cur_ch}_I'] = cp.multiply(cur_data_gpu, self._ddc_cur_cossin_arrays[ddc_arr_ind][3])
-            data_pkt['data'][f'{cur_ch}_Q'] = cp.multiply(cur_data_gpu, self._ddc_cur_cossin_arrays[ddc_arr_ind][4])
+            data_pkt['data'][f'{cur_ch}_I'] = 2.0*cp.multiply(cur_data_gpu, self._ddc_cur_cossin_arrays[ddc_arr_ind][3])
+            data_pkt['data'][f'{cur_ch}_Q'] = 2.0*cp.multiply(cur_data_gpu, self._ddc_cur_cossin_arrays[ddc_arr_ind][4])
             data_pkt['misc']['SampleRates'].insert(2*ch_ind+1, sample_rate)
             del cur_data_gpu    #Perhaps necessary - well it's no time for caution...
 
         return data_pkt
+
+    def _get_current_config(self):
+        return {
+            'Type'  : self.__class__.__name__,
+            'Frequencies' : self._ddc_freqs[:]
+        }

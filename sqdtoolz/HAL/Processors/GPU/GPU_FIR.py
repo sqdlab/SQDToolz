@@ -19,11 +19,9 @@ class GPU_FIR(ProcNodeGPU):
         #A data store of current cosine|sine CuPy arrays used for DDC with each entry formatted as: (num-samples, sample-rate, ddc-frequency, cosine-array, sine-array)
         self._fir_arrays = []
 
-    def input_format(self):
-        return ['repetition', 'segment', 'sample']
-
-    def output_format(self):
-        return ['repetition', 'segment', 'sample']
+    @classmethod
+    def fromConfigDict(cls, config_dict):
+        return cls(config_dict['FIRspecs'])
 
     def process_data(self, data_pkt):
         assert 'misc' in data_pkt, "The data packet does not have miscellaneous data under the key 'misc'"
@@ -43,3 +41,10 @@ class GPU_FIR(ProcNodeGPU):
             data_pkt['data'][cur_ch] = cupyx.scipy.ndimage.convolve1d( ProcNodeGPU.check_conv_to_cupy_array(data_pkt['data'][cur_ch]) , myFilt_vals)
 
         return data_pkt
+
+    def _get_current_config(self):
+        return {
+            'Type'  : self.__class__.__name__,
+            'FIRspecs' : self._fir_specs
+        }
+

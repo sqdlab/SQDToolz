@@ -36,13 +36,13 @@ class GENvoltSource(HALbase):
         ret_dict = {
             'Name' : self.Name,
             'instrument' : self._instr_volt.full_name,
-            'type' : self.__class__.__name__
+            'Type' : self.__class__.__name__
             }
         self.pack_properties_to_dict(['Voltage', 'RampRate', 'Output'], ret_dict)
         return ret_dict
 
     def _set_current_config(self, dict_config, lab):
-        assert dict_config['type'] == self.__class__.__name__, 'Cannot set configuration to a Voltage-Source with a configuration that is of type ' + dict_config['type']
+        assert dict_config['Type'] == self.__class__.__name__, 'Cannot set configuration to a Voltage-Source with a configuration that is of type ' + dict_config['Type']
         self.Voltage = dict_config['Voltage']
         self.RampRate = dict_config['RampRate']
         self.Output = dict_config['Output']

@@ -18,11 +18,9 @@ class CPU_FIR(ProcNodeCPU):
         #A data store of current cosine|sine CuPy arrays used for DDC with each entry formatted as: (num-samples, sample-rate, ddc-frequency, cosine-array, sine-array)
         self._fir_arrays = []
 
-    def input_format(self):
-        return ['repetition', 'segment', 'sample']
-
-    def output_format(self):
-        return ['repetition', 'segment', 'sample']
+    @classmethod
+    def fromConfigDict(cls, config_dict):
+        return cls(config_dict['FIRspecs'])
 
     def process_data(self, data_pkt, **kwargs):
         assert 'misc' in data_pkt, "The data packet does not have miscellaneous data under the key 'misc'"
@@ -40,9 +38,15 @@ class CPU_FIR(ProcNodeCPU):
             else:
                 myFilt_vals = 1.0 - np.array(scipy.signal.firwin(self._fir_specs[ch_ind]['Taps'], freq_cutoff_norm, window=self._fir_specs[ch_ind]['Win']))
             
-            param_slicer = [np.s_[0:]]*len(data_pkt['data'][cur_ch].shape)
-            param_slicer[-1] = np.s_[int(self._fir_specs[ch_ind]['Taps']):]
-            param_slicer = tuple(x for x in param_slicer)
-            data_pkt['data'][cur_ch] = scipy.ndimage.convolve1d( data_pkt['data'][cur_ch] , myFilt_vals)[param_slicer]
+            # param_slicer = [np.s_[0:]]*len(data_pkt['data'][cur_ch].shape)
+            # param_slicer[-1] = np.s_[int(self._fir_specs[ch_ind]['Taps']):]
+            # param_slicer = tuple(x for x in param_slicer)
+            data_pkt['data'][cur_ch] = scipy.ndimage.convolve1d( data_pkt['data'][cur_ch] , myFilt_vals) #[param_slicer]
 
         return data_pkt
+
+    def _get_current_config(self):
+        return {
+            'Type'  : self.__class__.__name__,
+            'FIRspecs' : self._fir_specs
+        }

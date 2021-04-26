@@ -85,7 +85,7 @@ class GENmwSource(HALbase, TriggerInputCompatible, TriggerInput):
             'Name' : self.Name,
             'instrument' : self._instr_mw_src_name,
             'InstrumentChannel' : self._instr_mw_src_channel,
-            'type' : self.__class__.__name__,
+            'Type' : self.__class__.__name__,
             'TriggerSource' : self._get_trig_src_params_dict(),
             'InputTriggerEdge' : self._instr_mw_output.TriggerInputEdge
             }
@@ -93,7 +93,7 @@ class GENmwSource(HALbase, TriggerInputCompatible, TriggerInput):
         return ret_dict
 
     def _set_current_config(self, dict_config, lab):
-        assert dict_config['type'] == self.__class__.__name__, 'Cannot set configuration to a MW-Source with a configuration that is of type ' + dict_config['type']
+        assert dict_config['Type'] == self.__class__.__name__, 'Cannot set configuration to a MW-Source with a configuration that is of type ' + dict_config['Type']
         self._channel_name = dict_config['Name']
         self.Power = dict_config['Power']
         self.Frequency = dict_config['Frequency']

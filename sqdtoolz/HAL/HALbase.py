@@ -9,7 +9,7 @@ class HALbase:
             hal_name = kwargs,get('hal_name', '')
         else:
             hal_name = args[0]
-        assert isinstance(hal_name, str) and hal_name != '', "Name parameter was not passed or does not exist as the first argument in the variable class initialisation?"
+        assert isinstance(hal_name, str) and hal_name != '', "Parameter hal_name was not passed or does not exist as the first argument in the variable class initialisation?"
         if len(args) < 2:
             lab = kwargs.get('lab', None)
             if lab == None:

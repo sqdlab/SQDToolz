@@ -153,7 +153,7 @@ class ProcessorGPU(DataProcessor):
             'PipelineEnd' : [x._get_current_config() for x in self.pipeline_end]
         }
 
-    def _set_current_config(self, dict_config):
+    def _set_current_config(self, dict_config, lab):
         assert dict_config['Type'] == self.__class__.__name__, f"Dictionary specifies wrong processor class type ({self.__class__.__name__})."
         #Delete everything...
         self.reset_pipeline()

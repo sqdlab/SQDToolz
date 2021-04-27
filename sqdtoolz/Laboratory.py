@@ -59,7 +59,10 @@ class Laboratory:
             with open(last_dir + "/laboratory_configuration.txt") as json_file:
                 data = json.load(json_file)
                 self.cold_reload_instruments(data)
-        self.cold_reload_experiment_configurations()
+        if os.path.isfile(last_dir + "/experiment_configurations.txt"):
+            with open(last_dir + "/experiment_configurations.txt") as json_file:
+                data = json.load(json_file)
+                self.cold_reload_experiment_configurations(data)
         self.update_variables_from_last_expt()
         # if os.path.isfile(last_dir + "/experiment_configuration.txt"):
         #     with open(last_dir + "/experiment_configuration.txt") as json_file:
@@ -232,9 +235,9 @@ class Laboratory:
         #TODO: Add flag to get/save for live-plotting
 
         #Save the experiment configuration
-        
+        self.save_experiment_configs(cur_exp_path)
         #Save experiment-specific experiment-configuration data (i.e. timing diagram)
-        expt_obj.save_config(cur_exp_path, 'experiment_configuration')
+        expt_obj.save_config(cur_exp_path, 'timing_diagram')
 
         #Save instrument configurations (QCoDeS)
         self._save_instrument_config(cur_exp_path)
@@ -258,7 +261,7 @@ class Laboratory:
                 ',\n'.join(f"\"{x}\" : {json.dumps(param_dict[x])}" for x in param_dict.keys()) +
                 '\n}\n')
 
-    def save_experiment_configs(self, cur_exp_path, file_name = 'experiment_configuration.txt'):
+    def save_experiment_configs(self, cur_exp_path, file_name = 'experiment_configurations.txt'):
         dict_expt_configs = {x : self._expt_configs[x].get_config() for x in self._expt_configs}
         with open(cur_exp_path + file_name, 'w') as outfile:
             json.dump(dict_expt_configs, outfile, indent=4)

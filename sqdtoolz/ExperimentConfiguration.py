@@ -58,7 +58,7 @@ class ExperimentConfiguration:
         if self._hal_ACQ:
             self._proc = self._hal_ACQ.data_processor
             if self._proc:
-                self._proc_configs = [self._proc._get_current_config()]
+                self._proc_configs = [self._proc]
 
     def get_config(self):
         return self._init_config

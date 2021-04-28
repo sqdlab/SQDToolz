@@ -39,6 +39,10 @@ class WaveformTransformation:
     def Name(self):
         return self._name
 
+    @property
+    def Parent(self):
+        return None
+
     def initialise_for_new_waveform(self):
         raise NotImplementedError()
 

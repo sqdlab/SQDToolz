@@ -117,12 +117,17 @@ class Laboratory:
         if isinstance(cur_obj, HALbase):
             assert cur_obj.Name in self._hal_objs, f"It seems that {sqdObj.Name} is a part of some rogue unregistered HAL object."
             resolution_tree += [(cur_obj.Name, 'HAL')]
+        elif isinstance(cur_obj, WaveformTransformation):
+            assert cur_obj.Name in self._waveform_transforms, f"It seems that {sqdObj.Name} is a part of some rogue unregistered WaveformTransformation object."
+            resolution_tree += [(cur_obj.Name, 'WFMT')]
         return resolution_tree[::-1]
 
     def _get_resolved_obj(self, res_list):
         ret_obj = None
         if res_list[0][1] == 'HAL':
             ret_obj = self.HAL(res_list[0][0])
+        elif res_list[0][1] == 'WFMT':
+            ret_obj = self.WFMT(res_list[0][0])
         #
         if ret_obj == None:
             return None

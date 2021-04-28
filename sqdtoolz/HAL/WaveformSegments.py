@@ -15,7 +15,7 @@ class WaveformSegmentBase:
         return self._name
 
     def NumPts(self, fs):
-        return self.Duration*fs
+        return int(np.round(self.Duration*fs))
 
     @property
     def Duration(self):

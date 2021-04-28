@@ -7,6 +7,8 @@ from sqdtoolz.HAL.AWG import*
 from sqdtoolz.HAL.DDG import*
 from sqdtoolz.HAL.GENmwSource import*
 
+from sqdtoolz.HAL.WaveformGeneric import*
+
 import numpy as np
 import unittest
 
@@ -341,32 +343,179 @@ assert arr_equality(arr_act_segs[:,1], arr_exp[:,1]), "Incorrect trigger segment
 hal_acq.InputTriggerEdge = 1
 new_lab._get_instrument('virMWS').get_output('CH1').TriggerInputEdge = 1
 
-
+#
 #Test waveform-update and mapping
+#
+#Try simple example
 expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq)
 waveform_mapping = {
-    'waveforms' : {'qubit' : 'Wfm1'}
+    'waveforms' : {'qubit' : 'Wfm1'},
+    'digital'   : {
+        'readout'  : awg_wfm.get_output_channel(0).marker(1),
+        'sequence' : awg_wfm.get_output_channel(1).marker(0)
+        }
 }
 expConfig.map_waveforms(waveform_mapping)
-new_waveform = {
-    'waveforms' : {
-        'qubit' : [
-            WFS_Gaussian("init", None, 20e-9, 0.5-0.1),
-            WFS_Constant("zero1", None, 30e-9, 0.1),
-            WFS_Gaussian("init2", None, 45e-9, 0.5-0.1),
-            WFS_Constant("zero2", None, 77e-9, 0.0)
-        ]
-    },
-    'readout' : {
-        'refWaveform' : 'qubit',
-        'segments' : ["init"]
-        },
-    'sequence' : {
-        'refWaveform' : 'qubit',
-        'TrigDelay' : 0.0,
-        'TrigLength' : 10.0e-9
-    }
+wfm = WaveformGeneric(['qubit'], ['readout', 'sequence'])
+wfm.set_waveform('qubit', [
+    WFS_Gaussian("init", None, 20e-9, 0.5-0.1),
+    WFS_Constant("zero1", None, 30e-9, 0.1),
+    WFS_Gaussian("init2", None, 45e-9, 0.5-0.1),
+    WFS_Constant("zero2", None, 77e-9, 0.0)
+])
+wfm.set_digital_segments('readout', 'qubit', ['zero2'])
+wfm.set_digital_trigger('sequence', 50e-9)
+expConfig.update_waveforms(wfm)
+arr_act, arr_act_segs = expConfig.get_trigger_edges(awg_wfm2.get_output_channel(0).marker(0))
+arr_exp = round_to_samplerate(awg_wfm, np.array([20e-9+30e-9+45e-9]) + 650e-9 )
+assert arr_equality(arr_act, arr_exp), "Incorrect trigger edges when using waveform mapping."
+#
+#Try multiple waveforms...
+expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq)
+waveform_mapping = {
+    'waveforms' : {'qubit1' : 'Wfm1', 'qubit2' : 'Wfm2'},
+    'digital'   : {
+        'readout'  : awg_wfm.get_output_channel(0).marker(1),
+        'sequence' : awg_wfm.get_output_channel(1).marker(0)
+        }
 }
+expConfig.map_waveforms(waveform_mapping)
+wfm = WaveformGeneric(['qubit1', 'qubit2'], ['readout', 'sequence'])
+wfm.set_waveform('qubit1', [
+    WFS_Gaussian("init", None, 20e-9, 0.5-0.1),
+    WFS_Constant("zero1", None, 30e-9, 0.1),
+    WFS_Gaussian("init2", None, 45e-9, 0.5-0.1),
+    WFS_Constant("zero2", None, 77e-9, 0.0)
+])
+wfm.set_waveform('qubit2', [
+    WFS_Gaussian("initX", None, 20e-9, 0.5-0.1),
+    WFS_Constant("zero1X", None, 30e-9, 0.1),
+    WFS_Gaussian("init2X", None, 45e-9, 0.5-0.1),
+    WFS_Constant("zero2X", None, 77e-9, 0.0)
+])
+wfm.set_digital_segments('readout', 'qubit1', ['zero1'])
+wfm.set_digital_segments('sequence', 'qubit2', ['init2X'])
+expConfig.update_waveforms(wfm)
+arr_act, arr_act_segs = expConfig.get_trigger_edges(awg_wfm2.get_output_channel(0).marker(0))
+arr_exp = round_to_samplerate(awg_wfm, np.array([20e-9]) + 650e-9 )
+assert arr_equality(arr_act, arr_exp), "Incorrect trigger edges when using waveform mapping on multiple waveforms."
+#
+#Try multiple waveforms but reference waveform is on another waveform...
+expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq)
+waveform_mapping = {
+    'waveforms' : {'qubit1' : 'Wfm1', 'qubit2' : 'Wfm2'},
+    'digital'   : {
+        'readout'  : awg_wfm.get_output_channel(0).marker(1),
+        'sequence' : awg_wfm.get_output_channel(1).marker(0)
+        }
+}
+expConfig.map_waveforms(waveform_mapping)
+wfm = WaveformGeneric(['qubit1', 'qubit2'], ['readout', 'sequence'])
+wfm.set_waveform('qubit1', [
+    WFS_Gaussian("init", None, 20e-9, 0.5-0.1),
+    WFS_Constant("zero1", None, 30e-9, 0.1),
+    WFS_Gaussian("init2", None, 45e-9, 0.5-0.1),
+    WFS_Constant("zero2", None, 77e-9, 0.0)
+])
+wfm.set_waveform('qubit2', [
+    WFS_Gaussian("initX", None, 20e-9, 0.5-0.1),
+    WFS_Constant("zero1X", None, 45e-9, 0.1),
+    WFS_Gaussian("init2X", None, 30e-9, 0.5-0.1),
+    WFS_Constant("zero2X", None, 77e-9, 0.0)
+])
+wfm.set_digital_segments('readout', 'qubit2', ['init2X'])
+wfm.set_digital_segments('sequence', 'qubit1', ['zero1'])
+expConfig.update_waveforms(wfm)
+arr_act, arr_act_segs = expConfig.get_trigger_edges(awg_wfm2.get_output_channel(0).marker(0))
+arr_exp = round_to_samplerate(awg_wfm, np.array([65e-9]) + 650e-9 )
+assert arr_equality(arr_act, arr_exp), "Incorrect trigger edges when using waveform mapping on multiple waveforms."
+#Check the assert triggers if the waveforms are of different size...
+wfm.set_waveform('qubit2', [
+    WFS_Gaussian("initX", None, 20e-9, 0.5-0.1),
+    WFS_Constant("zero1X", None, 45e-9, 0.1),
+    WFS_Gaussian("init2X", None, 31e-9, 0.5-0.1),
+    WFS_Constant("zero2X", None, 77e-9, 0.0)
+])
+assert_found = False
+try:
+    expConfig.update_waveforms(wfm)
+except AssertionError:
+    assert_found = True
+    # assert arr_act.size == 0, "There are erroneous trigger edges found in the current configuration."
+assert assert_found, "Function update_waveforms failed to trigger an assertion error when feeding waveforms of different size while demanding reference marker segments amongst each other."
+#
+#Try with elastic segments and multiple waveforms...
+awg_wfm = WaveformAWG("Wfm1", new_lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9, total_time=200e-9)
+expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq)
+waveform_mapping = {
+    'waveforms' : {'qubit1' : 'Wfm1', 'qubit2' : 'Wfm2'},
+    'digital'   : {
+        'readout'  : awg_wfm.get_output_channel(0).marker(1),
+        'sequence' : awg_wfm.get_output_channel(1).marker(0)
+        }
+}
+expConfig.map_waveforms(waveform_mapping)
+wfm = WaveformGeneric(['qubit1', 'qubit2'], ['readout', 'sequence'])
+wfm.set_waveform('qubit1', [
+    WFS_Gaussian("init", None, 20e-9, 0.5-0.1),
+    WFS_Constant("zero1", None, -1, 0.1),
+    WFS_Gaussian("init2", None, 45e-9, 0.5-0.1),
+    WFS_Constant("zero2", None, 77e-9, 0.0)
+])
+wfm.set_waveform('qubit2', [
+    WFS_Gaussian("initX", None, 20e-9, 0.5-0.1),
+    WFS_Constant("zero1X", None, 30e-9, 0.1),
+    WFS_Gaussian("init2X", None, 45e-9, 0.5-0.1),
+    WFS_Constant("zero2X", None, 77e-9, 0.0)
+])
+wfm.set_digital_segments('readout', 'qubit1', ['init2'])
+wfm.set_digital_segments('sequence', 'qubit1', ['zero2'])
+expConfig.update_waveforms(wfm)
+arr_act, arr_act_segs = expConfig.get_trigger_edges(awg_wfm2.get_output_channel(0).marker(0))
+arr_exp = round_to_samplerate(awg_wfm, np.array([20e-9+58e-9]) + 650e-9 )
+assert arr_equality(arr_act, arr_exp), "Incorrect trigger edges when using an elastic waveform and waveform mapping on multiple waveforms."
+#
+#Try with elastic segments and multiple waveforms but reference waveform is on another waveform...
+awg_wfm = WaveformAWG("Wfm1", new_lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9, total_time=200e-9)
+awg_wfm2 = WaveformAWG("Wfm2", new_lab, [('virAWG', 'CH3'), ('virAWG', 'CH4')], 1e9, total_time=200e-9)
+expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq)
+waveform_mapping = {
+    'waveforms' : {'qubit1' : 'Wfm1', 'qubit2' : 'Wfm2'},
+    'digital'   : {
+        'readout'  : awg_wfm.get_output_channel(0).marker(1),
+        'sequence' : awg_wfm.get_output_channel(1).marker(0)
+        }
+}
+expConfig.map_waveforms(waveform_mapping)
+wfm = WaveformGeneric(['qubit1', 'qubit2'], ['readout', 'sequence'])
+wfm.set_waveform('qubit1', [
+    WFS_Gaussian("init", None, 20e-9, 0.5-0.1),
+    WFS_Constant("zero1", None, -1, 0.1),
+    WFS_Gaussian("init2", None, 45e-9, 0.5-0.1),
+    WFS_Constant("zero2", None, 77e-9, 0.0)
+])
+wfm.set_waveform('qubit2', [
+    WFS_Gaussian("initX", None, 20e-9, 0.5-0.1),
+    WFS_Constant("zero1X", None, 45e-9, 0.1),
+    WFS_Gaussian("init2X", None, -1, 0.5-0.1),
+    WFS_Constant("zero2X", None, 77e-9, 0.0)
+])
+wfm.set_digital_segments('readout', 'qubit2', ['init2X'])
+wfm.set_digital_segments('sequence', 'qubit1', ['zero1'])
+expConfig.update_waveforms(wfm)
+arr_act, arr_act_segs = expConfig.get_trigger_edges(awg_wfm2.get_output_channel(0).marker(0))
+arr_exp = round_to_samplerate(awg_wfm, np.array([65e-9]) + 650e-9 )
+assert arr_equality(arr_act, arr_exp), "Incorrect trigger edges when using an elastic waveform and waveform mapping on multiple waveforms."
+#Check the assert triggers if the waveforms are of different size...
+awg_wfm2 = WaveformAWG("Wfm2", new_lab, [('virAWG', 'CH3'), ('virAWG', 'CH4')], 1e9, total_time=201e-9)
+assert_found = False
+try:
+    expConfig.update_waveforms(wfm)
+except AssertionError:
+    assert_found = True
+    # assert arr_act.size == 0, "There are erroneous trigger edges found in the current configuration."
+assert assert_found, "Function update_waveforms failed to trigger an assertion error when feeding waveforms of different size while demanding reference marker segments amongst each other."
+
 
 #########################################################################################################
 #######################################TESTING SAVE/LOAD FUNCTIONS#######################################

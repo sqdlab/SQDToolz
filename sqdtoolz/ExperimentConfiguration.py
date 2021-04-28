@@ -19,6 +19,8 @@ class ExperimentConfiguration:
         self._list_HALs = list_HALs[:]
         self._hal_ACQ = hal_ACQ
 
+        self._dict_wfm_map = {'waveforms' : {}, 'digital' : {} }
+
         self._settle_currently_used_processors()
         
         self._init_config = self.save_config()
@@ -63,7 +65,7 @@ class ExperimentConfiguration:
         return self._init_config
 
     def save_config(self, file_name = ''):
-        cur_config = {'HALs' : [], 'PROCs' : [], 'RepetitionTime' : self.RepetitionTime}
+        cur_config = {'HALs' : [], 'PROCs' : [], 'RepetitionTime' : self.RepetitionTime, 'WaveformMapping' : self._dict_wfm_map}
 
         #Prepare the dictionary of HAL configurations
         for cur_hal in self._list_HALs + [self._hal_ACQ]:
@@ -98,32 +100,50 @@ class ExperimentConfiguration:
                     break
             assert found_proc, f"PROC object {cur_dict['Name']} does not exist in the current ExperimentConfiguration object."
         self.RepetitionTime = conf['RepetitionTime']
+        self._dict_wfm_map = conf['WaveformMapping'] 
         #
         self._init_config = conf
 
     def map_waveforms(self, map_dict):
         self._dict_wfm_map = map_dict
-        {
-            'waveforms' : {
-                np.cos(np.linspace(0,6,50))
-            }
-        }
+        #Convert marker objects into guids...
+        if 'digital' in self._dict_wfm_map:
+            for cur_dig in self._dict_wfm_map['digital']:
+                self._dict_wfm_map['digital'][cur_dig] = self._lab._resolve_sqdobj_tree(self._dict_wfm_map['digital'][cur_dig])
 
-    def update_waveforms(self, new_waveforms):
+    def update_waveforms(self, wfm_gen):
         #Settle the actual waveforms first
-        assert 'waveforms' in new_waveforms, "The input waveform dictionary must have a \'wave\' key."
-        for cur_wave in  new_waveform['waveforms']:
-            assert cur_wave in self._dict_wfm_map['waveforms']
+        for cur_wave in  wfm_gen.waveforms:
+            assert cur_wave in self._dict_wfm_map['waveforms'], f"There is no mapping for waveform {cur_wave}"
             awg_hal = None
             for cur_hal in self._list_HALs:
                 if self._dict_wfm_map['waveforms'][cur_wave] == cur_hal.Name:
                     awg_hal = cur_hal
                     break
             assert awg_hal != None, f"The AWG waveform HAL {self._dict_wfm_map['waveforms'][cur_wave]} does not exist in this Experiment Configuration."
-            awg_hal.set_waveform_segments(new_waveforms['waveforms'][cur_wave])
+            awg_hal.set_waveform_segments(wfm_gen.waveforms[cur_wave])
+            awg_hal.null_all_markers()
         #Now settle the output markers
+        for cur_dig in wfm_gen.digitals:
+            assert cur_dig in self._dict_wfm_map['digital'], f"There is no mapping for digital waveform {cur_wave}"
+            if 'refWaveform' in wfm_gen.digitals[cur_dig]:
+                pass
+                cur_mkr = self._lab._get_resolved_obj(self._dict_wfm_map['digital'][cur_dig])
 
-        new_waveform['wave']
+                cur_mkr_awg = self._dict_wfm_map['digital'][cur_dig][0][0]
+                cur_ref_awg = self._dict_wfm_map['waveforms'][ wfm_gen.digitals[cur_dig]['refWaveform'] ]
+                if cur_mkr_awg == cur_ref_awg:
+                    cur_mkr.set_markers_to_segments(wfm_gen.digitals[cur_dig]['segments'])
+                else:
+                    mkr_wfm = self._lab.HAL(cur_ref_awg)._get_marker_waveform_from_segments(wfm_gen.digitals[cur_dig]['segments'])
+                    assert mkr_wfm.size == self._lab.HAL(cur_mkr_awg).NumPts, "When setting a marker on a given waveform using reference segments from another waveforms, the two waveforms must be the same size."
+                    cur_mkr.set_markers_to_arbitrary(mkr_wfm)
+            else:
+                cur_trig = self._lab._get_resolved_obj(self._dict_wfm_map['digital'][cur_dig])
+                cur_trig.set_markers_to_trigger()
+                cur_trig.TrigPulseDelay = wfm_gen.digitals[cur_dig]['trig_delay']
+                cur_trig.TrigPulseLength = wfm_gen.digitals[cur_dig]['trig_length']
+                cur_trig.TrigPolarity = wfm_gen.digitals[cur_dig]['trig_polarity']
 
     def init_instruments(self):
         self.update_config(self._init_config)

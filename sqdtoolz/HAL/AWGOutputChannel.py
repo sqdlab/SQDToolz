@@ -118,6 +118,10 @@ class AWGOutputChannel(TriggerInput):
         '''
         return self._trig_src_obj
 
+    def null_all_markers(self):
+        for cur_mark in self._awg_mark_list:
+            cur_mark.set_markers_to_none()
+
     def marker(self, marker_index):
         '''
         Returns an AWGOutputMarker object.
@@ -194,6 +198,7 @@ class AWGOutputMarker(TriggerOutput, TriggerInput):
 
     def set_markers_to_arbitrary(self, arb_mkr_list):
         self._marker_arb_array = arb_mkr_list[:]
+        self._marker_status = 'Arbitrary'
     
     def set_markers_to_trigger(self):
         '''
@@ -285,11 +290,10 @@ class AWGOutputMarker(TriggerOutput, TriggerInput):
         elif self._marker_status == 'Arbitrary':
             return self._marker_arb_array
         elif self._marker_status == 'Segments':
-            final_wfm = np.zeros(int(np.round(self._parent_waveform_obj.NumPts)), dtype=np.ubyte) + 1 - self._marker_pol
-            for cur_seg_name in self._marker_seg_list:
-                start_pt, end_pt = self._parent_waveform_obj._get_index_points_for_segment(cur_seg_name)
-                final_wfm[start_pt:end_pt+1] = self._marker_pol
-            return final_wfm
+            return self._parent_waveform_obj._get_marker_waveform_from_segments(self._marker_seg_list)
+
+    def get_raw_marker_waveform(self):
+        return self._assemble_marker_raw()
 
     def get_trigger_id(self):
         return [self._awg_output_ch._ch_index, self._ch_index]

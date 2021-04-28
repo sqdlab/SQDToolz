@@ -104,8 +104,11 @@ class ExperimentConfiguration:
         #
         self._init_config = conf
 
-    def map_waveforms(self, map_dict):
-        self._dict_wfm_map = map_dict
+    def map_waveforms(self, wfm_map_obj):
+        self._dict_wfm_map = {
+            'waveforms' : wfm_map_obj.waveforms,
+            'digital'   : wfm_map_obj.digitals
+        }
         #Convert marker objects into guids...
         if 'digital' in self._dict_wfm_map:
             for cur_dig in self._dict_wfm_map['digital']:

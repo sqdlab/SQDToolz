@@ -28,6 +28,10 @@ class Experiment:
 
         self._expt_config.init_instruments()
 
+        waveform_updates = kwargs.get('update_waveforms', None)
+        if waveform_updates:
+            self._expt_config.update_waveforms(waveform_updates)
+
         if len(sweep_vars) == 0:
             self._expt_config.prepare_instruments()
             data = self._expt_config.get_data()
@@ -52,10 +56,6 @@ class Experiment:
                 ping_iteration((ind_coord+1)/sweep_grids.shape[0])
                 #TODO: Add in a preprocessor?
                 # data_all += [np.mean(data[0][0])]
-        
-        #data_all = np.concatenate(data_all)
-        # data_final = np.c_[sweep_grids, np.real(np.array(data_all))]
-        # data_final = np.c_[data_final, np.imag(np.array(data_all))]
 
         data_file.close()
         self._expt_config.makesafe_instruments()

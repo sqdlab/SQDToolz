@@ -8,6 +8,7 @@ from sqdtoolz.HAL.DDG import*
 from sqdtoolz.HAL.GENmwSource import*
 
 from sqdtoolz.HAL.WaveformGeneric import*
+from sqdtoolz.HAL.WaveformMapper import*
 
 import numpy as np
 import unittest
@@ -348,13 +349,10 @@ new_lab._get_instrument('virMWS').get_output('CH1').TriggerInputEdge = 1
 #
 #Try simple example
 expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq)
-waveform_mapping = {
-    'waveforms' : {'qubit' : 'Wfm1'},
-    'digital'   : {
-        'readout'  : awg_wfm.get_output_channel(0).marker(1),
-        'sequence' : awg_wfm.get_output_channel(1).marker(0)
-        }
-}
+waveform_mapping = WaveformMapper()
+waveform_mapping.add_waveform('qubit', 'Wfm1')
+waveform_mapping.add_digital('readout', awg_wfm.get_output_channel(0).marker(1))
+waveform_mapping.add_digital('sequence', awg_wfm.get_output_channel(1).marker(0))
 expConfig.map_waveforms(waveform_mapping)
 wfm = WaveformGeneric(['qubit'], ['readout', 'sequence'])
 wfm.set_waveform('qubit', [
@@ -372,13 +370,11 @@ assert arr_equality(arr_act, arr_exp), "Incorrect trigger edges when using wavef
 #
 #Try multiple waveforms...
 expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq)
-waveform_mapping = {
-    'waveforms' : {'qubit1' : 'Wfm1', 'qubit2' : 'Wfm2'},
-    'digital'   : {
-        'readout'  : awg_wfm.get_output_channel(0).marker(1),
-        'sequence' : awg_wfm.get_output_channel(1).marker(0)
-        }
-}
+waveform_mapping = WaveformMapper()
+waveform_mapping.add_waveform('qubit1', 'Wfm1')
+waveform_mapping.add_waveform('qubit2', 'Wfm2')
+waveform_mapping.add_digital('readout', awg_wfm.get_output_channel(0).marker(1))
+waveform_mapping.add_digital('sequence', awg_wfm.get_output_channel(1).marker(0))
 expConfig.map_waveforms(waveform_mapping)
 wfm = WaveformGeneric(['qubit1', 'qubit2'], ['readout', 'sequence'])
 wfm.set_waveform('qubit1', [
@@ -402,13 +398,11 @@ assert arr_equality(arr_act, arr_exp), "Incorrect trigger edges when using wavef
 #
 #Try multiple waveforms but reference waveform is on another waveform...
 expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq)
-waveform_mapping = {
-    'waveforms' : {'qubit1' : 'Wfm1', 'qubit2' : 'Wfm2'},
-    'digital'   : {
-        'readout'  : awg_wfm.get_output_channel(0).marker(1),
-        'sequence' : awg_wfm.get_output_channel(1).marker(0)
-        }
-}
+waveform_mapping = WaveformMapper()
+waveform_mapping.add_waveform('qubit1', 'Wfm1')
+waveform_mapping.add_waveform('qubit2', 'Wfm2')
+waveform_mapping.add_digital('readout', awg_wfm.get_output_channel(0).marker(1))
+waveform_mapping.add_digital('sequence', awg_wfm.get_output_channel(1).marker(0))
 expConfig.map_waveforms(waveform_mapping)
 wfm = WaveformGeneric(['qubit1', 'qubit2'], ['readout', 'sequence'])
 wfm.set_waveform('qubit1', [
@@ -447,13 +441,11 @@ assert assert_found, "Function update_waveforms failed to trigger an assertion e
 #Try with elastic segments and multiple waveforms...
 awg_wfm = WaveformAWG("Wfm1", new_lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9, total_time=200e-9)
 expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq)
-waveform_mapping = {
-    'waveforms' : {'qubit1' : 'Wfm1', 'qubit2' : 'Wfm2'},
-    'digital'   : {
-        'readout'  : awg_wfm.get_output_channel(0).marker(1),
-        'sequence' : awg_wfm.get_output_channel(1).marker(0)
-        }
-}
+waveform_mapping = WaveformMapper()
+waveform_mapping.add_waveform('qubit1', 'Wfm1')
+waveform_mapping.add_waveform('qubit2', 'Wfm2')
+waveform_mapping.add_digital('readout', awg_wfm.get_output_channel(0).marker(1))
+waveform_mapping.add_digital('sequence', awg_wfm.get_output_channel(1).marker(0))
 expConfig.map_waveforms(waveform_mapping)
 wfm = WaveformGeneric(['qubit1', 'qubit2'], ['readout', 'sequence'])
 wfm.set_waveform('qubit1', [
@@ -479,13 +471,11 @@ assert arr_equality(arr_act, arr_exp), "Incorrect trigger edges when using an el
 awg_wfm = WaveformAWG("Wfm1", new_lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9, total_time=200e-9)
 awg_wfm2 = WaveformAWG("Wfm2", new_lab, [('virAWG', 'CH3'), ('virAWG', 'CH4')], 1e9, total_time=200e-9)
 expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq)
-waveform_mapping = {
-    'waveforms' : {'qubit1' : 'Wfm1', 'qubit2' : 'Wfm2'},
-    'digital'   : {
-        'readout'  : awg_wfm.get_output_channel(0).marker(1),
-        'sequence' : awg_wfm.get_output_channel(1).marker(0)
-        }
-}
+waveform_mapping = WaveformMapper()
+waveform_mapping.add_waveform('qubit1', 'Wfm1')
+waveform_mapping.add_waveform('qubit2', 'Wfm2')
+waveform_mapping.add_digital('readout', awg_wfm.get_output_channel(0).marker(1))
+waveform_mapping.add_digital('sequence', awg_wfm.get_output_channel(1).marker(0))
 expConfig.map_waveforms(waveform_mapping)
 wfm = WaveformGeneric(['qubit1', 'qubit2'], ['readout', 'sequence'])
 wfm.set_waveform('qubit1', [

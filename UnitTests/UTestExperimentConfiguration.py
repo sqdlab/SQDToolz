@@ -691,7 +691,7 @@ assert awg_wfm.get_waveform_segment('zero22').Duration == 96, "Property incorrec
 
 new_lab.save_experiment_configs('UnitTests/')
 
-expConfig.save_config('UnitTests/next_test.txt')
 new_lab.save_laboratory_config('UnitTests/')
+new_lab.save_experiment_configs('UnitTests/')
 
 print("Experiment Configuration Unit Tests completed successfully.")

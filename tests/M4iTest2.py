@@ -11,7 +11,7 @@ from sqdtoolz.HAL.GENmwSource import*
 import numpy as np
 from sqdtoolz.Variable import*
 from sqdtoolz.HAL.WaveformSegments import*
-from sqdtoolz.HAL.WaveformModulations import*
+from sqdtoolz.HAL.WaveformTransformations import*
 from sqdtoolz.Variable import*
 from sqdtoolz.HAL.Processors.ProcessorGPU import*
 from sqdtoolz.HAL.Processors.GPU.GPU_DDC import*

@@ -4,7 +4,7 @@ from sqdtoolz.HAL.AWG import*
 from sqdtoolz.HAL.ACQ import*
 from sqdtoolz.ExperimentConfiguration import*
 from sqdtoolz.HAL.WaveformSegments import*
-from sqdtoolz.HAL.WaveformModulations import*
+from sqdtoolz.HAL.WaveformTransformations import*
 import numpy as np
 from sqdtoolz.Variable import*
 from sqdtoolz.Laboratory import*

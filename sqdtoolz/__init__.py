@@ -9,7 +9,7 @@ from sqdtoolz.HAL.AWG import WaveformAWG as AWG #TODO: Refactor this - RB is ang
 from sqdtoolz.HAL.GENmwSource import GENmwSource
 from sqdtoolz.HAL.GENvoltSource import GENvoltSource
 from sqdtoolz.HAL.WaveformSegments import*
-from sqdtoolz.HAL.WaveformModulations import*
+from sqdtoolz.HAL.WaveformTransformations import*
 
 from sqdtoolz.HAL.Processors.ProcessorCPU import*
 

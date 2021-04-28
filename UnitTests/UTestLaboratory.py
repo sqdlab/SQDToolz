@@ -5,9 +5,9 @@ from sqdtoolz.Laboratory import*
 new_lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir')
 with open("UnitTests/laboratory_configuration.txt") as json_file:
     data = json.load(json_file)
-    new_lab.cold_reload_instruments(data)
+    new_lab.cold_reload_labconfig(data)
 #
-with open("UnitTests/experiment_configuration.txt") as json_file:
+with open("UnitTests/experiment_configurations.txt") as json_file:
     data = json.load(json_file)
     new_lab.cold_reload_experiment_configurations(data)
 new_lab.CONFIG('testConf').init_instruments()
@@ -132,7 +132,7 @@ old_obj_varS = new_lab.VAR("testSpace")
 #Check with a warm reload configuration and variables
 with open("UnitTests/laboratory_configuration2.txt") as json_file:
     data = json.load(json_file)
-    new_lab.cold_reload_instruments(data)
+    new_lab.cold_reload_labconfig(data)
 new_lab.update_variables_from_last_expt('UnitTests\\laboratory_parameters.txt')
 #
 #Check that the variables have been correctly reloaded...
@@ -155,12 +155,48 @@ assert old_obj_dur1 == new_lab.VAR("myDura1"), "New variable object has been cre
 assert old_obj_dur2 == new_lab.VAR("myDura2"), "New variable object has been created when updating from file."
 assert old_obj_varS == new_lab.VAR("testSpace"), "New variable object has been created when updating from file."
 
+
+#
+#Test WaveformTransformations
+#
+#Create some variables
+assert new_lab.WFMT("IQmod") == None, "WaveformTransformation is somehow already in the Laboratory."
+WFMT_ModulationIQ("IQmod", new_lab, 49e6)
+#
+assert new_lab.WFMT("IQmod").IQFrequency == 49e6, "WaveformTransformation property incorrectly set"
+new_lab.WFMT("IQmod").IQFrequency = 84e7
+assert new_lab.WFMT("IQmod").IQFrequency == 84e7, "WaveformTransformation property incorrectly set"
+#
+assert new_lab.WFMT("IQmod").IQAmplitude == 1.0, "WaveformTransformation property incorrectly set"
+new_lab.WFMT("IQmod").IQAmplitude = 9.4
+assert new_lab.WFMT("IQmod").IQAmplitude == 9.4, "WaveformTransformation property incorrectly set"
+#
+assert new_lab.WFMT("IQmod").IQAmplitudeFactor == 1.0, "WaveformTransformation property incorrectly set"
+new_lab.WFMT("IQmod").IQAmplitudeFactor = 78.1
+assert new_lab.WFMT("IQmod").IQAmplitudeFactor == 78.1, "WaveformTransformation property incorrectly set"
+#
+assert new_lab.WFMT("IQmod").IQPhaseOffset == 0.0, "WaveformTransformation property incorrectly set"
+new_lab.WFMT("IQmod").IQPhaseOffset = 54.3
+assert new_lab.WFMT("IQmod").IQPhaseOffset == 54.3, "WaveformTransformation property incorrectly set"
+#
+assert new_lab.WFMT("IQmod").IQdcOffset == (0,0), "WaveformTransformation property incorrectly set"
+new_lab.WFMT("IQmod").IQdcOffset = (9,1)
+assert new_lab.WFMT("IQmod").IQdcOffset == (9,1), "WaveformTransformation property incorrectly set"
+#
+assert new_lab.WFMT("IQmod").IQUpperSideband, "WaveformTransformation property incorrectly set"
+new_lab.WFMT("IQmod").IQUpperSideband = False
+assert new_lab.WFMT("IQmod").IQUpperSideband == False, "WaveformTransformation property incorrectly set"
+#
+new_lab.save_laboratory_config('UnitTests/', 'laboratory_configuration3.txt')
+
+#
 #Check again on a cold reload
+#
 new_lab._station.close_all_registered_instruments()
 new_lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir')
-with open("UnitTests/laboratory_configuration2.txt") as json_file:
+with open("UnitTests/laboratory_configuration3.txt") as json_file:
     data = json.load(json_file)
-    new_lab.cold_reload_instruments(data)
+    new_lab.cold_reload_labconfig(data)
 new_lab.update_variables_from_last_expt('UnitTests\\laboratory_parameters.txt')
 #
 #Check that the variables have been correctly reloaded...
@@ -173,7 +209,13 @@ assert new_lab.HAL("Wfm1").get_waveform_segment('init0').Amplitude == 86, "Varia
 assert new_lab.VAR("myDura1").Value == 2016, "Variable incorrectly reloaded"
 assert new_lab.VAR("myDura2").Value == 2016+3.1415926, "Variable incorrectly reloaded"
 assert new_lab.HAL("Wfm1").get_waveform_segment('init2').Duration == 2016+3.1415926, "Variable incorrectly reloaded"
-
+#
+assert new_lab.WFMT("IQmod").IQFrequency == 84e7, "WaveformTransformation property incorrectly set"
+assert new_lab.WFMT("IQmod").IQAmplitude == 9.4, "WaveformTransformation property incorrectly set"
+assert new_lab.WFMT("IQmod").IQAmplitudeFactor == 78.1, "WaveformTransformation property incorrectly set"
+assert new_lab.WFMT("IQmod").IQPhaseOffset == 54.3, "WaveformTransformation property incorrectly set"
+assert new_lab.WFMT("IQmod").IQdcOffset == (9,1), "WaveformTransformation property incorrectly set"
+assert new_lab.WFMT("IQmod").IQUpperSideband == False, "WaveformTransformation property incorrectly set"
 
 
 print("Laboratory Unit Tests completed successfully.")

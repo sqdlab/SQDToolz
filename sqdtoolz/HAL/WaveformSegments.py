@@ -1,10 +1,14 @@
 import numpy as np
+from sqdtoolz.HAL.WaveformTransformations import*
 
 class WaveformSegmentBase:
-    def __init__(self, name, mod_func, duration):
+    def __init__(self, name, transform_func, duration):
         self._name = name
-        self._mod_func = mod_func
+        if transform_func:
+            assert isinstance(transform_func, WaveformTransformationArgs), "Transformation function specified incorrectly - remember to call apply() on the WFMT object..."
+        self._transform_func = transform_func
         self._duration = duration
+        self._lab = None    #Should be set by the AWG class when required...
 
     @property
     def Name(self):
@@ -19,6 +23,10 @@ class WaveformSegmentBase:
     @Duration.setter
     def Duration(self, len_seconds):
         self._duration = len_seconds
+
+    def reset_waveform_transforms(self):
+        if self._transform_func:
+            return self._lab.WFMT(self._transform_func.wfmt_name).initialise_for_new_waveform()
 
     def get_waveform(self, fs, t0_ind, ch_index):
         '''
@@ -35,8 +43,9 @@ class WaveformSegmentBase:
         Returns a numpy array of points representing the total waveform.
         '''
         cur_wfm = self._get_waveform(fs, t0_ind, ch_index)
-        if self._mod_func:
-            return self._mod_func.modify_waveform(cur_wfm, fs, t0_ind, ch_index)
+        #Transform if necessary:      
+        if self._transform_func:
+            return self._lab.WFMT(self._transform_func.wfmt_name).modify_waveform(cur_wfm, fs, t0_ind, ch_index, **self._transform_func.kwargs)
         else:
             return cur_wfm
 
@@ -51,22 +60,16 @@ class WaveformSegmentBase:
         '''
         cur_dict = {}
         cur_dict['Name'] = self.Name
-        if self._mod_func == None:
-            cur_dict['Mod Func'] = ''
+        cur_dict['Type'] = self.__class__.__name__
+        if self._transform_func == None:
+            cur_dict['Mod Func'] = {'Name' : '', 'Args' : ''}
         else:
-            cur_dict['Mod Func'] = self._mod_func.Name
+            cur_dict['Mod Func'] = {'Name' : self._transform_func.wfmt_name, 'Args' : self._transform_func.kwargs}
         return cur_dict
 
-    def _set_base_config(self, config_dict):
-        '''
-        Sets the name and modulation function as appropriate. Daughter classes should call this in their @classmethod fromConfigDict.
-        '''
-        for cur_key in ["Name", "Mod Func"]:
-            assert cur_key in config_dict, "Configuration dictionary does not have the key: " + cur_key
-        
 class WFS_Group(WaveformSegmentBase):
-    def __init__(self, name, wfm_segs, time_len=-1, mod_func=None):
-        super().__init__(name, mod_func, time_len)
+    def __init__(self, name, wfm_segs, time_len=-1, transform_func=None):
+        super().__init__(name, transform_func, time_len)
         self._abs_time = time_len   #_abs_time is the total absolute time (if -1, the duration is the sum of the individual time segment durations)
         self._wfm_segs = wfm_segs
         self._validate_wfm_segs()
@@ -120,18 +123,22 @@ class WFS_Group(WaveformSegmentBase):
         return final_wfm
 
 class WFS_Constant(WaveformSegmentBase):
-    def __init__(self, name, mod_func, time_len, value=0.0):
-        super().__init__(name, mod_func, time_len)
+    def __init__(self, name, transform_func, time_len, value=0.0):
+        super().__init__(name, transform_func, time_len)
         self._value = value
 
     @classmethod
     def fromConfigDict(cls, config_dict):
-        assert 'type' in config_dict, "Configuration dictionary does not have the key: type"
-        assert config_dict['type'] == 'WFS_Constant', "Configuration dictionary has the wrong type."
+        assert 'Type' in config_dict, "Configuration dictionary does not have the key: type"
+        assert config_dict['Type'] == cls.__name__, "Configuration dictionary has the wrong type."
         for cur_key in ["Name", "Duration", "Value"]:
             assert cur_key in config_dict, "Configuration dictionary does not have the key: " + cur_key
         #TODO: Fix the functionality here.
-        return cls(config_dict["Name"], None, config_dict["Duration"], config_dict["Value"])
+        if config_dict['Mod Func']['Name'] == '':
+            wfmt_obj = None
+        else:
+            wfmt_obj = WaveformTransformationArgs(config_dict['Mod Func']['Name'], config_dict['Mod Func']['Args'])
+        return cls(config_dict["Name"], wfmt_obj, config_dict["Duration"], config_dict["Value"])
 
     @property
     def Value(self):
@@ -145,27 +152,29 @@ class WFS_Constant(WaveformSegmentBase):
 
     def _get_current_config(self):
         cur_dict = WaveformSegmentBase._get_current_config(self)
-        cur_dict['type'] = 'WFS_Constant'
-        cur_dict['type'] = 'WFS_Constant'
         cur_dict['Duration'] = self.Duration
         cur_dict['Value'] = self._value
         return cur_dict
 
 class WFS_Gaussian(WaveformSegmentBase):
-    def __init__(self, name, mod_func, time_len, amplitude, num_sd=1.96):
-        super().__init__(name, mod_func, time_len)
+    def __init__(self, name, transform_func, time_len, amplitude, num_sd=1.96):
+        super().__init__(name, transform_func, time_len)
         #TODO: Add in a classmethod to use sigma and truncate...
         self._amplitude = amplitude
         self._num_sd = num_sd
 
     @classmethod
     def fromConfigDict(cls, config_dict):
-        assert 'type' in config_dict, "Configuration dictionary does not have the key: type"
-        assert config_dict['type'] == 'WFS_Gaussian', "Configuration dictionary has the wrong type."
+        assert 'Type' in config_dict, "Configuration dictionary does not have the key: type"
+        assert config_dict['Type'] == cls.__name__, "Configuration dictionary has the wrong type."
         for cur_key in ["Name", "Duration", "Amplitude", "Num SD"]:
             assert cur_key in config_dict, "Configuration dictionary does not have the key: " + cur_key
-
-        return cls(config_dict["Name"], None, config_dict["Duration"], config_dict["Amplitude"], config_dict["Num SD"])
+        #TODO: Fix the functionality here.
+        if config_dict['Mod Func']['Name'] == '':
+            wfmt_obj = None
+        else:
+            wfmt_obj = WaveformTransformationArgs(config_dict['Mod Func']['Name'], config_dict['Mod Func']['Args'])
+        return cls(config_dict["Name"], wfmt_obj, config_dict["Duration"], config_dict["Amplitude"], config_dict["Num SD"])
 
     @property
     def Amplitude(self):
@@ -193,7 +202,6 @@ class WFS_Gaussian(WaveformSegmentBase):
 
     def _get_current_config(self):
         cur_dict = WaveformSegmentBase._get_current_config(self)
-        cur_dict['type'] = 'WFS_Gaussian'
         cur_dict['Duration'] = self.Duration
         cur_dict['Amplitude'] = self._amplitude
         cur_dict['Num SD'] = self._num_sd

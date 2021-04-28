@@ -32,6 +32,7 @@ class Laboratory:
         self._processors = {}
         self._expt_configs = {}
         self._variables = {}
+        self._waveform_transforms = {}
         self._activated_instruments = []
 
     def update_variables_from_last_expt(self, file_name = ''):
@@ -58,7 +59,7 @@ class Laboratory:
         if os.path.isfile(last_dir + "/laboratory_configuration.txt"):
             with open(last_dir + "/laboratory_configuration.txt") as json_file:
                 data = json.load(json_file)
-                self.cold_reload_instruments(data)
+                self.cold_reload_labconfig(data)
         if os.path.isfile(last_dir + "/experiment_configurations.txt"):
             with open(last_dir + "/experiment_configurations.txt") as json_file:
                 data = json.load(json_file)
@@ -68,11 +69,6 @@ class Laboratory:
         #     with open(last_dir + "/experiment_configuration.txt") as json_file:
         #         data = json.load(json_file)
         #         self.cold_reload_configuration(data)
-
-    def cold_reload_configs(self, cur_exp_path, file_name = 'experiment_configuration.txt'):
-        dict_expt_configs = {x : self._expt_configs[x].get_config() for x in self._expt_configs}
-        with open(cur_exp_path + file_name, 'w') as outfile:
-            json.dump(dict_expt_configs, outfile, indent=4)
 
     def cold_reload_experiment_configurations(self, config_dict):
         for cur_expt_config in config_dict:
@@ -89,7 +85,7 @@ class Laboratory:
             new_expt_config = ExperimentConfiguration(cur_expt_config, self, 0, cur_hals, acq_obj)
             new_expt_config.update_config(config_dict[cur_expt_config])
     
-    def cold_reload_instruments(self, config_dict):
+    def cold_reload_labconfig(self, config_dict):
         for cur_instr in config_dict['ActiveInstruments']:
             self.activate_instrument(cur_instr)
         #Create the HALs
@@ -104,6 +100,10 @@ class Laboratory:
         for dict_cur_proc in config_dict['PROCs']:
             cur_class_name = dict_cur_proc['Type']
             globals()[cur_class_name].fromConfigDict(dict_cur_proc, self)
+        #Create and load the WFMTs
+        for dict_cur_wfmt in config_dict['WFMTs']:
+            cur_class_name = dict_cur_wfmt['Type']
+            globals()[cur_class_name].fromConfigDict(dict_cur_wfmt, self)
 
 
     def _resolve_sqdobj_tree(self, sqdObj):
@@ -154,6 +154,17 @@ class Laboratory:
     def PROC(self, proc_name):
         if proc_name in self._processors:
             return self._processors[proc_name]
+        else:
+            return None
+
+    def _register_WFMT(self, wfmt):
+        if not (wfmt.Name in self._waveform_transforms):
+            self._waveform_transforms[wfmt.Name] = wfmt
+            return True
+        return False
+    def WFMT(self, wfmt_name):
+        if wfmt_name in self._waveform_transforms:
+            return self._waveform_transforms[wfmt_name]
         else:
             return None
 
@@ -277,10 +288,16 @@ class Laboratory:
         for cur_proc in self._processors:
             dict_procs.append(self._processors[cur_proc]._get_current_config())
 
+        #Prepare the dictionary of Waveform Transformations
+        dict_wfmts = []
+        for cur_wfmt in self._waveform_transforms:
+            dict_wfmts.append(self._waveform_transforms[cur_wfmt]._get_current_config())
+
         param_dict = {
                     'ActiveInstruments' : self._activated_instruments,
                     'HALs' : dict_hals,
-                    'PROCs': dict_procs
+                    'PROCs': dict_procs,
+                    'WFMTs': dict_wfmts
                     }
         if cur_exp_path != '':
             with open(cur_exp_path + file_name, 'w') as outfile:

@@ -545,7 +545,7 @@ if TEST_CPU:
     new_lab = Laboratory('', 'savedir')
     with open("UnitTests/laboratory_configuration_procs.txt") as json_file:
         data = json.load(json_file)
-        new_lab.cold_reload_instruments(data)
+        new_lab.cold_reload_labconfig(data)
     new_proc = new_lab.PROC('cpu_test')
 
     #Testing with actual datsets...
@@ -573,7 +573,7 @@ if TEST_CPU:
     new_lab = Laboratory('', 'savedir')
     with open("UnitTests/laboratory_configuration_procs.txt") as json_file:
         data = json.load(json_file)
-        new_lab.cold_reload_instruments(data)
+        new_lab.cold_reload_labconfig(data)
     new_proc = new_lab.PROC('cpu_test')
     #
     cur_data = {
@@ -608,7 +608,7 @@ if TEST_GPU:
     new_lab = Laboratory('', 'savedir')
     with open("UnitTests/laboratory_configuration_procs.txt") as json_file:
         data = json.load(json_file)
-        new_lab.cold_reload_instruments(data)
+        new_lab.cold_reload_labconfig(data)
     new_proc = new_lab.PROC('gpu_test')
 
     #Testing with actual datsets...
@@ -636,7 +636,7 @@ if TEST_GPU:
     new_lab = Laboratory('', 'savedir')
     with open("UnitTests/laboratory_configuration_procs.txt") as json_file:
         data = json.load(json_file)
-        new_lab.cold_reload_instruments(data)
+        new_lab.cold_reload_labconfig(data)
     new_proc = new_lab.PROC('gpu_test')
     #
     cur_data = {

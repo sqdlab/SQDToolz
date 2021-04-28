@@ -4,7 +4,7 @@ from sqdtoolz.HAL.DDG import*
 from sqdtoolz.HAL.ACQ import*
 from sqdtoolz.HAL.AWG import*
 from sqdtoolz.HAL.WaveformSegments import*
-from sqdtoolz.HAL.WaveformModulations import*
+from sqdtoolz.HAL.WaveformTransformations import*
 from sqdtoolz.Drivers.dummyDDG import*
 from sqdtoolz.Drivers.dummyACQ import*
 from sqdtoolz.Drivers.dummyAWG import*

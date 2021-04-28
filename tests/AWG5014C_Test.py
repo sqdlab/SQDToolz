@@ -5,7 +5,7 @@ from sqdtoolz.HAL.AWG import*
 from sqdtoolz.HAL.ACQ import*
 from sqdtoolz.ExperimentConfiguration import*
 from sqdtoolz.HAL.WaveformSegments import*
-from sqdtoolz.HAL.WaveformModulations import*
+from sqdtoolz.HAL.WaveformTransformations import*
 
 
 new_lab = Laboratory(instr_config_file = "tests\\AWG5014C_Test.yaml", save_dir = "mySaves\\")

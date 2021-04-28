@@ -10,7 +10,7 @@ from sqdtoolz.HAL.GENmwSource import*
 import numpy as np
 from sqdtoolz.Variable import*
 from sqdtoolz.HAL.WaveformSegments import*
-from sqdtoolz.HAL.WaveformModulations import*
+from sqdtoolz.HAL.WaveformTransformations import*
 
 
 new_lab = Laboratory(instr_config_file = "tests\\AWG_N8241A_TestMS.yaml", save_dir = "mySaves\\")

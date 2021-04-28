@@ -35,6 +35,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
             self._wfm_segment_list = []
             self._total_time = total_time
         
+        self._lab = lab
         self._cur_prog_waveforms = [None]*len(awg_channel_tuples)
 
     @classmethod
@@ -78,10 +79,12 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
         #NOTE: THIS WORKS BECAUSE WAVEFORM SEGMENTS CANNOT BE SHARED ACROSS WAVEFORM HALS - THIS IS WHY IT'S a COPY [:] OPERATION!
         for cur_wfm in self._wfm_segment_list:
             cur_wfm.Parent = (self, 'w')
+            wfm_segment._lab = self._lab
 
     def add_waveform_segment(self, wfm_segment):
         self._wfm_segment_list.append(wfm_segment)
         wfm_segment.Parent = (self, 'w')
+        wfm_segment._lab = self._lab
         
     def get_waveform_segment(self, wfm_segment_name):
         the_seg = None
@@ -172,12 +175,15 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
         final_wfms = [np.array([])]*num_chnls
         #Assemble each channel separately
         for cur_ch in range(len(self._awg_chan_list)):
+            #Reset any waveform modulation commands for a new sequence construction...
+            for cur_wfm_seg in self._wfm_segment_list:
+                cur_wfm_seg.reset_waveform_transforms()
             t0 = 0
             #Concatenate the individual waveform segments
             for cur_wfm_seg in self._wfm_segment_list:
                 #TODO: Preallocate - this is a bit inefficient...
                 final_wfms[cur_ch] = np.concatenate((final_wfms[cur_ch], cur_wfm_seg.get_waveform(self._sample_rate, t0, cur_ch)))
-                t0 += final_wfms[cur_ch].size
+                t0 = final_wfms[cur_ch].size
             #Scale the waveform via the global scale-factor...
             final_wfms[cur_ch] *= self._global_factor
         
@@ -254,11 +260,12 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
         '''
         self._wfm_segment_list.clear()
         for cur_wfm in list_wfm_dict_config:
-            cur_wfm_type = cur_wfm['type']
+            cur_wfm_type = cur_wfm['Type']
             assert cur_wfm_type in globals(), cur_wfm_type + " is not in the current namespace. If the class does not exist in WaveformSegments include wherever it lives by importing it in AWG.py."
             cur_wfm_type = globals()[cur_wfm_type]
             new_wfm_seg = cur_wfm_type.fromConfigDict(cur_wfm)
             new_wfm_seg.Parent = (self, 'w')
+            new_wfm_seg._lab = self._lab
             self._wfm_segment_list.append(new_wfm_seg)
 
     def plot_waveforms(self, overlap=False):
@@ -284,6 +291,9 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
     def deactivate(self):
         for cur_awg_chan in self._awg_chan_list:
             cur_awg_chan.Output = False
+
+    def get_raw_waveforms(self):
+        return self._assemble_waveform_raw()[0]
 
     def prepare_initial(self):
         #Prepare the waveform

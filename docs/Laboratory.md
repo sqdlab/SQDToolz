@@ -17,6 +17,12 @@ All objects that are relevant to the experiment (easily defined as those that mu
 lab.HAL('MW-Src')
 #Accessing a variable object
 lab.VAR('CavFreq')
+#Accessing a data-processor object
+lab.PROC('gpu_ddc_fir')
+#Accessing a waveform-transformation object
+lab.WFMT('gpu_ddc_fir')
+#Accessing an experiment-configuration object
+lab.CONFIG('cont_meas')
 ```
 
 

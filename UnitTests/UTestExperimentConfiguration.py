@@ -342,6 +342,32 @@ hal_acq.InputTriggerEdge = 1
 new_lab._get_instrument('virMWS').get_output('CH1').TriggerInputEdge = 1
 
 
+#Test waveform-update and mapping
+expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq)
+waveform_mapping = {
+    'waveforms' : {'qubit' : 'Wfm1'}
+}
+expConfig.map_waveforms(waveform_mapping)
+new_waveform = {
+    'waveforms' : {
+        'qubit' : [
+            WFS_Gaussian("init", None, 20e-9, 0.5-0.1),
+            WFS_Constant("zero1", None, 30e-9, 0.1),
+            WFS_Gaussian("init2", None, 45e-9, 0.5-0.1),
+            WFS_Constant("zero2", None, 77e-9, 0.0)
+        ]
+    },
+    'readout' : {
+        'refWaveform' : 'qubit',
+        'segments' : ["init"]
+        },
+    'sequence' : {
+        'refWaveform' : 'qubit',
+        'TrigDelay' : 0.0,
+        'TrigLength' : 10.0e-9
+    }
+}
+
 #########################################################################################################
 #######################################TESTING SAVE/LOAD FUNCTIONS#######################################
 #########################################################################################################

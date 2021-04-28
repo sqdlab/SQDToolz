@@ -1,6 +1,5 @@
 from sqdtoolz.HAL.TriggerPulse import*
-import matplotlib.patches as patches
-import matplotlib.pyplot as plt
+from sqdtoolz.Utilities.TimingPlots import*
 import numpy as np
 import json
 
@@ -102,6 +101,30 @@ class ExperimentConfiguration:
         #
         self._init_config = conf
 
+    def map_waveforms(self, map_dict):
+        self._dict_wfm_map = map_dict
+        {
+            'waveforms' : {
+                np.cos(np.linspace(0,6,50))
+            }
+        }
+
+    def update_waveforms(self, new_waveforms):
+        #Settle the actual waveforms first
+        assert 'waveforms' in new_waveforms, "The input waveform dictionary must have a \'wave\' key."
+        for cur_wave in  new_waveform['waveforms']:
+            assert cur_wave in self._dict_wfm_map['waveforms']
+            awg_hal = None
+            for cur_hal in self._list_HALs:
+                if self._dict_wfm_map['waveforms'][cur_wave] == cur_hal.Name:
+                    awg_hal = cur_hal
+                    break
+            assert awg_hal != None, f"The AWG waveform HAL {self._dict_wfm_map['waveforms'][cur_wave]} does not exist in this Experiment Configuration."
+            awg_hal.set_waveform_segments(new_waveforms['waveforms'][cur_wave])
+        #Now settle the output markers
+
+        new_waveform['wave']
+
     def init_instruments(self):
         self.update_config(self._init_config)
 
@@ -159,68 +182,6 @@ class ExperimentConfiguration:
                 all_times = np.concatenate( [cur_times + prev_time for prev_time in all_times] )
         return (all_times, cur_gated_segments)
 
-    @staticmethod
-    def _add_rectangle(ax, xStart, xEnd, bar_width, yOff):
-        '''
-        Draws a rectangular patch for the timing diagram based on the delay and length values from a trigger object.
-
-        Inputs:
-            - ax     - Axis object to which the rectangle is to be drawn
-            - xStart - Starting value on the x-axis
-            - xEnd   - Ending value on the x-axis
-            - bar_width - Vertical width of the rectangle to be drawn (should be less than 1 if multiple rows are to not intersect their rectangles)
-            - yOff    - Current y-offset
-        '''
-        rect = patches.Rectangle( (xStart,yOff - 0.5*bar_width), xEnd-xStart, bar_width,
-                                facecolor='white', edgecolor='black', hatch = '///')
-        ax.add_patch(rect)
-
-    @staticmethod
-    def _add_rectangle_with_plot(ax, xStart, xEnd, bar_width, yOff, yVals):
-        rect = patches.Rectangle( (xStart,yOff - 0.5*bar_width), xEnd-xStart, bar_width,
-                                facecolor='white', edgecolor='black')
-        ax.add_patch(rect)
-        xOccupyFactor = 0.8
-        yOccupyFactor = 0.8
-        x0 = xStart + (1-xOccupyFactor)/2*(xEnd-xStart)
-        x1 = xStart + (1+xOccupyFactor)/2*(xEnd-xStart)
-        xVals = np.linspace(x0, x1, yVals.size)
-        y0 = yOff-0.5*bar_width + (1-yOccupyFactor)/2*bar_width
-        y1 = y0 + yOccupyFactor*bar_width
-        yValsPlot = yVals * (y1-y0) + y0
-        ax.plot(xVals, yValsPlot, 'k')
-
-    @staticmethod
-    def _plot_digital_pulse_sampled(ax, vals01, xStart, pts2xVals, bar_width, yOff):
-        xVals = [xStart]
-        yVals = [vals01[0]]
-        last_val = vals01[0]
-        for ind, cur_yval in enumerate(vals01):
-            if cur_yval != last_val:
-                xVals.append(pts2xVals * ind + xStart)
-                xVals.append(pts2xVals * ind + xStart)
-                yVals.append(last_val)
-                yVals.append(cur_yval)
-                last_val = cur_yval
-        xVals.append(pts2xVals * ind + xStart)
-        yVals.append(last_val)
-        #Now scale the pulse appropriately...
-        xVals = np.array(xVals)
-        yVals = np.array(yVals)
-        yVals = yVals*bar_width + yOff - bar_width*0.5
-        ax.plot(xVals, yVals, 'k')
-
-    @staticmethod
-    def _plot_digital_pulse(ax, list_time_vals, xStart, scale_fac_x, bar_width, yOff):
-        xVals = np.array( [xStart + x[0]*scale_fac_x for x in list_time_vals] )
-        yVals = np.array( [x[1] for x in list_time_vals] )
-        #
-        xVals = np.repeat(xVals,2)[1:]
-        yVals = np.ndarray.flatten(np.vstack([yVals,yVals]).T)[:-1]
-        #Now scale the pulse appropriately...
-        yVals = yVals*bar_width + yOff - bar_width*0.5
-        ax.plot(xVals, yVals, 'k')
-
     def plot(self):
         '''
         Generate a representation of the timing configuration with matplotlib.
@@ -242,12 +203,7 @@ class ExperimentConfiguration:
             scale_fac = 1
             plt_units = 's'
 
-        bar_width = 0.6
-
-        fig = plt.figure()
-        ax = fig.add_axes((0.25, 0.125, 0.7, 0.78))
-        num_channels = 0
-        yticklabels = []
+        tp = TimingPlot()
 
         disp_objs = []
         for cur_hal in self._list_HALs + [self._hal_ACQ]:
@@ -266,31 +222,34 @@ class ExperimentConfiguration:
             cur_diag_info = cur_obj._get_timing_diagram_info()
             if cur_diag_info['Type'] == 'None':
                 continue
-            elif cur_diag_info['Type'] == 'BlockShaded':
+            
+            tp.goto_new_row(cur_obj.Name)
+
+            if cur_diag_info['Type'] == 'BlockShaded':
                 if cur_diag_info['TriggerType'] == 'Gated':
                     if seg_times.size == 0:
                         continue
                     for cur_trig_seg in seg_times:
                         cur_trig_start = cur_trig_seg[0] * scale_fac
                         cur_len = (cur_trig_seg[1]-cur_trig_seg[0]) * scale_fac
-                        self._add_rectangle(ax, cur_trig_start, cur_trig_start + cur_len, bar_width, num_channels)
+                        tp.add_rectangle(cur_trig_start, cur_trig_start + cur_len)
                 else:
                     for cur_trig_time in trig_times:
                         cur_trig_start = cur_trig_time * scale_fac
                         cur_len = cur_diag_info['Period'] * scale_fac
-                        self._add_rectangle(ax, cur_trig_start, cur_trig_start + cur_len, bar_width, num_channels)
+                        tp.add_rectangle(cur_trig_start, cur_trig_start + cur_len)
             elif cur_diag_info['Type'] == 'DigitalSampled':
                 for cur_trig_time in trig_times:
                     cur_trig_start = cur_trig_time * scale_fac
                     mkrs, sample_rate = cur_diag_info['Data']
                     assert mkrs.size > 0, "Digital sampled pulse waveform is empty when plotting the timing diagram. Ensure _get_timing_diagram_info properly returns \'Type\' as \'None\' if inactive/empty..."
-                    self._plot_digital_pulse_sampled(ax, mkrs, cur_trig_start, scale_fac/sample_rate, bar_width, num_channels)
+                    tp.add_digital_pulse_sampled(mkrs, cur_trig_start, scale_fac/sample_rate)
             elif cur_diag_info['Type'] == 'DigitalEdges':
                 for cur_trig_time in trig_times:
                     cur_trig_start = cur_trig_time * scale_fac
                     pts = cur_diag_info['Data']
                     assert len(pts) > 0 and pts[0][0] == 0.0, "Digital pulse waveform must be non-empty and start with t=0.0 when plotting the timing diagram."
-                    self._plot_digital_pulse(ax, pts, cur_trig_start, scale_fac, bar_width, num_channels)
+                    tp.add_digital_pulse(pts, cur_trig_start, scale_fac)
             elif cur_diag_info['Type'] == 'AnalogueSampled':
                 for cur_trig_time in trig_times:
                     cur_trig_start = cur_trig_time * scale_fac
@@ -298,20 +257,9 @@ class ExperimentConfiguration:
                     cur_seg_x = cur_trig_start
                     for cur_wfm_dict in cur_diag_info['Data']:
                         cur_dur = cur_wfm_dict['Duration']*scale_fac
-                        self._add_rectangle_with_plot(ax, cur_seg_x, cur_seg_x + cur_dur, bar_width, num_channels, cur_wfm_dict['yPoints'])
+                        tp.add_rectangle_with_plot(cur_seg_x, cur_seg_x + cur_dur, cur_wfm_dict['yPoints'])
                         cur_seg_x += cur_dur
             else:
                 assert False, "The \'Type\' key in the dictionary returned on calling the function _get_timing_diagram_info is invalid."
-            num_channels += 1
-            yticklabels.append(cur_obj.Name)
 
-        ax.set_xlim((0, self._total_time*scale_fac))
-        ax.set_ylim((-bar_width, num_channels + bar_width))
-        
-        fig.suptitle(f'Configuration: {self.Name}')
-        ax.set_xlabel(f'time ({plt_units})')
-     
-        ax.set_yticks(range(len(yticklabels)))
-        ax.set_yticklabels(yticklabels, size=12)
-
-        return fig
+        return tp.finalise_plot(self._total_time*scale_fac, plt_units, f'Configuration: {self.Name}')

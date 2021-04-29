@@ -1,6 +1,7 @@
 from sqdtoolz.Experiment import*
 from sqdtoolz.HAL.WaveformGeneric import*
 from sqdtoolz.HAL.WaveformSegments import*
+from sqdtoolz.Utilities.DataFitting import*
 
 class ExpRabi(Experiment):
     def __init__(self, name, expt_config, wfmt_qubit_drive, iq_indices = [0,1], **kwargs):

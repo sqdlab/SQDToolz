@@ -7,6 +7,7 @@ from sqdtoolz.HAL.AWG import*
 from sqdtoolz.HAL.DDG import*
 from sqdtoolz.HAL.GENmwSource import*
 from sqdtoolz.HAL.GENvoltSource import*
+from sqdtoolz.HAL.GENswitch import*
 from sqdtoolz.HAL.Processors.ProcessorCPU import*
 from sqdtoolz.HAL.Processors.ProcessorGPU import*
 from datetime import datetime

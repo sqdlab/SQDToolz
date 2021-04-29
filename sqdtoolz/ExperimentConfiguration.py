@@ -114,6 +114,7 @@ class ExperimentConfiguration:
         if 'digital' in self._dict_wfm_map:
             for cur_dig in self._dict_wfm_map['digital']:
                 self._dict_wfm_map['digital'][cur_dig] = self._lab._resolve_sqdobj_tree(self._dict_wfm_map['digital'][cur_dig])
+        self._init_config['WaveformMapping'] = self._dict_wfm_map
 
     def update_waveforms(self, wfm_gen, var_requests=[]):
         #var_requests is given as a list of tuples: (var_name, waveform_name, segment_name, property_name)

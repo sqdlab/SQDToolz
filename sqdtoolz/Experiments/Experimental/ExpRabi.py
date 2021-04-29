@@ -11,13 +11,13 @@ class ExpRabi(Experiment):
 
         self._is_trough = kwargs.get('is_trough', False)
         self._post_processor = kwargs.get('post_processor', None)
-        self._param_centre = kwargs.get('param_centre', None)
-        self._param_width = kwargs.get('param_width', None)
-        self._param_amplitude = kwargs.get('param_amplitude', None)
-        self._param_offset = kwargs.get('param_offset', None)
+        self._param_rabi_frequency = kwargs.get('param_rabi_frequency', None)
+        self._param_rabi_decay_time = kwargs.get('param_rabi_decay_time', None)
     
     def _run(self, file_path, sweep_vars=[], **kwargs):
-        assert len(sweep_vars) == 1, "Can only sweep one variable in this experiment."
+        assert len(sweep_vars) == 0, "Cannot specify sweeping variables in this experiment."
+
+        self._expt_config.init_instruments()
 
         wfm = WaveformGeneric(['qubit'], ['readout'])
         wfm.set_waveform('qubit', [
@@ -28,9 +28,13 @@ class ExpRabi(Experiment):
             WFS_Constant("read", None, 2e-6, 0.0)
         ])
         wfm.set_digital_segments('readout', 'qubit', ['read'])
-        kwargs['update_waveforms'] = self._expt_config.update_waveforms(wfm)
+        self._temp_vars = self._expt_config.update_waveforms(wfm, [('Drive Amplitude', 'qubit', 'drive', 'Amplitude')] )
 
-        self._cur_param_name = sweep_vars[0][0].Name
+        sweep_vars = [(self._temp_vars[0], np.linspace(0.0, 0.5, 50))]
+
+        kwargs['skip_init_instruments'] = True
+
+        self._cur_param_name = self._temp_vars[0].Name
         return super()._run(file_path, sweep_vars, **kwargs)
 
     def _post_process(self, data):
@@ -45,18 +49,14 @@ class ExpRabi(Experiment):
         data_x = data.param_vals[cur_sweep_ind]
         data_y = np.sqrt(arr[:,self._iq_indices[0]]**2 + arr[:,self._iq_indices[1]]**2)
 
-        dfit = DFitPeakLorentzian()
-        dpkt = dfit.get_fitted_plot(data_x, data_y, xLabel=self._cur_param_name, dip=self._is_trough)
+        dfit = DFitSinusoid()
+        dpkt = dfit.get_fitted_plot(data_x, data_y, 'Drive Amplitude', 'IQ Amplitude')
 
         #Commit to parameters...
-        if self._param_centre:
-            self._param_centre.Value = dpkt['centre']
-        if self._param_width:
-            self._param_width.Value = dpkt['width']
-        if self._param_amplitude:
-            self._param_amplitude.Value = dpkt['amplitude']
-        if self._param_offset:
-            self._param_offset.Value = dpkt['offset']
+        if self._param_rabi_frequency:
+            self._param_rabi_frequency.Value = dpkt['frequency']
+        if self._param_rabi_decay_time:
+            self._param_rabi_decay_time.Value = dpkt['decay_time']
 
         dpkt['fig'].show()
         

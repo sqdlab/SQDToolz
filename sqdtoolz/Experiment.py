@@ -26,10 +26,11 @@ class Experiment:
 
         data_file = FileIOWriter(file_path + 'data.h5')
 
-        self._expt_config.init_instruments()
+        if not kwargs.get('skip_init_instruments', False):
+            self._expt_config.init_instruments()
 
         waveform_updates = kwargs.get('update_waveforms', None)
-        if waveform_updates:
+        if waveform_updates != None:
             self._expt_config.update_waveforms(waveform_updates)
 
         if len(sweep_vars) == 0:

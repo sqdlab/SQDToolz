@@ -1,5 +1,6 @@
 from sqdtoolz.HAL.TriggerPulse import*
 from sqdtoolz.Utilities.TimingPlots import*
+from sqdtoolz.Variable import*
 import numpy as np
 import json
 
@@ -114,7 +115,9 @@ class ExperimentConfiguration:
             for cur_dig in self._dict_wfm_map['digital']:
                 self._dict_wfm_map['digital'][cur_dig] = self._lab._resolve_sqdobj_tree(self._dict_wfm_map['digital'][cur_dig])
 
-    def update_waveforms(self, wfm_gen):
+    def update_waveforms(self, wfm_gen, var_requests=[]):
+        #var_requests is given as a list of tuples: (var_name, waveform_name, segment_name, property_name)
+
         #Settle the actual waveforms first
         for cur_wave in  wfm_gen.waveforms:
             assert cur_wave in self._dict_wfm_map['waveforms'], f"There is no mapping for waveform {cur_wave}"
@@ -147,6 +150,19 @@ class ExperimentConfiguration:
                 cur_trig.TrigPulseDelay = wfm_gen.digitals[cur_dig]['trig_delay']
                 cur_trig.TrigPulseLength = wfm_gen.digitals[cur_dig]['trig_length']
                 cur_trig.TrigPolarity = wfm_gen.digitals[cur_dig]['trig_polarity']
+        #Now calculate and return any variable requests...
+        ret_trans_vars = []
+        for cur_var_req in var_requests:
+            var_name, waveform_name, segment_name, property_name = cur_var_req
+            assert waveform_name in self._dict_wfm_map['waveforms'], f"There is no mapping for waveform {waveform_name} from which to create a variable."
+            awg_hal = None
+            for cur_hal in self._list_HALs:
+                if self._dict_wfm_map['waveforms'][waveform_name] == cur_hal.Name:
+                    awg_hal = cur_hal
+                    break
+            assert awg_hal != None, f"The AWG waveform HAL {self._dict_wfm_map['waveforms'][waveform_name]} does not exist in this Experiment Configuration."
+            ret_trans_vars += [ VariablePropertyTransient(var_name, awg_hal.get_waveform_segment(segment_name), property_name) ]
+        return ret_trans_vars
 
     def init_instruments(self):
         self.update_config(self._init_config)

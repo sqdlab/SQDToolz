@@ -132,6 +132,29 @@ class VariableProperty(VariableBase):
         self._obj_res_list = dict_config['ResList']
         self._prop = dict_config['Property']
 
+class VariablePropertyTransient:
+    def __init__(self, name, sqdtoolz_obj, prop_name):
+        self._name = name
+        self._sqdtoolz_obj = sqdtoolz_obj
+        self._prop_name  = prop_name
+
+    @property
+    def Name(self):
+        return self._name
+
+    @property
+    def Value(self):
+        return self.get_raw()
+    @Value.setter
+    def Value(self, val):
+        self.set_raw(val)
+
+    def get_raw(self):
+        return getattr(self._sqdtoolz_obj, self._prop_name)
+
+    def set_raw(self, value):
+        setattr(self._sqdtoolz_obj, self._prop_name, value)
+
 class VariableSpaced(VariableBase):
     def __init__(self, name, lab, var_1, var_2, space_val):
         super().__init__(name)

@@ -193,6 +193,12 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
                 t0 = final_wfms[cur_ch].size
             #Scale the waveform via the global scale-factor...
             final_wfms[cur_ch] *= self._global_factor
+            #On the rare case where the segments won't fit the overall size (e.g. 2.4, 2.4, 4.2 adds up to 9, but rounding
+            #the sampled segments yields 2, 2, 4 which adds up to 9), the last few values (presuming that the waveform does not
+            #tie into anything in a continuous manner) will be repeated as 'padding' of sorts:
+            if final_wfms[cur_ch].size != self.NumPts:
+                pad_wfm = np.ones(int(self.NumPts - final_wfms[cur_ch].size))
+                final_wfms[cur_ch] = np.concatenate([final_wfms[cur_ch], pad_wfm])
         
         #Reset segment to be elastic
         if elas_seg_ind != -1:

@@ -81,12 +81,18 @@ class VariableInternal(VariableBase):
         self._val = dict_config['Value']
     
 class VariableProperty(VariableBase):
-    def __init__(self, name, lab, sqdtoolz_obj, prop_name):
+    def __init__(self, name, lab, sqdtoolz_obj, prop_name, **kwargs):
         super().__init__(name)
+
+        list_from_obj_that_doesnt_exist = kwargs.get('_lonely_dict', None)
+
         self._lab = lab
-        self._obj_res_list = lab._resolve_sqdobj_tree(sqdtoolz_obj)
-        halObj = self._lab._get_resolved_obj(self._obj_res_list)
-        assert hasattr(halObj, prop_name), "The given object does not have a property " + prop_name
+        if list_from_obj_that_doesnt_exist != None:
+            self._obj_res_list = list_from_obj_that_doesnt_exist
+        else:
+            self._obj_res_list = lab._resolve_sqdobj_tree(sqdtoolz_obj)
+            halObj = self._lab._get_resolved_obj(self._obj_res_list)
+            assert hasattr(halObj, prop_name), "The given object does not have a property " + prop_name
         self._prop = prop_name
         #
         lab._register_VAR(self)
@@ -95,8 +101,11 @@ class VariableProperty(VariableBase):
     def fromConfigDict(cls, name, config_dict, lab):
         obj = lab._get_resolved_obj(config_dict["ResList"])
         prop = config_dict["Property"]
-        setattr(obj, prop, config_dict["Value"])
-        return cls(name, lab, obj, prop)   #TODO: Add custom flag to make this a bit less inefficient... Not that bad as it should only be used in cold-loading anyway...
+        if obj != None:
+            setattr(obj, prop, config_dict["Value"])
+            return cls(name, lab, obj, prop)   #TODO: Add custom flag to make this a bit less inefficient... Not that bad as it should only be used in cold-loading anyway...
+        else:
+            return cls(name, lab, obj, prop, _lonely_dict=config_dict["ResList"])
 
     def get_raw(self):
         obj = self._lab._get_resolved_obj(self._obj_res_list)

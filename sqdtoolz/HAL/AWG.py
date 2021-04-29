@@ -126,7 +126,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
 
     @property
     def NumPts(self):
-        return self.Duration * self._sample_rate
+        return round(self.Duration * self._sample_rate)
 
     def null_all_markers(self):
         for cur_output in self._awg_chan_list:

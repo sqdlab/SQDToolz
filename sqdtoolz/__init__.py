@@ -8,6 +8,7 @@ from sqdtoolz.HAL.ACQ import ACQ
 from sqdtoolz.HAL.AWG import WaveformAWG as AWG #TODO: Refactor this - RB is angry
 from sqdtoolz.HAL.GENmwSource import GENmwSource
 from sqdtoolz.HAL.GENvoltSource import GENvoltSource
+from sqdtoolz.HAL.GENswitch import GENswitch
 from sqdtoolz.HAL.WaveformSegments import*
 from sqdtoolz.HAL.WaveformTransformations import*
 

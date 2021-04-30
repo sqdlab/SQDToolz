@@ -57,7 +57,7 @@ class ExpRabi(Experiment):
         if self._param_rabi_frequency:
             self._param_rabi_frequency.Value = dpkt['frequency']
         if self._param_rabi_decay_time:
-            self._param_rabi_decay_time.Value = dpkt['decay_time']
+            self._param_rabi_decay_time.Value = 1.0 / dpkt['decay_rate']
 
         dpkt['fig'].show()
         

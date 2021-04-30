@@ -202,7 +202,7 @@ class Laboratory:
             #Go through each submodule...
             for m in range(1, len(instrID)):
                 assert instrID[m] in cur_instr_obj.submodules, f"The submodule {instrID[m]} does not exist."
-                cur_instr_obj = cur_instr_obj.submodules(instrID[m])
+                cur_instr_obj = cur_instr_obj.submodules[instrID[m]]
             return cur_instr_obj
         else:
             assert instrID in self._station.components, f"Instrument by the name {instrID} has not been loaded. Call activate_instrument on it first."

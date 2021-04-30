@@ -121,7 +121,7 @@ class ExperimentConfiguration:
 
         #Settle the actual waveforms first
         for cur_wave in  wfm_gen.waveforms:
-            assert cur_wave in self._dict_wfm_map['waveforms'], f"There is no mapping for waveform {cur_wave}"
+            assert cur_wave in self._dict_wfm_map['waveforms'], f"There is no mapping for waveform \'{cur_wave}\'"
             awg_hal = None
             for cur_hal in self._list_HALs:
                 if self._dict_wfm_map['waveforms'][cur_wave] == cur_hal.Name:
@@ -132,7 +132,7 @@ class ExperimentConfiguration:
             awg_hal.null_all_markers()
         #Now settle the output markers
         for cur_dig in wfm_gen.digitals:
-            assert cur_dig in self._dict_wfm_map['digital'], f"There is no mapping for digital waveform {cur_wave}"
+            assert cur_dig in self._dict_wfm_map['digital'], f"There is no mapping for digital waveform \'{cur_wave}\'"
             if 'refWaveform' in wfm_gen.digitals[cur_dig]:
                 pass
                 cur_mkr = self._lab._get_resolved_obj(self._dict_wfm_map['digital'][cur_dig])
@@ -155,7 +155,7 @@ class ExperimentConfiguration:
         ret_trans_vars = []
         for cur_var_req in var_requests:
             var_name, waveform_name, segment_name, property_name = cur_var_req
-            assert waveform_name in self._dict_wfm_map['waveforms'], f"There is no mapping for waveform {waveform_name} from which to create a variable."
+            assert waveform_name in self._dict_wfm_map['waveforms'], f"There is no mapping for waveform \'{waveform_name}\' from which to create a variable."
             awg_hal = None
             for cur_hal in self._list_HALs:
                 if self._dict_wfm_map['waveforms'][waveform_name] == cur_hal.Name:

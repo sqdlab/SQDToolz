@@ -4,13 +4,14 @@ from sqdtoolz.HAL.WaveformSegments import*
 from sqdtoolz.Utilities.DataFitting import*
 
 class ExpRabi(Experiment):
-    def __init__(self, name, expt_config, wfmt_qubit_drive, iq_indices = [0,1], **kwargs):
+    def __init__(self, name, expt_config, wfmt_qubit_drive, range_amps, iq_indices = [0,1], **kwargs):
         super().__init__(name, expt_config)
 
         self._iq_indices = iq_indices
         self._wfmt_qubit_drive = wfmt_qubit_drive
 
-        self._is_trough = kwargs.get('is_trough', False)
+        # self._range_amps = kwargs.get('range_amps', None)
+        self._range_amps = range_amps
         self._post_processor = kwargs.get('post_processor', None)
         self._param_rabi_frequency = kwargs.get('param_rabi_frequency', None)
         self._param_rabi_decay_time = kwargs.get('param_rabi_decay_time', None)
@@ -31,7 +32,7 @@ class ExpRabi(Experiment):
         wfm.set_digital_segments('readout', 'qubit', ['read'])
         self._temp_vars = self._expt_config.update_waveforms(wfm, [('Drive Amplitude', 'qubit', 'drive', 'Amplitude')] )
 
-        sweep_vars = [(self._temp_vars[0], np.linspace(0.0, 0.5, 50))]
+        sweep_vars = [(self._temp_vars[0], self._range_amps)]
 
         kwargs['skip_init_instruments'] = True
 

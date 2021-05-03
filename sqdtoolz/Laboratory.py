@@ -231,8 +231,6 @@ class Laboratory:
         self._group_dir['InitDir'] = ""
 
     def run_single(self, expt_obj, sweep_vars=[], **kwargs):
-        delay = kwargs.get('delay', 0.0)
-
         #Get time-stamp
         if self._group_dir['Dir'] == "":
             folder_time_stamp = datetime.now().strftime(f"%Y-%m-%d/%H%M%S-" + expt_obj.Name + "/")
@@ -248,7 +246,7 @@ class Laboratory:
         self._time_stamp_begin = time.time()
         self._time_stamps = [(0,0),]
         self._prog_bar_str = ''
-        ret_vals = expt_obj._run(cur_exp_path, sweep_vars, ping_iteration=self._update_progress_bar, delay=delay)
+        ret_vals = expt_obj._run(cur_exp_path, sweep_vars, ping_iteration=self._update_progress_bar, **kwargs)
         #TODO: Add flag to get/save for live-plotting
 
         #Save the experiment configuration

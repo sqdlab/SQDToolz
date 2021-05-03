@@ -23,7 +23,11 @@ class FileIOWriter:
                 offset = len(sweep_vars)
                 #
                 random_dataset = next(iter(data_pkt['data'].values()))
-                param_sizes = random_dataset.shape
+                if np.isscalar(random_dataset):
+                    param_sizes = (1,)
+                else:
+                    param_sizes = random_dataset.shape
+                #
                 for m, cur_param in enumerate(data_pkt['parameters']):
                     grp_params.create_dataset(cur_param, data=np.hstack([m+offset,np.arange(param_sizes[m])]))
                 

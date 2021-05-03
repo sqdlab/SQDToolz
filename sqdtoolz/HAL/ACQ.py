@@ -6,6 +6,7 @@ class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
         HALbase.__init__(self, hal_name)
         if lab._register_HAL(self):
             #
+            self._instr_id = instr_acq_name
             self._instr_acq = lab._get_instrument(instr_acq_name)
             self._trig_src_obj = None
             self.data_processor = None
@@ -91,7 +92,7 @@ class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
             proc_name = ''
         ret_dict = {
             'Name' : self.Name,
-            'instrument' : self._instr_acq.name,
+            'instrument' : self._instr_id,
             'Type' : self.__class__.__name__,
             'TriggerSource' : self._get_trig_src_params_dict(),
             'Processor' : proc_name

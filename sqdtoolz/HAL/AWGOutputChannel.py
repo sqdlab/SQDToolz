@@ -135,7 +135,7 @@ class AWGOutputChannel(TriggerInput):
     def _get_current_config(self):
         retDict = {
             'Name' : self.Name,
-            'InstrumentAWG' : self._instr_awg.name,
+            'InstrumentAWG' : self._instr_awg_name,
             'InstrumentChannel' : self._channel_name,
             'Amplitude' : self.Amplitude,
             'Offset' : self.Offset,
@@ -148,7 +148,7 @@ class AWGOutputChannel(TriggerInput):
         return retDict
 
     def _set_current_config(self, dict_config, lab):
-        assert self._instr_awg.name == dict_config['InstrumentAWG'], "Instrument names do not match for this output-channel definition."
+        assert self._instr_awg_name == dict_config['InstrumentAWG'], "Instrument names do not match for this output-channel definition."
         assert self._channel_name == dict_config['InstrumentChannel'], "Instrument channel names do not match for this output-channel definition."
         self._channel_name = dict_config['Name']
         self.Amplitude = dict_config['Amplitude']

@@ -56,6 +56,13 @@ class SIM928_ChannelModule(InstrumentChannel):
         else:
             self.voltage.step = 1.0
         self.voltage.inter_delay = self.voltage.step / ramp_rate
+
+    @property
+    def Output(self):
+        return True
+    @Output.setter
+    def Output(self, val):
+        pass
         
     @property
     def Voltage(self):
@@ -70,7 +77,6 @@ class SIM928_ChannelModule(InstrumentChannel):
     @RampRate.setter
     def RampRate(self, val):
         self.voltage_ramp_rate(val)
-
 
 
 class VOLT_SIM928_PLX(PrologixGPIBEthernet, Instrument):

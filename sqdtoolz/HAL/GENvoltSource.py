@@ -6,6 +6,7 @@ class GENvoltSource(HALbase):
         if lab._register_HAL(self):
             #
             self._instr_volt = lab._get_instrument(instr_gen_volt_src_channel)
+            self._instr_id = instr_gen_volt_src_channel
 
     @classmethod
     def fromConfigDict(cls, config_dict, lab):
@@ -35,7 +36,7 @@ class GENvoltSource(HALbase):
     def _get_current_config(self):
         ret_dict = {
             'Name' : self.Name,
-            'instrument' : self._instr_volt.full_name,
+            'instrument' : self._instr_id,
             'Type' : self.__class__.__name__
             }
         self.pack_properties_to_dict(['Voltage', 'RampRate', 'Output'], ret_dict)

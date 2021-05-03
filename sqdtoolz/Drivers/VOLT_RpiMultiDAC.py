@@ -11,7 +11,7 @@ class MultiDACchannel(InstrumentChannel):
                         label="Output voltage ramp-rate",
                         initial_value=2.5e-3/0.05,
                         vals=vals.Numbers(0.001, 1),
-                        get_cmd=lambda : self.voltage.step/self.voltage.inter_delay,
+                        get_cmd=lambda : self._param_volt.step/self._param_volt.inter_delay,
                         set_cmd=self._set_ramp_rate)
 
     def _set_ramp_rate(self, ramp_rate):
@@ -24,6 +24,13 @@ class MultiDACchannel(InstrumentChannel):
         else:
             self._param_volt.step = 1.0
         self._param_volt.inter_delay = self._param_volt.step / ramp_rate
+
+    @property
+    def Output(self):
+        return True
+    @Output.setter
+    def Output(self, val):
+        pass
         
     @property
     def Voltage(self):

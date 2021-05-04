@@ -98,3 +98,30 @@ class DFitSinusoid:
 
         return datapkt
             
+
+class DFitMinMax2D:
+    def __init__(self):
+        pass
+
+    def get_fitted_plot(self, data_x, data_y, data_z, isMin=True, xLabel="", yLabel=""):
+        fig, axs = plt.subplots(1)
+        axs.pcolor(data_x, data_y, data_z.T, shading='auto')
+        
+        if isMin:
+            ext_inds = np.unravel_index(data_z.argmin(), data_z.shape)
+        else:
+            ext_inds = np.unravel_index(data_z.argmax(), data_z.shape)
+
+        axs.plot(data_x[ext_inds[0]], data_y[ext_inds[1]], 'rx')
+        axs.set_xlabel(xLabel)
+        axs.set_ylabel(yLabel)
+
+        ext_vals = ( data_x[ext_inds[0]], data_y[ext_inds[1]] )
+
+        datapkt = {
+            'extremum' : ext_vals,
+            'fig' : fig
+        }
+
+        return datapkt
+            

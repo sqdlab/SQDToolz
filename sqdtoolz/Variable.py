@@ -1,7 +1,9 @@
+import numpy as np
 
 class VariableBase:
-    def __init__(self, name):
+    def __init__(self, name, lab):
         self._name = name
+        self._lab = lab
 
     def __new__(cls, *args, **kwargs):
         if len(args) == 0:
@@ -51,9 +53,40 @@ class VariableBase:
     def _set_current_config(self, dict_config):
         raise NotImplementedError()
 
+    def linspace(self, start_val, stop_val, num_pts):
+        #Good reference: https://stackoverflow.com/questions/42743053/what-happens-when-closing-a-loop-using-an-infinite-iterable
+        try:
+            self._lab._sweep_enqueue(self.Name)
+            cur_vals = np.linspace(start_val, stop_val, num_pts)
+            for cur_val in cur_vals:
+                self.Value = cur_val
+                yield cur_val
+        finally:
+            self._lab._sweep_dequeue(self.Name)
+
+    def arange(self, start_val, stop_val, step):
+        try:
+            self._lab._sweep_enqueue(self.Name)
+            cur_vals = np.arange(start_val, stop_val, step)
+            for cur_val in cur_vals:
+                self.Value = cur_val
+                yield cur_val
+        finally:
+            self._lab._sweep_dequeue(self.Name)
+
+    def array(self, numpy_array):
+        try:
+            self._lab._sweep_enqueue(self.Name)
+            cur_vals = numpy_array[:]
+            for cur_val in cur_vals:
+                self.Value = cur_val
+                yield cur_val
+        finally:
+            self._lab._sweep_dequeue(self.Name)
+
 class VariableInternal(VariableBase):
     def __init__(self, name, lab, init_val = None):
-        super().__init__(name)
+        super().__init__(name, lab)
         if lab._register_VAR(self):
             if init_val == None:
                 self._val = 0.0
@@ -82,7 +115,7 @@ class VariableInternal(VariableBase):
     
 class VariableProperty(VariableBase):
     def __init__(self, name, lab, sqdtoolz_obj, prop_name, **kwargs):
-        super().__init__(name)
+        super().__init__(name, lab)
 
         list_from_obj_that_doesnt_exist = kwargs.get('_lonely_dict', None)
 
@@ -157,7 +190,7 @@ class VariablePropertyTransient:
 
 class VariableSpaced(VariableBase):
     def __init__(self, name, lab, var_1, var_2, space_val):
-        super().__init__(name)
+        super().__init__(name, lab)
         self._lab = lab
         self._var_1 = var_1
         self._var_2 = var_2

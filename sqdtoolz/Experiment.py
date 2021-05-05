@@ -37,6 +37,7 @@ class Experiment:
             self._expt_config.prepare_instruments()
             data = self._expt_config.get_data()
             data_file.push_datapkt(data, sweep_vars)
+            time.sleep(delay)
         else:
             sweep_arrays = [x[1] for x in sweep_vars]
             sweep_grids = np.meshgrid(*sweep_arrays)
@@ -66,8 +67,17 @@ class Experiment:
         #TODO: Should the return value be a list if there are a few saved files?
         return FileIOReader(file_path + 'data.h5')
 
-    def save_config(self, save_dir, file_name):
+    def save_config(self, save_dir, name_time_diag, name_expt_params, sweep_queue = []):
         #Save a PNG of the Timing Plot
         lePlot = self._expt_config.plot()
-        lePlot.savefig(save_dir + file_name + '.png')
+        lePlot.savefig(save_dir + name_time_diag + '.png')
         plt.close(lePlot)
+
+        dict_expt_params = {
+            'Name' : self.Name,
+            'Type' : self.__class__.__name__,
+            'Config' : self._expt_config.Name,
+            'Sweeps' : sweep_queue
+        }
+        with open(save_dir + name_expt_params, 'w') as outfile:
+            json.dump(dict_expt_params, outfile, indent=4)

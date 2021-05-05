@@ -1,8 +1,10 @@
 from sqdtoolz.ExperimentConfiguration import*
 from sqdtoolz.Laboratory import*
+from sqdtoolz.Experiment import*
+import numpy as np
 
 #Test cold-reload
-new_lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir')
+new_lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir/')
 with open("UnitTests/laboratory_configuration.txt") as json_file:
     data = json.load(json_file)
     new_lab.cold_reload_labconfig(data)
@@ -193,7 +195,7 @@ new_lab.save_laboratory_config('UnitTests/', 'laboratory_configuration3.txt')
 #Check again on a cold reload
 #
 new_lab._station.close_all_registered_instruments()
-new_lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir')
+new_lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir/')
 with open("UnitTests/laboratory_configuration3.txt") as json_file:
     data = json.load(json_file)
     new_lab.cold_reload_labconfig(data)
@@ -217,5 +219,42 @@ assert new_lab.WFMT("IQmod").IQPhaseOffset == 54.3, "WaveformTransformation prop
 assert new_lab.WFMT("IQmod").IQdcOffset == (9,1), "WaveformTransformation property incorrectly set"
 assert new_lab.WFMT("IQmod").IQUpperSideband == False, "WaveformTransformation property incorrectly set"
 
+#
+#Check variable sweeps
+#
+#Check linspace
+cur_arr = np.linspace(1,15,14)
+m = 0
+for cur_val in new_lab.VAR("myFreq").linspace(1,15,14):
+    assert cur_val == cur_arr[m], "Variable linspace does not return correct value"
+    assert new_lab.VAR("myFreq").Value == cur_arr[m], "Variable linspace does not set correct value"
+    m += 1
+#Check arange
+cur_arr = np.arange(1,15,0.45)
+m = 0
+for cur_val in new_lab.VAR("myFreq").arange(1,15,0.45):
+    assert cur_val == cur_arr[m], "Variable linspace does not return correct value"
+    assert new_lab.VAR("myFreq").Value == cur_arr[m], "Variable linspace does not set correct value"
+    m += 1
+#Check array
+cur_arr = np.arange(1,151,0.5)
+m = 0
+for cur_val in new_lab.VAR("myFreq").array(cur_arr):
+    assert cur_val == cur_arr[m], "Variable linspace does not return correct value"
+    assert new_lab.VAR("myFreq").Value == cur_arr[m], "Variable linspace does not set correct value"
+    m += 1
+
+#
+#Check with experiment sweeps
+#
+new_lab.HAL('dum_acq').set_trigger_source(None)
+ExperimentConfiguration('testConf', new_lab, 1.0, [new_lab.HAL('ddg')], new_lab.HAL('dum_acq'))
+#
+new_lab.group_open("test_group")
+for cur_freq in new_lab.VAR("myFreq").array([1,2,3]):
+    for cur_amp in new_lab.VAR("testAmpl").array([4,7,8]):
+        exp = Experiment("test", new_lab.CONFIG('testConf'))
+        new_lab.run_single(exp, delay=1)
+new_lab.group_close()
 
 print("Laboratory Unit Tests completed successfully.")

@@ -27,7 +27,7 @@ class Laboratory:
 
         #Convert Windows backslashes into forward slashes (should be compatible with MAC/Linux then...)
         self._save_dir = save_dir.replace('\\','/')
-        self._group_dir = {'Dir':"", 'InitDir':""}
+        self._group_dir = {'Dir':"", 'InitDir':"", 'SweepQueue':[]}
 
         self._hal_objs = {}
         self._processors = {}
@@ -225,10 +225,17 @@ class Laboratory:
     def group_open(self, group_name):
         self._group_dir['Dir'] = group_name
         self._group_dir['InitDir'] = ""
+        self._group_dir['SweepQueue'] = []
 
     def group_close(self):
         self._group_dir['Dir'] = ""
         self._group_dir['InitDir'] = ""
+        self._group_dir['SweepQueue'] = []
+
+    def _sweep_enqueue(self, var_name):
+        self._group_dir['SweepQueue'].append(var_name)
+    def _sweep_dequeue(self, var_name):
+        self._group_dir['SweepQueue'].pop()
 
     def run_single(self, expt_obj, sweep_vars=[], **kwargs):
         #Get time-stamp
@@ -252,7 +259,7 @@ class Laboratory:
         #Save the experiment configuration
         self.save_experiment_configs(cur_exp_path)
         #Save experiment-specific experiment-configuration data (i.e. timing diagram)
-        expt_obj.save_config(cur_exp_path, 'timing_diagram')
+        expt_obj.save_config(cur_exp_path, 'timing_diagram', 'experiment_parameters.txt', self._group_dir['SweepQueue'])
 
         #Save instrument configurations (QCoDeS)
         self._save_instrument_config(cur_exp_path)

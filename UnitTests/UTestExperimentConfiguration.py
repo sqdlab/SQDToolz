@@ -530,6 +530,7 @@ leConfig = expConfig.save_config()
 #Reinitialise the waveform
 read_segs = []
 read_segs2 = []
+awg_wfm = WaveformAWG("Wfm1", new_lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9)
 awg_wfm.clear_segments()
 awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, 10e-9, 0.0))
 for m in range(4):

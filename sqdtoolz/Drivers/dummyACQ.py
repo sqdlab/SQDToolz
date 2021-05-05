@@ -56,8 +56,8 @@ class DummyACQ(Instrument):
         cur_processor = kwargs.get('data_processor', None)
 
         #channels, segments, samples
-        wav1 = np.array([[np.random.rand(self.NumSamples)]*self.NumSegments])
-        wav2 = np.array([[np.random.rand(self.NumSamples)]*self.NumSegments])
+        wav1 = np.array([[np.random.rand(self.NumSamples)]*self.NumSegments]*self.NumRepetitions)
+        wav2 = np.array([[np.random.rand(self.NumSamples)]*self.NumSegments]*self.NumRepetitions)
         ret_val = {
             'parameters' : ['repetition', 'segment', 'sample'],
             'data' : {

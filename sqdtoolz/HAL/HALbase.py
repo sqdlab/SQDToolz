@@ -25,6 +25,13 @@ class HALbase:
         else:
             return super(cls.__class__, cls).__new__(cls)
 
+    def __str__(self):
+        cur_dict = self._get_current_config()
+        cur_str = ""
+        for cur_key in cur_dict:
+            cur_str += f"{cur_key}: {cur_dict[cur_key]}\n"
+        return cur_str
+
     @property
     def Name(self):
         return self._name

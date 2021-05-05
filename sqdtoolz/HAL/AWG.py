@@ -231,6 +231,21 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
             trig_inp_objs += cur_chan.get_all_markers()
         return trig_inp_objs
 
+    def __str__(self):
+        ret_str = ""
+        ret_str += f'Name: {self.Name}\n'
+        ret_str += f'Type: {self.__class__.__name__}\n'
+        ret_str += f'SampleRate: {self.SampleRate}\n'
+        ret_str += f'TotalTime: {self._total_time}\n'
+        ret_str += f'global_factor: {self._global_factor}\n'
+        ret_str += f'Waveform Segments:\n'
+        seg_data = self._get_current_config_waveforms()
+        for cur_seg in seg_data:
+            cur_name = cur_seg.pop('Name')
+            cur_type = cur_seg.pop('Type')
+            cur_seg.pop('Mod Func')
+            ret_str += f'\t{cur_type}, {cur_name}, {cur_seg}\n'
+        return ret_str
 
     def _get_current_config(self):
         retDict = {

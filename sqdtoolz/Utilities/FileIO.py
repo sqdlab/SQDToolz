@@ -207,5 +207,3 @@ class FileIODirectory:
 
     def get_numpy_array(self):
         return self._cur_data
-
-FileIODirectory.fromReader(FileIOReader('test_save_dir\\2021-05-05\\130520-test_group\\130520-test\\data.h5'))

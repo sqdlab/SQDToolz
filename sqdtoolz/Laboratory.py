@@ -36,13 +36,21 @@ class Laboratory:
         self._waveform_transforms = {}
         self._activated_instruments = []
 
+    def _load_json_file(self, filepath):
+        if os.path.isfile(filepath):
+            with open(filepath) as json_file:
+                data = json.load(json_file)
+                return data
+            return None
+        return None
+
     def update_variables_from_last_expt(self, file_name = ''):
         if file_name == '':
             #TODO: Stress test this with say 100000 directories
             dirs = [x[0] for x in os.walk(self._save_dir)]  #Walk gives a tuple: (dirpath, dirnames, filenames)
-            last_dir = dirs[-1].replace('\\','/')
-            if os.path.isfile(last_dir + "/laboratory_parameters.txt"):
-                filepath = last_dir + "/laboratory_parameters.txt"
+            cur_dir = dirs[-1].replace('\\','/')
+            if os.path.isfile(cur_dir + "/laboratory_parameters.txt"):
+                filepath = cur_dir + "/laboratory_parameters.txt"
         else:
             filepath = file_name
         with open(filepath) as json_file:
@@ -56,20 +64,23 @@ class Laboratory:
 
     def cold_reload_last_configuration(self):
         dirs = [x[0] for x in os.walk(self._save_dir)]  #Walk gives a tuple: (dirpath, dirnames, filenames)
-        last_dir = dirs[-1].replace('\\','/')
-        if os.path.isfile(last_dir + "/laboratory_configuration.txt"):
-            with open(last_dir + "/laboratory_configuration.txt") as json_file:
-                data = json.load(json_file)
-                self.cold_reload_labconfig(data)
-        if os.path.isfile(last_dir + "/experiment_configurations.txt"):
-            with open(last_dir + "/experiment_configurations.txt") as json_file:
-                data = json.load(json_file)
-                self.cold_reload_experiment_configurations(data)
-        self.update_variables_from_last_expt()
-        # if os.path.isfile(last_dir + "/experiment_configuration.txt"):
-        #     with open(last_dir + "/experiment_configuration.txt") as json_file:
-        #         data = json.load(json_file)
-        #         self.cold_reload_configuration(data)
+        
+        #Go through the directories in reverse chronological order (presuming data-stamped folders)
+        for cur_cand_dir in dirs[::-1]:
+            cur_dir = cur_cand_dir.replace('\\','/')
+            #Check current candidate directory has the required files
+            if not os.path.isfile(cur_dir + "/laboratory_configuration.txt"):
+                continue
+            if not os.path.isfile(cur_dir + "/experiment_configurations.txt"):
+                continue
+            if not os.path.isfile(cur_dir + "/laboratory_parameters.txt"):
+                continue
+            #If the files concurrently exist, then load the data...
+            self.cold_reload_labconfig(self._load_json_file(cur_dir + "/laboratory_configuration.txt"))
+            self.cold_reload_experiment_configurations(self._load_json_file(cur_dir + "/experiment_configurations.txt"))
+            self.update_variables_from_last_expt(cur_dir + "/laboratory_parameters.txt")
+            return
+        assert False, "No valid previous experiment with all data files were found to be present."
 
     def cold_reload_experiment_configurations(self, config_dict):
         for cur_expt_config in config_dict:
@@ -140,15 +151,14 @@ class Laboratory:
                 ret_obj = ret_obj._get_child(res_list[m])
         return ret_obj
 
-    def _register_VAR(self, hal_var):
-        if not (hal_var.Name in self._variables):
-            self._variables[hal_var.Name] = hal_var
+    def _register_HAL(self, hal_obj):
+        if not (hal_obj.Name in self._hal_objs):
+            self._hal_objs[hal_obj.Name] = hal_obj
             return True
         return False
-    def VAR(self, param_name):
-        #assert param_name in self._variables, f"Parameter name {param_name} does not exist."
-        if param_name in self._variables:
-            return self._variables[param_name]
+    def HAL(self, hal_ID):
+        if hal_ID in self._hal_objs:
+            return self._hal_objs[hal_ID]
         else:
             return None
 
@@ -171,6 +181,17 @@ class Laboratory:
     def WFMT(self, wfmt_name):
         if wfmt_name in self._waveform_transforms:
             return self._waveform_transforms[wfmt_name]
+        else:
+            return None
+
+    def _register_VAR(self, hal_var):
+        if not (hal_var.Name in self._variables):
+            self._variables[hal_var.Name] = hal_var
+            return True
+        return False
+    def VAR(self, param_name):
+        if param_name in self._variables:
+            return self._variables[param_name]
         else:
             return None
 
@@ -207,20 +228,7 @@ class Laboratory:
         else:
             assert instrID in self._station.components, f"Instrument by the name {instrID} has not been loaded. Call activate_instrument on it first."
             return self._station.components[instrID]
-    def _register_HAL(self, hal_obj):
-        # assert isinstance(hal_obj, HALbase), "Supplied HAL object must be a valid HAL object implementing HALbase"
-        # assert not (hal_obj.Name in self._hal_objs), f"Supplied HAL object with the name {hal_obj.Name} already exists in the Laboratory object."
-        if not (hal_obj.Name in self._hal_objs):
-            self._hal_objs[hal_obj.Name] = hal_obj
-            return True
-        return False
 
-    def HAL(self, hal_ID):
-        # assert hal_ID in self._hal_objs, f"HAL object {hal_ID} does not exist."
-        if hal_ID in self._hal_objs:
-            return self._hal_objs[hal_ID]
-        else:
-            return None
 
     def group_open(self, group_name):
         self._group_dir['Dir'] = group_name

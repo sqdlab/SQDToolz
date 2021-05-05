@@ -2,6 +2,13 @@ from sqdtoolz.ExperimentConfiguration import*
 from sqdtoolz.Laboratory import*
 from sqdtoolz.Experiment import*
 import numpy as np
+from sqdtoolz.Utilities.FileIO import*
+from pathlib import Path
+
+def arr_equality(arr1, arr2):
+    if arr1.size != arr2.size:
+        return False
+    return np.sum(np.abs(arr1 - arr2)) < 1e-15
 
 #Test cold-reload
 new_lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir/')
@@ -254,7 +261,63 @@ new_lab.group_open("test_group")
 for cur_freq in new_lab.VAR("myFreq").array([1,2,3]):
     for cur_amp in new_lab.VAR("testAmpl").array([4,7,8]):
         exp = Experiment("test", new_lab.CONFIG('testConf'))
-        new_lab.run_single(exp, delay=1)
+        res = new_lab.run_single(exp, delay=1)
 new_lab.group_close()
+#Check the written data...
+amalg_res = FileIODirectory.fromReader(res)
+assert arr_equality(amalg_res.param_vals[0], np.array([1,2,3])), "The extracted FileIODirectory object has incorrect right sweeping values."
+assert arr_equality(amalg_res.param_vals[1], np.array([4,7,8])), "The extracted FileIODirectory object has incorrect right sweeping values."
+assert amalg_res.param_names[0:2] == ["myFreq", "testAmpl"], "The extracted FileIODirectory object has incorrect right sweeping parameter names."
+
+#
+#Check again on a complete cold reload
+#
+new_lab._station.close_all_registered_instruments()
+new_lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir/')
+new_lab.cold_reload_last_configuration()
+#
+#Check that the variables have been correctly reloaded...
+assert new_lab.VAR("myFreq").Value == 3, "Variable incorrectly reloaded."
+assert new_lab.VAR("test RepTime").Value == 99, "Variable incorrectly reloaded."
+assert new_lab.HAL("ddg").RepetitionTime == 99, "Variable incorrectly reloaded."
+assert new_lab.VAR("testAmpl").Value == 8, "Variable incorrectly reloaded."
+assert new_lab.HAL("Wfm1").get_waveform_segment('init0').Amplitude == 8, "Variable incorrectly reloaded."
+#
+assert new_lab.VAR("myDura1").Value == 2016, "Variable incorrectly reloaded"
+assert new_lab.VAR("myDura2").Value == 2016+3.1415926, "Variable incorrectly reloaded"
+assert new_lab.HAL("Wfm1").get_waveform_segment('init2').Duration == 2016+3.1415926, "Variable incorrectly reloaded"
+#
+assert new_lab.WFMT("IQmod").IQFrequency == 84e7, "WaveformTransformation property incorrectly set"
+assert new_lab.WFMT("IQmod").IQAmplitude == 9.4, "WaveformTransformation property incorrectly set"
+assert new_lab.WFMT("IQmod").IQAmplitudeFactor == 78.1, "WaveformTransformation property incorrectly set"
+assert new_lab.WFMT("IQmod").IQPhaseOffset == 54.3, "WaveformTransformation property incorrectly set"
+assert new_lab.WFMT("IQmod").IQdcOffset == (9,1), "WaveformTransformation property incorrectly set"
+assert new_lab.WFMT("IQmod").IQUpperSideband == False, "WaveformTransformation property incorrectly set"
+#
+#
+#Check that cold-reloading works even if there are invalid directories...
+Path('test_save_dir/3099-09-09/123456-test').mkdir(parents=True, exist_ok=True)
+new_lab._station.close_all_registered_instruments()
+new_lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir/')
+new_lab.cold_reload_last_configuration()
+#
+#Check that the variables have been correctly reloaded...
+assert new_lab.VAR("myFreq").Value == 3, "Variable incorrectly reloaded."
+assert new_lab.VAR("test RepTime").Value == 99, "Variable incorrectly reloaded."
+assert new_lab.HAL("ddg").RepetitionTime == 99, "Variable incorrectly reloaded."
+assert new_lab.VAR("testAmpl").Value == 8, "Variable incorrectly reloaded."
+assert new_lab.HAL("Wfm1").get_waveform_segment('init0').Amplitude == 8, "Variable incorrectly reloaded."
+#
+assert new_lab.VAR("myDura1").Value == 2016, "Variable incorrectly reloaded"
+assert new_lab.VAR("myDura2").Value == 2016+3.1415926, "Variable incorrectly reloaded"
+assert new_lab.HAL("Wfm1").get_waveform_segment('init2').Duration == 2016+3.1415926, "Variable incorrectly reloaded"
+#
+assert new_lab.WFMT("IQmod").IQFrequency == 84e7, "WaveformTransformation property incorrectly set"
+assert new_lab.WFMT("IQmod").IQAmplitude == 9.4, "WaveformTransformation property incorrectly set"
+assert new_lab.WFMT("IQmod").IQAmplitudeFactor == 78.1, "WaveformTransformation property incorrectly set"
+assert new_lab.WFMT("IQmod").IQPhaseOffset == 54.3, "WaveformTransformation property incorrectly set"
+assert new_lab.WFMT("IQmod").IQdcOffset == (9,1), "WaveformTransformation property incorrectly set"
+assert new_lab.WFMT("IQmod").IQUpperSideband == False, "WaveformTransformation property incorrectly set"
+
 
 print("Laboratory Unit Tests completed successfully.")

@@ -23,6 +23,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
             self._global_factor = global_factor
             self._wfm_segment_list = []
             self._auto_comp = 'None'
+            self._auto_comp_linked = False
             self._auto_comp_algos = ['None', 'Basic']
             self._total_time = total_time
         else:
@@ -56,6 +57,13 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
     def AutoCompression(self, algorithm):
         assert algorithm in ['None', 'Basic'], f"Unknown algorithm for auto-compression. Allowed algorithms are: {self._auto_comp_algos}"
         self._auto_comp = algorithm
+
+    @property
+    def AutoCompressionLinkChannels(self):
+        return self._auto_comp_linked
+    @AutoCompressionLinkChannels.setter
+    def AutoCompressionLinkChannels(self, boolVal):
+        self._auto_comp_linked = boolVal
 
     def _get_child(self, tuple_name_group):
         cur_name, cur_type = tuple_name_group
@@ -278,6 +286,8 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
             'SampleRate' : self.SampleRate,
             'TotalTime' : self._total_time,
             'global_factor' : self._global_factor,
+            'AutoCompression' : self.AutoCompression,
+            'AutoCompressionLinkChannels' : self.AutoCompressionLinkChannels,
             'OutputChannels' : [x._get_current_config() for x in self._awg_chan_list]
             }
         retDict['WaveformSegments'] = self._get_current_config_waveforms()
@@ -293,6 +303,8 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
         self._sample_rate = dict_config['SampleRate']
         self._total_time = dict_config['TotalTime']
         self._global_factor = dict_config['global_factor']
+        self.AutoCompression = dict_config['AutoCompression']
+        self.AutoCompressionLinkChannels = dict_config['AutoCompressionLinkChannels']
         for ind, cur_ch_output in enumerate(dict_config['OutputChannels']):
             self._awg_chan_list[ind]._set_current_config(cur_ch_output, lab)
 
@@ -358,6 +370,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
             assert num_pts >= mem_params['MinSize'], f"Waveform too short; needs to have at least {mem_params['MinSize']} points."
             assert num_pts % mem_params['Multiple'] == 0, f"Number of points in waveform needs to be a multiple of {mem_params['Multiple']}."
 
+        #Assemble markers
         final_mkrs = []
         for ind, cur_awg_chan in enumerate(self._awg_chan_list):
             if len(cur_awg_chan._awg_mark_list) > 0:
@@ -366,6 +379,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
                 mkr_list = [np.array([])]
             final_mkrs += [mkr_list]
 
+        #Check if there are any changes in the waveforms - if not, then there's no need to reprogram...
         self._dont_reprogram = True
         for m in range(len(self._cur_prog_waveforms)):
             if self._cur_prog_waveforms[m] is not None:
@@ -378,24 +392,42 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
         if self._dont_reprogram:
             return
 
-        self.cur_wfms_to_commit = []
-        for ind, cur_awg_chan in enumerate(self._awg_chan_list):
-            mkr_list = final_mkrs[ind]
-                
-            dict_auto_comp = cur_awg_chan._instr_awg.AutoCompressionSupport
-            if self.AutoCompression == 'None' or not dict_auto_comp['Supported'] or final_wfms[0].size < dict_auto_comp['MinSize']*2:
-                #UNCOMPRESSED
-                #Just program the AWG via over a single waveform    
-                #Don't compress if disabled, unsupported or if the waveform size is too small to compress
-                dict_wfm_data = {'waveforms' : [final_wfms[ind]], 'markers' : [mkr_list], 'seq_ids' : [0]}
-            elif self.AutoCompression == 'Basic':
-                #BASIC COMPRESSION
-                #The basic compression algorithm is to chop up the waveform into its minimum set of bite-sized pieces and to find repetitive aspects
-                dict_wfm_data = self._program_auto_comp_basic(cur_awg_chan, final_wfms[ind], mkr_list)
-                
-            seg_lens = [x.size for x in dict_wfm_data['waveforms']]
-            cur_awg_chan._instr_awg.prepare_waveform_memory(cur_awg_chan._instr_awg_chan.short_name, seg_lens, raw_data=dict_wfm_data)
-            self.cur_wfms_to_commit.append(dict_wfm_data)
+        #For the case where the sequencing table must be the same for all channels (e.g. channels on the Agilent N8241A), the sequencing is
+        #done on all the waveforms across all channels
+        if self.AutoCompressionLinkChannels and self.AutoCompression != 'None':
+            assert self.AutoCompression == 'Basic', "Only the \'Basic\' algorithm is currently supported for linked-channel auto-compression."
+            self.cur_wfms_to_commit = []
+            #Check that the memory requirements are the same across all channels (i.e. typically the same AWG)
+            dict_auto_comps = [cur_awg_chan._instr_awg.AutoCompressionSupport for cur_awg_chan in self._awg_chan_list]
+            for cur_key in dict_auto_comps[0]:
+                for cur_dict in dict_auto_comps:
+                    assert cur_dict[cur_key] == dict_auto_comps[0][cur_key], f"Linked-channel auto-compression requires all channels to have the same {cur_key}."
+            #Perform BASIC compression on all the channels simultaneously...
+            dict_wfm_datas = self._program_auto_comp_basic_linked(dict_auto_comps[0]['MinSize'], final_wfms, final_mkrs)
+            for ind, cur_awg_chan in enumerate(self._awg_chan_list):
+                dict_wfm_data = dict_wfm_datas[ind]
+                seg_lens = [x.size for x in dict_wfm_data['waveforms']]
+                cur_awg_chan._instr_awg.prepare_waveform_memory(cur_awg_chan._instr_awg_chan.short_name, seg_lens, raw_data=dict_wfm_data)
+                self.cur_wfms_to_commit.append(dict_wfm_data)
+        else:
+            self.cur_wfms_to_commit = []
+            for ind, cur_awg_chan in enumerate(self._awg_chan_list):
+                mkr_list = final_mkrs[ind]
+                    
+                dict_auto_comp = cur_awg_chan._instr_awg.AutoCompressionSupport
+                if self.AutoCompression == 'None' or not dict_auto_comp['Supported'] or final_wfms[0].size < dict_auto_comp['MinSize']*2:
+                    #UNCOMPRESSED
+                    #Just program the AWG via over a single waveform    
+                    #Don't compress if disabled, unsupported or if the waveform size is too small to compress
+                    dict_wfm_data = {'waveforms' : [final_wfms[ind]], 'markers' : [mkr_list], 'seq_ids' : [0]}
+                elif self.AutoCompression == 'Basic':
+                    #BASIC COMPRESSION
+                    #The basic compression algorithm is to chop up the waveform into its minimum set of bite-sized pieces and to find repetitive aspects
+                    dict_wfm_data = self._program_auto_comp_basic(cur_awg_chan, final_wfms[ind], mkr_list)
+                    
+                seg_lens = [x.size for x in dict_wfm_data['waveforms']]
+                cur_awg_chan._instr_awg.prepare_waveform_memory(cur_awg_chan._instr_awg_chan.short_name, seg_lens, raw_data=dict_wfm_data)
+                self.cur_wfms_to_commit.append(dict_wfm_data)
 
     def prepare_final(self):
         if not self._dont_reprogram:
@@ -467,4 +499,60 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
                 seq_mkrs[-1] = cur_mkrs
 
         return {'waveforms' : seq_segs, 'markers' : seq_mkrs, 'seq_ids' : seq_ids}
+
+    def _program_auto_comp_basic_linked(self, minSize, final_wfms, final_mkrs):
+        #TODO: Add flags for changed/requires-update to ensure that segments in sequence are not unnecessary programmed repeatedly...
+        #TODO: Improve algorithm
+        num_channels = len(final_wfms)
+        dS = minSize
+        num_main_secs = int(np.floor(final_wfms[0].size / dS))
+        #The following variables are representative across all channels.
+        seq_segs = [[final_wfm_for_chan[0:dS]] for final_wfm_for_chan in final_wfms]                #Slice: channel, waveform-segment, waveform-pts
+        seq_mkrs = [[self._extract_marker_segments(mkr_list, 0, dS)] for mkr_list in final_mkrs]    #Slice: channel, marker-segment, marker-index, marker-pts
+        seq_ids  = [0]
+        for m in range(1,num_main_secs):
+            #Extract current dS slice of the final waveforms and markers across all channels
+            cur_seg = [final_wfm_for_chan[(m*dS):((m+1)*dS)] for final_wfm_for_chan in final_wfms]
+            cur_mkrs = [self._extract_marker_segments(mkr_list, m*dS, (m+1)*dS) for mkr_list in final_mkrs]
+            #Check for a match in a previous segment
+            for seg_ind in range(len(seq_segs[0])):     #Loop through all previous segments
+                found_match = True
+                for cur_ch in range(num_channels):   #For each segment to check, check across all channels
+                    #Check main waveform array
+                    if np.array_equal(cur_seg[cur_ch], seq_segs[cur_ch][seg_ind]):
+                        #Check the sub-markers
+                        mkrs_match = True
+                        for mkr in range(len(cur_mkrs[cur_ch])):
+                            if not np.array_equal(seq_mkrs[cur_ch][seg_ind][mkr], cur_mkrs[cur_ch][mkr]):
+                                mkrs_match = False
+                                break
+                        #If for the current channel, the markers do not match, move onto the next segment...
+                        if not mkrs_match:
+                            found_match = False
+                            break
+                    else:
+                        found_match = False
+                        break
+                if found_match:
+                    seq_ids += [seg_ind]
+                    break
+            if not found_match:
+                seq_ids += [len(seq_segs[0])]
+                for cur_ch in range(num_channels):
+                    seq_segs[cur_ch] += [cur_seg[cur_ch]]
+                    seq_mkrs[cur_ch] += [cur_mkrs[cur_ch]]
+        if (m+1)*dS < final_wfms[0].size:
+            #Reverse it if it was matched against some other segment previously...
+            cur_mkrs = [self._extract_marker_segments(mkr_list, m*dS, mkr_list[0].size) for mkr_list in final_mkrs]
+            if found_match:
+                seq_ids[-1] = len(seq_segs)
+                for cur_ch in range(num_channels):
+                    seq_segs[cur_ch] += [final_wfms[cur_ch][(m*dS):]]
+                    seq_mkrs[cur_ch] += [cur_mkrs[cur_ch]]
+            else:
+                for cur_ch in range(num_channels):
+                    seq_segs[cur_ch][-1] = final_wfms[cur_ch][(m*dS):]
+                    seq_mkrs[cur_ch][-1] = cur_mkrs[cur_ch]
+
+        return [{'waveforms' : seq_segs[cur_ch], 'markers' : seq_mkrs[cur_ch], 'seq_ids' : seq_ids} for cur_ch in range(num_channels)]
         

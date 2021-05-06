@@ -23,26 +23,31 @@ new_lab = Laboratory(instr_config_file = "tests\\AWG_N8241A_TestMS.yaml", save_d
 # - Also using an external 10MHz reference on the AWG...
 
 #Sample Clock
-freq_module = GENmwSource(new_lab._station.load_SGS100A().get_output('RFOUT'))
+new_lab.load_instrument('SGS100A')
+freq_module = GENmwSource('MW_sample_clock', new_lab, 'SGS100A', 'RFOUT')
 freq_module.Output = True
 
 #Ideally, the length and polarity are set to default values in the drivers via the YAML file - i.e. just set TrigPulseDelay
-ddg_module = DDG(new_lab._station.load_pulser())
+new_lab.load_instrument('pulser')
+ddg_module = DDG('ddg', new_lab, 'pulser')
 ddg_module.get_trigger_output('AB').TrigPulseLength = 500e-9
 ddg_module.get_trigger_output('AB').TrigPolarity = 1
 ddg_module.get_trigger_output('AB').TrigPulseDelay = 0e-9
-new_lab._station.load_pulser().trigger_rate(500e3)
+ddg_module.RepetitionTime = 2.5e-6
 
-mod_freq_qubit = WM_SinusoidalIQ("QubitFreqMod", 100e6)
+mod_freq_qubit = WFMT_ModulationIQ("QubitFreqMod", new_lab, 100e6)
 
-instr_Agi1 = new_lab._station.load_Agi1()
-awg_wfm_q = WaveformAWG("Waveform 1", [(instr_Agi1, 'ch1'),(instr_Agi1, 'ch2')], 1.25e9)
-awg_wfm_q.add_waveform_segment(WFS_Gaussian("init", mod_freq_qubit, 512e-9, 0.5))
+new_lab.load_instrument('Agi1')
+awg_wfm_q = WaveformAWG("Waveform 1", new_lab, [('Agi1', 'ch1'),('Agi1', 'ch2')], 1.25e9)
+awg_wfm_q.add_waveform_segment(WFS_Constant("SEQ", None, 512e-9, 0.0))
+awg_wfm_q.add_waveform_segment(WFS_Constant("init", mod_freq_qubit.apply(), 512e-9, 0.5))
 awg_wfm_q.add_waveform_segment(WFS_Constant("zero1", None, 512e-9, 0.25))
-awg_wfm_q.add_waveform_segment(WFS_Gaussian("init2", mod_freq_qubit, 512e-9, 0.5))
-awg_wfm_q.add_waveform_segment(WFS_Constant("zero2", None, 512e-9, 0.0))
-awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments(["init","init2"])
-awg_wfm_q.program_AWG()
+awg_wfm_q.add_waveform_segment(WFS_Gaussian("init2", mod_freq_qubit.apply(), 512e-9, 0.5))
+awg_wfm_q.add_waveform_segment(WFS_Constant("zero2", None, 512e-9*10, 0.0))
+awg_wfm_q.get_output_channel(0).marker(1).set_markers_to_segments(["init"])
+awg_wfm_q.get_output_channel(1).marker(0).set_markers_to_segments(["SEQ", "init"])
+awg_wfm_q.AutoCompression = 'Basic'
+awg_wfm_q.AutoCompressionLinkChannels = True
 
 #Check multi-program works
 # input('press <ENTER> to continue')
@@ -51,13 +56,21 @@ awg_wfm_q.program_AWG()
 
 awg_wfm_q.get_output_channel(0).Output = True
 
-instr_Agi2 = new_lab._station.load_Agi2()
-awg_wfm_q2 = WaveformAWG("Waveform 2", [(instr_Agi2, 'ch1'),(instr_Agi2, 'ch2')], 1.25e9)
+new_lab.load_instrument('Agi2')
+awg_wfm_q2 = WaveformAWG("Waveform 2", new_lab, [('Agi2', 'ch1'),('Agi2', 'ch2')], 1.25e9)
 awg_wfm_q2.add_waveform_segment(WFS_Gaussian("init", None, 512e-9, 0.5))
-awg_wfm_q2.add_waveform_segment(WFS_Constant("zero1", mod_freq_qubit, 512e-9, 0.25))
-awg_wfm_q2.add_waveform_segment(WFS_Gaussian("init2", mod_freq_qubit, 512e-9, 0.5))
-awg_wfm_q2.add_waveform_segment(WFS_Constant("zero2", None, 512e-9, 0.0))
+awg_wfm_q2.add_waveform_segment(WFS_Constant("zero1", mod_freq_qubit.apply(), 512e-9, 0.25))
+awg_wfm_q2.add_waveform_segment(WFS_Gaussian("init2", mod_freq_qubit.apply(), 512e-9, 0.5))
+awg_wfm_q2.add_waveform_segment(WFS_Constant("zero2", None, 512e-9*10, 0.0))
 awg_wfm_q2.get_output_channel(0).marker(0).set_markers_to_segments(["init","init2"])
-awg_wfm_q2.program_AWG()
+awg_wfm_q2.AutoCompression = 'Basic'
+awg_wfm_q.AutoCompressionLinkChannels = True
+
+awg_wfm_q.prepare_initial()
+awg_wfm_q2.prepare_initial()
+awg_wfm_q.prepare_final()
+awg_wfm_q2.prepare_final()
+awg_wfm_q.activate()
+awg_wfm_q2.activate()
 
 input('press <ENTER> to continue')

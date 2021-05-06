@@ -18,7 +18,7 @@ setuptools.setup(
     ],
     python_requires='>=3.7',
     keywords='control toolbox, timing',
-    install_requires=['numpy','qcodes>=0.21.0','matplotlib','scipy','pyvisa-py'],
+    install_requires=['numpy','qcodes>=0.21.0','matplotlib','scipy','pyvisa-py', 'çupy'],
     package_data={
         "sqdtoolz":["Drivers/*.py","HAL/*.py"]
     }

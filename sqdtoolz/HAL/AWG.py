@@ -128,6 +128,30 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
     def NumPts(self):
         return round(self.Duration * self._sample_rate)
 
+    def get_valid_length_from_pts(self, num_pts):
+        ret_vals = []
+        for ind, cur_awg_chan in enumerate(self._awg_chan_list):
+            mem_params = cur_awg_chan._instr_awg.MemoryRequirements
+            resid = num_pts % mem_params['Multiple']
+            if resid > 0:
+                num_pts = num_pts + mem_params['Multiple'] - resid
+            if num_pts < mem_params['MinSize']:
+                num_pts = mem_params['MinSize']
+            ret_vals += [ num_pts / self.SampleRate ]
+        return ret_vals
+    def get_valid_length_from_time(self, time_length):
+        ret_vals = []
+        for ind, cur_awg_chan in enumerate(self._awg_chan_list):
+            mem_params = cur_awg_chan._instr_awg.MemoryRequirements
+            num_pts = time_length * self.SampleRate
+            resid = num_pts % mem_params['Multiple']
+            if resid > 0:
+                num_pts = num_pts + mem_params['Multiple'] - resid
+            if num_pts < mem_params['MinSize']:
+                num_pts = mem_params['MinSize']
+            ret_vals += [ num_pts / self.SampleRate ]
+        return ret_vals
+
     def null_all_markers(self):
         for cur_output in self._awg_chan_list:
             cur_output.null_all_markers()
@@ -326,6 +350,13 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
     def prepare_initial(self):
         #Prepare the waveform
         final_wfms, elastic_ind = self._assemble_waveform_raw()
+
+        #Ensure that the number of points in the waveform satisfies the AWG memory requirements...
+        for ind, cur_awg_chan in enumerate(self._awg_chan_list):
+            mem_params = cur_awg_chan._instr_awg.MemoryRequirements
+            num_pts = final_wfms[ind].size
+            assert num_pts >= mem_params['MinSize'], f"Waveform too short; needs to have at least {mem_params['MinSize']} points."
+            assert num_pts % mem_params['Multiple'] == 0, f"Number of points in waveform needs to be a multiple of {mem_params['Multiple']}."
 
         final_mkrs = []
         for ind, cur_awg_chan in enumerate(self._awg_chan_list):

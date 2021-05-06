@@ -99,7 +99,7 @@ class Laboratory:
     
     def cold_reload_labconfig(self, config_dict):
         for cur_instr in config_dict['ActiveInstruments']:
-            self.activate_instrument(cur_instr)
+            self.load_instrument(cur_instr)
         #Create the HALs
         for dict_cur_hal in config_dict['HALs']:
             cur_class_name = dict_cur_hal['Type']
@@ -210,7 +210,7 @@ class Laboratory:
         self._station.add_component(instrObj)
         self._activated_instruments += [instrObj.name]
 
-    def activate_instrument(self, instrID):
+    def load_instrument(self, instrID):
         # assert not (instrID in self._station.components), f"Instrument by the name {instrID} has already been loaded."
         if not (instrID in self._station.components):
             self._station.load_instrument(instrID)
@@ -218,7 +218,7 @@ class Laboratory:
 
     def _get_instrument(self, instrID):
         if type(instrID) is list:
-            assert instrID[0] in self._station.components, f"Instrument by the name {instrID[0]} has not been loaded. Call activate_instrument on it first."
+            assert instrID[0] in self._station.components, f"Instrument by the name {instrID[0]} has not been loaded. Call load_instrument on it first."
             cur_instr_obj = self._station.components[instrID[0]]
             #Go through each submodule...
             for m in range(1, len(instrID)):
@@ -226,7 +226,7 @@ class Laboratory:
                 cur_instr_obj = cur_instr_obj.submodules[instrID[m]]
             return cur_instr_obj
         else:
-            assert instrID in self._station.components, f"Instrument by the name {instrID} has not been loaded. Call activate_instrument on it first."
+            assert instrID in self._station.components, f"Instrument by the name {instrID} has not been loaded. Call load_instrument on it first."
             return self._station.components[instrID]
 
 

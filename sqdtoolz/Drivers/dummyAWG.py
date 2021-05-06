@@ -85,6 +85,10 @@ class DummyAWG(Instrument):
         return {'Supported' : True, 'MinSize' : 8, 'Multiple' : 8}
 
     @property
+    def MemoryRequirements(self):
+        return {'MinSize' : 8, 'Multiple' : 8}
+
+    @property
     def TriggerInputEdge(self):
         return self._trigger_edge
     @TriggerInputEdge.setter

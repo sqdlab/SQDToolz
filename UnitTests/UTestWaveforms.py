@@ -3,7 +3,7 @@ from sqdtoolz.HAL.AWG import*
 import numpy as np
 
 new_lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir')
-new_lab.activate_instrument('virAWG')
+new_lab.load_instrument('virAWG')
 awg_wfm = WaveformAWG("Wfm1", new_lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9)
 
 ERR_TOL = 5e-13
@@ -236,6 +236,75 @@ temp[0, init3_stencil] *= np.cos(omega*1e-9*(np.arange(45)+182-10)+0.1)
 temp[1, init3_stencil] *= np.sin(omega*1e-9*(np.arange(45)+182-10)+0.1)
 assert np.max(np.abs(temp - wfm_mod)) < ERR_TOL, "The IQ waveform was incorrectly compiled when changing phase in a previous waveform segment with 2 frequencies in play."
 
+#
+#Verify the waveform memory requirement checks
+#
+#Multiple of N check
+read_segs = []
+read_segs2 = []
+awg_wfm.clear_segments()
+awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, 10e-9, 0.0))
+awg_wfm.add_waveform_segment(WFS_Gaussian("init", None, 20e-9, 0.5-0.1))
+awg_wfm.add_waveform_segment(WFS_Constant("zero1", None, 30e-9, 0.1))
+awg_wfm.add_waveform_segment(WFS_Gaussian("init2", None, 45e-9, 0.5-0.1))
+awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 77e-9, 0.0))
+awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
+read_segs += ["init"]
+read_segs2 += ["zero2"]
+awg_wfm.get_output_channel(0).marker(1).set_markers_to_segments(read_segs)
+awg_wfm.get_output_channel(1).marker(0).set_markers_to_segments(read_segs2)
+assert_found = False
+try:
+    awg_wfm.prepare_initial()
+    awg_wfm.prepare_final()
+except AssertionError:
+    assert_found = True
+assert assert_found, "The waveform preparation function incorrectly accepts a waveform that does not satisfy the instrument's memory requirement (multiple of 8)."
+#
+#Minimum N check
+read_segs = []
+read_segs2 = []
+awg_wfm.clear_segments()
+awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, 1e-9, 0.0))
+awg_wfm.add_waveform_segment(WFS_Gaussian("init", None, 1e-9, 0.5-0.1))
+awg_wfm.add_waveform_segment(WFS_Gaussian("zero2", None, 1e-9, 0.5-0.1))
+read_segs += ["init"]
+read_segs2 += ["zero2"]
+awg_wfm.get_output_channel(0).marker(1).set_markers_to_segments(read_segs)
+awg_wfm.get_output_channel(1).marker(0).set_markers_to_segments(read_segs2)
+assert_found = False
+try:
+    awg_wfm.prepare_initial()
+    awg_wfm.prepare_final()
+except AssertionError:
+    assert_found = True
+assert assert_found, "The waveform preparation function incorrectly accepts a waveform that does not satisfy the instrument's memory requirement (minimum of 8)."
+#
+#Check normal programming works...
+read_segs = []
+read_segs2 = []
+awg_wfm.clear_segments()
+awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, 12e-9, 0.0))
+awg_wfm.add_waveform_segment(WFS_Gaussian("init", None, 4e-9, 0.5-0.1))
+awg_wfm.add_waveform_segment(WFS_Gaussian("zero2", None, 8e-9, 0.5-0.1))
+read_segs += ["init"]
+read_segs2 += ["zero2"]
+awg_wfm.get_output_channel(0).marker(1).set_markers_to_segments(read_segs)
+awg_wfm.get_output_channel(1).marker(0).set_markers_to_segments(read_segs2)
+assert_found = False
+awg_wfm.prepare_initial()
+awg_wfm.prepare_final()
+
+#
+#Check the valid length functions
+#
+assert awg_wfm.get_valid_length_from_time(12e-9) == [16e-9, 16e-9], "Valid time lengths for a given time are incorrect."
+assert awg_wfm.get_valid_length_from_time(16e-9) == [16e-9, 16e-9], "Valid time lengths for a given time are incorrect."
+assert awg_wfm.get_valid_length_from_time(5e-9) == [8e-9, 8e-9], "Valid time lengths for a given time are incorrect."
+#
+assert awg_wfm.get_valid_length_from_pts(12) == [16e-9, 16e-9], "Valid time lengths for a given time are incorrect."
+assert awg_wfm.get_valid_length_from_pts(16) == [16e-9, 16e-9], "Valid time lengths for a given time are incorrect."
+assert awg_wfm.get_valid_length_from_pts(5) == [8e-9, 8e-9], "Valid time lengths for a given time are incorrect."
 
 # import matplotlib.pyplot as plt
 # plt.plot(wfm_mod[0,:])

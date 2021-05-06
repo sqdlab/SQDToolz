@@ -1546,6 +1546,10 @@ class Agilent_N8241A(Instrument):
     def AutoCompressionSupport(self):
         return {'Supported' : True, 'MinSize' : 128 , 'Multiple' : 8}
 
+    @property
+    def MemoryRequirements(self):
+        return {'MinSize' : 128 , 'Multiple' : 8}
+
     def prepare_waveform_memory(self, chan_id, seg_lens, **kwargs):
         if len(seg_lens) > 1:
             self._seq_mode = True

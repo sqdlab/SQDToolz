@@ -21,10 +21,10 @@ ENABLE_MANUAL_COMPONENTS = False
 
 new_lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir')
 
-new_lab.activate_instrument('virACQ')
-new_lab.activate_instrument('virDDG')
-new_lab.activate_instrument('virAWG')
-new_lab.activate_instrument('virMWS')
+new_lab.load_instrument('virACQ')
+new_lab.load_instrument('virDDG')
+new_lab.load_instrument('virAWG')
+new_lab.load_instrument('virMWS')
 
 #Initialise test-modules
 hal_acq = ACQ("dum_acq", new_lab, 'virACQ')

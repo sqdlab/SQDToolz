@@ -192,6 +192,10 @@ class TaborP2584M_AWG(InstrumentChannel):
     def AutoCompressionSupport(self):
         return {'Supported' : True, 'MinSize' : 1024, 'Multiple' : 32}
 
+    @property
+    def MemoryRequirements(self):
+        return {'MinSize' : 1024, 'Multiple' : 32}
+
     def _get_channel_output(self, identifier):
         if identifier in self.submodules:
             return self.submodules[identifier]  #!!!NOTE: Note from above in the initialiser regarding the parent storing the AWG channel submodule

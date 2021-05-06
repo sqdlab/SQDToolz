@@ -6,7 +6,7 @@ The role of the laboratory class is to manage the entire experiment and to handl
 lab = Laboratory(instr_config_file='instr_config.yaml', save_dir='save_dir')
 ```
 
-The arguments `instr_config_file` and `save_dir` are optional and specify the instrument YAML and absolute (or relative) save directory in which to post the experiment results. Although the YAML automatically loads the instrument configurations, the individual QCoDeS instruments must be loaded manually via the `activate_instrument` command.
+The arguments `instr_config_file` and `save_dir` are optional and specify the instrument YAML and absolute (or relative) save directory in which to post the experiment results. Although the YAML automatically loads the instrument configurations, the individual QCoDeS instruments must be loaded manually via the `load_instrument` command.
 
 ## Design pattern
 

@@ -30,7 +30,11 @@ class FileIOWriter:
                     param_sizes = random_dataset.shape
                 #
                 for m, cur_param in enumerate(data_pkt['parameters']):
-                    grp_params.create_dataset(cur_param, data=np.hstack([m+offset,np.arange(param_sizes[m])]))
+                    if 'parameter_values' in data_pkt and cur_param in data_pkt['parameter_values']:
+                        assert data_pkt['parameter_values'][cur_param].size == param_sizes[m], f"The dataset parameter {cur_param} has {data_pkt['parameter_values'][cur_param].size} values, while the corresponding array index is of size {param_sizes[m]}."
+                        grp_params.create_dataset(cur_param, data=np.hstack([m+offset,data_pkt['parameter_values'][cur_param]]))
+                    else:
+                        grp_params.create_dataset(cur_param, data=np.hstack([m+offset,np.arange(param_sizes[m])]))
                 
                 #Write down the measurement output channels (i.e. dependent variables)
                 grp_meas = self._hf.create_group('measurements')

@@ -21,6 +21,7 @@ There cannot be a unified format for acquired data due to different instrument c
 
 - `data` - A *dictionary* of N-dimensional numpy arrays in which each key is the name of the output measurement
 - `parameters` - A list of N strings representing the indexing through the ND-arrays
+- `parameter_values` - A dictionary (can be empty) mapping parameters in `parameters` onto a list of values. If none are given, the values are enumerated via whole numbers.
 
 Now take the example where two channels are measured as a time-series. The data may be accessed as follows:
 

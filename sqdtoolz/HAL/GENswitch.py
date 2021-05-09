@@ -33,5 +33,5 @@ class GENswitch(HALbase):
         return ret_dict
 
     def _set_current_config(self, dict_config, lab):
-        assert dict_config['Type'] == self.__class__.__name__, 'Cannot set configuration to a Voltage-Source with a configuration that is of type ' + dict_config['Type']
+        assert dict_config['Type'] == self.__class__.__name__, 'Cannot set configuration to a Switch with a configuration that is of type ' + dict_config['Type']
         self.Position = dict_config['Position']

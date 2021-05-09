@@ -1,0 +1,7 @@
+instruments:
+  #The following is just for a DDG, a M/S Agilent setup and a SGS100A for the source. Not really necessary, but nice to have something feeding it...
+  vna_agilent:
+    driver: sqdtoolz.Drivers.VNA_Agilent_N5232A
+    type: VNA_Agilent_N5232A
+    address: 'TCPIP::192.168.1.202::INSTR'
+    enable_forced_reconnect: true

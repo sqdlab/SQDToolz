@@ -132,6 +132,7 @@ class VNA_Agilent_N5232A(VisaInstrument):
             set_cmd = 'TRIG:SOUR {}', vals = vals.Enum('EXT', 'IMM', 'MAN'))
         
         self._num_repetitions = 1
+        self._segment_freqs = []
 
         # *IDN?
         self.connect_message()
@@ -227,6 +228,13 @@ class VNA_Agilent_N5232A(VisaInstrument):
         self.averaging(val)
 
     @property
+    def Bandwidth(self):
+        return self.bandwidth()
+    @Bandwidth.setter
+    def Bandwidth(self, val):
+        self.bandwidth(val)
+
+    @property
     def NumRepetitions(self):
         return self._num_repetitions
     @NumRepetitions.setter
@@ -257,6 +265,7 @@ class VNA_Agilent_N5232A(VisaInstrument):
 
 
     def setup_segmented(self, segment_freqs):
+        self._segment_freqs = segment_freqs[:]
         #Clear all segments
         self.write("SENS:FOM:RANG:SEGM:DEL:ALL")
         #Initialise segments
@@ -272,6 +281,8 @@ class VNA_Agilent_N5232A(VisaInstrument):
             self.write(f"SENS:SEGM{index+1}:FREQ:STOP {freq_end} Hz")
             self.write(f"SENS:SEGM{index+1}:SWE:POIN {freq_pts}")
 
+    def get_frequency_segments(self):
+        return self._segment_freqs[:]
 
     def setup_measurements(self, ports_meas_src_tuples):
         self._delete_all_measurements()
@@ -303,23 +314,77 @@ class VNA_Agilent_N5232A(VisaInstrument):
             ret_data['data'][f'{cur_meas}_real'] = []
             ret_data['data'][f'{cur_meas}_imag'] = []
 
-        for r in range(self.NumRepetitions):
-            self.write('ABORT')
-            self.trigger.set('cont')
-            self.write('TRIG:SOUR IMM')
-            if self.AveragesEnable:
-                self.clear_averages()
-                while not self._finished_averaging():
-                    time.sleep(0.01)
-            for cur_meas_name, cur_meas in cur_meas_traces:
-                self.write(f'CALC:PAR:SEL \'{cur_meas_name}\'')
-                #Note that SDATA just means complex-valued...
-                s_data_raw = self.ask('CALC:DATA? SDATA').split(',')
-                s_data_raw = np.array(list(map(float, s_data_raw)))
-                ret_data['data'][f'{cur_meas}_real'] += [ s_data_raw[::2] ]
-                ret_data['data'][f'{cur_meas}_imag'] += [ s_data_raw[1::2] ]
-        freq_data_raw = self.ask('CALC:X?').split(',')
-        ret_data['parameter_values'][x_var_name] = np.array(list(map(float, freq_data_raw)))
+        #Strange behaviour when running the benchmark in the end is that ascii is the fastest at ~49ms per point (15 in total) while
+        #bin32/bin64 are the same speed at ~59ms?!?! So there's no speed difference in transferring more data and yet it's faster to
+        #transfer and encode ascii data?!
+        mode = 'ascii'
+
+        if mode == 'ascii':
+            self.write('FORM:DATA ASCii,0')
+            self.write(f'MMEM:STOR:TRAC:FORM:SNP RI')
+
+            av_enabled = self.AveragesEnable
+            for r in range(self.NumRepetitions):
+                self.write('ABORT')
+                self.trigger.set('cont')
+                self.write('TRIG:SOUR IMM')
+                if self.AveragesEnable:
+                    self.clear_averages()
+                    while not self._finished_averaging():
+                        time.sleep(0.01)
+                for cur_meas_name, cur_meas in cur_meas_traces:
+                    self.write(f'CALC:PAR:SEL \'{cur_meas_name}\'')
+                    #Note that SDATA just means complex-valued...
+                    s_data_raw = self.ask('CALC:DATA? SDATA').split(',')
+                    s_data_raw = np.array(list(map(float, s_data_raw)))
+                    ret_data['data'][f'{cur_meas}_real'] += [ s_data_raw[::2] ]
+                    ret_data['data'][f'{cur_meas}_imag'] += [ s_data_raw[1::2] ]
+            freq_data_raw = self.ask('CALC:X?').split(',')
+            ret_data['parameter_values'][x_var_name] = np.array(list(map(float, freq_data_raw)))
+        elif mode == 'bin32':
+            #Set data-type to be float-32 - can be 64 as well...
+            self.write('FORM:DATA REAL,32')
+            #Set output to be real-imaginary...
+            self.write(f'MMEM:STOR:TRAC:FORM:SNP RI')
+
+            av_enabled = self.AveragesEnable
+            for r in range(self.NumRepetitions):
+                self.write('ABORT')
+                self.trigger.set('cont')
+                self.write('TRIG:SOUR IMM')
+                if av_enabled:
+                    self.clear_averages()
+                    while not self._finished_averaging():
+                        time.sleep(0.01)
+                for cur_meas_name, cur_meas in cur_meas_traces:
+                    self.write(f'CALC:PAR:SEL \'{cur_meas_name}\'')
+                    #Note that SDATA just means complex-valued...
+                    s_data_raw = self.visa_handle.query_binary_values('CALC:DATA? SDATA', datatype=u'f')
+                    ret_data['data'][f'{cur_meas}_real'] += [ s_data_raw[::2] ]
+                    ret_data['data'][f'{cur_meas}_imag'] += [ s_data_raw[1::2] ]
+            ret_data['parameter_values'][x_var_name] = self.visa_handle.query_binary_values('CALC:X?', datatype=u'f')
+        elif mode == 'bin64':
+            #Set data-type to be float-32 - can be 64 as well...
+            self.write('FORM:DATA REAL,64')
+            #Set output to be real-imaginary...
+            self.write(f'MMEM:STOR:TRAC:FORM:SNP RI')
+
+            av_enabled = self.AveragesEnable
+            for r in range(self.NumRepetitions):
+                self.write('ABORT')
+                self.trigger.set('cont')
+                self.write('TRIG:SOUR IMM')
+                if av_enabled:
+                    self.clear_averages()
+                    while not self._finished_averaging():
+                        time.sleep(0.01)
+                for cur_meas_name, cur_meas in cur_meas_traces:
+                    self.write(f'CALC:PAR:SEL \'{cur_meas_name}\'')
+                    #Note that SDATA just means complex-valued...
+                    s_data_raw = self.visa_handle.query_binary_values('CALC:DATA? SDATA', datatype=u'd')
+                    ret_data['data'][f'{cur_meas}_real'] += [ s_data_raw[::2] ]
+                    ret_data['data'][f'{cur_meas}_imag'] += [ s_data_raw[1::2] ]
+            ret_data['parameter_values'][x_var_name] = self.visa_handle.query_binary_values('CALC:X?', datatype=u'd')
 
         for cur_meas_name, cur_meas in cur_meas_traces:
             ret_data['data'][f'{cur_meas}_real'] = np.vstack(ret_data['data'][f'{cur_meas}_real'])
@@ -348,19 +413,7 @@ class VNA_Agilent_N5232A(VisaInstrument):
         self.write('SENS:AVER:CLE')
 
     def _finished_averaging(self):
-        return ibool(self.ask('STATUS:OPER:AVERAGING?'))
-        
-    def trigger_measurement(self):
-        '''Resets the averaging and triggers the measurement.
-        Does not wait until the measurement is finished.'''
-        self.trigger.set('hold')
-        if (self.averaging.get()):
-            self.clear_averages()
-            self.write('ABORT')
-            self.trigger.set('cont')
-        else:
-            self.write('TRIG:SOUR MAN')
-            self.write('ABORT; :INIT:IMM')
+        return bool(int(self.ask('STATUS:OPER:AVERAGING?')))
             
     def IsFinishedMeasuring(self):
         '''Checks whether the current running measurement is finished.
@@ -371,29 +424,6 @@ class VNA_Agilent_N5232A(VisaInstrument):
         else:
             self._set_visa_timeout(self.sweep_time.get() + 5)
             return self.ask('*OPC?') > 0
-    
-    def get_trace_fast(self, trace_type = "AUTO"):
-        """Performs a measurement and returns the unordered data in a numpy array. To be used only for faster measurements."""
-        self.trigger.set('hold')
-        if (self.averaging.get()):
-            self._finished_averaging()
-            self.write('ABORT')
-            self.trigger.set('cont')
-            self.write('TRIG:SOUR IMM')
-            self.clear_averages()
-            while not self._finished_averaging():
-                time.sleep(0.1)
-        else:
-            self.write('TRIG:SOUR MAN')
-            try:
-                self._set_visa_timeout(len(self.trace.columns)*self.sweep_time.get() + 5)
-            except AttributeError:
-                self._set_visa_timeout(self.sweep_time.get() + 50)
-            self.write('ABORT; :INIT:IMM')
-            self.ask('*OPC?')
-        self.write('FORM:DATA REAL,32; BORDER SWAP')
-        self.write(f'MMEM:STOR:TRAC:FORM:SNP {trace_type}')
-        return self.visa_handle.query_binary_values('CALC:DATA? SDATA')
                
     def preset(self):
         '''Deletes all traces, measurements, and windows. In addition, resets the analyzer to factory defined default settings and creates a S11 measurement named "CH1_S11_1".'''
@@ -429,18 +459,20 @@ def runme():
     test_vna.SweepPoints = 801
 
     test_vna.AveragesEnable = False
+    test_vna.AveragesNum = 8
+    test_vna.Bandwidth = 100e3
 
 
     cur_time = time.time()
-    test_vna.NumRepetitions = 100
+    test_vna.NumRepetitions = 200
     leData = test_vna.get_data()
     cur_time = time.time() - cur_time
 
     
     s23s = np.sqrt(leData['data']['S12_real']**2 + leData['data']['S12_imag']**2)
-    plt.plot(leData['parameter_values'][x_var], s23s)
-    s22s = np.sqrt(leData['data']['S11_real']**2 + leData['data']['S11_imag']**2)
-    plt.plot(leData['parameter_values'][x_var], s22s)
+    plt.plot(leData['parameter_values'][x_var], s23s[0])
+    # s22s = np.sqrt(leData['data']['S11_real']**2 + leData['data']['S11_imag']**2)
+    # plt.plot(leData['parameter_values'][x_var], s22s[0])
     plt.show()
     input('Press ENTER')
 

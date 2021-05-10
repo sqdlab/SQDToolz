@@ -12,8 +12,8 @@ log = logging.getLogger(__name__)
 
 
 class SIM928_ChannelModule(InstrumentChannel):
-    def __init__(self, parent:Instrument, slot_num) -> None:
-        super().__init__(parent, f"SIM928_SLOT_{slot_num}")
+    def __init__(self, parent:Instrument, slot_num, leName) -> None:
+        super().__init__(parent, leName)
         self._parent = parent
         self.slot_num = slot_num
 
@@ -115,8 +115,9 @@ class VOLT_SIM928_PLX(PrologixGPIBEthernet, Instrument):
         self._source_outputs = {}
         for ch_ind in self.modules:
             self._write_module(ch_ind, 'TERM LF')
-            cur_module = SIM928_ChannelModule(self, ch_ind)
-            self.add_submodule(cur_module.name, cur_module)    #Name is christened inside the channel object...
+            leName = f'CH{ch_ind}'
+            cur_module = SIM928_ChannelModule(self, ch_ind, leName)
+            self.add_submodule(leName, cur_module)    #Name is christened inside the channel object...
             self._source_outputs[ch_ind] = cur_module
 
         super().connect_message()

@@ -23,8 +23,14 @@ class Experiment:
     def _run(self, file_path, sweep_vars=[], **kwargs):
         delay = kwargs.get('delay', 0.0)
         ping_iteration = kwargs.get('ping_iteration')
+        
+        data_file_index = kwargs.get('data_file_index', -1)
+        if data_file_index >= 0:
+            data_file_name = f'data{data_file_index}.h5'
+        else:
+            data_file_name = 'data.h5'
 
-        data_file = FileIOWriter(file_path + 'data.h5')
+        data_file = FileIOWriter(file_path + data_file_name)
 
         if not kwargs.get('skip_init_instruments', False):
             self._expt_config.init_instruments()
@@ -65,7 +71,7 @@ class Experiment:
         #TODO: think about different data-piece sizes: https://stackoverflow.com/questions/3386259/how-to-make-a-multidimension-numpy-array-with-a-varying-row-size
 
         #TODO: Should the return value be a list if there are a few saved files?
-        return FileIOReader(file_path + 'data.h5')
+        return FileIOReader(file_path + data_file_name)
 
     def save_config(self, save_dir, name_time_diag, name_expt_params, sweep_queue = []):
         #Save a PNG of the Timing Plot

@@ -23,6 +23,7 @@ class Laboratory:
             self._station = qc.Station()
         else:
             self._station = qc.Station(config_file=instr_config_file)
+        self._instr_config_file = instr_config_file
         #TODO: Add initialiser for load last file in save_dir thing...
 
         #Convert Windows backslashes into forward slashes (should be compatible with MAC/Linux then...)
@@ -35,6 +36,12 @@ class Laboratory:
         self._variables = {}
         self._waveform_transforms = {}
         self._activated_instruments = []
+
+    def reload_yaml(self):
+        #NOTE: This will update the snapshots and thus, change instrument state of already loaded instruments. But it is handy
+        #to help load a new instrument into the QCoDeS station (when adding a new instrument in the YAML).
+        if self._instr_config_file != "":
+            self._station.load_config_file(self._instr_config_file)
 
     def _load_json_file(self, filepath):
         if os.path.isfile(filepath):

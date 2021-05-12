@@ -3,6 +3,23 @@ import numpy as np
 
 
 data_x = np.arange(0,10,0.05)
+data_y = 1.2*(1-np.exp(-data_x/5.7)) + 0.5*np.random.rand(data_x.size)
+
+dfit = DFitExponential()
+dpkt = dfit.get_fitted_plot(data_x, data_y, rise=True)
+dpkt['fig'].show()
+input('Press ENTER')
+
+data_x = np.arange(0,10,0.05)
+data_y = np.exp(-data_x/5.7) + 0.5*np.random.rand(data_x.size)
+
+dfit = DFitExponential()
+dpkt = dfit.get_fitted_plot(data_x, data_y)
+dpkt['fig'].show()
+input('Press ENTER')
+
+
+data_x = np.arange(0,10,0.05)
 data_y = np.arange(0,10,0.05)
 xx, yy = np.meshgrid(data_x, data_y)
 data_z = np.sin(xx) + np.sin(yy) + 0.25*(yy-2)**2

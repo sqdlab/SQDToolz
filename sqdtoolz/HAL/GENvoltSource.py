@@ -3,7 +3,7 @@ from sqdtoolz.HAL.HALbase import*
 class GENvoltSource(HALbase):
     def __init__(self, hal_name, lab, instr_gen_volt_src_channel):
         HALbase.__init__(self, hal_name)
-        lab._register_HAL(self):
+        lab._register_HAL(self)
         #
         self._instr_volt = lab._get_instrument(instr_gen_volt_src_channel)
         self._instr_id = instr_gen_volt_src_channel

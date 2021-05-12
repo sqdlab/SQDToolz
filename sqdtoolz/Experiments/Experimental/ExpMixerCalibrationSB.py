@@ -19,8 +19,8 @@ class ExpMixerCalibrationSB(Experiment):
         self._expt_config.init_instruments()
         self._var_down_conv_freq.Value = self._freq_SB_minimise
         kwargs['skip_init_instruments'] = True
-        return super()._run(file_path, [(self._var_amp, np.linspace(self._range_amps[0], self._range_amps[1], 10)),
-                                        (self._var_phs, np.linspace(self._range_phs[0], self._range_phs[1], 10))], **kwargs)
+        return super()._run(file_path, [(self._var_amp, np.linspace(self._range_amps[0], self._range_amps[1], 13)),
+                                        (self._var_phs, np.linspace(self._range_phs[0], self._range_phs[1], 13))], **kwargs)
                                         
     def _post_process(self, data):
         arr = data.get_numpy_array()

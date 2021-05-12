@@ -97,7 +97,53 @@ class DFitSinusoid:
         }
 
         return datapkt
-            
+
+class DFitExponential:
+    def __init__(self):
+        pass
+
+    def get_fitted_plot(self, data_x, data_y, xLabel="", rise = False):
+        def func(x, a, c, tau):
+            return a * np.exp(-x/tau) + c
+
+        data_x = data_x - np.min(data_x)
+
+        xMin = np.min(data_x)
+        xMax = np.max(data_x)
+        yMin = np.min(data_y)
+        yMax = np.max(data_y)
+
+        #Calculate initial guesses...
+        if rise:
+            hgt = yMax-yMin
+            c0 = yMin + hgt
+            a0 = -hgt
+        else:
+            a0 = yMax-yMin
+            c0 = yMin
+        tau0 = (xMax-xMin)*0.5
+
+        if rise:
+            popt, pcov = scipy.optimize.curve_fit(func, data_x, data_y, [a0, c0, tau0],
+                                             bounds=([2.0*a0, yMin, 0.01*tau0], [0, yMax, tau0*10]))
+        else:
+            popt, pcov = scipy.optimize.curve_fit(func, data_x, data_y, [a0, c0, tau0],
+                                             bounds=([0, yMin, 0.01*tau0], [2.0*a0, yMax, tau0*10]))
+
+        fig, axs = plt.subplots(1)
+        axs.plot(data_x, data_y, 'kx')
+        axs.plot(data_x, func(data_x, *popt), 'r-')
+        axs.set_xlabel(xLabel)
+        axs.set_ylabel('IQ Amplitude')
+
+        datapkt = {
+            'amplitude' : np.abs(popt[0]),
+            'offset' : popt[1],
+            'decay_time' : popt[2],
+            'fig'   : fig
+        }
+
+        return datapkt   
 
 class DFitMinMax2D:
     def __init__(self):

@@ -119,6 +119,8 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
 
     @property
     def Duration(self):
+        if self._total_time != -1:
+            return self._total_time
         full_len = 0
         for cur_seg in self._wfm_segment_list:
             full_len += cur_seg.Duration
@@ -197,7 +199,13 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
         #Get the elastic segment index
         if len(elastic_segs) > 0:
             elas_seg_ind = elastic_segs[0]
-            elastic_time = self._total_time - (sum([x.Duration for x in self._wfm_segment_list])+1)    #Negate the -1 segment
+            fs = self.SampleRate
+            #On the rare case where the segments won't fit the overall size by being too little (e.g. 2.4, 2.4, 4.2 adds up to 9, but rounding
+            #the sampled segments yields 2, 2, 4 which adds up to 8) or too large (e.g. 2.6, 2.6, 3.8 adds up to 9, but rounding the sampled
+            #segments yields 3, 3, 4 which adds up to 10), the elastic-time must be carefully calculated from the total number of sample points
+            #rather than the durations!
+            elastic_time = self._total_time*fs - (sum([self._wfm_segment_list[x].NumPts(fs) for x in range(len(self._wfm_segment_list)) if x != elas_seg_ind]))
+            elastic_time = elastic_time / fs
         else:
             elas_seg_ind = -1
             elastic_time = -1
@@ -225,12 +233,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
                 t0 = final_wfms[cur_ch].size
             #Scale the waveform via the global scale-factor...
             final_wfms[cur_ch] *= self._global_factor
-            #On the rare case where the segments won't fit the overall size (e.g. 2.4, 2.4, 4.2 adds up to 9, but rounding
-            #the sampled segments yields 2, 2, 4 which adds up to 9), the last few values (presuming that the waveform does not
-            #tie into anything in a continuous manner) will be repeated as 'padding' of sorts:
-            if final_wfms[cur_ch].size != self.NumPts:
-                pad_wfm = np.ones(int(self.NumPts - final_wfms[cur_ch].size))
-                final_wfms[cur_ch] = np.concatenate([final_wfms[cur_ch], pad_wfm])
+            assert self.NumPts == final_wfms[cur_ch].size, "The sample-rate and segment-lengths yield segment points that exceed the total waveform size. Ensure that there is sufficient freedom in the elastic segment size to compensate."
         
         #Reset segment to be elastic
         if elas_seg_ind != -1:

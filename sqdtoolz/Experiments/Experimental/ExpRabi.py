@@ -23,7 +23,7 @@ class ExpRabi(Experiment):
 
         wfm = WaveformGeneric(['qubit'], ['readout'])
         wfm.set_waveform('qubit', [
-            WFS_Constant("SEQPAD", None, 100e-9-2e-10, 0.0),
+            WFS_Constant("SEQPAD", None, -1, 0.0),
             WFS_Constant("init", None, 40e-6, 0.0),
             WFS_Gaussian("drive", self._wfmt_qubit_drive.apply(phase=0), 20e-9, 0.001),
             WFS_Constant("pad", None, 5e-9, 0.0),

@@ -155,8 +155,9 @@ class AWGOutputChannel(TriggerInput):
         self.Offset = dict_config['Offset']
         self.Output = dict_config['Output']       
         #
-        trig_src_obj = TriggerInput.process_trigger_source(dict_config['TriggerSource'], lab)
-        self.set_trigger_source(trig_src_obj, dict_config['InputTriggerEdge'])
+        if 'TriggerSource' in dict_config:
+            trig_src_obj = TriggerInput.process_trigger_source(dict_config['TriggerSource'], lab)
+            self.set_trigger_source(trig_src_obj, dict_config['InputTriggerEdge'])
         #
         for ind, cur_mark_dict in enumerate(dict_config['Markers']):
             self._awg_mark_list[ind]._set_current_config(cur_mark_dict)

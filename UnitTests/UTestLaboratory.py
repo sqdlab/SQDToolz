@@ -1,4 +1,5 @@
 from sqdtoolz.ExperimentConfiguration import*
+from sqdtoolz.ExperimentSpecification import*
 from sqdtoolz.Laboratory import*
 from sqdtoolz.Experiment import*
 import numpy as np
@@ -225,6 +226,76 @@ assert new_lab.WFMT("IQmod").IQAmplitudeFactor == 78.1, "WaveformTransformation 
 assert new_lab.WFMT("IQmod").IQPhaseOffset == 54.3, "WaveformTransformation property incorrectly set"
 assert new_lab.WFMT("IQmod").IQdcOffset == (9,1), "WaveformTransformation property incorrectly set"
 assert new_lab.WFMT("IQmod").IQUpperSideband == False, "WaveformTransformation property incorrectly set"
+
+#
+#Check ExperimentSpecifications
+#
+new_lab.load_instrument('virMWS2')
+hal_mw2 = GENmwSource("MW-Src2", new_lab, 'virMWS2', 'CH1')
+expConfig = ExperimentConfiguration('testConf4', new_lab, 1.0, [new_lab.HAL('MW-Src'), new_lab.HAL('MW-Src2')], None)
+#
+ExperimentSpecification('cavity', new_lab)
+new_lab.SPEC('cavity').add('Frequency', 0, new_lab.HAL('MW-Src'), 'Frequency')
+#
+new_lab.HAL('MW-Src').Frequency = 4
+expConfig = ExperimentConfiguration('testConf4', new_lab, 1.0, [new_lab.HAL('MW-Src'), new_lab.HAL('MW-Src2')], None, ['cavity'])
+assert new_lab.HAL('MW-Src').Frequency == 4, "HAL property incorrectly set."
+expConfig.init_instruments()
+assert new_lab.HAL('MW-Src').Frequency == 0, "HAL property incorrectly loaded from ExperimentSpecification."
+new_lab.SPEC('cavity')['Frequency'] = 5.8
+assert new_lab.HAL('MW-Src').Frequency == 0, "HAL property incorrectly set."
+expConfig.init_instruments()
+assert new_lab.HAL('MW-Src').Frequency == 5.8, "HAL property incorrectly set from the ExperimentSpecification."
+new_lab.HAL('MW-Src').Frequency = 5
+assert new_lab.HAL('MW-Src').Frequency == 5, "HAL property incorrectly set."
+expConfig.init_instruments()
+assert new_lab.HAL('MW-Src').Frequency == 5.8, "HAL property incorrectly loaded from ExperimentSpecification."
+#
+expConfig = ExperimentConfiguration('testConf4', new_lab, 1.0, [new_lab.HAL('MW-Src'), new_lab.HAL('MW-Src2')], None, ['cavity'])
+VariableProperty('SrcFreq', new_lab, new_lab.HAL("MW-Src"), 'Frequency')
+VariableProperty('DncFreq', new_lab, new_lab.HAL("MW-Src2"), 'Frequency')
+VariableSpaced('cavFreq', new_lab, 'SrcFreq', 'DncFreq', 3.5)
+new_lab.VAR('cavFreq').Value = 15
+assert new_lab.VAR('SrcFreq').Value == 15, "HAL property incorrectly set."
+assert new_lab.VAR('DncFreq').Value == 18.5, "HAL property incorrectly set."
+new_lab.SPEC('cavity').set_destination('Frequency', new_lab.VAR('cavFreq'))
+assert new_lab.VAR('SrcFreq').Value == 15, "HAL property incorrectly set."
+assert new_lab.VAR('DncFreq').Value == 18.5, "HAL property incorrectly set."
+expConfig.init_instruments()
+assert new_lab.VAR('SrcFreq').Value == 5.8, "HAL property incorrectly loaded from ExperimentSpecification."
+assert new_lab.VAR('DncFreq').Value == 9.3, "HAL property incorrectly loaded from ExperimentSpecification."
+new_lab.VAR('DncFreq').Value = 21
+assert new_lab.VAR('SrcFreq').Value == 5.8, "HAL property incorrectly set."
+assert new_lab.VAR('DncFreq').Value == 21, "HAL property incorrectly set."
+expConfig.init_instruments()
+assert new_lab.VAR('SrcFreq').Value == 5.8, "HAL property incorrectly loaded from ExperimentSpecification."
+assert new_lab.VAR('DncFreq').Value == 9.3, "HAL property incorrectly loaded from ExperimentSpecification."
+new_lab.VAR('SrcFreq').Value = 24
+new_lab.VAR('DncFreq').Value = 21
+assert new_lab.VAR('SrcFreq').Value == 24, "HAL property incorrectly set."
+assert new_lab.VAR('DncFreq').Value == 21, "HAL property incorrectly set."
+#
+new_lab.save_laboratory_config('UnitTests/', 'laboratory_configuration4.txt')
+new_lab.save_variables('UnitTests\\')
+new_lab.save_experiment_configs('UnitTests/', 'experiment_configurations2.txt')
+#
+#Check with cold-reload...
+new_lab._station.close_all_registered_instruments()
+new_lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir/')
+with open("UnitTests/laboratory_configuration4.txt") as json_file:
+    data = json.load(json_file)
+    new_lab.cold_reload_labconfig(data)
+new_lab.update_variables_from_last_expt('UnitTests\\laboratory_parameters.txt')
+with open("UnitTests/experiment_configurations2.txt") as json_file:
+    data = json.load(json_file)
+    new_lab.cold_reload_experiment_configurations(data)
+#
+assert new_lab.VAR('SrcFreq').Value == 24, "HAL property incorrectly set."
+assert new_lab.VAR('DncFreq').Value == 21, "HAL property incorrectly set."
+assert new_lab.SPEC('cavity')['Frequency'] == 5.8, "Incorrect property loaded into ExperimentSpecification via cold-reload."
+new_lab.CONFIG('testConf4').init_instruments()
+assert new_lab.VAR('SrcFreq').Value == 5.8, "HAL property incorrectly loaded from ExperimentSpecification."
+assert new_lab.VAR('DncFreq').Value == 9.3, "HAL property incorrectly loaded from ExperimentSpecification."
 
 #
 #Check variable sweeps

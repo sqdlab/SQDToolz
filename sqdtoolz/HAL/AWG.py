@@ -313,6 +313,10 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
 
         self._set_current_config_waveforms(dict_config['WaveformSegments'])
 
+        #This function is called via init_instruments in the ExperimentConfiguration class right at the BEGINNING of an Experiment
+        #run - it's dangerous to assume concurrence with previous waveforms here...
+        self._cur_prog_waveforms = [None]*len(self._awg_chan_list)
+
     def _set_current_config_waveforms(self, list_wfm_dict_config):
         '''
         Sets the current waveform AWG waveform segments by clearing the current waveform segments, instantiating new classes by using the
@@ -436,6 +440,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
         if not self._dont_reprogram:
             for ind, cur_awg_chan in enumerate(self._awg_chan_list):
                 cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.short_name, self.cur_wfms_to_commit[ind])
+                #Set it AFTER the programming in case there is an error etc...
                 self._cur_prog_waveforms[ind] = self.cur_wfms_to_commit[ind]
 
     def _check_changes_wfm_data(self, dict_wfm_data, final_wfm, final_mkrs):

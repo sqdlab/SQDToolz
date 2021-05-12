@@ -1266,7 +1266,7 @@ class Agilent_N8241A(Instrument):
         '''
         if not isinstance(seq_handle, ViInt32):
             seq_handle = ViInt32(seq_handle)
-        rc = self._dll.AGN6030A_ClearArbSquence(self._handle, seq_handle)
+        rc = self._dll.AGN6030A_ClearArbSequence(self._handle, seq_handle)
         self._status_handle(rc)
 
     def configure_arb_sequence(self, ch, seq_handle, gain, offset):
@@ -1565,16 +1565,25 @@ class Agilent_N8241A(Instrument):
         #Since the channels cannot be independently programmed, this function must be called after programming both channels (i.e. calling prepare_waveform_memory).
         #Just be aware of this during debugging.
 
-        if len(self._seq_wfms['ch1']) > 0:
-            #TODO: Implement the update-flag discriminator here... (If it's even possible with this AWG?)
-            for cur_wgm_handle in self._seq_wfms['ch1']:
-                self.clear_arb_waveform(cur_wgm_handle)
-        self._seq_wfms['ch1'] = []
-        if len(self._seq_wfms['ch2']) > 0:
-            #TODO: Implement the update-flag discriminator here... (If it's even possible with this AWG?)
-            for cur_wgm_handle in self._seq_wfms['ch2']:
-                self.clear_arb_waveform(cur_wgm_handle)
-        self._seq_wfms['ch2'] = []
+        # if len(self._seq_wfms['ch1']) > 0:
+        #     #TODO: Implement the update-flag discriminator here... (If it's even possible with this AWG?)
+        #     for cur_wgm_handle in self._seq_wfms['ch1']:
+        #         self.clear_arb_waveform(cur_wgm_handle)
+        # self._seq_wfms['ch1'] = []
+        # if len(self._seq_wfms['ch2']) > 0:
+        #     #TODO: Implement the update-flag discriminator here... (If it's even possible with this AWG?)
+        #     for cur_wgm_handle in self._seq_wfms['ch2']:
+        #         self.clear_arb_waveform(cur_wgm_handle)
+        # self._seq_wfms['ch2'] = []
+        #In case the last programming event had an error or abortion...
+        self.stop()
+        if len(self._seq_wfms['ch1']) > 0 or len(self._seq_wfms['ch2']) > 0:
+            #Some reason, clear-arbitrary-memory only works when in advanced sequence mode?!
+            self.output_mode('Advanced Sequence')
+            self.clear_arb_memory()
+            self.output_mode('Arbitrary Waveform')
+            self._seq_wfms['ch1'] = []
+            self._seq_wfms['ch2'] = []
 
         if self._seq_mode:
             self._program_channels_sequence()
@@ -1592,6 +1601,9 @@ class Agilent_N8241A(Instrument):
         self.done_programming = True
         self._seq_mode = False
         # self._raw_wfm_data = {}   #Pre-cache it so that if the data is unchanged, then it can be reused as channels must be programmed together on this special AWG...
+        
+        #Not required for Independent mode, but it is required for Master/Slave mode
+        self.run()
 
     def _wfm_clog_memory(self):
         return self.create_arb_waveform_with_markers([0]*128, [0]*16)
@@ -1660,7 +1672,6 @@ class Agilent_N8241A(Instrument):
         self._raw_wfm_data[chan_id]['seq_ids'] = [1,2]
 
     def _program_channels_sequence(self):
-        self.stop()
         self.output_mode('Sequence')
 
         gain_1 = self.ch1.gain()
@@ -1724,9 +1735,9 @@ class Agilent_N8241A(Instrument):
         for ind, chan_id in enumerate(['ch1', 'ch2']):
             if num_wfms[ind] == 0:
                 continue
-            #Clear previous sequence if it exists...
-            if self._seq_handles[chan_id] != None:
-                self.clear_arb_sequence(self._seq_handles[chan_id])
+            #Clear previous sequence if it exists...    Don't need to do this as AGN6030A_ClearArbMemory does this automatically...
+            # if self._seq_handles[chan_id] != None:
+            #     self.clear_arb_sequence(self._seq_handles[chan_id])
             #Upload sequence
             wfm_handle_seq = [self._seq_wfms[chan_id][x] for x in self._raw_wfm_data[chan_id]['seq_ids']]
             loop_counts = [1]*len(wfm_handle_seq)
@@ -1735,11 +1746,7 @@ class Agilent_N8241A(Instrument):
         self.configure_arb_sequence(2, self._seq_handles['ch2'], gains[1], 0.0)
         self.configure_arb_sequence(1, self._seq_handles['ch1'], gains[0], 0.0)
 
-        #Not required for Independent mode, but it is required for Master/Slave mode
-        self.run()
-
     def _program_channel_non_sequence(self, chan_id, wfm_data, mkr_data = np.array([])):
-        self.stop()
         self.output_mode('Arbitrary Waveform')
 
         #Bit 6 is Mkr1, Bit 7 is Mkr2
@@ -1762,8 +1769,6 @@ class Agilent_N8241A(Instrument):
             else:
                 self._seq_wfms['ch2'] = [self.create_arb_waveform(wfm_data / self.ch2.gain())]
             self.configure_arb_waveform(2, self._seq_wfms['ch2'][0], self.ch2.gain(), 0.0)
-        #Not required for Independent mode, but it is required for Master/Slave mode
-        self.run()
     
     def _get_awg_sync_state(self):
         return self._sync_state #TODO: Remove this redundant state variable and augment sync_mode?

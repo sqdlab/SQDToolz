@@ -71,6 +71,13 @@ awg_wfm_q2.prepare_initial()
 awg_wfm_q.prepare_final()
 awg_wfm_q2.prepare_final()
 awg_wfm_q.activate()
-awg_wfm_q2.activate()
+awg_wfm_q2.deactivate()
+
+new_lab.HAL("Waveform 1").get_waveform_segment("init").Value = 0.1
+awg_wfm_q.prepare_initial()
+awg_wfm_q.prepare_final()
+new_lab.HAL("Waveform 1").get_waveform_segment("init").Value = 0.0
+awg_wfm_q.prepare_initial()
+awg_wfm_q.prepare_final()
 
 input('press <ENTER> to continue')

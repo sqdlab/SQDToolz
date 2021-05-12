@@ -126,8 +126,9 @@ class Laboratory:
             cur_class_name = dict_cur_wfmt['Type']
             globals()[cur_class_name].fromConfigDict(dict_cur_wfmt, self)
         #Create and load the SPECs
-        for dict_cur_spec in config_dict['SPECs']:
-            ExperimentSpecification(dict_cur_spec["Name"], self)._set_current_config(dict_cur_spec)
+        if 'SPECs' in config_dict:
+            for dict_cur_spec in config_dict['SPECs']:
+                ExperimentSpecification(dict_cur_spec["Name"], self)._set_current_config(dict_cur_spec)
 
 
 

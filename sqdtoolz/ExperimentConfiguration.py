@@ -93,8 +93,8 @@ class ExperimentConfiguration:
                     continue
                 if cur_hal.Name == cur_dict['Name']:
                     found_hal = True
-                    if commit_changes_to_HALsPROCs:
-                        cur_hal._set_current_config(cur_dict, self._lab)
+                    # if commit_changes_to_HALsPROCs:
+                    cur_hal._set_current_config(cur_dict, self._lab)
                     break
             assert found_hal, f"HAL object {cur_dict['Name']} does not exist in the current ExperimentConfiguration object."
         self._settle_currently_used_processors()
@@ -103,13 +103,14 @@ class ExperimentConfiguration:
             for cur_proc in self._proc_configs:
                 if cur_proc.Name == cur_dict['Name']:
                     found_proc = True
-                    if commit_changes_to_HALsPROCs:
-                        cur_proc._set_current_config(cur_dict, self._lab)
+                    # if commit_changes_to_HALsPROCs:
+                    cur_proc._set_current_config(cur_dict, self._lab)
                     break
             assert found_proc, f"PROC object {cur_dict['Name']} does not exist in the current ExperimentConfiguration object."
         self.RepetitionTime = conf['RepetitionTime']
         self._dict_wfm_map = conf['WaveformMapping']
-        self._list_spec_names = conf['SPECs']
+        if 'SPECs' in conf:
+           self._list_spec_names = conf['SPECs']
         #
         self._init_config = conf
 

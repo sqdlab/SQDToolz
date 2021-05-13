@@ -77,6 +77,17 @@ class ExperimentSpecification:
             obj = self._lab._get_resolved_obj(self._cur_mappings[cur_entry]['Destination'])
             if obj != None:
                 setattr(obj, self._cur_mappings[cur_entry]['Property'], self._cur_mappings[cur_entry]['Value'])
+
+    def __str__(self):
+        cur_str = ""
+        cur_str = f"Name: {self.Name}\n"
+        cur_str = f"Entries:\n"
+        for cur_key in self._cur_mappings:
+            cur_str += f"\t{cur_key}: {self._cur_mappings[cur_key]['Value']}"
+            if len(self._cur_mappings[cur_key]['Destination']) > 0:
+                cur_str += f", {self._cur_mappings[cur_key]['Destination'] + [self._cur_mappings[cur_key]['Property']]}"
+            cur_str += f"\n"
+        return cur_str
     
     def _get_current_config(self):
         return {

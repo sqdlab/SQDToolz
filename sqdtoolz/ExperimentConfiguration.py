@@ -55,6 +55,16 @@ class ExperimentConfiguration:
     def RepetitionTime(self, len_seconds):
         self._total_time = len_seconds
 
+    def __str__(self):
+        cur_str = f"Name: {self.Name}\n"
+        cur_str += f"RepetitionTime: {self.RepetitionTime}\n"
+        cur_str += f"HALs: {[x.Name for x in self._list_HALs]}\n"
+        cur_str += f"ACQ: {self._hal_ACQ.Name}\n"
+        cur_str += f"Processors: {[x.Name for x in self._proc_configs]}\n"
+        cur_str += f"Experiment Specifications: {self._list_spec_names}\n"
+        cur_str += f"WaveformMapping: {self._dict_wfm_map}"
+        return cur_str
+
     def _settle_currently_used_processors(self, conf=None):
         self._proc_configs = []
         if conf != None:

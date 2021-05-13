@@ -21,6 +21,8 @@ lab.VAR('CavFreq')
 lab.PROC('gpu_ddc_fir')
 #Accessing a waveform-transformation object
 lab.WFMT('gpu_ddc_fir')
+#Accessing an experiment-specification object
+lab.SPEC('cav_specs')
 #Accessing an experiment-configuration object
 lab.CONFIG('cont_meas')
 ```

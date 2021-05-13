@@ -49,6 +49,19 @@ class WaveformTransformation:
     def modify_waveform(self, wfm_pts, fs, t0_ind, ch_index, **kwargs):
         raise NotImplementedError()
 
+    def __str__(self):
+        cur_dict = self._get_current_config()
+        cur_str = ""
+        for cur_key in cur_dict:
+            cur_str += f"{cur_key}: {cur_dict[cur_key]}\n"
+        return cur_str
+
+    def _get_current_config(self):
+        raise NotImplementedError()
+
+    def _set_current_config(self, dict_config, instr_obj = None):
+        raise NotImplementedError()
+
 class WFMT_ModulationIQ(WaveformTransformation):
     def __init__(self, name, lab, iq_frequency, **kwargs):
         super().__init__(name)

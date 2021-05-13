@@ -392,7 +392,7 @@ assert new_lab.VAR("myDura1").Value == 2016, "Variable incorrectly reloaded"
 assert new_lab.VAR("myDura2").Value == 2016+3.1415926, "Variable incorrectly reloaded"
 assert new_lab.HAL("Wfm1").get_waveform_segment('init2').Duration == 2016+3.1415926, "Variable incorrectly reloaded"
 #
-assert new_lab.WFMT("IQmod").IQFrequency == 84e7, "WaveformTransformation property incorrectly set"
+assert new_lab.WFMT("WFMT").IQFrequency == 84e7, "WaveformTransformation property incorrectly set"
 assert new_lab.WFMT("IQmod").IQAmplitude == 9.4, "WaveformTransformation property incorrectly set"
 assert new_lab.WFMT("IQmod").IQAmplitudeFactor == 78.1, "WaveformTransformation property incorrectly set"
 assert new_lab.WFMT("IQmod").IQPhaseOffset == 54.3, "WaveformTransformation property incorrectly set"

@@ -119,6 +119,21 @@ class ProcessorCPU(DataProcessor):
     def add_stage_end(self, ProcNodeCPUobj):
         self.pipeline_end.append(ProcNodeCPUobj)
 
+    def __str__(self):
+        cur_str = f"Name: {self.Name}\n"
+        cur_str += f"Type: {self.__class__.__name__}\n"
+        cur_str += f"Main Pipeline:\n"
+        for cur_pipe in self.pipeline:
+            cur_data = cur_pipe._get_current_config()
+            cur_type = cur_data.pop('Type')
+            cur_str += f"\t{cur_type}: {cur_data}\n"
+        cur_str += f"Ending Pipeline:\n"
+        for cur_pipe in self.pipeline_end:
+            cur_data = cur_pipe._get_current_config()
+            cur_type = cur_data.pop('Type')
+            cur_str += f"\t{cur_type}: {cur_data}\n"
+        return cur_str
+
     def _get_current_config(self):
         return {
             'Name' : self.Name,

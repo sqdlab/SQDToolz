@@ -136,6 +136,8 @@ class Laboratory:
     def _resolve_sqdobj_tree(self, sqdObj):
         resolution_tree = []
         cur_obj = sqdObj
+        if sqdObj == None:
+            return []
         cur_parent = cur_obj.Parent  #Note that Parent is: (object reference to parent, metadata to find current object from parent object's POV)
         while (type(cur_parent) is tuple and cur_parent[0] != None):
             resolution_tree += [( cur_obj.Name, cur_parent[1] )]

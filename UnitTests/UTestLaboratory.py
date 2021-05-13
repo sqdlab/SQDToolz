@@ -234,6 +234,7 @@ new_lab.load_instrument('virMWS2')
 hal_mw2 = GENmwSource("MW-Src2", new_lab, 'virMWS2', 'CH1')
 expConfig = ExperimentConfiguration('testConf4', new_lab, 1.0, [new_lab.HAL('MW-Src'), new_lab.HAL('MW-Src2')], None)
 #
+ExperimentSpecification('cavityFile', new_lab, 'Cavity').commit_entries()
 ExperimentSpecification('cavity', new_lab)
 new_lab.SPEC('cavity').add('Frequency', 0, new_lab.HAL('MW-Src'), 'Frequency')
 #

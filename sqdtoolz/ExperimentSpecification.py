@@ -1,11 +1,21 @@
 from sqdtoolz.Variable import*
+import json
+
+import importlib.resources as pkg_resources
+from sqdtoolz import ExperimentSpecifications
+
 
 class ExperimentSpecification:
-    def __init__(self, name, lab):
+    def __init__(self, name, lab, init_specs = ""):
         self._name = name
         self._lab = lab
         if lab._register_SPEC(self):
             self._cur_mappings = {}
+        if init_specs != "":
+            data = pkg_resources.read_text(ExperimentSpecifications, init_specs + '.json')
+            data = json.loads(data)
+            for cur_key in data:
+                self.add(cur_key, data[cur_key])
 
     def __new__(cls, *args, **kwargs):
         if len(args) == 0:
@@ -52,6 +62,8 @@ class ExperimentSpecification:
     
     def commit_entries(self):
         for cur_entry in self._cur_mappings:
+            if len(self._cur_mappings[cur_entry]['Destination']) == 0:
+                continue
             obj = self._lab._get_resolved_obj(self._cur_mappings[cur_entry]['Destination'])
             if obj != None:
                 setattr(obj, self._cur_mappings[cur_entry]['Property'], self._cur_mappings[cur_entry]['Value'])

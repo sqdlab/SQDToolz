@@ -9,7 +9,10 @@ from sqdtoolz.HAL.GENmwSource import*
 from sqdtoolz.HAL.GENvoltSource import*
 from sqdtoolz.HAL.GENswitch import*
 from sqdtoolz.HAL.Processors.ProcessorCPU import*
-from sqdtoolz.HAL.Processors.ProcessorGPU import*
+try:
+    from sqdtoolz.HAL.Processors.ProcessorGPU import*
+except ModuleNotFoundError:
+    pass
 from datetime import datetime
 from pathlib import Path
 import json

@@ -287,11 +287,11 @@ class VNA_Agilent_N5232A(VisaInstrument):
     def setup_measurements(self, ports_meas_src_tuples):
         self._delete_all_measurements()
         self._display_window()
-        for cur_s_param in ports_meas_src_tuples:
+        for i, cur_s_param in enumerate(ports_meas_src_tuples):
             cur_s_str = f'S{cur_s_param[0]}{cur_s_param[1]}'
             cur_name = f'ch1_{cur_s_str}'
             self.write(f'CALC:PAR:EXT {cur_name}, {cur_s_str}')
-            self.write(f'DISP:WIND:TRAC:FEED {cur_name}')
+            self.write(f'DISP:WIND:TRAC{i+1}:FEED {cur_name}')
 
     def get_data(self):
         #Just check what data traces are being measured at the moment just in case...
@@ -332,6 +332,14 @@ class VNA_Agilent_N5232A(VisaInstrument):
                     self.clear_averages()
                     while not self._finished_averaging():
                         time.sleep(0.01)
+                else:
+                    self.write('TRIG:SOUR MAN')
+                    try:
+                        self._set_visa_timeout(len(cur_meas_traces)*self.sweep_time.get() + 5)
+                    except AttributeError:
+                        self._set_visa_timeout(self.sweep_time.get() + 5)
+                    self.write('ABORT; :INIT:IMM')
+                    self.ask('*OPC?')
                 for cur_meas_name, cur_meas in cur_meas_traces:
                     self.write(f'CALC:PAR:SEL \'{cur_meas_name}\'')
                     #Note that SDATA just means complex-valued...
@@ -356,6 +364,14 @@ class VNA_Agilent_N5232A(VisaInstrument):
                     self.clear_averages()
                     while not self._finished_averaging():
                         time.sleep(0.01)
+                else:
+                    self.write('TRIG:SOUR MAN')
+                    try:
+                        self._set_visa_timeout(len(cur_meas_traces)*self.sweep_time.get() + 5)
+                    except AttributeError:
+                        self._set_visa_timeout(self.sweep_time.get() + 5)
+                    self.write('ABORT; :INIT:IMM')
+                    self.ask('*OPC?')
                 for cur_meas_name, cur_meas in cur_meas_traces:
                     self.write(f'CALC:PAR:SEL \'{cur_meas_name}\'')
                     #Note that SDATA just means complex-valued...
@@ -378,6 +394,14 @@ class VNA_Agilent_N5232A(VisaInstrument):
                     self.clear_averages()
                     while not self._finished_averaging():
                         time.sleep(0.01)
+                else:
+                    self.write('TRIG:SOUR MAN')
+                    try:
+                        self._set_visa_timeout(len(cur_meas_traces)*self.sweep_time.get() + 5)
+                    except AttributeError:
+                        self._set_visa_timeout(self.sweep_time.get() + 5)
+                    self.write('ABORT; :INIT:IMM')
+                    self.ask('*OPC?')
                 for cur_meas_name, cur_meas in cur_meas_traces:
                     self.write(f'CALC:PAR:SEL \'{cur_meas_name}\'')
                     #Note that SDATA just means complex-valued...
@@ -423,7 +447,7 @@ class VNA_Agilent_N5232A(VisaInstrument):
             return self._finished_averaging()
         else:
             self._set_visa_timeout(self.sweep_time.get() + 5)
-            return self.ask('*OPC?') > 0
+            return int(self.ask('*OPC?')) > 0
                
     def preset(self):
         '''Deletes all traces, measurements, and windows. In addition, resets the analyzer to factory defined default settings and creates a S11 measurement named "CH1_S11_1".'''

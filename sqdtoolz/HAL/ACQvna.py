@@ -130,10 +130,10 @@ class ACQvna(HALbase):
 
     def _set_current_config(self, dict_config, lab):
         assert dict_config['Type'] == self.__class__.__name__, 'Cannot set configuration to a VNA with a configuration that is of type ' + dict_config['Type']
-        self.Position = dict_config['Position']
         for cur_prop in ['SweepMode', 'FrequencyStart', 'FrequencyEnd', 'Power', 'SweepPoints', 'AveragesNum', 'AveragesEnable',
                          'Bandwidth', 'NumRepetitions', 'FrequencySingle', 'PowerStart', 'PowerEnd']:
             setattr(self, cur_prop, dict_config[cur_prop])
         cur_mode = dict_config['SweepMode']     #Current mode may not have necessarily have set as 'Segmented' mode requires the calling of setup_segmented_sweep to set the segments first...
-        self.setup_segmented_sweep(dict_config['FrequencySegments'])
+        if cur_mode == 'Segmented':
+            self.setup_segmented_sweep(dict_config['FrequencySegments'])
         self.SweepMode = cur_mode

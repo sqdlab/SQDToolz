@@ -1,0 +1,4 @@
+instruments:
+  ivvi:
+    driver: sqdtoolz.Drivers.VOLT_IVVI_pyro
+    type: IVVI_pyro

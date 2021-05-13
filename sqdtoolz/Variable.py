@@ -223,3 +223,37 @@ class VariableSpaced(VariableBase):
         self._var_1 = dict_config['Var1']
         self._var_2 = dict_config['Var2']
         self.space_val = dict_config['Space']
+
+class VariableDifferential(VariableBase):
+    def __init__(self, name, lab, var_1, var_2):
+        super().__init__(name, lab)
+        self._lab = lab
+        self._var_1 = var_1
+        self._var_2 = var_2
+        #
+        lab._register_VAR(self)
+
+    @classmethod
+    def fromConfigDict(cls, name, config_dict, lab):
+        return cls(name, lab, config_dict["Var1"], config_dict["Var2"], config_dict["Space"])
+
+    def get_raw(self):
+        return self._lab.VAR(self._var_1).get_raw() - self._lab.VAR(self._var_2).get_raw()
+
+    def set_raw(self, value):
+        self._lab.VAR(self._var_1).set_raw(value/2)
+        self._lab.VAR(self._var_2).set_raw(-value/2)
+
+    def _get_current_config(self):
+        return {
+            'Value' : self.Value,
+            'Var1'  : self._var_1,
+            'Var2'  : self._var_2,
+            'Type'  : self.__class__.__name__
+        }
+
+    def _set_current_config(self, dict_config):
+        assert dict_config['Type'] == self.__class__.__name__
+        self._var_1 = dict_config['Var1']
+        self._var_2 = dict_config['Var2']
+

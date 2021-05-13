@@ -9,6 +9,7 @@ from sqdtoolz.HAL.AWG import WaveformAWG as AWG #TODO: Refactor this - RB is ang
 from sqdtoolz.HAL.GENmwSource import GENmwSource
 from sqdtoolz.HAL.GENvoltSource import GENvoltSource
 from sqdtoolz.HAL.GENswitch import GENswitch
+from sqdtoolz.HAL.ACQvna import ACQvna
 from sqdtoolz.HAL.WaveformSegments import*
 from sqdtoolz.HAL.WaveformTransformations import*
 

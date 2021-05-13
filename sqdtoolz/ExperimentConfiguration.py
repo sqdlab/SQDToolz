@@ -57,7 +57,7 @@ class ExperimentConfiguration:
 
     def _settle_currently_used_processors(self):
         self._proc_configs = []
-        if self._hal_ACQ:
+        if self._hal_ACQ and hasattr(self._hal_ACQ, 'data_processor'):
             self._proc = self._hal_ACQ.data_processor
             if self._proc:
                 self._proc_configs = [self._proc]
@@ -169,7 +169,7 @@ class ExperimentConfiguration:
         self.update_config(self._init_config)
 
     def prepare_instruments(self):
-        for cur_hal in self._list_HALs:
+        for cur_hal in self._list_HALs + [self._hal_ACQ]:
             if not cur_hal.ManualActivation:
                 cur_hal.activate()
 
@@ -182,7 +182,7 @@ class ExperimentConfiguration:
             cur_hal.prepare_final()
 
     def makesafe_instruments(self):
-        for cur_hal in self._list_HALs:
+        for cur_hal in self._list_HALs + [self._hal_ACQ]:
             if not cur_hal.ManualActivation:
                 cur_hal.deactivate()
 

@@ -31,6 +31,10 @@ x_var = 'time' #'power' #'frequency'
 test_vna.setup_segmented_sweep([(10e6,100e6,5), (500e6,1000e6,5), (1000e6,5000e6,5)])
 x_var = 'frequency'
 
+test_vna.SweepMode = 'Linear'
+x_var = 'frequency'
+
+
 test_vna.set_measurement_parameters([(1,2)])
 
 test_vna.SweepPoints = 801
@@ -40,10 +44,14 @@ test_vna.AveragesNum = 8
 test_vna.Bandwidth = 100e3
 
 
-cur_time = time.time()
-test_vna.NumRepetitions = 200
-leData = test_vna.get_data()
-cur_time = time.time() - cur_time
+# cur_time = time.time()
+# test_vna.NumRepetitions = 200
+# leData = test_vna.get_data()
+# cur_time = time.time() - cur_time
+
+expConfig = ExperimentConfiguration('vna_sweep', new_lab, 0, [], new_lab.HAL("VNA"))
+vna_sweep = Experiment("VNA_coarse_sweep", new_lab.CONFIG('vna_sweep'))
+leData = new_lab.run_single(vna_sweep)
 
 s23s = np.sqrt(leData['data']['S12_real']**2 + leData['data']['S12_imag']**2)
 plt.plot(leData['parameter_values'][x_var], s23s[0])

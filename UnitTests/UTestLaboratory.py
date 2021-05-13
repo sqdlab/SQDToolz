@@ -243,7 +243,7 @@ expConfig = ExperimentConfiguration('testConf4', new_lab, 1.0, [new_lab.HAL('MW-
 assert new_lab.HAL('MW-Src').Frequency == 4, "HAL property incorrectly set."
 expConfig.init_instruments()
 assert new_lab.HAL('MW-Src').Frequency == 0, "HAL property incorrectly loaded from ExperimentSpecification."
-new_lab.SPEC('cavity')['Frequency'] = 5.8
+new_lab.SPEC('cavity')['Frequency'].Value = 5.8
 assert new_lab.HAL('MW-Src').Frequency == 0, "HAL property incorrectly set."
 expConfig.init_instruments()
 assert new_lab.HAL('MW-Src').Frequency == 5.8, "HAL property incorrectly set from the ExperimentSpecification."
@@ -293,7 +293,7 @@ with open("UnitTests/experiment_configurations2.txt") as json_file:
 #
 assert new_lab.VAR('SrcFreq').Value == 24, "HAL property incorrectly set."
 assert new_lab.VAR('DncFreq').Value == 21, "HAL property incorrectly set."
-assert new_lab.SPEC('cavity')['Frequency'] == 5.8, "Incorrect property loaded into ExperimentSpecification via cold-reload."
+assert new_lab.SPEC('cavity')['Frequency'].Value == 5.8, "Incorrect property loaded into ExperimentSpecification via cold-reload."
 new_lab.CONFIG('testConf4').init_instruments()
 assert new_lab.VAR('SrcFreq').Value == 5.8, "HAL property incorrectly loaded from ExperimentSpecification."
 assert new_lab.VAR('DncFreq').Value == 9.3, "HAL property incorrectly loaded from ExperimentSpecification."

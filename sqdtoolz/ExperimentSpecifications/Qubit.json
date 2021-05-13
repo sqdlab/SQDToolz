@@ -1,5 +1,6 @@
 {
-    "Frequency GE" : 0,
+    "Frequency GE" : 5e9,
+    "Power" : -30,
     "Rabi Amplitude Frequency" : 0,
     "Amplitude X" : 0,
     "T1" : 0,

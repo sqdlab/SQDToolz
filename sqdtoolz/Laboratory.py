@@ -126,18 +126,15 @@ class Laboratory:
             cur_class_name = dict_cur_wfmt['Type']
             globals()[cur_class_name].fromConfigDict(dict_cur_wfmt, self)
         #Create and load the SPECs
-        if 'SPECs' in config_dict:
-            for dict_cur_spec in config_dict['SPECs']:
-                ExperimentSpecification(dict_cur_spec["Name"], self)._set_current_config(dict_cur_spec)
-
-
+        for dict_cur_spec in config_dict['SPECs']:
+            ExperimentSpecification(dict_cur_spec["Name"], self)._set_current_config(dict_cur_spec)
 
 
     def _resolve_sqdobj_tree(self, sqdObj):
         resolution_tree = []
-        cur_obj = sqdObj
         if sqdObj == None:
             return []
+        cur_obj = sqdObj
         cur_parent = cur_obj.Parent  #Note that Parent is: (object reference to parent, metadata to find current object from parent object's POV)
         while (type(cur_parent) is tuple and cur_parent[0] != None):
             resolution_tree += [( cur_obj.Name, cur_parent[1] )]
@@ -302,13 +299,13 @@ class Laboratory:
         #Save experiment-specific experiment-configuration data (i.e. timing diagram)
         expt_obj.save_config(cur_exp_path, 'timing_diagram', 'experiment_parameters.txt', self._group_dir['SweepQueue'])
 
+        #Run postprocessing
+        expt_obj._post_process(ret_vals)
+        
         #Save instrument configurations (QCoDeS)
         self._save_instrument_config(cur_exp_path)
         #Save Laboratory Configuration
         self.save_laboratory_config(cur_exp_path)
-
-        #Run postprocessing
-        expt_obj._post_process(ret_vals)
         
         #Save Laboratory Parameters
         self.save_variables(cur_exp_path)

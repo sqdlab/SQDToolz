@@ -38,7 +38,7 @@ expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, [hal_ddg, awg_wfm,
 assert hal_mw.Frequency == 4, "HAL property incorrectly set."
 expConfig.init_instruments()
 assert hal_mw.Frequency == 0, "HAL property incorrectly loaded from ExperimentSpecification."
-new_lab.SPEC('cavity')['Frequency'] = 5.8
+new_lab.SPEC('cavity')['Frequency'].Value = 5.8
 assert hal_mw.Frequency == 0, "HAL property incorrectly set."
 expConfig.init_instruments()
 assert hal_mw.Frequency == 5.8, "HAL property incorrectly set from the ExperimentSpecification."

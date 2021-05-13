@@ -1,4 +1,5 @@
 {
     "Frequency" : 0,
-    "ReadoutPower" : -30
+    "Power" : -30,
+    "LineWidth" : -30
 }

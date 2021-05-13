@@ -6,6 +6,19 @@ from sqdtoolz import ExperimentSpecifications
 
 
 class ExperimentSpecification:
+    class _key_value_item:
+        def __init__(self, exp_spec, prop_name):
+            self._exp_spec = exp_spec
+            self._prop_name = prop_name
+
+        @property
+        def Value(self):
+            return self._exp_spec._cur_mappings[self._prop_name]['Value']
+        @Value.setter
+        def Value(self, val):
+            self._exp_spec._cur_mappings[self._prop_name]['Value'] = val
+
+
     def __init__(self, name, lab, init_specs = ""):
         self._name = name
         self._lab = lab
@@ -47,6 +60,7 @@ class ExperimentSpecification:
         self._cur_mappings[entry_name] = {'Value' : value, 'Destination' : self._lab._resolve_sqdobj_tree(dest_obj), 'Property' : dest_prop_name}
     
     def set_destination(self, entry_name, dest_obj, dest_prop_name = ""):
+        assert entry_name in self._cur_mappings, f"Entry \'{entry_name}\' does not exist and must first be added via the \'add\' function."
         if isinstance(dest_obj, VariableBase):
             dest_prop_name = 'Value'
         self._cur_mappings[entry_name]['Destination'] = self._lab._resolve_sqdobj_tree(dest_obj)
@@ -54,11 +68,7 @@ class ExperimentSpecification:
 
     def __getitem__(self, key):
         assert key in self._cur_mappings, f"Entry \'{key}\' does not exist and must first be added via the \'add\' function."
-        return self._cur_mappings[key]['Value']
-    
-    def __setitem__(self, key, value):
-        assert key in self._cur_mappings, f"Entry \'{key}\' does not exist and must first be added via the \'add\' function."
-        self._cur_mappings[key]['Value'] = value
+        return self._key_value_item(self, key)
     
     def commit_entries(self):
         for cur_entry in self._cur_mappings:

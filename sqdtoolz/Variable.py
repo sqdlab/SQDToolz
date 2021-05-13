@@ -33,6 +33,10 @@ class VariableBase:
         return self._name
 
     @property
+    def Parent(self):
+        return None
+
+    @property
     def Value(self):
         return self.get_raw()
     @Value.setter

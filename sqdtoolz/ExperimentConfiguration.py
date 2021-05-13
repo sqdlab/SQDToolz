@@ -5,7 +5,7 @@ import numpy as np
 import json
 
 class ExperimentConfiguration:
-    def __init__(self, name, lab, duration, list_HALs, hal_ACQ):
+    def __init__(self, name, lab, duration, list_HALs, hal_ACQ, list_spec_names = []):
         self._name = name
         #Just register it to the labotarory - doesn't matter if it already exists as everything here needs to be reinitialised
         #to the new configuration anyway...
@@ -20,11 +20,11 @@ class ExperimentConfiguration:
         self._list_HALs = list_HALs[:]
         self._hal_ACQ = hal_ACQ
 
+        self._list_spec_names = list_spec_names[:]
+
         self._dict_wfm_map = {'waveforms' : {}, 'digital' : {} }
 
-        self._settle_currently_used_processors()
-        
-        self._init_config = self.save_config()
+        self.save_config()
 
     def __new__(cls, *args, **kwargs):
         if len(args) == 0:
@@ -55,22 +55,32 @@ class ExperimentConfiguration:
     def RepetitionTime(self, len_seconds):
         self._total_time = len_seconds
 
-    def _settle_currently_used_processors(self):
+    def _settle_currently_used_processors(self, conf=None):
         self._proc_configs = []
-        if self._hal_ACQ and hasattr(self._hal_ACQ, 'data_processor'):
-            self._proc = self._hal_ACQ.data_processor
-            if self._proc:
-                self._proc_configs = [self._proc]
+        if conf != None:
+            for cur_dict in conf['HALs']:
+                if 'Processor' in cur_dict:
+                    cur_proc = self._lab.PROC(cur_dict['Processor'])
+                    if cur_proc != None:
+                        self._proc_configs += [cur_proc]
+        else:            
+            if self._hal_ACQ and hasattr(self._hal_ACQ, 'data_processor'):
+                cur_proc = self._hal_ACQ.data_processor
+                if cur_proc:
+                    self._proc_configs = [cur_proc]
 
     def get_config(self):
         return self._init_config
 
     def save_config(self, file_name = ''):
-        cur_config = {'HALs' : [], 'PROCs' : [], 'RepetitionTime' : self.RepetitionTime, 'WaveformMapping' : self._dict_wfm_map}
+        self._settle_currently_used_processors()
+        
+        cur_config = {'HALs' : [], 'PROCs' : [], 'RepetitionTime' : self.RepetitionTime, 'WaveformMapping' : self._dict_wfm_map, 'SPECs' : self._list_spec_names}
 
         #Prepare the dictionary of HAL configurations
         for cur_hal in self._list_HALs + [self._hal_ACQ]:
-            cur_config['HALs'].append(cur_hal._get_current_config())
+            if cur_hal != None:
+                cur_config['HALs'].append(cur_hal._get_current_config())
 
         for cur_proc in self._proc_configs:
             cur_config['PROCs'].append(cur_proc._get_current_config())
@@ -79,29 +89,37 @@ class ExperimentConfiguration:
         if (file_name != ''):
             with open(file_name, 'w') as outfile:
                 json.dump(cur_config, outfile, indent=4)
+        
+        self._init_config = cur_config
         return cur_config
 
-    def update_config(self, conf):
+    def update_config(self, conf, commit_changes_to_HALsPROCs=True):
         #TODO: Check if these checks here are probably overkill and possibly obsolete?
         for cur_dict in conf['HALs']:
             found_hal = False
             for cur_hal in self._list_HALs + [self._hal_ACQ]:
+                if cur_hal == None:
+                    continue
                 if cur_hal.Name == cur_dict['Name']:
                     found_hal = True
-                    cur_hal._set_current_config(cur_dict, self._lab)
+                    if commit_changes_to_HALsPROCs:
+                        cur_hal._set_current_config(cur_dict, self._lab)
                     break
             assert found_hal, f"HAL object {cur_dict['Name']} does not exist in the current ExperimentConfiguration object."
-        self._settle_currently_used_processors()
+        self._settle_currently_used_processors(conf)
         for cur_dict in conf['PROCs']:
             found_proc = False
             for cur_proc in self._proc_configs:
                 if cur_proc.Name == cur_dict['Name']:
                     found_proc = True
-                    cur_proc._set_current_config(cur_dict, self._lab)
+                    if commit_changes_to_HALsPROCs:
+                        cur_proc._set_current_config(cur_dict, self._lab)
                     break
             assert found_proc, f"PROC object {cur_dict['Name']} does not exist in the current ExperimentConfiguration object."
         self.RepetitionTime = conf['RepetitionTime']
-        self._dict_wfm_map = conf['WaveformMapping'] 
+        self._dict_wfm_map = conf['WaveformMapping']
+        if 'SPECs' in conf:
+           self._list_spec_names = conf['SPECs']
         #
         self._init_config = conf
 
@@ -166,7 +184,13 @@ class ExperimentConfiguration:
         return ret_trans_vars
 
     def init_instruments(self):
+        #Setup HALs and PROCs...
         self.update_config(self._init_config)
+        #Setup SPECs...
+        for cur_spec in self._list_spec_names:
+            spec_obj = self._lab.SPEC(cur_spec)
+            if spec_obj != None:
+                spec_obj.commit_entries()
 
     def prepare_instruments(self):
         for cur_hal in self._list_HALs + [self._hal_ACQ]:

@@ -1,6 +1,7 @@
 from sqdtoolz.Laboratory import Laboratory
 from sqdtoolz.Experiment import Experiment
 from sqdtoolz.ExperimentConfiguration import*
+from sqdtoolz.ExperimentSpecification import*
 from sqdtoolz.Variable import*
 
 from sqdtoolz.HAL.DDG import DDG

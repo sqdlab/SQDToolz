@@ -1,6 +1,7 @@
 import qcodes as qc
 from sqdtoolz.ExperimentConfiguration import*
 from sqdtoolz.Variable import*
+from sqdtoolz.ExperimentSpecification import*
 from sqdtoolz.HAL.HALbase import*
 from sqdtoolz.HAL.ACQ import*
 from sqdtoolz.HAL.AWG import*
@@ -37,6 +38,7 @@ class Laboratory:
         self._processors = {}
         self._expt_configs = {}
         self._variables = {}
+        self._specifications = {}
         self._waveform_transforms = {}
         self._activated_instruments = []
 
@@ -105,7 +107,7 @@ class Laboratory:
                 acq_obj = None
             cur_hals = [self.HAL(x) for x in cur_hals]
             new_expt_config = ExperimentConfiguration(cur_expt_config, self, 0, cur_hals, acq_obj)
-            new_expt_config.update_config(config_dict[cur_expt_config])
+            new_expt_config.update_config(config_dict[cur_expt_config], False)
     
     def cold_reload_labconfig(self, config_dict):
         for cur_instr in config_dict['ActiveInstruments']:
@@ -126,10 +128,15 @@ class Laboratory:
         for dict_cur_wfmt in config_dict['WFMTs']:
             cur_class_name = dict_cur_wfmt['Type']
             globals()[cur_class_name].fromConfigDict(dict_cur_wfmt, self)
+        #Create and load the SPECs
+        for dict_cur_spec in config_dict['SPECs']:
+            ExperimentSpecification(dict_cur_spec["Name"], self)._set_current_config(dict_cur_spec)
 
 
     def _resolve_sqdobj_tree(self, sqdObj):
         resolution_tree = []
+        if sqdObj == None:
+            return []
         cur_obj = sqdObj
         cur_parent = cur_obj.Parent  #Note that Parent is: (object reference to parent, metadata to find current object from parent object's POV)
         while (type(cur_parent) is tuple and cur_parent[0] != None):
@@ -142,6 +149,9 @@ class Laboratory:
         elif isinstance(cur_obj, WaveformTransformation):
             assert cur_obj.Name in self._waveform_transforms, f"It seems that {sqdObj.Name} is a part of some rogue unregistered WaveformTransformation object."
             resolution_tree += [(cur_obj.Name, 'WFMT')]
+        elif isinstance(cur_obj, VariableBase):
+            assert cur_obj.Name in self._variables, f"It seems that {sqdObj.Name} is a part of some rogue unregistered Variable object."
+            resolution_tree += [(cur_obj.Name, 'VAR')]
         return resolution_tree[::-1]
 
     def _get_resolved_obj(self, res_list):
@@ -150,6 +160,8 @@ class Laboratory:
             ret_obj = self.HAL(res_list[0][0])
         elif res_list[0][1] == 'WFMT':
             ret_obj = self.WFMT(res_list[0][0])
+        elif res_list[0][1] == 'VAR':
+            ret_obj = self.VAR(res_list[0][0])
         #
         if ret_obj == None:
             return None
@@ -202,6 +214,17 @@ class Laboratory:
     def VAR(self, param_name):
         if param_name in self._variables:
             return self._variables[param_name]
+        else:
+            return None
+
+    def _register_SPEC(self, spec):
+        if not (spec.Name in self._specifications):
+            self._specifications[spec.Name] = spec
+            return True
+        return False
+    def SPEC(self, spec_name):
+        if spec_name in self._specifications:
+            return self._specifications[spec_name]
         else:
             return None
 
@@ -279,13 +302,13 @@ class Laboratory:
         #Save experiment-specific experiment-configuration data (i.e. timing diagram)
         expt_obj.save_config(cur_exp_path, 'timing_diagram', 'experiment_parameters.txt', self._group_dir['SweepQueue'])
 
+        #Run postprocessing
+        expt_obj._post_process(ret_vals)
+        
         #Save instrument configurations (QCoDeS)
         self._save_instrument_config(cur_exp_path)
         #Save Laboratory Configuration
         self.save_laboratory_config(cur_exp_path)
-
-        #Run postprocessing
-        expt_obj._post_process(ret_vals)
         
         #Save Laboratory Parameters
         self.save_variables(cur_exp_path)
@@ -322,11 +345,17 @@ class Laboratory:
         for cur_wfmt in self._waveform_transforms:
             dict_wfmts.append(self._waveform_transforms[cur_wfmt]._get_current_config())
 
+        #Prepare the dictionary of Experiment Specifications
+        dict_specs = []
+        for cur_spec in self._specifications:
+            dict_specs.append(self._specifications[cur_spec]._get_current_config())
+
         param_dict = {
                     'ActiveInstruments' : self._activated_instruments,
                     'HALs' : dict_hals,
                     'PROCs': dict_procs,
-                    'WFMTs': dict_wfmts
+                    'WFMTs': dict_wfmts,
+                    'SPECs': dict_specs
                     }
         if cur_exp_path != '':
             with open(cur_exp_path + file_name, 'w') as outfile:

@@ -11,3 +11,6 @@ instruments:
   virMWS:
     driver: sqdtoolz.Drivers.dummyGENmwSource
     type: DummyGENmwSrc
+  virMWS2:
+    driver: sqdtoolz.Drivers.dummyGENmwSource
+    type: DummyGENmwSrc

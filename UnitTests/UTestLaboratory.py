@@ -298,6 +298,38 @@ assert new_lab.VAR('SrcFreq').Value == 5.8, "HAL property incorrectly loaded fro
 assert new_lab.VAR('DncFreq').Value == 9.3, "HAL property incorrectly loaded from ExperimentSpecification."
 
 #
+#Check cold-reload on ExperimentConfigurations again with Processors...
+#
+from sqdtoolz.HAL.Processors.ProcessorCPU import*
+from sqdtoolz.HAL.Processors.CPU.CPU_DDC import*
+from sqdtoolz.HAL.Processors.CPU.CPU_FIR import*
+from sqdtoolz.HAL.Processors.CPU.CPU_Mean import*
+expConfig = ExperimentConfiguration('testConf4', new_lab, 1.0, [new_lab.HAL('MW-Src'), new_lab.HAL('MW-Src2')], new_lab.HAL('dum_acq'), ['cavity'])
+new_proc = ProcessorCPU('cpu_test', new_lab)
+new_proc.add_stage(CPU_DDC([0.14]))
+new_proc.add_stage(CPU_FIR([{'Type' : 'low', 'Taps' : 40, 'fc' : 0.01, 'Win' : 'hamming'}]*2))
+new_proc.add_stage_end(CPU_Mean('repetition'))
+new_lab.HAL("dum_acq").set_data_processor(new_proc)
+new_lab.CONFIG('testConf4').save_config()
+#
+new_lab.save_laboratory_config('UnitTests/', 'laboratory_configuration4.txt')
+new_lab.save_variables('UnitTests\\')
+new_lab.save_experiment_configs('UnitTests/', 'experiment_configurations2.txt')
+#
+#Check with cold-reload...
+new_lab._station.close_all_registered_instruments()
+new_lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir/')
+with open("UnitTests/laboratory_configuration4.txt") as json_file:
+    data = json.load(json_file)
+    new_lab.cold_reload_labconfig(data)
+new_lab.update_variables_from_last_expt('UnitTests\\laboratory_parameters.txt')
+with open("UnitTests/experiment_configurations2.txt") as json_file:
+    data = json.load(json_file)
+    new_lab.cold_reload_experiment_configurations(data)
+new_lab.PROC('cpu_test').add_stage_end(CPU_Mean('sample'))
+new_lab.CONFIG('testConf4').init_instruments()
+
+#
 #Check variable sweeps
 #
 #Check linspace
@@ -326,6 +358,7 @@ for cur_val in new_lab.VAR("myFreq").array(cur_arr):
 #Check with experiment sweeps
 #
 new_lab.HAL('dum_acq').set_trigger_source(None)
+new_lab.HAL('dum_acq').set_data_processor(None)
 ExperimentConfiguration('testConf', new_lab, 1.0, [new_lab.HAL('ddg')], new_lab.HAL('dum_acq'))
 #
 new_lab.group_open("test_group")

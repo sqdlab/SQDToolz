@@ -132,6 +132,10 @@ class Laboratory:
         for dict_cur_spec in config_dict['SPECs']:
             ExperimentSpecification(dict_cur_spec["Name"], self)._set_current_config(dict_cur_spec)
 
+    def makesafe_HALs(self):
+        for cur_hal in self._hal_objs:
+            if not self.HAL(cur_hal).ManualActivation:
+                self.HAL(cur_hal).deactivate()
 
     def _resolve_sqdobj_tree(self, sqdObj):
         resolution_tree = []

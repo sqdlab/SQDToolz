@@ -15,6 +15,10 @@ class ExpRabi(Experiment):
         self._post_processor = kwargs.get('post_processor', None)
         self._param_rabi_frequency = kwargs.get('param_rabi_frequency', None)
         self._param_rabi_decay_time = kwargs.get('param_rabi_decay_time', None)
+
+        self.load_time = kwargs.get('load_time', 40e-6)
+        self.readout_time = kwargs.get('readout_time', 2e-6)
+        self.drive_time = kwargs.get('drive_time', 20e-9)
     
     def _run(self, file_path, sweep_vars=[], **kwargs):
         assert len(sweep_vars) == 0, "Cannot specify sweeping variables in this experiment."
@@ -24,10 +28,10 @@ class ExpRabi(Experiment):
         wfm = WaveformGeneric(['qubit'], ['readout'])
         wfm.set_waveform('qubit', [
             WFS_Constant("SEQPAD", None, -1, 0.0),
-            WFS_Constant("init", None, 40e-6, 0.0),
-            WFS_Gaussian("drive", self._wfmt_qubit_drive.apply(phase=0), 20e-9, 0.001),
+            WFS_Constant("init", None, self.load_time, 0.0),
+            WFS_Gaussian("drive", self._wfmt_qubit_drive.apply(phase=0), self.drive_time, 0.001),
             WFS_Constant("pad", None, 5e-9, 0.0),
-            WFS_Constant("read", None, 2e-6, 0.0)
+            WFS_Constant("read", None, self.readout_time, 0.0)
         ])
         wfm.set_digital_segments('readout', 'qubit', ['read'])
         self._temp_vars = self._expt_config.update_waveforms(wfm, [('Drive Amplitude', 'qubit', 'drive', 'Amplitude')] )

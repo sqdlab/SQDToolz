@@ -219,6 +219,11 @@ class ExperimentConfiguration:
             if spec_obj != None:
                 spec_obj.commit_entries()
 
+    def edit(self):
+        self.init_instruments()
+    def commit(self):
+        self.save_config()
+
     def prepare_instruments(self):
         for cur_hal in self._list_HALs + [self._hal_ACQ]:
             if not cur_hal.ManualActivation:

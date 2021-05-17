@@ -3,28 +3,40 @@ from sqdtoolz.Utilities.TimingPlots import*
 from sqdtoolz.Variable import*
 import numpy as np
 import json
+import copy
 
 class ExperimentConfiguration:
-    def __init__(self, name, lab, duration, list_HALs, hal_ACQ, list_spec_names = []):
+    def __init__(self, name, lab, duration, list_HALs, hal_ACQ, list_spec_names = [], **kwargs):
         self._name = name
         #Just register it to the labotarory - doesn't matter if it already exists as everything here needs to be reinitialised
         #to the new configuration anyway...
         lab._register_CONFIG(self)
 
-        self._total_time = duration
+        prev_config = kwargs.get('_hidden_config', None)
+        if prev_config != None:
+            self._total_time = prev_config._total_time
+            self._lab = lab
+            self._list_HALs = prev_config._list_HALs[:]
+            self._hal_ACQ = prev_config._hal_ACQ
+            self._list_spec_names = prev_config._list_spec_names[:]
+            self._dict_wfm_map = copy.deepcopy(prev_config._dict_wfm_map)
+            self._init_config = copy.deepcopy(prev_config._init_config)
+            self.init_instruments()
+        else:
+            self._total_time = duration
 
-        #Hard links are O.K. as the HAL objects won't get replaced on reinitialisation due to the design of __new__ in the Halbase
-        #class. In addition, cold-restarts should have the strings properly instantiating the HALs once anyway. Nonetheless, the
-        #update function will work with the laboratory class...
-        self._lab = lab
-        self._list_HALs = list_HALs[:]
-        self._hal_ACQ = hal_ACQ
+            #Hard links are O.K. as the HAL objects won't get replaced on reinitialisation due to the design of __new__ in the Halbase
+            #class. In addition, cold-restarts should have the strings properly instantiating the HALs once anyway. Nonetheless, the
+            #update function will work with the laboratory class...
+            self._lab = lab
+            self._list_HALs = list_HALs[:]
+            self._hal_ACQ = hal_ACQ
 
-        self._list_spec_names = list_spec_names[:]
+            self._list_spec_names = list_spec_names[:]
 
-        self._dict_wfm_map = {'waveforms' : {}, 'digital' : {} }
+            self._dict_wfm_map = {'waveforms' : {}, 'digital' : {} }
 
-        self.save_config()
+            self.save_config()
 
     def __new__(cls, *args, **kwargs):
         if len(args) == 0:
@@ -43,6 +55,11 @@ class ExperimentConfiguration:
             return prev_exists
         else:
             return super(cls.__class__, cls).__new__(cls)
+
+    @classmethod
+    def copyConfig(cls, name, lab, expt_config):
+        assert isinstance(expt_config, ExperimentConfiguration), "Previous configuration must be a valid ExperimentConfiguration object."
+        return cls(name, lab, -1, [], None, [], _hidden_config = expt_config)
 
     @property
     def Name(self):

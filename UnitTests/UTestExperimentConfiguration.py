@@ -860,4 +860,17 @@ new_lab.save_experiment_configs('UnitTests/')
 new_lab.save_laboratory_config('UnitTests/')
 new_lab.save_experiment_configs('UnitTests/')
 
+#Finally test the copy-configuration functionality
+#
+ExperimentConfiguration.copyConfig("testConfCopy", new_lab, new_lab.CONFIG('testConf'))
+assert awg_wfm.SampleRate == 1e9, "Property incorrectly reloaded in AWG Waveform."
+assert awg_wfm._global_factor == 1.0, "Property incorrectly reloaded in AWG Waveform."
+assert awg_wfm.get_output_channel(0).Amplitude == 1, "Property incorrectly reloaded in AWG Waveform."
+assert awg_wfm.get_output_channel(1).Offset == 0, "Property incorrectly set in AWG Waveform."
+assert awg_wfm.get_waveform_segment('init0').Amplitude == 0.5, "Property incorrectly reloaded in AWG Waveform Segment."
+assert awg_wfm.get_waveform_segment('init2').Duration == 20e-9, "Property incorrectly reloaded in AWG Waveform Segment."
+assert awg_wfm.get_waveform_segment('zero11').Value == 0.1, "Property incorrectly reloaded in AWG Waveform Segment."
+assert awg_wfm.get_waveform_segment('zero22').Duration == 77e-9*3, "Property incorrectly reloaded in AWG Waveform Segment."
+
+
 print("Experiment Configuration Unit Tests completed successfully.")

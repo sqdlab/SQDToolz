@@ -13,6 +13,10 @@ class ACQvna(HALbase):
         return cls(config_dict["Name"], lab, config_dict["instrument"])
 
     @property
+    def IsACQhal(self):
+        return True
+
+    @property
     def SweepMode(self):
         return self._instr_vna.SweepMode
     @SweepMode.setter

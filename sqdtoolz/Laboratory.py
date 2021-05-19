@@ -100,17 +100,13 @@ class Laboratory:
             cur_keys = config_dict[cur_expt_config]['HALs']
             cur_types = [x['Type'] for x in cur_keys]
             cur_hals = [x['Name'] for x in cur_keys]
-            if 'ACQ' in cur_types:
-                ind = cur_types.index('ACQ')
-                cur_hals.pop(ind)
-                acq_obj = cur_keys[ind]['Name']
-            elif 'ACQvna' in cur_types:
-                ind = cur_types.index('ACQvna')
-                cur_hals.pop(ind)
-                acq_obj = cur_keys[ind]['Name']
-            else:
-                acq_obj = None
-            new_expt_config = ExperimentConfiguration(cur_expt_config, self, 0, cur_hals, acq_obj)
+            #Find the ACQ HAL module...
+            acq_hal = None
+            for cur_hal in cur_hals:
+                if self.HAL(cur_hal).IsACQhal:
+                    acq_hal = cur_hal
+                    break
+            new_expt_config = ExperimentConfiguration(cur_expt_config, self, 0, cur_hals, acq_hal)
             new_expt_config.update_config(config_dict[cur_expt_config], False)
     
     def cold_reload_labconfig(self, config_dict):

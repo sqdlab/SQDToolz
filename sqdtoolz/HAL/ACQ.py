@@ -16,6 +16,10 @@ class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
         return cls(config_dict["Name"], lab, config_dict["instrument"])
 
     @property
+    def IsACQhal(self):
+        return True
+
+    @property
     def NumSamples(self):
         return self._instr_acq.NumSamples
     @NumSamples.setter

@@ -85,7 +85,10 @@ class ExperimentConfiguration:
         cur_str = f"Name: {self.Name}\n"
         cur_str += f"RepetitionTime: {self.RepetitionTime}\n"
         cur_str += f"HALs: {[x.Name for x in self._list_HALs]}\n"
-        cur_str += f"ACQ: {self._hal_ACQ.Name}\n"
+        if self._hal_ACQ == None:
+            cur_str += f"ACQ: None\n"
+        else:
+            cur_str += f"ACQ: {self._hal_ACQ.Name}\n"
         cur_str += f"Processors: {[x.Name for x in self._proc_configs]}\n"
         cur_str += f"Experiment Specifications: {self._list_spec_names}\n"
         cur_str += f"WaveformMapping: {self._dict_wfm_map}"

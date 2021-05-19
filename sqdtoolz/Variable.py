@@ -239,7 +239,7 @@ class VariableDifferential(VariableBase):
 
     @classmethod
     def fromConfigDict(cls, name, config_dict, lab):
-        return cls(name, lab, config_dict["Var1"], config_dict["Var2"], config_dict["Space"])
+        return cls(name, lab, config_dict["Var1"], config_dict["Var2"])
 
     def get_raw(self):
         return self._lab.VAR(self._var_1).get_raw() - self._lab.VAR(self._var_2).get_raw()

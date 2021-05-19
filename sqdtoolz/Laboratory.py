@@ -9,6 +9,7 @@ from sqdtoolz.HAL.DDG import*
 from sqdtoolz.HAL.GENmwSource import*
 from sqdtoolz.HAL.GENvoltSource import*
 from sqdtoolz.HAL.GENswitch import*
+from sqdtoolz.HAL.ACQvna import*
 from sqdtoolz.HAL.Processors.ProcessorCPU import*
 try:
     from sqdtoolz.HAL.Processors.ProcessorGPU import*
@@ -101,6 +102,10 @@ class Laboratory:
             cur_hals = [x['Name'] for x in cur_keys]
             if 'ACQ' in cur_types:
                 ind = cur_types.index('ACQ')
+                cur_hals.pop(ind)
+                acq_obj = cur_keys[ind]['Name']
+            elif 'ACQvna' in cur_types:
+                ind = cur_types.index('ACQvna')
                 cur_hals.pop(ind)
                 acq_obj = cur_keys[ind]['Name']
             else:

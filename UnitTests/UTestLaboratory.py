@@ -232,14 +232,14 @@ assert new_lab.WFMT("IQmod").IQUpperSideband == False, "WaveformTransformation p
 #
 new_lab.load_instrument('virMWS2')
 hal_mw2 = GENmwSource("MW-Src2", new_lab, 'virMWS2', 'CH1')
-expConfig = ExperimentConfiguration('testConf4', new_lab, 1.0, [new_lab.HAL('MW-Src'), new_lab.HAL('MW-Src2')], None)
+expConfig = ExperimentConfiguration('testConf4', new_lab, 1.0, ['MW-Src', 'MW-Src2'], None)
 #
 ExperimentSpecification('cavityFile', new_lab, 'Cavity').commit_entries()
 ExperimentSpecification('cavity', new_lab)
 new_lab.SPEC('cavity').add('Frequency', 0, new_lab.HAL('MW-Src'), 'Frequency')
 #
 new_lab.HAL('MW-Src').Frequency = 4
-expConfig = ExperimentConfiguration('testConf4', new_lab, 1.0, [new_lab.HAL('MW-Src'), new_lab.HAL('MW-Src2')], None, ['cavity'])
+expConfig = ExperimentConfiguration('testConf4', new_lab, 1.0, ['MW-Src', 'MW-Src2'], None, ['cavity'])
 assert new_lab.HAL('MW-Src').Frequency == 4, "HAL property incorrectly set."
 expConfig.init_instruments()
 assert new_lab.HAL('MW-Src').Frequency == 0, "HAL property incorrectly loaded from ExperimentSpecification."
@@ -252,7 +252,7 @@ assert new_lab.HAL('MW-Src').Frequency == 5, "HAL property incorrectly set."
 expConfig.init_instruments()
 assert new_lab.HAL('MW-Src').Frequency == 5.8, "HAL property incorrectly loaded from ExperimentSpecification."
 #
-expConfig = ExperimentConfiguration('testConf4', new_lab, 1.0, [new_lab.HAL('MW-Src'), new_lab.HAL('MW-Src2')], None, ['cavity'])
+expConfig = ExperimentConfiguration('testConf4', new_lab, 1.0, ['MW-Src', 'MW-Src2'], None, ['cavity'])
 VariableProperty('SrcFreq', new_lab, new_lab.HAL("MW-Src"), 'Frequency')
 VariableProperty('DncFreq', new_lab, new_lab.HAL("MW-Src2"), 'Frequency')
 VariableSpaced('cavFreq', new_lab, 'SrcFreq', 'DncFreq', 3.5)
@@ -305,7 +305,7 @@ from sqdtoolz.HAL.Processors.ProcessorCPU import*
 from sqdtoolz.HAL.Processors.CPU.CPU_DDC import*
 from sqdtoolz.HAL.Processors.CPU.CPU_FIR import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Mean import*
-expConfig = ExperimentConfiguration('testConf4', new_lab, 1.0, [new_lab.HAL('MW-Src'), new_lab.HAL('MW-Src2')], new_lab.HAL('dum_acq'), ['cavity'])
+expConfig = ExperimentConfiguration('testConf4', new_lab, 1.0, ['MW-Src', 'MW-Src2'], 'dum_acq', ['cavity'])
 new_proc = ProcessorCPU('cpu_test', new_lab)
 new_proc.add_stage(CPU_DDC([0.14]))
 new_proc.add_stage(CPU_FIR([{'Type' : 'low', 'Taps' : 40, 'fc' : 0.01, 'Win' : 'hamming'}]*2))
@@ -360,7 +360,7 @@ for cur_val in new_lab.VAR("myFreq").array(cur_arr):
 #
 new_lab.HAL('dum_acq').set_trigger_source(None)
 new_lab.HAL('dum_acq').set_data_processor(None)
-ExperimentConfiguration('testConf', new_lab, 1.0, [new_lab.HAL('ddg')], new_lab.HAL('dum_acq'))
+ExperimentConfiguration('testConf', new_lab, 1.0, ['ddg'], 'dum_acq')
 #
 new_lab.group_open("test_group")
 for cur_freq in new_lab.VAR("myFreq").array([1,2,3]):
@@ -392,7 +392,7 @@ assert new_lab.VAR("myDura1").Value == 2016, "Variable incorrectly reloaded"
 assert new_lab.VAR("myDura2").Value == 2016+3.1415926, "Variable incorrectly reloaded"
 assert new_lab.HAL("Wfm1").get_waveform_segment('init2').Duration == 2016+3.1415926, "Variable incorrectly reloaded"
 #
-assert new_lab.WFMT("WFMT").IQFrequency == 84e7, "WaveformTransformation property incorrectly set"
+assert new_lab.WFMT("IQmod").IQFrequency == 84e7, "WaveformTransformation property incorrectly set"
 assert new_lab.WFMT("IQmod").IQAmplitude == 9.4, "WaveformTransformation property incorrectly set"
 assert new_lab.WFMT("IQmod").IQAmplitudeFactor == 78.1, "WaveformTransformation property incorrectly set"
 assert new_lab.WFMT("IQmod").IQPhaseOffset == 54.3, "WaveformTransformation property incorrectly set"

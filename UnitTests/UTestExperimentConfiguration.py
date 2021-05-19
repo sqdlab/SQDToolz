@@ -89,7 +89,7 @@ assert hal_acq.NumRepetitions == 10, "ACQ HAL did not properly enter the number 
 assert hal_acq.NumSegments == 2, "ACQ HAL did not properly enter the number of segments."
 assert hal_acq.NumSamples == 30, "ACQ HAL did not properly enter the number of samples."
 #
-expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, [], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, [], 'dum_acq')
 
 def arr_equality(arr1, arr2):
     if arr1.size != arr2.size:
@@ -111,7 +111,7 @@ hal_ddg.get_trigger_output('C').TrigPulseDelay = 250e-9
 hal_ddg.get_trigger_output('C').TrigPolarity = 0
 #
 #Test the case where there are no trigger relations
-expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, [hal_ddg], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, ['ddg'], 'dum_acq')
 arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
 assert arr_act.size == 0, "There are erroneous trigger edges found in the current configuration."
 assert arr_act_segs.size == 0, "There are erroneous trigger segments found in the current configuration."
@@ -120,7 +120,7 @@ assert arr_act_segs.size == 0, "There are erroneous trigger segments found in th
 #
 #Test trivial DDG - should raise assert as it is not TriggerInputCompatible...
 hal_acq.set_trigger_source(hal_ddg.get_trigger_output('A'))
-expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, [hal_ddg], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, ['ddg'], 'dum_acq')
 assert_found = False
 try:
     arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_ddg)    
@@ -131,7 +131,7 @@ assert assert_found, "Function get_trigger_edges failed to trigger an assertion 
 #
 #Test ACQ with positive input polarity
 hal_acq.set_trigger_source(hal_ddg.get_trigger_output('A'))
-expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, [hal_ddg], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, ['ddg'], 'dum_acq')
 arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
 arr_exp = np.array([50e-9])
 assert arr_equality(arr_act, arr_exp), "Incorrect trigger edges returned by the get_trigger_edges function."
@@ -141,7 +141,7 @@ assert arr_equality(arr_act_segs[:,1], arr_exp[:,1]), "Incorrect trigger segment
 #
 #Test ACQ again with the same positive input polarity
 hal_acq.set_trigger_source(hal_ddg.get_trigger_output('B'))
-expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, [hal_ddg], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, ['ddg'], 'dum_acq')
 arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
 arr_exp = np.array([50e-9])
 assert arr_equality(arr_act, arr_exp), "Incorrect trigger edges returned by the get_trigger_edges function."
@@ -151,7 +151,7 @@ assert arr_equality(arr_act_segs[:,1], arr_exp[:,1]), "Incorrect trigger segment
 #
 #Test ACQ with negative input polarity
 hal_acq.set_trigger_source(hal_ddg.get_trigger_output('C'))
-expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, [hal_ddg], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, ['ddg'], 'dum_acq')
 arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
 arr_exp = np.array([650e-9])
 assert arr_equality(arr_act, arr_exp), "Incorrect trigger edges returned by the get_trigger_edges function."
@@ -180,7 +180,7 @@ awg_wfm.AutoCompression = 'None'#'Basic'
 hal_acq.set_trigger_source(awg_wfm.get_output_channel(0).marker(1))
 awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('A'))
 try:
-    expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, [hal_ddg], hal_acq)
+    expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, ['ddg'], 'dum_acq')
 except AssertionError:
     assert_found = True
     # assert arr_act.size == 0, "There are erroneous trigger edges found in the current configuration."
@@ -189,7 +189,7 @@ assert assert_found, "ExperimentConfiguration failed to trigger an assertion err
 #Simple test feeding the AWG with simple pulse from DDG
 hal_acq.set_trigger_source(awg_wfm.get_output_channel(0).marker(1))
 awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('A'))
-expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, [hal_ddg, awg_wfm], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, ['ddg', 'Wfm1'], 'dum_acq')
 arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
 arr_exp = round_to_samplerate(awg_wfm, np.array([10e-9, 1e-9*(10+20+30+45+77), 1e-9*(10+(20+30+45)*2+77*3), 1e-9*(10+(20+30+45)*3+77*6)]) + 50e-9 )
 assert arr_equality(arr_act, arr_exp), "Incorrect trigger edges returned by the get_trigger_edges function on including an AWG."
@@ -200,7 +200,7 @@ assert arr_equality(arr_act_segs[:,1], arr_exp[:,1]), "Incorrect trigger segment
 #Try with a negative polarity DDG output
 hal_acq.set_trigger_source(awg_wfm.get_output_channel(0).marker(1))
 awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('C'))
-expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, [hal_ddg, awg_wfm], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, ['ddg', 'Wfm1'], 'dum_acq')
 arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
 arr_exp = round_to_samplerate(awg_wfm, np.array([10e-9, 1e-9*(10+20+30+45+77), 1e-9*(10+(20+30+45)*2+77*3), 1e-9*(10+(20+30+45)*3+77*6)]) + 650e-9 )
 assert arr_equality(arr_act, arr_exp), "Incorrect trigger edges returned by the get_trigger_edges function on including an AWG."
@@ -212,7 +212,7 @@ assert arr_equality(arr_act_segs[:,1], arr_exp[:,1]), "Incorrect trigger segment
 hal_acq.set_trigger_source(awg_wfm.get_output_channel(0).marker(1))
 awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('C'))
 hal_acq.InputTriggerEdge = 0
-expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, [hal_ddg, awg_wfm], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, ['ddg', 'Wfm1'], 'dum_acq')
 arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
 arr_exp = round_to_samplerate(awg_wfm, np.array([(10+20)*1e-9, 1e-9*(10+20+30+45+77+20), 1e-9*(10+(20+30+45)*2+77*3+20), 1e-9*(10+(20+30+45)*3+77*6+20)]) + 650e-9 )
 assert arr_equality(arr_act, arr_exp), "Incorrect trigger edges returned by the get_trigger_edges function on including an AWG."
@@ -234,7 +234,7 @@ awg_wfm2.AutoCompression = 'None'#'Basic'
 hal_acq.set_trigger_source(awg_wfm2.get_output_channel(0).marker(0))
 awg_wfm2.set_trigger_source_all(awg_wfm.get_output_channel(0).marker(1))
 awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('C'))
-expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, [hal_ddg, awg_wfm, awg_wfm2], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, ['ddg', 'Wfm1', 'Wfm2'], 'dum_acq')
 arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
 temp = np.array([10e-9, 1e-9*(10+20+30+45+77), 1e-9*(10+(20+30+45)*2+77*3), 1e-9*(10+(20+30+45)*3+77*6)])
 arr_exp = round_to_samplerate(awg_wfm, np.sort(np.concatenate( [(650+20)*1e-9 + temp, (650+20+27+20)*1e-9 + temp])) )
@@ -247,7 +247,7 @@ hal_acq.set_trigger_source(awg_wfm2.get_output_channel(0).marker(0))
 awg_wfm2.set_trigger_source_all(awg_wfm.get_output_channel(0).marker(1))
 awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('C'))
 hal_acq.InputTriggerEdge = 0
-expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, [hal_ddg, awg_wfm, awg_wfm2], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, ['ddg', 'Wfm1', 'Wfm2'], 'dum_acq')
 arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
 temp = np.array([10e-9, 1e-9*(10+20+30+45+77), 1e-9*(10+(20+30+45)*2+77*3), 1e-9*(10+(20+30+45)*3+77*6)])
 arr_exp = round_to_samplerate(awg_wfm, np.sort(np.concatenate( [(650+0)*1e-9 + temp, (650+20+27)*1e-9 + temp])) )
@@ -265,7 +265,7 @@ hal_acq.set_trigger_source(awg_wfm2.get_output_channel(0).marker(0))
 awg_wfm2.set_trigger_source_all(awg_wfm.get_output_channel(0).marker(1))
 awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('C'))
 hal_acq.InputTriggerEdge = 0
-expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, ['ddg', 'Wfm1', 'Wfm2', 'MW-Src'], 'dum_acq')
 arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
 temp = np.array([10e-9, 1e-9*(10+20+30+45+77), 1e-9*(10+(20+30+45)*2+77*3), 1e-9*(10+(20+30+45)*3+77*6)])
 arr_exp = round_to_samplerate(awg_wfm, np.sort(np.concatenate( [(650+0)*1e-9 + temp, (650+20+27)*1e-9 + temp])) )
@@ -283,7 +283,7 @@ hal_acq.set_trigger_source(awg_wfm2.get_output_channel(0).marker(0))
 awg_wfm2.set_trigger_source_all(awg_wfm.get_output_channel(0).marker(1))
 awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('C'))
 hal_acq.InputTriggerEdge = 0
-expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, ['ddg', 'Wfm1', 'Wfm2', 'MW-Src'], 'dum_acq')
 arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
 temp = np.array([10e-9, 1e-9*(10+20+30+45+77), 1e-9*(10+(20+30+45)*2+77*3), 1e-9*(10+(20+30+45)*3+77*6)])
 arr_exp = round_to_samplerate(awg_wfm, np.sort(np.concatenate( [(650+0)*1e-9 + temp, (650+20+27)*1e-9 + temp])) )
@@ -300,7 +300,7 @@ hal_acq.set_trigger_source(awg_wfm2.get_output_channel(0).marker(0))
 awg_wfm2.set_trigger_source_all(awg_wfm.get_output_channel(0).marker(1))
 awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('C'))
 hal_acq.InputTriggerEdge = 0
-expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, ['ddg', 'Wfm1', 'Wfm2', 'MW-Src'], 'dum_acq')
 arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
 temp = np.array([10e-9, 1e-9*(10+20+30+45+77), 1e-9*(10+(20+30+45)*2+77*3), 1e-9*(10+(20+30+45)*3+77*6)])
 arr_exp = round_to_samplerate(awg_wfm, np.sort(np.concatenate( [(650+0)*1e-9 + temp, (650+20+27)*1e-9 + temp])) )
@@ -317,7 +317,7 @@ hal_acq.set_trigger_source(awg_wfm2.get_output_channel(0).marker(0))
 awg_wfm2.set_trigger_source_all(awg_wfm.get_output_channel(0).marker(1))
 awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('C'))
 hal_acq.InputTriggerEdge = 0
-expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, ['ddg', 'Wfm1', 'Wfm2', 'MW-Src'], 'dum_acq')
 arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_mw)
 arr_exp = round_to_samplerate(awg_wfm, np.array([1e-9*(10+20+30+45), 1e-9*(10+(20+30+45)*2+77), 1e-9*(10+(20+30+45)*3+77*3), 1e-9*(10+(20+30+45)*4+77*6)]) + 650e-9 )
 assert arr_equality(arr_act, arr_exp), "Incorrect trigger edges returned by the get_trigger_edges function on including 2 AWGs and MW-Source."
@@ -334,7 +334,7 @@ hal_acq.set_trigger_source(awg_wfm2.get_output_channel(0).marker(0))
 awg_wfm2.set_trigger_source_all(awg_wfm.get_output_channel(0).marker(1))
 awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('C'))
 hal_acq.InputTriggerEdge = 0
-expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, ['ddg', 'Wfm1', 'Wfm2', 'MW-Src'], 'dum_acq')
 arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_mw)
 arr_exp = round_to_samplerate(awg_wfm, np.array([0.0, 1e-9*(10+20+30+45+77), 1e-9*(10+(20+30+45)*2+77*3), 1e-9*(10+(20+30+45)*3+77*6)]) + 650e-9 )
 assert arr_equality(arr_act, arr_exp), "Incorrect trigger edges returned by the get_trigger_edges function on including 2 AWGs and MW-Source."
@@ -348,7 +348,7 @@ new_lab._get_instrument('virMWS').get_output('CH1').TriggerInputEdge = 1
 #Test waveform-update and mapping
 #
 #Try simple example
-expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, ['ddg', 'Wfm1', 'Wfm2', 'MW-Src'], 'dum_acq')
 waveform_mapping = WaveformMapper()
 waveform_mapping.add_waveform('qubit', 'Wfm1')
 waveform_mapping.add_digital('readout', awg_wfm.get_output_channel(0).marker(1))
@@ -369,7 +369,7 @@ arr_exp = round_to_samplerate(awg_wfm, np.array([20e-9+30e-9+45e-9]) + 650e-9 )
 assert arr_equality(arr_act, arr_exp), "Incorrect trigger edges when using waveform mapping."
 #
 #Try multiple waveforms...
-expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, ['ddg', 'Wfm1', 'Wfm2', 'MW-Src'], 'dum_acq')
 waveform_mapping = WaveformMapper()
 waveform_mapping.add_waveform('qubit1', 'Wfm1')
 waveform_mapping.add_waveform('qubit2', 'Wfm2')
@@ -397,7 +397,7 @@ arr_exp = round_to_samplerate(awg_wfm, np.array([20e-9]) + 650e-9 )
 assert arr_equality(arr_act, arr_exp), "Incorrect trigger edges when using waveform mapping on multiple waveforms."
 #
 #Try multiple waveforms but reference waveform is on another waveform...
-expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, ['ddg', 'Wfm1', 'Wfm2', 'MW-Src'], 'dum_acq')
 waveform_mapping = WaveformMapper()
 waveform_mapping.add_waveform('qubit1', 'Wfm1')
 waveform_mapping.add_waveform('qubit2', 'Wfm2')
@@ -440,7 +440,7 @@ assert assert_found, "Function update_waveforms failed to trigger an assertion e
 #
 #Try with elastic segments and multiple waveforms...
 awg_wfm = WaveformAWG("Wfm1", new_lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9, total_time=200e-9)
-expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, ['ddg', 'Wfm1', 'Wfm2', 'MW-Src'], 'dum_acq')
 waveform_mapping = WaveformMapper()
 waveform_mapping.add_waveform('qubit1', 'Wfm1')
 waveform_mapping.add_waveform('qubit2', 'Wfm2')
@@ -470,7 +470,7 @@ assert arr_equality(arr_act, arr_exp), "Incorrect trigger edges when using an el
 #Try with elastic segments and multiple waveforms but reference waveform is on another waveform...
 awg_wfm = WaveformAWG("Wfm1", new_lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9, total_time=200e-9)
 awg_wfm2 = WaveformAWG("Wfm2", new_lab, [('virAWG', 'CH3'), ('virAWG', 'CH4')], 1e9, total_time=200e-9)
-expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 2e-6, ['ddg', 'Wfm1', 'Wfm2', 'MW-Src'], 'dum_acq')
 waveform_mapping = WaveformMapper()
 waveform_mapping.add_waveform('qubit1', 'Wfm1')
 waveform_mapping.add_waveform('qubit2', 'Wfm2')
@@ -524,7 +524,7 @@ assert hal_acq.NumSegments == 2, "ACQ HAL did not properly enter the number of s
 assert hal_acq.NumSamples == 30, "ACQ HAL did not properly enter the number of samples."
 #
 hal_acq.set_trigger_source(None)
-expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, [], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, [], 'dum_acq')
 leConfig = expConfig.save_config()
 
 #Reinitialise the waveform
@@ -547,7 +547,7 @@ awg_wfm.AutoCompression = 'None'#'Basic'
 hal_acq.set_trigger_source(awg_wfm.get_output_channel(0).marker(1))
 awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('A'))
 #
-expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, ['ddg', 'Wfm1', 'Wfm2', 'MW-Src'], 'dum_acq')
 hal_acq.SampleRate = 500e6
 hal_acq.InputTriggerEdge = 1
 #
@@ -696,7 +696,7 @@ assert hal_acq.NumSegments == 2, "ACQ HAL did not properly enter the number of s
 assert hal_acq.NumSamples == 30, "ACQ HAL did not properly enter the number of samples."
 #
 hal_acq.set_trigger_source(None)
-expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, [], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, [], 'dum_acq')
 leConfig = expConfig.save_config()
 
 #Reinitialise the waveform
@@ -718,7 +718,7 @@ awg_wfm.AutoCompression = 'None'#'Basic'
 hal_acq.set_trigger_source(awg_wfm.get_output_channel(0).marker(1))
 awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('A'))
 #
-expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq)
+expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, ['ddg', 'Wfm1', 'Wfm2', 'MW-Src'], 'dum_acq')
 hal_acq.SampleRate = 500e6
 hal_acq.InputTriggerEdge = 1
 #
@@ -816,7 +816,7 @@ awg_wfm.get_waveform_segment('init0').Amplitude = 9001
 awg_wfm.get_waveform_segment('init2').Duration = 40e-9
 awg_wfm.get_waveform_segment('zero11').Value = 78
 awg_wfm.get_waveform_segment('zero22').Duration = 96
-expConfig2 = ExperimentConfiguration('testConf2', new_lab, 1.0, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq)
+expConfig2 = ExperimentConfiguration('testConf2', new_lab, 1.0, ['ddg', 'Wfm1', 'Wfm2', 'MW-Src'], 'dum_acq')
 assert awg_wfm.SampleRate == 49e7, "Property incorrectly set in AWG Waveform."
 assert awg_wfm._global_factor == 300, "Property incorrectly set in AWG Waveform."
 assert awg_wfm.get_output_channel(0).Amplitude == 5, "Property incorrectly set in AWG Waveform."

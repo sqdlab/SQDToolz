@@ -102,10 +102,9 @@ class Laboratory:
             if 'ACQ' in cur_types:
                 ind = cur_types.index('ACQ')
                 cur_hals.pop(ind)
-                acq_obj = self.HAL(cur_keys[ind]['Name'])
+                acq_obj = cur_keys[ind]['Name']
             else:
                 acq_obj = None
-            cur_hals = [self.HAL(x) for x in cur_hals]
             new_expt_config = ExperimentConfiguration(cur_expt_config, self, 0, cur_hals, acq_obj)
             new_expt_config.update_config(config_dict[cur_expt_config], False)
     

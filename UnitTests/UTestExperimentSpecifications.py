@@ -34,7 +34,7 @@ ExperimentSpecification('cavity', new_lab)
 new_lab.SPEC('cavity').add('Frequency', 0, hal_mw, 'Frequency')
 
 hal_mw.Frequency = 4
-expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq, ['cavity'])
+expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, ['ddg', 'Wfm1', 'Wfm2', 'MW-Src'], 'dum_acq', ['cavity'])
 assert hal_mw.Frequency == 4, "HAL property incorrectly set."
 expConfig.init_instruments()
 assert hal_mw.Frequency == 0, "HAL property incorrectly loaded from ExperimentSpecification."
@@ -47,7 +47,7 @@ assert hal_mw.Frequency == 5, "HAL property incorrectly set."
 expConfig.init_instruments()
 assert hal_mw.Frequency == 5.8, "HAL property incorrectly loaded from ExperimentSpecification."
 
-expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, [hal_ddg, awg_wfm, awg_wfm2, hal_mw], hal_acq, ['cavity'])
+expConfig = ExperimentConfiguration('testConf', new_lab, 1.0, ['ddg', 'Wfm1', 'Wfm2', 'MW-Src'], 'dum_acq', ['cavity'])
 VariableProperty('SrcFreq', new_lab, new_lab.HAL("MW-Src"), 'Frequency')
 VariableProperty('DncFreq', new_lab, new_lab.HAL("MW-Src2"), 'Frequency')
 VariableSpaced('cavFreq', new_lab, 'SrcFreq', 'DncFreq', 3.5)

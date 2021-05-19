@@ -6,7 +6,7 @@ import json
 import copy
 
 class ExperimentConfiguration:
-    def __init__(self, name, lab, duration, list_HALs, hal_ACQ, list_spec_names = [], **kwargs):
+    def __init__(self, name, lab, duration, list_HALs, hal_ACQ = None, list_spec_names = [], **kwargs):
         self._name = name
         #Just register it to the labotarory - doesn't matter if it already exists as everything here needs to be reinitialised
         #to the new configuration anyway...
@@ -29,8 +29,17 @@ class ExperimentConfiguration:
             #class. In addition, cold-restarts should have the strings properly instantiating the HALs once anyway. Nonetheless, the
             #update function will work with the laboratory class...
             self._lab = lab
-            self._list_HALs = list_HALs[:]
-            self._hal_ACQ = hal_ACQ
+            self._list_HALs = []
+            for cur_hal in list_HALs:
+                cur_hal_obj = lab.HAL(cur_hal)
+                assert cur_hal_obj != None, f"Could not find HAL {cur_hal}."
+                self._list_HALs += [cur_hal_obj]
+            if hal_ACQ != None:
+                cur_hal_obj = lab.HAL(hal_ACQ)
+                assert cur_hal_obj != None, f"Could not find HAL {hal_ACQ}."
+                self._hal_ACQ = cur_hal_obj
+            else:
+                self._hal_ACQ = None
 
             self._list_spec_names = list_spec_names[:]
 

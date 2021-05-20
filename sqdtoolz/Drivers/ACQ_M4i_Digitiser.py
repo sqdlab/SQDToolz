@@ -50,9 +50,9 @@ class ACQ_M4i_Digitiser(M4i):
         self.enable_channels(spcm.CHANNEL0 | spcm.CHANNEL1) # spcm.CHANNEL0 | spcm.CHANNEL1
         self.num_channels = 2   #!!!!!CHANGE THIS IF CHANGING ABOVE
         self.set_channel_settings(1, mV_range=1000., input_path=1, 
-                                termination=0, coupling=1)
+                                termination=0, coupling=0)#1)
         self.set_channel_settings(0, mV_range=1000., input_path=1, 
-                                termination=0, coupling=1)
+                                termination=0, coupling=0)#1)
         ###########################################################
 
         self.override_card_lock = False
@@ -63,11 +63,11 @@ class ACQ_M4i_Digitiser(M4i):
             vals=vals.Multiples(divisor=16, min_value=32))
         self.samples(2048)
 
-        self.add_parameter(
-            'channels',
-            label='Number of channels',
-            set_cmd=self._set_channels,
-            vals=vals.Ints(1,2), initial_value=1)
+        # self.add_parameter(
+        #     'channels',
+        #     label='Number of channels',
+        #     set_cmd=self._set_channels,
+        #     vals=vals.Ints(1,2), initial_value=1)
 
         self.add_parameter(
             'segments',
@@ -79,7 +79,30 @@ class ACQ_M4i_Digitiser(M4i):
                        Connect the sequence start trigger to X0 (X1) for channels 0 (1) of the digitizer.")
         
         self._repetitions = 1
+        self.ch_states = (True, False)
     
+    @property
+    def ChannelStates(self):
+        return self.ch_states
+    @ChannelStates.setter
+    def ChannelStates(self, ch_states):
+        assert len(ch_states) == 2, "There are 2 channel states that must be specified."
+        
+        final_flags = 0
+        self.num_channels = 0
+        if ch_states[0]:
+            final_flags |= spcm.CHANNEL0
+            self.num_channels += 1
+        if ch_states[1]:
+            final_flags |= spcm.CHANNEL1
+            self.num_channels += 1
+        self.enable_channels(final_flags)
+        self.ch_states = ch_states
+
+    @property
+    def AvailableChannels(self):
+        return 2
+
     @property
     def NumSamples(self):
         return self.samples()
@@ -141,13 +164,6 @@ class ACQ_M4i_Digitiser(M4i):
             # setting number of segments to specific value.
             # Assuming X0 is the sequence start trigger.
             # self.multipurpose_mode_0.set('digital_in')
-
-    def _set_channels(self, num_of_channels):
-        if num_of_channels == 1:
-            self.enable_channels(spcm.CHANNEL0) # spcm.CHANNEL0 | spcm.CHANNEL1
-        if num_of_channels == 2:
-            self.enable_channels(spcm.CHANNEL0 | spcm.CHANNEL1) # spcm.CHANNEL0 | spcm.CHANNEL1
-        self.num_channels = num_of_channels
 
     def _set_sample_rate(self, rate):
         self.sample_rate.set(rate)

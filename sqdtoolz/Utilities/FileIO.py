@@ -155,6 +155,8 @@ class FileIODirectory:
     def _check_if_meshgrid(self, sweep_grid):
         unique_vals = []
         num_cols = sweep_grid.shape[1]
+        if num_cols == 0:
+            return None
         for m in range(num_cols):
             u, ind = np.unique(sweep_grid[:,m], return_index=True)
             unique_vals += [u[np.argsort(ind)]]

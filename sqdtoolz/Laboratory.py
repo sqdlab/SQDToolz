@@ -10,6 +10,7 @@ from sqdtoolz.HAL.GENmwSource import*
 from sqdtoolz.HAL.GENvoltSource import*
 from sqdtoolz.HAL.GENswitch import*
 from sqdtoolz.HAL.ACQvna import*
+from sqdtoolz.HAL.GENatten import*
 from sqdtoolz.HAL.Processors.ProcessorCPU import*
 try:
     from sqdtoolz.HAL.Processors.ProcessorGPU import*

@@ -44,12 +44,13 @@ class Laboratory:
         self._waveform_transforms = {}
         self._activated_instruments = []
         self._update_state = True
+        self.update_state()
 
     @property
-    def UpdateState(self):
+    def UpdateStateEnabled(self):
         return self._update_state
-    @UpdateState.setter
-    def UpdateState(self, bool_val):
+    @UpdateStateEnabled.setter
+    def UpdateStateEnabled(self, bool_val):
         self._update_state = bool_val
 
     def reload_yaml(self):
@@ -101,8 +102,10 @@ class Laboratory:
             self.cold_reload_labconfig(self._load_json_file(cur_dir + "/laboratory_configuration.txt"))
             self.cold_reload_experiment_configurations(self._load_json_file(cur_dir + "/experiment_configurations.txt"))
             self.update_variables_from_last_expt(cur_dir + "/laboratory_parameters.txt")
+            self.update_state()
             return
         assert False, "No valid previous experiment with all data files were found to be present."
+
 
     def cold_reload_experiment_configurations(self, config_dict):
         for cur_expt_config in config_dict:
@@ -326,6 +329,7 @@ class Laboratory:
         #Save Laboratory Parameters
         self.save_variables(cur_exp_path)
 
+        self.update_state()
         return ret_vals
 
     def save_variables(self, cur_exp_path = '', file_name = 'laboratory_parameters.txt'):
@@ -424,11 +428,12 @@ class Laboratory:
         return ret_str
 
     def update_state(self):
-        self.save_laboratory_config(self._save_dir, '_last_state.txt')
+        if self.UpdateStateEnabled:
+            self.save_laboratory_config(self._save_dir, '_last_state.txt')
     def open_browser(self):
         cur_dir = os.path.dirname(os.path.realpath(__file__)).replace('\\','/')
         drive = cur_dir[0:2]
-        os.system(f'start \"temp\" cmd /k \"{drive} && cd \"{cur_dir}/Utilities\" && python ExperimentViewer.py\"')
+        os.system(f'start \"temp\" cmd /k \"{drive} && cd \"{cur_dir}/Utilities\" && python ExperimentViewer.py \"{self._save_dir}\"\"')
 
     def _update_progress_bar(self, val_pct):
         self._time_stamps += [(val_pct, time.time())]
@@ -469,5 +474,4 @@ class Laboratory:
         self._prog_bar_str = self._printProgressBar(int(val_pct*100), 100, suffix=f"{total_time}, {time_left}", prev_str=self._prog_bar_str)
 
         #Use the progress-bar ping as an opportunity to dump the current state of the instruments if update is enabled...
-        if self.UpdateState:
-            self.update_state()
+        self.update_state()

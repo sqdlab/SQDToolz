@@ -23,7 +23,8 @@ class GENatten(HALbase):
         ret_dict = {
             'Name' : self.Name,
             'instrument' : self._instr_id,
-            'Type' : self.__class__.__name__ 
+            'Type' : self.__class__.__name__
+            #Ignoring ManualActivation here...
             }
         self.pack_properties_to_dict(['Attenuation'], ret_dict)
         return ret_dict

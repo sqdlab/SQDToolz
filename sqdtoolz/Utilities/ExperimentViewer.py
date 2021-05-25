@@ -5,6 +5,7 @@ from tkinter import ttk
 
 import os
 import json
+import sys
 
 class ListBoxScrollBar:
     def __init__(self, parent_ui_element):
@@ -84,11 +85,11 @@ class ListBoxScrollBar:
         self.select_index(cur_ind, generate_selection_event)
 
 class ExperimentViewer:
-    def __init__(self):
+    def __init__(self, path):
         self.root = tk.Tk()
-        self.root.wm_title("SQDviz - Data visualisation tool")
+        self.root.wm_title("SQDToolz experiment visualisation tool")
 
-        self._path = 'C:/Users/PrasannaPC/Desktop/Test/'
+        self._path = path
 
         tabControl = ttk.Notebook(self.root)        
         self.tab_dashboard = ttk.Frame(tabControl)
@@ -201,7 +202,7 @@ class ExperimentViewer:
             for cur_hal in data['HALs']:
                 cur_str = ""
                 for cur_key in cur_hal:
-                    if isinstance(cur_hal[cur_key], str) or isinstance(cur_hal[cur_key], float):
+                    if isinstance(cur_hal[cur_key], str) or isinstance(cur_hal[cur_key], float) or isinstance(cur_hal[cur_key], int) or isinstance(cur_hal[cur_key], bool):
                         cur_str += f"{cur_key}: {cur_hal[cur_key]}\n"
                 
                 #Get state-colours based on the Output key...
@@ -309,16 +310,16 @@ class ExperimentViewer:
         #Run through the Dictionaries
         list_vals = []
         list_vals += ["DIFFERENCES IN HALs"]
-        list_vals += self._compare_dicts(data_left['HALs'], data_right['HALs'])
+        list_vals += self._compare_dicts(data_left.get('HALs', {}), data_right.get('HALs', {}))
         list_vals += [" "]
         list_vals += ["DIFFERENCES IN PROCs"]
-        list_vals += self._compare_dicts(data_left['PROCs'], data_right['PROCs'])
+        list_vals += self._compare_dicts(data_left.get('PROCs', {}), data_right.get('PROCs', {}))
         list_vals += [" "]
         list_vals += ["DIFFERENCES IN WFMTs"]
-        list_vals += self._compare_dicts(data_left['WFMTs'], data_right['WFMTs'])
+        list_vals += self._compare_dicts(data_left.get('WFMTs', {}), data_right.get('WFMTs', {}))
         list_vals += [" "]
         list_vals += ["DIFFERENCES IN SPECs"]
-        list_vals += self._compare_dicts(data_left['SPECs'], data_right['SPECs'])
+        list_vals += self._compare_dicts(data_left.get('SPECs', {}), data_right.get('SPECs', {}))
         self.lstbx_comps.update_vals(list_vals)
 
 
@@ -338,18 +339,20 @@ class ExperimentViewer:
             else:
                 all_same = True
                 for cur_key in cur_dict:
-                    if cur_dict[cur_key] != right_comp[cur_key]:
+                    if cur_dict.get(cur_key, '') != right_comp.get(cur_key, ''):
                         if all_same:
                             list_vals += [cur_dict['Name']]
                             all_same = False
-                        list_vals += [f"---{cur_key}: {cur_dict[cur_key]} -> {right_comp[cur_key]}"]
+                        list_vals += [f"---{cur_key}: {cur_dict.get(cur_key, '')} → {right_comp.get(cur_key, '')}"]
         while len(list_right) > 0:
-            right_comp = list_right.pop(cur_right_dict_ind)
+            right_comp = list_right.pop(0)
             list_vals += [f"Added {right_comp['Name']}"]
         
         return list_vals
 
 
 if __name__ == '__main__':
-    ExperimentViewer().main_loop()
+    if len(sys.argv) >= 2:
+        print(sys.argv[1])
+        ExperimentViewer(sys.argv[1]).main_loop()
 

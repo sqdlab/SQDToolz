@@ -87,7 +87,8 @@ class GENmwSource(HALbase, TriggerInputCompatible, TriggerInput):
             'InstrumentChannel' : self._instr_mw_src_channel,
             'Type' : self.__class__.__name__,
             'TriggerSource' : self._get_trig_src_params_dict(),
-            'InputTriggerEdge' : self._instr_mw_output.TriggerInputEdge
+            'InputTriggerEdge' : self._instr_mw_output.TriggerInputEdge,
+            'ManualActivation' : self.ManualActivation
             }
         self.pack_properties_to_dict(['Power', 'Frequency', 'Phase', 'Mode', 'Output'], ret_dict)
         return ret_dict
@@ -100,6 +101,7 @@ class GENmwSource(HALbase, TriggerInputCompatible, TriggerInput):
         self.Phase = dict_config['Phase']
         self.Mode = dict_config['Mode']
         self.Output = dict_config.get('Output', False)
+        self.ManualActivation = dict_config.get('ManualActivation', False)
         #
         trig_src_obj = TriggerInput.process_trigger_source(dict_config['TriggerSource'], lab)
         self.set_trigger_source(trig_src_obj)

@@ -29,6 +29,7 @@ class GENswitch(HALbase):
             'instrument' : self._instr_id,
             'Type' : self.__class__.__name__,
             'Position' : self.Position
+            #Ignoring ManualActivation
             }
         return ret_dict
 

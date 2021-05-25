@@ -425,6 +425,10 @@ class Laboratory:
 
     def update_state(self):
         self.save_laboratory_config(self._save_dir, '_last_state.txt')
+    def open_browser(self):
+        cur_dir = os.path.dirname(os.path.realpath(__file__)).replace('\\','/')
+        drive = cur_dir[0:2]
+        os.system(f'start \"temp\" cmd /k \"{drive} && cd \"{cur_dir}/Utilities\" && python ExperimentViewer.py\"')
 
     def _update_progress_bar(self, val_pct):
         self._time_stamps += [(val_pct, time.time())]

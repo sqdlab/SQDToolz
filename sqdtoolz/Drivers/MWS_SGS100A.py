@@ -38,7 +38,7 @@ class MWS_SGS100A_Channel(InstrumentChannel):
 
     @property
     def Output(self):
-        return self.output()
+        return self.output() == 'ON'
     @Output.setter
     def Output(self, boolVal):
         if boolVal:

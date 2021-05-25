@@ -181,7 +181,7 @@ class ACQ_M4i_Digitiser(M4i):
 
         #Capture extra frame when running SEQ triggering as the SEQ trigger signal on X0 may not align exactly before the first captured segment trigger...
         if self.enable_TS_SEQ_trig():
-            total_frames = (self.NumRepetitions+2)*self.NumSegments
+            total_frames = (self.NumRepetitions+1)*self.NumSegments
         else:
             total_frames = (self.NumRepetitions)*self.NumSegments
 
@@ -218,6 +218,8 @@ class ACQ_M4i_Digitiser(M4i):
             #Gather data and either pass it to the data-processor or just collate it under final_arr - note that it is sent to the processor as properly grouped under the ACQ
             #data format specification.
             cache_array = []
+            total_reps = 0
+            done = False
             for cur_block in self.multiple_trigger_fifo_acquisition(total_frames, self.NumSamples, 1, self.NumSegments, notify_page_size_bytes=4096):
                 if len(cache_array) > 0:
                     arr_blk = np.concatenate((cache_array, np.array(cur_block)))
@@ -225,26 +227,47 @@ class ACQ_M4i_Digitiser(M4i):
                     arr_blk = np.array(cur_block)
 
                 if self.num_channels == 1:
-                    num_reps = int( arr_blk.size / (self.NumSegments*self.NumSamples) )
-                    cache_array = arr_blk[(num_reps*self.NumSegments*self.NumSamples):]
-                    if num_reps == 0:
-                        continue
-                    arr_blk = [arr_blk[0:(num_reps*self.NumSegments*self.NumSamples)].reshape(num_reps, self.NumSegments, self.NumSamples)]
+                    num_reps = int( arr_blk.size / (self.NumSegments*self.NumSamples) ) 
+                    if num_reps + total_reps <= self.NumRepetitions:
+                        total_reps += num_reps                
+                        cache_array = arr_blk[(num_reps*self.NumSegments*self.NumSamples):]
+                        if num_reps == 0:
+                            continue
+                        arr_blk = [arr_blk[0:(num_reps*self.NumSegments*self.NumSamples)].reshape(num_reps, self.NumSegments, self.NumSamples)]
+                    else:
+                        num_reps = self.NumRepetitions - total_reps
+                        if num_reps == 0:
+                            done = True
+                        arr_blk = [arr_blk[0:(num_reps*self.NumSegments*self.NumSamples)].reshape(num_reps, self.NumSegments, self.NumSamples)]
+                        done = True
                 else:
                     num_reps = int( arr_blk.size / (self.NumSegments*self.NumSamples*2) )
-                    cache_array = arr_blk[(num_reps*self.NumSegments*self.NumSamples*2):]
-                    if num_reps == 0:
-                        continue
-                    arr_blk = [
-                        arr_blk[0:(num_reps*self.NumSegments*self.NumSamples*2):2].reshape(num_reps, self.NumSegments, self.NumSamples),
-                        arr_blk[1:(num_reps*self.NumSegments*self.NumSamples*2):2].reshape(num_reps, self.NumSegments, self.NumSamples)
-                    ]
-
+                    if num_reps + total_reps <= self.NumRepetitions:
+                        total_reps += num_reps
+                        cache_array = arr_blk[(num_reps*self.NumSegments*self.NumSamples*2):]
+                        if num_reps == 0:
+                            continue
+                        arr_blk = [
+                            arr_blk[0:(num_reps*self.NumSegments*self.NumSamples*2):2].reshape(num_reps, self.NumSegments, self.NumSamples),
+                            arr_blk[1:(num_reps*self.NumSegments*self.NumSamples*2):2].reshape(num_reps, self.NumSegments, self.NumSamples)
+                        ]
+                    else:
+                        num_reps = self.NumRepetitions - total_reps
+                        if num_reps == 0:
+                            done = True
+                        arr_blk = [
+                            arr_blk[0:(num_reps*self.NumSegments*self.NumSamples*2):2].reshape(num_reps, self.NumSegments, self.NumSamples),
+                            arr_blk[1:(num_reps*self.NumSegments*self.NumSamples*2):2].reshape(num_reps, self.NumSegments, self.NumSamples)
+                        ]
+                        done = True
+                
                 cur_processor.push_data({
                     'parameters' : ['repetition', 'segment', 'sample'],
                     'data' : { f'ch{m}' : arr_blk[m].astype(dtype=np.float64) for m in range(self.num_channels) },
                     'misc' : {'SampleRates' : [self.sample_rate.get()]*self.num_channels}
                 })
+                if done:
+                    break
         
             return cur_processor.get_all_data()
 
@@ -257,25 +280,39 @@ import time
 
 import scipy.fftpack
 
+from sqdtoolz.Laboratory import Laboratory
+
 #import pdb
 def runme():
+    lab = Laboratory('','')
     new_digi = ACQ_M4i_Digitiser("test")
-    new_digi._set_channels(1)
-    new_digi.segments(1)#3 * (2**26))
-    new_digi.samples(2**19)#(2**13)#2**8+2**7)
+    new_digi.ChannelStates = (True,False)
+    new_digi.NumSegments = 1#3 * (2**26))
+    new_digi.NumSamples = 2**19#(2**13)#2**8+2**7)
     new_digi.NumRepetitions = 1
+
+    new_digi.NumRepetitions = 4096
+    new_digi.NumSegments = 3
+    new_digi.NumSamples = 512
 
     # term = new_digi._param32bit(30130)
     # term = new_digi.termination_1()
     # new_digi.snapshot()
 
-
-    myProc = ProcessorCPU()
+    myProc = ProcessorCPU('test', lab)
     myProc.add_stage(CPU_DDC([25e6]*2))
-    # myProc.add_stage(CPU_FIR([{'Type' : 'low', 'Taps' : 40, 'fc' : 25e6, 'Win' : 'hamming'}]*4))
+    myProc.add_stage(CPU_FIR([{'Type' : 'low', 'Taps' : 40, 'fc' : 25e6, 'Win' : 'hamming'}]*4))
     # myProc.add_stage(CPU_Mean('sample'))
     # myProc.add_stage(CPU_Mean('segment'))
     # myProc.add_stage_end(CPU_Mean('repetition'))
+
+    a = new_digi.get_data(data_processor=myProc)
+    b = new_digi.get_data(data_processor=myProc)
+    c = new_digi.get_data(data_processor=myProc)
+    d = new_digi.get_data(data_processor=myProc)
+    e = new_digi.get_data(data_processor=myProc)
+    f=0
+
 
     # new_digi._set_channels(2)
     # new_digi.pretrigger_memory_size(0)

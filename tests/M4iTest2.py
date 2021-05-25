@@ -29,29 +29,29 @@ new_lab = Laboratory(instr_config_file = "tests\\M4iTest.yaml", save_dir = "mySa
 # - Also using an external 10MHz reference on the AWG...
 
 #Sample Clock
-freq_module = GENmwSource(new_lab._station.load_SGS100A().get_output('RFOUT'))
-freq_module.Output = True
+# freq_module = GENmwSource(new_lab._station.load_SGS100A().get_output('RFOUT'))
+# freq_module.Output = True
 
 #Ideally, the length and polarity are set to default values in the drivers via the YAML file - i.e. just set TrigPulseDelay
-instr_ddg = new_lab._station.load_pulser()
-ddg_module = DDG(instr_ddg)
-ddg_module.get_trigger_output('AB').TrigPulseLength = 750e-9
-ddg_module.get_trigger_output('AB').TrigPolarity = 1
-ddg_module.get_trigger_output('AB').TrigPulseDelay = 0e-9
-instr_ddg.trigger_rate(100e3)
+instr_ddg = new_lab.load_instrument('pulser')
+DDG("DDG", new_lab, 'pulser')
+new_lab.HAL('DDG').get_trigger_output('AB').TrigPulseLength = 750e-9
+new_lab.HAL('DDG').get_trigger_output('AB').TrigPolarity = 1
+new_lab.HAL('DDG').get_trigger_output('AB').TrigPulseDelay = 0e-9
+new_lab.HAL('DDG').RepetitionTime = 1/100e3
 
-mod_freq_qubit = WM_SinusoidalIQ("QubitFreqMod", 100e6)
+WFMT_ModulationIQ('QubitFreqMod', new_lab, 100e6)
 
-instr_Agi1 = new_lab._station.load_Agi1()
-awg_wfm_q = WaveformAWG("Waveform 1", [(instr_Agi1, 'ch1'), (instr_Agi1, 'ch2')], 1.25e9)
+instr_Agi1 = new_lab.load_instrument('Agi1')
+awg_wfm_q = WaveformAWG("Waveform 1", new_lab, [('Agi1', 'ch1'), ('Agi1', 'ch2')], 1.25e9)
 read_segs = []
 awg_wfm_q.add_waveform_segment(WFS_Constant("SEQPAD", None, 102.4e-9, 0.0))
-for m in range(4):
-    awg_wfm_q.add_waveform_segment(WFS_Gaussian(f"init{m}", mod_freq_qubit, 512e-9, 0.5-0.1*m))
+for m in range(3):
+    awg_wfm_q.add_waveform_segment(WFS_Gaussian(f"init{m}", new_lab.WFMT('QubitFreqMod').apply(), 512e-9, 0.5-0.1*m))
     awg_wfm_q.add_waveform_segment(WFS_Constant(f"zero1{m}", None, 512e-9, 0.1*m))
     awg_wfm_q.add_waveform_segment(WFS_Gaussian(f"init2{m}", None, 512e-9, 0.5-0.1*m))
-    awg_wfm_q.add_waveform_segment(WFS_Constant(f"zero2{m}", None, 512e-9, 0.0))
-    read_segs += [f"init{m}"]
+    awg_wfm_q.add_waveform_segment(WFS_Constant(f"zero2{m}", None, 1024e-9, 0.0))
+    read_segs += [f"zero2{m}"]
 # awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments(["init","init2"])
 awg_wfm_q.get_output_channel(0).marker(1).set_markers_to_segments(read_segs)
 awg_wfm_q.get_output_channel(1).marker(0).set_markers_to_segments(['SEQPAD', 'init0'])

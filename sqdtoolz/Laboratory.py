@@ -43,6 +43,14 @@ class Laboratory:
         self._specifications = {}
         self._waveform_transforms = {}
         self._activated_instruments = []
+        self._update_state = True
+
+    @property
+    def UpdateState(self):
+        return self._update_state
+    @UpdateState.setter
+    def UpdateState(self, bool_val):
+        self._update_state = bool_val
 
     def reload_yaml(self):
         #NOTE: This will update the snapshots and thus, change instrument state of already loaded instruments. But it is handy
@@ -415,6 +423,9 @@ class Laboratory:
             print()
         return ret_str
 
+    def update_state(self):
+        self.save_laboratory_config(self._save_dir, '_last_state.txt')
+
     def _update_progress_bar(self, val_pct):
         self._time_stamps += [(val_pct, time.time())]
 
@@ -452,3 +463,7 @@ class Laboratory:
             total_time = f"Total time: {total_time:.2f}s"
         
         self._prog_bar_str = self._printProgressBar(int(val_pct*100), 100, suffix=f"{total_time}, {time_left}", prev_str=self._prog_bar_str)
+
+        #Use the progress-bar ping as an opportunity to dump the current state of the instruments if update is enabled...
+        if self.UpdateState:
+            self.update_state()

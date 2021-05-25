@@ -791,16 +791,13 @@ class M4i(Instrument):
             trig_mode)  # trigger mode
 
     def _stop_acquisition(self):
-
-        # close acquisition
-        self.general_command(pyspcm.M2CMD_DATA_STOPDMA)
-
         # invalidate buffer
         self._invalidate_buf(pyspcm.SPCM_BUF_DATA)
         # invalidate timestamp buffer
         self._invalidate_buf(pyspcm.SPCM_BUF_TIMESTAMP)
 
-        self.general_command(pyspcm.M2CMD_CARD_STOP)
+        # close acquisition
+        self.general_command(pyspcm.M2CMD_CARD_STOP | pyspcm.M2CMD_DATA_STOPDMA)
 
     # TODO: if multiple channels are used at the same time, the voltage conversion needs to be updated
     # TODO: the data also needs to be organized nicely (currently it
@@ -927,8 +924,8 @@ class M4i(Instrument):
             while qwTotalMem.value < 2*segments*num_samples*numch:
                 dwError = pyspcm.spcm_dwSetParam_i32 (self.hCard, pyspcm.SPC_M2CMD, pyspcm.M2CMD_DATA_WAITDMA)
                 if dwError != ERR_OK:
-                    assert dwError == ERR_TIMEOUT, "... Timeout\n"
                     print("... Error: {0:d}\n".format(dwError))
+                    assert dwError == ERR_TIMEOUT, "... Timeout\n"
                     break
                 else:
                     pyspcm.spcm_dwGetParam_i32 (self.hCard, pyspcm.SPC_M2STATUS,            pyspcm.byref (lStatus))

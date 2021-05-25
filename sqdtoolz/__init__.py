@@ -17,7 +17,7 @@ from sqdtoolz.HAL.WaveformMapper import*
 from sqdtoolz.HAL.WaveformTransformations import*
 
 from sqdtoolz.HAL.Processors.ProcessorCPU import*
-
+from sqdtoolz.HAL.Processors.ProcessorGPU import*
 
 
 # print('hi')

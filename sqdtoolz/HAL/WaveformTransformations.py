@@ -65,14 +65,22 @@ class WaveformTransformation:
 class WFMT_ModulationIQ(WaveformTransformation):
     def __init__(self, name, lab, iq_frequency, **kwargs):
         super().__init__(name)
-        lab._register_WFMT(self)
-        self._iq_frequency = iq_frequency
-        self._iq_amplitude = kwargs.get('iq_amplitude', 1.0)   #Given as the raw output voltage (should usually set the envelopes to unity amplitude in this case)
-        self._iq_amplitude_factor = kwargs.get('iq_amplitude_factor', 1.0)    #Defined as a = Q/I amplitudes and the factor 'a' is multiplied onto the Q-channel waveform 
-        self._iq_phase_offset = kwargs.get('iq_phase_offset', 0.0)            #Defined as the phase to add to the Q (sine) term
-        self._iq_dc_offsets = kwargs.get('iq_dc_offsets', (0.0, 0.0))       
-        self._iq_upper_sb = kwargs.get('iq_upper_sb', True)             #If True, the phases of the cosine and sine waves are reset to zero after every waveform segment.
-        self._cur_t0 = 0.0
+        if lab._register_WFMT(self):
+            self._iq_frequency = iq_frequency
+            self._iq_amplitude = kwargs.get('iq_amplitude', 1.0)   #Given as the raw output voltage (should usually set the envelopes to unity amplitude in this case)
+            self._iq_amplitude_factor = kwargs.get('iq_amplitude_factor', 1.0)    #Defined as a = Q/I amplitudes and the factor 'a' is multiplied onto the Q-channel waveform 
+            self._iq_phase_offset = kwargs.get('iq_phase_offset', 0.0)            #Defined as the phase to add to the Q (sine) term
+            self._iq_dc_offsets = kwargs.get('iq_dc_offsets', (0.0, 0.0))       
+            self._iq_upper_sb = kwargs.get('iq_upper_sb', True)             #If True, the phases of the cosine and sine waves are reset to zero after every waveform segment.
+            self._cur_t0 = 0.0
+        else:
+            self._iq_frequency = iq_frequency
+            self._iq_amplitude = kwargs.get('iq_amplitude', self._iq_amplitude)   #Given as the raw output voltage (should usually set the envelopes to unity amplitude in this case)
+            self._iq_amplitude_factor = kwargs.get('iq_amplitude_factor', self._iq_amplitude_factor)    #Defined as a = Q/I amplitudes and the factor 'a' is multiplied onto the Q-channel waveform 
+            self._iq_phase_offset = kwargs.get('iq_phase_offset', self._iq_phase_offset)            #Defined as the phase to add to the Q (sine) term
+            self._iq_dc_offsets = kwargs.get('iq_dc_offsets', self._iq_dc_offsets)       
+            self._iq_upper_sb = kwargs.get('iq_upper_sb', self._iq_upper_sb)             #If True, the phases of the cosine and sine waves are reset to zero after every waveform segment.
+            self._cur_t0 = 0.0
 
     @classmethod
     def fromConfigDict(cls, config_dict, lab):

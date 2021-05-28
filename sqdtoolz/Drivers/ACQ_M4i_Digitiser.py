@@ -50,9 +50,9 @@ class ACQ_M4i_Digitiser(M4i):
         self.enable_channels(spcm.CHANNEL0 | spcm.CHANNEL1) # spcm.CHANNEL0 | spcm.CHANNEL1
         self.num_channels = 2   #!!!!!CHANGE THIS IF CHANGING ABOVE
         self.set_channel_settings(1, mV_range=1000., input_path=1, 
-                                termination=0, coupling=0)#1)
+                                termination=0, coupling=1)#0)
         self.set_channel_settings(0, mV_range=1000., input_path=1, 
-                                termination=0, coupling=0)#1)
+                                termination=0, coupling=1)#0)
         ###########################################################
 
         self.override_card_lock = False

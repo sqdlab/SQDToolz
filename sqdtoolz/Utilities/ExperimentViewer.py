@@ -106,7 +106,8 @@ class ExperimentViewer:
         self.dash_ATTENs = self._create_dashboard_group("Attenuators")
         self.dash_VOLTs = self._create_dashboard_group("Voltage Sources")
         self.dash_SWs = self._create_dashboard_group("Switches")
-
+        self.dash_WFMTs = self._create_dashboard_group("Waveform Transformations")
+        self.dash_SPECs = self._create_dashboard_group("Experiment Specifications")
 
         self.pw_main_LR_UI = PanedWindow(orient =tk.HORIZONTAL, master=self.parent_expt_comp, sashwidth=3, bg = "#000077", bd = 0)
         frame_left = Frame(master=self.pw_main_LR_UI)
@@ -228,11 +229,35 @@ class ExperimentViewer:
                 if cur_hal['Type'] == 'GENatten':
                     cur_attens += [(cur_str[:-1], col)]    #:-1 is to remove the last \n
 
+            cur_wfmts = []
+            for cur_wfmt in data['WFMTs']:
+                cur_str = ""
+                for cur_key in cur_wfmt:
+                    if isinstance(cur_wfmt[cur_key], str) or isinstance(cur_wfmt[cur_key], float) or isinstance(cur_wfmt[cur_key], int) or isinstance(cur_wfmt[cur_key], bool):
+                        cur_str += f"{cur_key}: {cur_wfmt[cur_key]}\n"
+                col = 'white'
+                cur_wfmts += [(cur_str[:-1], col)]
+
+            cur_specs = []
+            for cur_spec in data['SPECs']:
+                cur_str = f"Name: {cur_spec['Name']}\n"
+                for cur_key in cur_spec['Entries']:
+                    dest = cur_spec['Entries'][cur_key]['Destination']
+                    if len(dest) > 0:
+                        dest = f"({dest[0][1]}: {dest[0][0]})"
+                    else:
+                        dest = ""
+                    cur_str += f"{cur_key}: {cur_spec['Entries'][cur_key]['Value']} {dest}\n"
+                col = 'white'
+                cur_specs += [(cur_str[:-1], col)]
+
             #Setup the dashboard of labels...
             self._set_frame_labels(self.dash_MWs, cur_mws)
             self._set_frame_labels(self.dash_VOLTs, cur_volts)
             self._set_frame_labels(self.dash_SWs, cur_sws)
             self._set_frame_labels(self.dash_ATTENs, cur_attens)
+            self._set_frame_labels(self.dash_WFMTs, cur_wfmts)
+            self._set_frame_labels(self.dash_SPECs, cur_specs)
             
             
             self.trvw_expts
@@ -354,5 +379,5 @@ class ExperimentViewer:
 if __name__ == '__main__':
     if len(sys.argv) >= 2:
         print(sys.argv[1])
-        ExperimentViewer(sys.argv[1]).main_loop()
+    ExperimentViewer('Z:/Data/sqdtoolz_test/').main_loop()
 

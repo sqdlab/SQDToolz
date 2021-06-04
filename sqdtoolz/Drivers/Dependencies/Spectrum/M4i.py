@@ -959,23 +959,23 @@ class M4i(Instrument):
                             del data_arr
                             data_arr = []
                     elif first_acq:
-                        if self.enable_TS_SEQ_trig():
-                            ts_vals = []
-                            ts_times = []
-                            pyspcm.spcm_dwGetParam_i32(self.hCard, pyspcm.SPC_TS_AVAIL_USER_LEN, pyspcm.byref(lAvailUserTS))
-                            # read timestamp value (1 timestamp = 8 bytes (M2i, M3i) or 16 byte (M4i))
-                            if (lAvailUserTS.value >= lBytesPerTS):
-                                pyspcm.spcm_dwGetParam_i32 (self.hCard, pyspcm.SPC_TS_AVAIL_USER_POS, pyspcm.byref(lPCPosTS))
-                                if ((lPCPosTS.value + lAvailUserTS.value) >= qwBufferSizeTS.value):
-                                    lAvailUserTS.value = qwBufferSizeTS.value - lPCPosTS.value
-                                for i in range (0, int (lAvailUserTS.value / lBytesPerTS), 1):
-                                    # calculate current timestamp buffer index
-                                    lIndex = int (lPCPosTS.value / 8) + i * int (lBytesPerTS / 8)
-                                    # calculate timestamp value
-                                    timestampVal = pllData[lIndex] #/ llSamplingrate.value
-                                    ts_times += [timestampVal & 0xFFFFFFFFFF]
-                                    ts_vals += [(timestampVal & 0xFFFFF0000000000)>>40]
-                                pyspcm.spcm_dwSetParam_i32 (self.hCard, pyspcm.SPC_TS_AVAIL_CARD_LEN, lAvailUserTS.value)
+                        ts_vals = []
+                        ts_times = []
+                        pyspcm.spcm_dwGetParam_i32(self.hCard, pyspcm.SPC_TS_AVAIL_USER_LEN, pyspcm.byref(lAvailUserTS))
+                        # read timestamp value (1 timestamp = 8 bytes (M2i, M3i) or 16 byte (M4i))
+                        if (lAvailUserTS.value >= lBytesPerTS):
+                            pyspcm.spcm_dwGetParam_i32 (self.hCard, pyspcm.SPC_TS_AVAIL_USER_POS, pyspcm.byref(lPCPosTS))
+                            if ((lPCPosTS.value + lAvailUserTS.value) >= qwBufferSizeTS.value):
+                                lAvailUserTS.value = qwBufferSizeTS.value - lPCPosTS.value
+                            for i in range (0, int (lAvailUserTS.value / lBytesPerTS), 1):
+                                # calculate current timestamp buffer index
+                                lIndex = int (lPCPosTS.value / 8) + i * int (lBytesPerTS / 8)
+                                # calculate timestamp value
+                                timestampVal = pllData[lIndex] #/ llSamplingrate.value
+                                ts_times += [timestampVal & 0xFFFFFFFFFF]
+                                ts_vals += [(timestampVal & 0xFFFFF0000000000)>>40]
+                            pyspcm.spcm_dwSetParam_i32 (self.hCard, pyspcm.SPC_TS_AVAIL_CARD_LEN, lAvailUserTS.value)
+                        #
                         first_ind = next((i for i, x in enumerate(ts_vals) if x), None)
                         if first_ind != None:
                             #This time-stamp capture found the first SEQ trigger - great, now let's set that as the filtering index...
@@ -990,9 +990,14 @@ class M4i(Instrument):
                                 #assert first_ind != None, "The SEQ trigger has not been captured - check that it's connected to input X0..."
                                 first_acq = False
                         else:
-                            #The slicing index falls beyond the current set of sampled time-stamps - so it'll fall in a future iteration... Only a problem if beyond 1024 segments per repetition...
+                            #The slicing index falls beyond the current set of sampled time-stamps - so it'll fall in a future iteration... Only a problem if beyond 1024 segments per repetition... What does the last sentence here even mean?
                             del data_arr
                             data_arr = []
+                    elif self.enable_TS_SEQ_trig():
+                        #Read from TS Buffer to enact its clear/free functionality...
+                        pyspcm.spcm_dwGetParam_i32(self.hCard, pyspcm.SPC_TS_AVAIL_USER_LEN, pyspcm.byref(lAvailUserTS))
+                        if (lAvailUserTS.value >= lBytesPerTS):
+                            pyspcm.spcm_dwSetParam_i32 (self.hCard, pyspcm.SPC_TS_AVAIL_CARD_LEN, lAvailUserTS.value)
 
                     #Return the data if relevant...
                     if len(data_arr) > 0:
@@ -1002,6 +1007,15 @@ class M4i(Instrument):
                         else:
                             yield np.array(data_arr)
         finally:
+            #Empty any remaining data in Main Buffer
+            pyspcm.spcm_dwGetParam_i32(self.hCard, pyspcm.SPC_DATA_AVAIL_USER_LEN, pyspcm.byref (lAvailUser))
+            if (lAvailUser.value > 0):
+                pyspcm.spcm_dwSetParam_i32(self.hCard, pyspcm.SPC_DATA_AVAIL_CARD_LEN, lAvailUser)
+            #Empty any remaining data in TS Buffer
+            pyspcm.spcm_dwGetParam_i32(self.hCard, pyspcm.SPC_TS_AVAIL_USER_LEN, pyspcm.byref(lAvailUserTS))
+            if (lAvailUserTS.value >= lBytesPerTS):
+                pyspcm.spcm_dwSetParam_i32 (self.hCard, pyspcm.SPC_TS_AVAIL_CARD_LEN, lAvailUserTS.value)
+
             # stop transfer before invalidating buffer
             self._stop_acquisition()
 

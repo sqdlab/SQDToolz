@@ -94,10 +94,13 @@ class Laboratory:
                 else:
                     self._variables[cur_key] = globals()[cur_dict['Type']].fromConfigDict(cur_key, cur_dict, self)
 
-    def cold_reload_last_configuration(self):
-        dirs = [x[0] for x in os.walk(self._save_dir)]  #Walk gives a tuple: (dirpath, dirnames, filenames)
-        
-        #Go through the directories in reverse chronological order (presuming data-stamped folders)
+    def cold_reload_last_configuration(self, folder_dir = ""):
+        if folder_dir != "":
+            dirs = [folder_dir]
+        else:
+            #Go through the directories in reverse chronological order (presuming data-stamped folders)
+            dirs = [x[0] for x in os.walk(self._save_dir)]  #Walk gives a tuple: (dirpath, dirnames, filenames)
+
         for cur_cand_dir in dirs[::-1]:
             cur_dir = cur_cand_dir.replace('\\','/')
             #Check current candidate directory has the required files
@@ -114,7 +117,6 @@ class Laboratory:
             self.update_state()
             return
         assert False, "No valid previous experiment with all data files were found to be present."
-
 
     def cold_reload_experiment_configurations(self, config_dict):
         for cur_expt_config in config_dict:

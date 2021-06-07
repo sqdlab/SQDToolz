@@ -39,12 +39,17 @@ class Experiment:
         if waveform_updates != None:
             self._expt_config.update_waveforms(waveform_updates)
 
+        assert isinstance(sweep_vars, list), "Sweeping variables must be given as a LIST of TUPLEs: [(VAR1, range1), (VAR2, range2), ...]"
         if len(sweep_vars) == 0:
             self._expt_config.prepare_instruments()
             data = self._expt_config.get_data()
             data_file.push_datapkt(data, sweep_vars)
             time.sleep(delay)
         else:
+            for ind_var, cur_var in enumerate(sweep_vars):
+                assert isinstance(cur_var[1], np.ndarray), "The second argument in each sweeping-variable tuple must be a Numpy Array."
+                assert cur_var[1].size > 0, f"The sweeping array for sweeping-variable {ind_var} is empty. If using arange, check the bounds!"
+
             sweep_arrays = [x[1] for x in sweep_vars]
             sweep_grids = np.meshgrid(*sweep_arrays)
             sweep_grids = np.array(sweep_grids).T.reshape(-1,len(sweep_arrays))

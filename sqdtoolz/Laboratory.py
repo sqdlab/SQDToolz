@@ -23,6 +23,13 @@ import os
 import time
 import numpy as np
 
+class customJSONencoder(json.JSONEncoder):
+    def default(self, obj):
+        #Inspired by: https://stackoverflow.com/questions/56250514/how-to-tackle-with-error-object-of-type-int32-is-not-json-serializable/56254172
+        if isinstance(obj, np.int32):
+            return int(obj)
+        return json.JSONEncoder.default(self, obj)
+
 class Laboratory:
     def __init__(self, instr_config_file, save_dir):
         if instr_config_file == "":
@@ -35,6 +42,8 @@ class Laboratory:
         #Convert Windows backslashes into forward slashes (should be compatible with MAC/Linux then...)
         self._save_dir = save_dir.replace('\\','/')
         self._group_dir = {'Dir':"", 'InitDir':"", 'SweepQueue':[]}
+
+        Path(self._save_dir).mkdir(parents=True, exist_ok=True)
 
         self._hal_objs = {}
         self._processors = {}
@@ -338,13 +347,13 @@ class Laboratory:
             # json.dump(param_dict, outfile)
             outfile.write(
                 '{\n' +
-                ',\n'.join(f"\"{x}\" : {json.dumps(param_dict[x])}" for x in param_dict.keys()) +
+                ',\n'.join(f"\"{x}\" : {json.dumps(param_dict[x], cls=customJSONencoder)}" for x in param_dict.keys()) +
                 '\n}\n')
 
     def save_experiment_configs(self, cur_exp_path, file_name = 'experiment_configurations.txt'):
         dict_expt_configs = {x : self._expt_configs[x].get_config() for x in self._expt_configs}
         with open(cur_exp_path + file_name, 'w') as outfile:
-            json.dump(dict_expt_configs, outfile, indent=4)
+            json.dump(dict_expt_configs, outfile, indent=4, cls=customJSONencoder)
 
     def save_laboratory_config(self, cur_exp_path, file_name = 'laboratory_configuration.txt'):
         #Prepare the dictionary of HAL configurations
@@ -376,7 +385,7 @@ class Laboratory:
                     }
         if cur_exp_path != '':
             with open(cur_exp_path + file_name, 'w') as outfile:
-                json.dump(param_dict, outfile, indent=4)
+                json.dump(param_dict, outfile, indent=4, cls=customJSONencoder)
         return param_dict
 
     def _save_instrument_config(self, cur_exp_path):
@@ -395,7 +404,7 @@ class Laboratory:
             return result
         with open(cur_exp_path + 'instrument_configuration.txt', 'w') as outfile:
             raw_snapshot = self._station.snapshot_base()
-            json.dump(decode_dict(raw_snapshot), outfile, indent=4)
+            json.dump(decode_dict(raw_snapshot), outfile, indent=4, cls=customJSONencoder)
 
 
     @staticmethod

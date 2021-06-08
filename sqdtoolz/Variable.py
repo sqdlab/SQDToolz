@@ -261,3 +261,35 @@ class VariableDifferential(VariableBase):
         self._var_1 = dict_config['Var1']
         self._var_2 = dict_config['Var2']
 
+class VariableMappedProperty(VariableProperty):
+    def __init__(self, name, lab, sqdtoolz_obj, prop_name, mapping, **kwargs):
+        super().__init__(name, lab, sqdtoolz_obj, prop_name, **kwargs)
+        self.mapping = mapping
+        self.inv_mapping = {v: k for k, v in mapping.items()}
+
+    def get_raw(self):
+        return self.inv_mapping[super().get_raw()]
+
+    def set_raw(self, value):
+        super().set_raw(self.mapping[value])
+
+    @classmethod
+    def fromConfigDict(cls, name, config_dict, lab):
+        obj = lab._get_resolved_obj(config_dict["ResList"])
+        prop = config_dict["Property"]
+        mapping = config_dict["Mapping"]
+        if obj != None:
+            setattr(obj, prop, config_dict["Value"])
+            return cls(name, lab, obj, prop, mapping)   #TODO: Add custom flag to make this a bit less inefficient... Not that bad as it should only be used in cold-loading anyway...
+        else:
+            return cls(name, lab, obj, prop, mapping, _lonely_dict=config_dict["ResList"])
+
+    def _get_current_config(self):
+        config_dict = super()._get_current_config()
+        config_dict["Mapping"] = self.mapping
+
+    def _set_current_config(self, dict_config):
+        super()._set_current_config(dict_config)
+        self.mapping = dict_config["Mapping"]
+        self.inv_mapping = {v: k for k, v in self.mapping.items()}
+

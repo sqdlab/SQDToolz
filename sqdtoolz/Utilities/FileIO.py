@@ -102,6 +102,21 @@ class FileIOReader:
         return self.dset[:].reshape(tuple(x for x in cur_shape))
 
 class FileIODirectory:
+    class plt_object:
+        def __init__(self, pc, z_values):
+            self.pc = pc
+            self.z_values = z_values
+            self._called_set_z_array = False
+        
+        def set_z_array(self, z_array):
+            self.pc.set_array(z_array)
+            self._called_set_z_array = True
+
+        def add_to_axis(self, ax):
+            assert self._called_set_z_array, "Must call set_z_array first."
+            ax.add_collection(self.pc)
+            ax.autoscale()
+
     def __init__(self, filepath):
         cur_dir_path = os.path.dirname(filepath)
         dir_name = os.path.basename(cur_dir_path)
@@ -223,7 +238,7 @@ class FileIODirectory:
     def get_numpy_array(self):
         return self._cur_data
 
-    def get_rects_from_nonuniform_index(self, second_axis_param, slicing_indices_dict, meas_ch_index, non_uniform_on_x = True):
+    def get_rects_from_nonuniform_index(self, second_axis_param, slicing_indices_dict, non_uniform_on_x = True):
         assert self.uniform_indices.count(False) == 1, "This function only supports 1 nonuniform index."
         axis1_index = self.uniform_indices.index(False) - len(self.param_vals)
 
@@ -259,7 +274,7 @@ class FileIODirectory:
                 inner_slicer += [np.s_[:]]
             else:
                 inner_slicer += [x]
-        inner_slicer += [np.s_[meas_ch_index]]
+        inner_slicer += [np.s_[:]]  #This is slicing across all measurement channels
         x_datas = [x['data'][tuple(inner_slicer)] for x in rec_data]
 
         dys = y_vals[1:]-y_vals[:-1]
@@ -292,12 +307,14 @@ class FileIODirectory:
                         ]
         verts = np.array(verts)
         pc = matplotlib.collections.PolyCollection(verts)
-        pc.set_array(np.concatenate(data_values))
-
-        return pc
-
+        z_vals = np.vstack(data_values)
+        return FileIODirectory.plt_object(pc, z_vals)
 
 # a = FileIODirectory(r'test_save_dir\2021-06-09\113138-test_group\113138-test\data.h5')
-# a = FileIODirectory(r'test_save_dir\2021-06-09\113134-test_group\113134-test\data.h5')
-# a.get_rects_from_nonuniform_index('DirFileNo', {'repetition':0, 'segment':0, 'sample':0}, 0, False)
+# a = FileIODirectory(r'test_save_dir\2021-06-09\162651-test_group\162654-test\data.h5')
+# pltObj = a.get_rects_from_nonuniform_index('DirFileNo', {'repetition':0, 'segment':0, 'sample':0}, False)
+# fig, ax = plt.subplots()
+# pltObj.set_z_array(np.sqrt(pltObj.z_values[:,0]**2+pltObj.z_values[:,1]**2))
+# pltObj.add_to_axis(ax)
+# plt.show()
 # b=0

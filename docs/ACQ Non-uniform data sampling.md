@@ -45,16 +45,16 @@ Although the syntax is the same for the amalgamation of uniformly sampled data f
 Note that the values within `param_vals` within each data dictionary (after slicing the outer indices amongst the different experiment files) will be different for the data is sampled non-uniformly. Finally, there is a handy utility to aid in plotting across multiple non-uniform datasets (that is, across different experiment files):
 
 ``` python
-#Plot across channel 3 (index 2) with the axes being Flux and Freq (having Freq on the y-axis - hence the last argument being False)
-pc = leData.get_rects_from_nonuniform_index('Flux', {'repetition':0, 'segment':0, 'sample':0, 'Power':1}, 2, False)
+#Plot across the axes Flux and Freq (having Freq on the y-axis - hence the last argument being False)
+pltObj = leData.get_rects_from_nonuniform_index('Flux', {'repetition':0, 'segment':0, 'sample':0, 'Power':1}, False)
 
 fig, ax = plt.subplots()
-ax.add_collection(pc)
-ax.autoscale()
+pltObj.set_z_array(np.sqrt(pltObj.z_values[:,0]**2+pltObj.z_values[:,1]**2))
+pltObj.add_to_axis(ax)
 plt.show()
 ```
 
-Note that the polygon collection returned by the function is a bunch of quadrilaterals. Note that one cannot in general use `pcolormesh` without resampling the dataset to all unique x and y values. This is a common occurrence in the case where one wishes to sample N points across a differing interval. Thus, the grid is not a uniform rectangular grid. The slicing dictionary supplied to the function gives the indices for all remaining parameters in the amalgamated dataset. Finally, note that the function is only supported for a limited use case:
+Note that the plotting object returned by the function just holds a bunch of quadrilaterals (with the attribute `z_values` holding the array of values with one column for every measurement output channel). Note that one cannot in general use `pcolormesh` without resampling the dataset to all unique x and y values. This is a common occurrence in the case where one wishes to sample N points across a differing interval. Thus, the grid is not a uniform rectangular grid. The slicing dictionary supplied to the function gives the indices for all remaining parameters in the amalgamated dataset. Finally, note that the function is only supported for a limited use case:
 
 - It only supports the case where one axis parameter is a sweeping variable across multiple experiment files, otherwise, the desired dataset is within one experiment file and one may simple utilise numpy slicing to gather the required data array.
 - One of the axes is by default the non-uniform dataset for otherwise, slicing across said dimension is in general ill-defined.

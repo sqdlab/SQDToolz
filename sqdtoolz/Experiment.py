@@ -18,7 +18,20 @@ class Experiment:
         return self._name
 
     def _post_process(self, data):
-        pass
+        return
+        #An example...
+        file_path = data.folder_path + '/data_proc.h5'
+        data_file = FileIOWriter(file_path)
+        data_pkt = {
+                    'parameters' : ['frequency', 'power'],
+                    'data' : {
+                        'amplitude' : np.zeros((5,4)),
+                        'phase' : np.zeros((5,4))
+                    },
+                    'parameter_values' : {'frequency' : np.arange(5)}
+                }
+        data_file.push_datapkt(data_pkt)
+        data_file.close()
 
     def _run(self, file_path, sweep_vars=[], **kwargs):
         delay = kwargs.get('delay', 0.0)

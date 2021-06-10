@@ -127,7 +127,8 @@ class ProcessorGPU(DataProcessor):
                 cur_data = cur_proc.process_data(cur_data)
             
             #Drain the GPU memory and transfer to CPU before processing next data packet...
-            for cur_ch in cur_data['data'].keys():
+            cur_keys = list(cur_data['data'].keys())
+            for cur_ch in cur_keys:
                 cp_arr = cur_data['data'].pop(cur_ch)
                 cur_data['data'][cur_ch] = cp.asnumpy(cp_arr)
                 del cp_arr

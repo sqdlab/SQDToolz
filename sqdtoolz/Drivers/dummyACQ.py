@@ -17,6 +17,8 @@ class DummyACQ(Instrument):
         self._sample_rate = 1e9
         self._trigger_edge = 1
 
+        self.ch_states = (True, True)
+
     @property
     def NumSamples(self):
         return self._num_samples
@@ -51,6 +53,18 @@ class DummyACQ(Instrument):
     @TriggerInputEdge.setter
     def TriggerInputEdge(self, pol):
         self._trigger_edge = pol
+
+    @property
+    def ChannelStates(self):
+        return self.ch_states
+    @ChannelStates.setter
+    def ChannelStates(self, ch_states):
+        assert len(ch_states) == 2, "There are 2 channel states that must be specified."
+        self.ch_states = ch_states
+
+    @property
+    def AvailableChannels(self):
+        return 2
 
     def get_data(self, **kwargs):
         cur_processor = kwargs.get('data_processor', None)

@@ -10,6 +10,7 @@ from sqdtoolz.HAL.GENmwSource import*
 from sqdtoolz.HAL.GENvoltSource import*
 from sqdtoolz.HAL.GENswitch import*
 from sqdtoolz.HAL.ACQvna import*
+from sqdtoolz.HAL.GENatten import*
 from sqdtoolz.HAL.Processors.ProcessorCPU import*
 try:
     from sqdtoolz.HAL.Processors.ProcessorGPU import*
@@ -21,6 +22,13 @@ import json
 import os
 import time
 import numpy as np
+
+class customJSONencoder(json.JSONEncoder):
+    def default(self, obj):
+        #Inspired by: https://stackoverflow.com/questions/56250514/how-to-tackle-with-error-object-of-type-int32-is-not-json-serializable/56254172
+        if isinstance(obj, np.int32):
+            return int(obj)
+        return json.JSONEncoder.default(self, obj)
 
 class Laboratory:
     def __init__(self, instr_config_file, save_dir):
@@ -35,6 +43,8 @@ class Laboratory:
         self._save_dir = save_dir.replace('\\','/')
         self._group_dir = {'Dir':"", 'InitDir':"", 'SweepQueue':[]}
 
+        Path(self._save_dir).mkdir(parents=True, exist_ok=True)
+
         self._hal_objs = {}
         self._processors = {}
         self._expt_configs = {}
@@ -42,6 +52,15 @@ class Laboratory:
         self._specifications = {}
         self._waveform_transforms = {}
         self._activated_instruments = []
+        self._update_state = True
+        self.update_state()
+
+    @property
+    def UpdateStateEnabled(self):
+        return self._update_state
+    @UpdateStateEnabled.setter
+    def UpdateStateEnabled(self, bool_val):
+        self._update_state = bool_val
 
     def reload_yaml(self):
         #NOTE: This will update the snapshots and thus, change instrument state of already loaded instruments. But it is handy
@@ -75,10 +94,13 @@ class Laboratory:
                 else:
                     self._variables[cur_key] = globals()[cur_dict['Type']].fromConfigDict(cur_key, cur_dict, self)
 
-    def cold_reload_last_configuration(self):
-        dirs = [x[0] for x in os.walk(self._save_dir)]  #Walk gives a tuple: (dirpath, dirnames, filenames)
-        
-        #Go through the directories in reverse chronological order (presuming data-stamped folders)
+    def cold_reload_last_configuration(self, folder_dir = ""):
+        if folder_dir != "":
+            dirs = [folder_dir]
+        else:
+            #Go through the directories in reverse chronological order (presuming data-stamped folders)
+            dirs = [x[0] for x in os.walk(self._save_dir)]  #Walk gives a tuple: (dirpath, dirnames, filenames)
+
         for cur_cand_dir in dirs[::-1]:
             cur_dir = cur_cand_dir.replace('\\','/')
             #Check current candidate directory has the required files
@@ -92,6 +114,7 @@ class Laboratory:
             self.cold_reload_labconfig(self._load_json_file(cur_dir + "/laboratory_configuration.txt"))
             self.cold_reload_experiment_configurations(self._load_json_file(cur_dir + "/experiment_configurations.txt"))
             self.update_variables_from_last_expt(cur_dir + "/laboratory_parameters.txt")
+            self.update_state()
             return
         assert False, "No valid previous experiment with all data files were found to be present."
 
@@ -100,17 +123,13 @@ class Laboratory:
             cur_keys = config_dict[cur_expt_config]['HALs']
             cur_types = [x['Type'] for x in cur_keys]
             cur_hals = [x['Name'] for x in cur_keys]
-            if 'ACQ' in cur_types:
-                ind = cur_types.index('ACQ')
-                cur_hals.pop(ind)
-                acq_obj = cur_keys[ind]['Name']
-            elif 'ACQvna' in cur_types:
-                ind = cur_types.index('ACQvna')
-                cur_hals.pop(ind)
-                acq_obj = cur_keys[ind]['Name']
-            else:
-                acq_obj = None
-            new_expt_config = ExperimentConfiguration(cur_expt_config, self, 0, cur_hals, acq_obj)
+            #Find the ACQ HAL module...
+            acq_hal = None
+            for cur_hal in cur_hals:
+                if self.HAL(cur_hal).IsACQhal:
+                    acq_hal = cur_hal
+                    break
+            new_expt_config = ExperimentConfiguration(cur_expt_config, self, 0, cur_hals, acq_hal)
             new_expt_config.update_config(config_dict[cur_expt_config], False)
     
     def cold_reload_labconfig(self, config_dict):
@@ -321,6 +340,7 @@ class Laboratory:
         #Save Laboratory Parameters
         self.save_variables(cur_exp_path)
 
+        self.update_state()
         return ret_vals
 
     def save_variables(self, cur_exp_path = '', file_name = 'laboratory_parameters.txt'):
@@ -329,13 +349,13 @@ class Laboratory:
             # json.dump(param_dict, outfile)
             outfile.write(
                 '{\n' +
-                ',\n'.join(f"\"{x}\" : {json.dumps(param_dict[x])}" for x in param_dict.keys()) +
+                ',\n'.join(f"\"{x}\" : {json.dumps(param_dict[x], cls=customJSONencoder)}" for x in param_dict.keys()) +
                 '\n}\n')
 
     def save_experiment_configs(self, cur_exp_path, file_name = 'experiment_configurations.txt'):
         dict_expt_configs = {x : self._expt_configs[x].get_config() for x in self._expt_configs}
         with open(cur_exp_path + file_name, 'w') as outfile:
-            json.dump(dict_expt_configs, outfile, indent=4)
+            json.dump(dict_expt_configs, outfile, indent=4, cls=customJSONencoder)
 
     def save_laboratory_config(self, cur_exp_path, file_name = 'laboratory_configuration.txt'):
         #Prepare the dictionary of HAL configurations
@@ -367,7 +387,7 @@ class Laboratory:
                     }
         if cur_exp_path != '':
             with open(cur_exp_path + file_name, 'w') as outfile:
-                json.dump(param_dict, outfile, indent=4)
+                json.dump(param_dict, outfile, indent=4, cls=customJSONencoder)
         return param_dict
 
     def _save_instrument_config(self, cur_exp_path):
@@ -386,7 +406,7 @@ class Laboratory:
             return result
         with open(cur_exp_path + 'instrument_configuration.txt', 'w') as outfile:
             raw_snapshot = self._station.snapshot_base()
-            json.dump(decode_dict(raw_snapshot), outfile, indent=4)
+            json.dump(decode_dict(raw_snapshot), outfile, indent=4, cls=customJSONencoder)
 
 
     @staticmethod
@@ -417,6 +437,14 @@ class Laboratory:
         if iteration == total: 
             print()
         return ret_str
+
+    def update_state(self):
+        if self.UpdateStateEnabled:
+            self.save_laboratory_config(self._save_dir, '_last_state.txt')
+    def open_browser(self):
+        cur_dir = os.path.dirname(os.path.realpath(__file__)).replace('\\','/')
+        drive = cur_dir[0:2]
+        os.system(f'start \"temp\" cmd /k \"{drive} && cd \"{cur_dir}/Utilities\" && python ExperimentViewer.py \"{self._save_dir}\"\"')
 
     def _update_progress_bar(self, val_pct):
         self._time_stamps += [(val_pct, time.time())]
@@ -455,3 +483,6 @@ class Laboratory:
             total_time = f"Total time: {total_time:.2f}s"
         
         self._prog_bar_str = self._printProgressBar(int(val_pct*100), 100, suffix=f"{total_time}, {time_left}", prev_str=self._prog_bar_str)
+
+        #Use the progress-bar ping as an opportunity to dump the current state of the instruments if update is enabled...
+        self.update_state()

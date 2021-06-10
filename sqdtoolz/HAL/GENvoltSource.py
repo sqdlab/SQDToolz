@@ -37,7 +37,8 @@ class GENvoltSource(HALbase):
         ret_dict = {
             'Name' : self.Name,
             'instrument' : self._instr_id,
-            'Type' : self.__class__.__name__
+            'Type' : self.__class__.__name__,
+            #Ignoring ManualActivation
             }
         self.pack_properties_to_dict(['Voltage', 'RampRate', 'Output'], ret_dict)
         return ret_dict
@@ -47,3 +48,4 @@ class GENvoltSource(HALbase):
         self.Voltage = dict_config['Voltage']
         self.RampRate = dict_config['RampRate']
         self.Output = dict_config['Output']
+        self.ManualActivation = dict_config.get('ManualActivation', False)

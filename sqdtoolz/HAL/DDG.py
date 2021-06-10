@@ -70,6 +70,7 @@ class DDG(TriggerOutputCompatible, HALbase):
             'Type' : self.__class__.__name__,
             'RepetitionTime' : self.RepetitionTime,
             'triggers' : trigDict
+            #Ignoring ManualActivation
             }
         return retDict
 

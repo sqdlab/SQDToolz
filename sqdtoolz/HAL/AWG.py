@@ -100,7 +100,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
             if cur_seg.Name == wfm_segment_name:
                 the_seg = cur_seg
                 break
-        assert the_seg != None, "Waveform Segment of name " + seg_name + " is not present in the current list of added Waveform Segments."
+        assert the_seg != None, "Waveform Segment of name " + wfm_segment_name + " is not present in the current list of added Waveform Segments."
         return the_seg
 
     def get_output_channel(self, outputIndex = 0):
@@ -291,7 +291,8 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
             'global_factor' : self._global_factor,
             'AutoCompression' : self.AutoCompression,
             'AutoCompressionLinkChannels' : self.AutoCompressionLinkChannels,
-            'OutputChannels' : [x._get_current_config() for x in self._awg_chan_list]
+            'OutputChannels' : [x._get_current_config() for x in self._awg_chan_list],
+            'ManualActivation' : self.ManualActivation
             }
         retDict['WaveformSegments'] = self._get_current_config_waveforms()
         return retDict
@@ -308,6 +309,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
         self._global_factor = dict_config['global_factor']
         self.AutoCompression = dict_config['AutoCompression']
         self.AutoCompressionLinkChannels = dict_config['AutoCompressionLinkChannels']
+        self.ManualActivation = dict_config.get('ManualActivation', False)
         for ind, cur_ch_output in enumerate(dict_config['OutputChannels']):
             self._awg_chan_list[ind]._set_current_config(cur_ch_output, lab)
 

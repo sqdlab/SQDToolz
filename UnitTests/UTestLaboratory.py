@@ -425,4 +425,32 @@ assert new_lab.WFMT("IQmod").IQdcOffset == (9,1), "WaveformTransformation proper
 assert new_lab.WFMT("IQmod").IQUpperSideband == False, "WaveformTransformation property incorrectly set"
 
 
+#Check Experiment sweep_vars don't accept empty arrays...
+exp = Experiment("test", new_lab.CONFIG('testConf'))
+res = new_lab.run_single(exp, [(new_lab.VAR("testAmpl"), np.arange(0,10,1))], delay=1)
+#
+assert_found = False
+try:
+    exp = Experiment("test", new_lab.CONFIG('testConf'))
+    res = new_lab.run_single(exp, (new_lab.VAR("testAmpl"), np.arange(0,2,1)), delay=1)
+except AssertionError:
+    assert_found = True
+assert assert_found, "Experiment class did not catch an error when incorrectly passing a sweeping-variables without a list bracket..."
+#
+assert_found = False
+try:
+    exp = Experiment("test", new_lab.CONFIG('testConf'))
+    res = new_lab.run_single(exp, [(new_lab.VAR("testAmpl"), [1,2,3])], delay=1)
+except AssertionError:
+    assert_found = True
+assert assert_found, "Experiment class did not catch an error when passing a sweeping-variable with a non-numpy array..."
+#
+assert_found = False
+try:
+    exp = Experiment("test", new_lab.CONFIG('testConf'))
+    res = new_lab.run_single(exp, [(new_lab.VAR("testAmpl"), np.arange(0,-1,1))], delay=1)
+except AssertionError:
+    assert_found = True
+assert assert_found, "Experiment class did not catch an error when passing a sweeping-variable with an empty list..."
+
 print("Laboratory Unit Tests completed successfully.")

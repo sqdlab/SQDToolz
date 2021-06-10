@@ -16,6 +16,17 @@ class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
         return cls(config_dict["Name"], lab, config_dict["instrument"])
 
     @property
+    def IsACQhal(self):
+        return True
+
+    @property
+    def ChannelStates(self):
+        return self._instr_acq.ChannelStates
+    @ChannelStates.setter
+    def ChannelStates(self, ch_states):
+        self._instr_acq.ChannelStates = ch_states
+
+    @property
     def NumSamples(self):
         return self._instr_acq.NumSamples
     @NumSamples.setter
@@ -97,7 +108,7 @@ class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
             'TriggerSource' : self._get_trig_src_params_dict(),
             'Processor' : proc_name
             }
-        self.pack_properties_to_dict(['NumSamples', 'NumSegments', 'NumRepetitions', 'SampleRate', 'InputTriggerEdge'], ret_dict)
+        self.pack_properties_to_dict(['NumSamples', 'NumSegments', 'NumRepetitions', 'SampleRate', 'InputTriggerEdge', 'ChannelStates'], ret_dict)
         return ret_dict
 
     def _set_current_config(self, dict_config, lab):
@@ -107,6 +118,7 @@ class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
         self.NumRepetitions = dict_config['NumRepetitions']
         self.SampleRate = dict_config['SampleRate']
         self.InputTriggerEdge = dict_config['InputTriggerEdge']
+        self.ChannelStates = tuple( dict_config.get('ChannelStates', [True]+[False]*(self._instr_acq.AvailableChannels-1)) )
         trig_src_obj = TriggerInput.process_trigger_source(dict_config['TriggerSource'], lab)
         self.set_trigger_source(trig_src_obj)
         if dict_config['Processor'] != '':

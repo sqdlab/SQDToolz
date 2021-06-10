@@ -40,6 +40,10 @@ class HALbase:
     def Parent(self):
         return None
 
+    @property
+    def IsACQhal(self):
+        return False
+
     def _get_child(self, tuple_name_group):
         raise NotImplementedError()
 

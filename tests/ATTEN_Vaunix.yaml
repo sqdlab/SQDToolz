@@ -1,0 +1,6 @@
+instruments:
+  VaunixAtten:
+    driver: sqdtoolz.Drivers.ATTEN_Vaunix
+    type: ATTEN_Vaunix
+    init:
+      dev_ind: 0

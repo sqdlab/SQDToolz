@@ -65,7 +65,14 @@ class Experiment:
 
             sweep_arrays = [x[1] for x in sweep_vars]
             sweep_grids = np.meshgrid(*sweep_arrays)
-            sweep_grids = np.array(sweep_grids).T.reshape(-1,len(sweep_arrays))
+            sweep_grids = np.array(sweep_grids)
+            axes = np.arange(len(sweep_grids.shape))
+            try:
+                axes[2] = 1
+                axes[1] = 2
+            except IndexError:
+                pass
+            sweep_grids = np.transpose(sweep_grids, axes=axes).reshape(len(sweep_arrays),-1).T
             
             data_all = []
             #sweep_vars is given as a list of tuples formatted as (parameter, sweep-values in an numpy-array)

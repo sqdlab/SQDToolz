@@ -379,5 +379,6 @@ class ExperimentViewer:
 if __name__ == '__main__':
     if len(sys.argv) >= 2:
         print(sys.argv[1])
-    ExperimentViewer('Z:/Data/sqdtoolz_test/').main_loop()
+        ExperimentViewer(sys.argv[1]).main_loop()
+    # ExperimentViewer('Z:/Data/sqdtoolz_test/').main_loop()
 

@@ -18,7 +18,20 @@ class Experiment:
         return self._name
 
     def _post_process(self, data):
-        pass
+        return
+        #An example...
+        file_path = data.folder_path + '/data_proc.h5'
+        data_file = FileIOWriter(file_path)
+        data_pkt = {
+                    'parameters' : ['frequency', 'power'],
+                    'data' : {
+                        'amplitude' : np.zeros((5,4)),
+                        'phase' : np.zeros((5,4))
+                    },
+                    'parameter_values' : {'frequency' : np.arange(5)}
+                }
+        data_file.push_datapkt(data_pkt)
+        data_file.close()
 
     def _run(self, file_path, sweep_vars=[], **kwargs):
         delay = kwargs.get('delay', 0.0)
@@ -52,7 +65,14 @@ class Experiment:
 
             sweep_arrays = [x[1] for x in sweep_vars]
             sweep_grids = np.meshgrid(*sweep_arrays)
-            sweep_grids = np.array(sweep_grids).T.reshape(-1,len(sweep_arrays))
+            sweep_grids = np.array(sweep_grids)
+            axes = np.arange(len(sweep_grids.shape))
+            try:
+                axes[2] = 1
+                axes[1] = 2
+            except IndexError:
+                pass
+            sweep_grids = np.transpose(sweep_grids, axes=axes).reshape(len(sweep_arrays),-1).T
             
             data_all = []
             #sweep_vars is given as a list of tuples formatted as (parameter, sweep-values in an numpy-array)

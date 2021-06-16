@@ -32,7 +32,7 @@ class ACQ_M4i_Digitiser(M4i):
             gc.collect()
             return data            
 
-    def __init__(self, name, cardid='spcm0', **kwargs):
+    def __init__(self, name, cardid='spcm0', input_couplings=0, **kwargs):
         super().__init__(name, cardid, **kwargs)
 
         ###########################################################
@@ -50,9 +50,9 @@ class ACQ_M4i_Digitiser(M4i):
         self.enable_channels(spcm.CHANNEL0 | spcm.CHANNEL1) # spcm.CHANNEL0 | spcm.CHANNEL1
         self.num_channels = 2   #!!!!!CHANGE THIS IF CHANGING ABOVE
         self.set_channel_settings(1, mV_range=1000., input_path=1, 
-                                termination=0, coupling=1)#0)
+                                termination=0, coupling=input_couplings)#0)
         self.set_channel_settings(0, mV_range=1000., input_path=1, 
-                                termination=0, coupling=1)#0)
+                                termination=0, coupling=input_couplings)#0)
         ###########################################################
 
         self.override_card_lock = False

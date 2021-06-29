@@ -20,7 +20,7 @@ class SIM928_ChannelModule(InstrumentChannel):
         self.add_parameter('voltage', unit='V',
                         label="Output voltage",
                         vals=vals.Numbers(-20, 20),
-                        get_cmd=self._get_voltage,partial(self._parent._ask_module, self.slot_num, 'VOLT?'),
+                        get_cmd=self._get_voltage,
                         set_cmd=self._set_voltage,
                         get_parser=float,
                         inter_delay=0.05,

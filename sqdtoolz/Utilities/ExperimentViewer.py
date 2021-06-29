@@ -204,7 +204,7 @@ class ExperimentViewer:
                 cur_str = ""
                 for cur_key in cur_hal:
                     if isinstance(cur_hal[cur_key], str) or isinstance(cur_hal[cur_key], float) or isinstance(cur_hal[cur_key], int) or isinstance(cur_hal[cur_key], bool):
-                        cur_str += f"{cur_key}: {cur_hal[cur_key]}\n"
+                        cur_str += f"{cur_key}: {self._get_units(cur_hal[cur_key])}\n"
                 
                 #Get state-colours based on the Output key...
                 cur_on_key = ''
@@ -267,6 +267,34 @@ class ExperimentViewer:
             except:
                 #Application destroyed...
                 return
+
+
+    def _get_units(self, val):
+        if isinstance(val, float):
+            if val <= 0.0:
+                return val
+
+            thinspace = u"\u2009"
+            def clip_val(value):
+                return f'{value:.12g}'
+
+            if val < 1e-6:
+                return f'{clip_val(val*1e9)}{thinspace}n'
+            if val < 1e-3:
+                return f'{clip_val(val*1e6)}{thinspace}μ'
+            if val < 1:
+                return f'{clip_val(val*1e3)}{thinspace}m'
+            if val < 1000:
+                return val
+            if val < 1e6:
+                return f'{clip_val(val*1e-3)}{thinspace}k'
+            if val < 1e9:
+                return f'{clip_val(val*1e-6)}{thinspace}M'
+
+            return f'{clip_val(val*1e-9)}{thinspace}G'
+        else:
+            return val
+
 
     def _create_dashboard_group(self, name):
         ret_dict = {

@@ -7,9 +7,11 @@ class TimingPlot:
         self.bar_width = 0.6
 
         self.fig = plt.figure()
-        self.ax = self.fig.add_axes((0.25, 0.125, 0.7, 0.78))
+        self.ax = self.fig.subplots()
         self.num_channels = -1
         self.yticklabels = []
+
+        self.min_feature_size = 1e15
 
     def add_rectangle(self, xStart, xEnd):
         '''
@@ -23,6 +25,8 @@ class TimingPlot:
         rect = patches.Rectangle( (xStart,yOff - 0.5*self.bar_width), xEnd-xStart, self.bar_width,
                                 facecolor='white', edgecolor='black', hatch = '///')
         self.ax.add_patch(rect)
+        #Calculate smallest feature size...
+        self.min_feature_size = min(self.min_feature_size, xEnd-xStart)
 
     def goto_new_row(self, new_ylabel):
         self.num_channels += 1
@@ -42,6 +46,8 @@ class TimingPlot:
         y1 = y0 + yOccupyFactor*self.bar_width
         yValsPlot = yVals * (y1-y0) + y0
         self.ax.plot(xVals, yValsPlot, 'k')
+        #Calculate smallest feature size...
+        self.min_feature_size = min(self.min_feature_size, xEnd-xStart)
 
     def add_digital_pulse_sampled(self, vals01, xStart, pts2xVals):
         yOff = self.num_channels
@@ -62,6 +68,9 @@ class TimingPlot:
         yVals = np.array(yVals)
         yVals = yVals*self.bar_width + yOff - self.bar_width*0.5
         self.ax.plot(xVals, yVals, 'k')
+        #Calculate smallest feature size...
+        feat_sizes = xVals[1:]-xVals[:-1]
+        self.min_feature_size = min(self.min_feature_size, np.min(feat_sizes[feat_sizes>0]))
 
     def add_digital_pulse(self, list_time_vals, xStart, scale_fac_x):
         yOff = self.num_channels
@@ -73,6 +82,9 @@ class TimingPlot:
         #Now scale the pulse appropriately...
         yVals = yVals*self.bar_width + yOff - self.bar_width*0.5
         self.ax.plot(xVals, yVals, 'k')
+        #Calculate smallest feature size...
+        feat_sizes = xVals[1:]-xVals[:-1]
+        self.min_feature_size = min(self.min_feature_size, np.min(feat_sizes[feat_sizes>0]))
 
     def finalise_plot(self, total_time, x_units, title):
         self.ax.set_xlim((0, total_time))
@@ -84,4 +96,30 @@ class TimingPlot:
         self.ax.set_yticks(range(len(self.yticklabels)))
         self.ax.set_yticklabels(self.yticklabels, size=12)
 
+        #Rescale plot to better observe the smaller features...
+        #
+        min_pixels_per_feature = 3
+        #
+        size_ratio_x = self.min_feature_size / total_time
+        #Get axis size (taken from: https://stackoverflow.com/questions/19306510/determine-matplotlib-axis-size-in-pixels)
+        bbox = self.ax.get_window_extent().transformed(self.fig.dpi_scale_trans.inverted())
+        width, height = bbox.width, bbox.height
+        width *= self.fig.dpi
+        height *= self.fig.dpi
+        #
+        if width*size_ratio_x < min_pixels_per_feature:
+            old_size = self.fig.get_size_inches()
+            size_fac =  min_pixels_per_feature / (width*size_ratio_x)
+            new_size_x = old_size[0]-bbox.width + bbox.width*size_fac
+            self.fig.set_size_inches(min(new_size_x, (8192) / self.fig.dpi), old_size[1]) #There's a limitation on MATPLOTLIB plots in which dimensions must be less than 2^16
+            self.fig.tight_layout()
+
         return self.fig
+
+# tp = TimingPlot()
+# tp.goto_new_row('test1')
+# tp.add_digital_pulse_sampled(np.array([0,0,1,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0]), 1e-9, 1e-9)
+# tp.add_digital_pulse([(0.0, 0), (5e-9, 1), (10e-9, 0)], 20e-9, 1)
+# tp.finalise_plot(1e-6, 'ns', 'test').show()
+# input('Press ENTER')
+

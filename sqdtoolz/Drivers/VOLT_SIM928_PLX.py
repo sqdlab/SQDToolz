@@ -20,7 +20,7 @@ class SIM928_ChannelModule(InstrumentChannel):
         self.add_parameter('voltage', unit='V',
                         label="Output voltage",
                         vals=vals.Numbers(-20, 20),
-                        get_cmd=partial(self._parent._ask_module, self.slot_num, 'VOLT?'),
+                        get_cmd=self._get_voltage,partial(self._parent._ask_module, self.slot_num, 'VOLT?'),
                         set_cmd=self._set_voltage,
                         get_parser=float,
                         inter_delay=0.05,
@@ -34,6 +34,13 @@ class SIM928_ChannelModule(InstrumentChannel):
                         vals=vals.Numbers(0.001, 1),
                         get_cmd=lambda : self.voltage.step/self.voltage.inter_delay,
                         set_cmd=self._set_ramp_rate)
+
+    def _get_voltage(self):
+        try:
+            result = float(self._parent._ask_module(self.slot_num, 'VOLT?'))
+        except ValueError:
+            result = self._get_voltage()
+        return result
 
     def _set_voltage(self, voltage):
         """

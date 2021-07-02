@@ -100,6 +100,7 @@ class Laboratory:
         else:
             #Go through the directories in reverse chronological order (presuming data-stamped folders)
             dirs = [x[0] for x in os.walk(self._save_dir)]  #Walk gives a tuple: (dirpath, dirnames, filenames)
+            dirs.sort()
 
         for cur_cand_dir in dirs[::-1]:
             cur_dir = cur_cand_dir.replace('\\','/')

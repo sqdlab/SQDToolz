@@ -289,6 +289,23 @@ class Laboratory:
             assert instrID in self._station.components, f"Instrument by the name {instrID} has not been loaded. Call load_instrument on it first."
             return self._station.components[instrID]
 
+    def print_HALs(self):
+        print("Laboratory HALs:")
+        for hal_ID in self._hal_objs:
+            print(f"\t{hal_ID} (Type: {self.HAL(hal_ID).__class__.__name__})")
+    def print_PROCs(self):
+        print("Laboratory PROCs:")
+        for proc_name in self._processors:
+            print(f"\t{proc_name} (Type: {self.PROC(proc_name).__class__.__name__})")
+    def print_WFMTs(self):
+        print("Laboratory WFMTs:")
+        for wfmt_name in self._waveform_transforms:
+            print(f"\t{wfmt_name} (Type: {self.WFMT(wfmt_name).__class__.__name__})")
+    def print_SPECs(self):
+        print("Laboratory SPECs:")
+        for spec_name in self._specifications:
+            print(f"\t{spec_name}")
+
 
     def group_open(self, group_name):
         self._group_dir['Dir'] = group_name

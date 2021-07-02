@@ -233,7 +233,7 @@ class FileIODirectory:
 
     @classmethod
     def fromReader(cls, obj_FileIOReader):
-        return cls(obj_FileIOReader._filepath)
+        return cls(obj_FileIOReader.file_path)
 
     def get_numpy_array(self):
         return self._cur_data

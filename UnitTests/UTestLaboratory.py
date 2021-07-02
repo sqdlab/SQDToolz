@@ -164,7 +164,13 @@ assert old_obj_repT == new_lab.VAR("test RepTime"), "New variable object has bee
 assert old_obj_dur1 == new_lab.VAR("myDura1"), "New variable object has been created when updating from file."
 assert old_obj_dur2 == new_lab.VAR("myDura2"), "New variable object has been created when updating from file."
 assert old_obj_varS == new_lab.VAR("testSpace"), "New variable object has been created when updating from file."
-
+#
+#
+#
+#Test with DDG's different scheme...
+VariableProperty('myDura2', new_lab, new_lab.HAL("ddg").get_trigger_output('A'), 'TrigPulseLength')
+new_lab.VAR('myDura2').Value = 48.5
+assert new_lab.HAL("ddg").get_trigger_output('A').TrigPulseLength == 48.5, "DDG parameter was incorrectly set by VariableProperty."
 
 #
 #Test WaveformTransformations

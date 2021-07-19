@@ -106,6 +106,7 @@ class ExperimentViewer:
         self.dash_ATTENs = self._create_dashboard_group("Attenuators")
         self.dash_VOLTs = self._create_dashboard_group("Voltage Sources")
         self.dash_SWs = self._create_dashboard_group("Switches")
+        self.dash_WFMs = self._create_dashboard_group("Waveforms")
         self.dash_WFMTs = self._create_dashboard_group("Waveform Transformations")
         self.dash_SPECs = self._create_dashboard_group("Experiment Specifications")
 
@@ -200,11 +201,23 @@ class ExperimentViewer:
             cur_sws = []
             cur_volts = []
             cur_attens = []
+            cur_wfms = []
             for cur_hal in data['HALs']:
                 cur_str = ""
                 for cur_key in cur_hal:
                     if isinstance(cur_hal[cur_key], str) or isinstance(cur_hal[cur_key], float) or isinstance(cur_hal[cur_key], int) or isinstance(cur_hal[cur_key], bool):
                         cur_str += f"{cur_key}: {self._get_units(cur_hal[cur_key])}\n"
+                    elif cur_key == "WaveformSegments": #Custom processing for AWG waveforms...
+                        cur_str += "Segments:\n"
+                        for cur_seg in cur_hal[cur_key]:
+                            if "Value" in cur_seg:
+                                ampl_val = self._get_units(cur_seg["Value"])
+                            elif "Amplitude" in cur_seg:
+                                ampl_val = self._get_units(cur_seg["Amplitude"])
+                            else:
+                                ampl_val = ""
+                            #Trim the WFS_ in the Type...
+                            cur_str += f'\t{cur_seg["Name"]}, [{cur_seg["Type"][4:]}], {self._get_units(cur_seg["Duration"])}s, {ampl_val}\n'
                 
                 #Get state-colours based on the Output key...
                 cur_on_key = ''
@@ -228,6 +241,8 @@ class ExperimentViewer:
                     cur_volts += [(cur_str[:-1], col)]    #:-1 is to remove the last \n
                 if cur_hal['Type'] == 'GENatten':
                     cur_attens += [(cur_str[:-1], col)]    #:-1 is to remove the last \n
+                if cur_hal['Type'] == 'WaveformAWG':
+                    cur_wfms += [(cur_str[:-1], col)]    #:-1 is to remove the last \n
 
             cur_wfmts = []
             for cur_wfmt in data['WFMTs']:
@@ -256,6 +271,7 @@ class ExperimentViewer:
             self._set_frame_labels(self.dash_VOLTs, cur_volts)
             self._set_frame_labels(self.dash_SWs, cur_sws)
             self._set_frame_labels(self.dash_ATTENs, cur_attens)
+            self._set_frame_labels(self.dash_WFMs, cur_wfms)
             self._set_frame_labels(self.dash_WFMTs, cur_wfmts)
             self._set_frame_labels(self.dash_SPECs, cur_specs)
             
@@ -405,8 +421,8 @@ class ExperimentViewer:
 
 
 if __name__ == '__main__':
-    if len(sys.argv) >= 2:
-        print(sys.argv[1])
-        ExperimentViewer(sys.argv[1]).main_loop()
-    # ExperimentViewer('Z:/Data/sqdtoolz_test/').main_loop()
+    # if len(sys.argv) >= 2:
+    #     print(sys.argv[1])
+    #     ExperimentViewer(sys.argv[1]).main_loop()
+    ExperimentViewer(r'Z:\Data\EH_QuantumClock_V2\\').main_loop()
 

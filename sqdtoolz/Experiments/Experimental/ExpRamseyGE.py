@@ -3,21 +3,17 @@ from sqdtoolz.HAL.WaveformGeneric import*
 from sqdtoolz.HAL.WaveformSegments import*
 from sqdtoolz.Utilities.DataFitting import*
 
-class ExpRabi(Experiment):
-    def __init__(self, name, expt_config, wfmt_qubit_drive, range_amps, SPEC_qubit, transition='GE', iq_indices = [0,1], **kwargs):
+class ExpRamseyGE(Experiment):
+    def __init__(self, name, expt_config, wfmt_qubit_drive, range_waits, SPEC_qubit, iq_indices = [0,1], **kwargs):
         super().__init__(name, expt_config)
 
         self._iq_indices = iq_indices
         self._wfmt_qubit_drive = wfmt_qubit_drive
-
-        assert transition == 'GE' or transition == 'EF', "Transition must be either GE or EF"
-        self._transition = transition
         
-        # self._range_amps = kwargs.get('range_amps', None)
-        self._range_amps = range_amps
+        self._range_waits = range_waits
         self._post_processor = kwargs.get('post_processor', None)
-        self._param_rabi_frequency = kwargs.get('param_rabi_frequency', None)
-        self._param_rabi_decay_time = kwargs.get('param_rabi_decay_time', None)
+        self._param_ramsey_frequency = kwargs.get('param_ramsey_frequency', None)
+        self._param_ramsey_decay_time = kwargs.get('param_ramsey_decay_time', None)
 
         self._SPEC_qubit = SPEC_qubit
 
@@ -26,10 +22,21 @@ class ExpRabi(Experiment):
         if def_load_time == 0:
             def_load_time = 40e-6
         #Override the load-time if one is specified explicitly
-        self.load_time = kwargs.get('load_time', def_load_time)
+        self.load_time = kwargs.get('load_time', 40e-6)
+
+        #Calculate tipping amplitude
+        def_tip_ampl = self._SPEC_qubit['GE X-Gate Amplitude'] * 0.5
+        #Override the tip-amplitude if one is specified explicitly
+        self.tip_ampl = kwargs.get('tip_amplitude', def_tip_ampl)
+        assert self.tip_ampl != 0, "Tip-amplitude is zero. Either supply a tip_amplitude or have \'GE X-Gate Amplitude\' inside the qubit SPEC to be non-zero (e.g. run Rabi first?)."
+
+        #Calculate tipping time
+        def_tip_time = self._SPEC_qubit['GE X-Gate Time']
+        #Override the tip-time if one is specified explicitly
+        self.tip_time = kwargs.get('tip_time', def_tip_time)
+        assert self.tip_time != 0, "Tip-time is zero. Either supply a tip_time or have \'GE X-Gate Time\' inside the qubit SPEC to be non-zero (e.g. run Rabi first?)."
 
         self.readout_time = kwargs.get('readout_time', 2e-6)
-        self.drive_time = kwargs.get('drive_time', 20e-9)
     
     def _run(self, file_path, sweep_vars=[], **kwargs):
         assert len(sweep_vars) == 0, "Cannot specify sweeping variables in this experiment."
@@ -40,14 +47,16 @@ class ExpRabi(Experiment):
         wfm.set_waveform('qubit', [
             WFS_Constant("SEQPAD", None, -1, 0.0),
             WFS_Constant("init", None, self.load_time, 0.0),
-            WFS_Gaussian("drive", self._wfmt_qubit_drive.apply(phase=0), self.drive_time, 0.001),
+            WFS_Gaussian("tip", self._wfmt_qubit_drive.apply(phase=0), self.tip_time, self.tip_ampl),
+            WFS_Constant("wait", None, 1e-9, 0.0),
+            WFS_Gaussian("untip", self._wfmt_qubit_drive.apply(), self.tip_time, self.tip_ampl),
             WFS_Constant("pad", None, 5e-9, 0.0),
             WFS_Constant("read", None, self.readout_time, 0.0)
         ])
         wfm.set_digital_segments('readout', 'qubit', ['read'])
-        self._temp_vars = self._expt_config.update_waveforms(wfm, [('Drive Amplitude', 'qubit', 'drive', 'Amplitude')] )
+        self._temp_vars = self._expt_config.update_waveforms(wfm, [('Wait Time', 'qubit', 'wait', 'Duration')] )
 
-        sweep_vars = [(self._temp_vars[0], self._range_amps)]
+        sweep_vars = [(self._temp_vars[0], self._range_waits)]
 
         kwargs['skip_init_instruments'] = True
 
@@ -75,12 +84,12 @@ class ExpRabi(Experiment):
         if self._param_rabi_decay_time:
             self._param_rabi_decay_time.Value = 1.0 / dpkt['decay_rate']
 
-        if self._transition == 'GE':
-            self._SPEC_qubit['GE X-Gate Amplitude'].Value = 0.5/self._param_rabi_frequency
-            self._SPEC_qubit['GE X-Gate Time'].Value = self.drive_time
-        else:
-            self._SPEC_qubit['EF X-Gate Amplitude'].Value = 0.5/self._param_rabi_frequency
-            self._SPEC_qubit['EF X-Gate Time'].Value = self.drive_time
+        # if self._transition == 'GE':
+        #     self._SPEC_qubit['GE X-Gate Amplitude'].Value = 0.5/self._param_rabi_frequency
+        #     self._SPEC_qubit['GE X-Gate Time'].Value = self.drive_time
+        # else:
+        #     self._SPEC_qubit['EF X-Gate Amplitude'].Value = 0.5/self._param_rabi_frequency
+        #     self._SPEC_qubit['EF X-Gate Time'].Value = self.drive_time
 
         dpkt['fig'].show()
         

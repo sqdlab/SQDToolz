@@ -1,8 +1,16 @@
 {
     "Frequency GE" : 5e9,
     "Power" : -30,
-    "Rabi Amplitude Frequency" : 0,
-    "Amplitude X" : 0,
-    "T1" : 0,
-    "T2*" : 0
+
+    "GE X-Gate Amplitude" : 0.0,
+    "GE X-Gate Time" : 20e-9,
+
+    "GE T1" : 0,
+    "GE T2*" : 0,
+
+    "EF X-Gate Amplitude" : 0.0,
+    "EF X-Gate Time" : 20e-9,
+
+    "EF T1" : 0,
+    "EF T2*" : 0
 }

@@ -141,9 +141,11 @@ class ProcessorGPU(DataProcessor):
         self.pipeline_end.clear()
 
     def add_stage(self, ProcNodeGPUobj):
+        assert isinstance(ProcNodeGPUobj, ProcNodeGPU), "Can only add GPU Processing stages in a GPU Processor."
         self.pipeline.append(ProcNodeGPUobj)
 
     def add_stage_end(self, ProcNodeGPUobj):
+        assert isinstance(ProcNodeGPUobj, ProcNodeGPU), "Can only add GPU Processing stages in a GPU Processor."
         self.pipeline_end.append(ProcNodeGPUobj)
 
     def __str__(self):

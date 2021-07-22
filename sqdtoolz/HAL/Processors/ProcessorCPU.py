@@ -116,9 +116,11 @@ class ProcessorCPU(DataProcessor):
         self.pipeline_end.clear()
 
     def add_stage(self, ProcNodeCPUobj):
+        assert isinstance(ProcNodeCPUobj, ProcNodeCPU), "Can only add CPU Processing stages in a CPU Processor."
         self.pipeline.append(ProcNodeCPUobj)
 
     def add_stage_end(self, ProcNodeCPUobj):
+        assert isinstance(ProcNodeCPUobj, ProcNodeCPU), "Can only add CPU Processing stages in a CPU Processor."
         self.pipeline_end.append(ProcNodeCPUobj)
 
     def __str__(self):

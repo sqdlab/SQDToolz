@@ -10,10 +10,9 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
     def __init__(self, hal_name, lab, awg_channel_tuples, sample_rate, total_time=-1, global_factor = 1.0):
         HALbase.__init__(self, hal_name)
         if lab._register_HAL(self):
-            #
             #awg_channel_tuples is given as (instr_AWG_name, channel_name)
             self._awg_chan_list = []
-            #TODO: Check that awg_channel_tuples is a list!
+            assert isinstance(awg_channel_tuples, list), "The parameter awg_channel_tuples must be a LIST of TUPLEs of form (instr_AWG_name, channel_name)."
             for ch_index, cur_ch_tupl in enumerate(awg_channel_tuples):
                 assert len(cur_ch_tupl) == 2, "The list awg_channel_tuples must contain tuples of form (instr_AWG_name, channel_name)."
                 cur_awg_name, cur_ch_name = cur_ch_tupl            
@@ -470,7 +469,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
 
     def _program_auto_comp_basic(self, cur_awg_chan, final_wfm_for_chan, mkr_list):
         #TODO: Add flags for changed/requires-update to ensure that segments in sequence are not unnecessary programmed repeatedly...
-        #TODO: Improve algorithm
+        #TODO: Improve algorithm (a winter research project for a Winter Student!)
         dict_auto_comp = cur_awg_chan._instr_awg.AutoCompressionSupport
         dS = dict_auto_comp['MinSize']
         num_main_secs = int(np.floor(final_wfm_for_chan.size / dS))
@@ -513,7 +512,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
 
     def _program_auto_comp_basic_linked(self, minSize, final_wfms, final_mkrs):
         #TODO: Add flags for changed/requires-update to ensure that segments in sequence are not unnecessary programmed repeatedly...
-        #TODO: Improve algorithm
+        #TODO: Improve algorithm (a winter research project for a Winter Student!)
         num_channels = len(final_wfms)
         dS = minSize
         num_main_secs = int(np.floor(final_wfms[0].size / dS))

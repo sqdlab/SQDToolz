@@ -178,7 +178,6 @@ class AWGOutputMarker(TriggerOutput, TriggerInput):
 
     @property
     def Name(self):
-        #TODO: Look to make all name properties to start with capital letters...
         return self._name
 
     @property

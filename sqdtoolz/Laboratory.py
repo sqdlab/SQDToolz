@@ -37,7 +37,6 @@ class Laboratory:
         else:
             self._station = qc.Station(config_file=instr_config_file)
         self._instr_config_file = instr_config_file
-        #TODO: Add initialiser for load last file in save_dir thing...
 
         #Convert Windows backslashes into forward slashes (should be compatible with MAC/Linux then...)
         self._save_dir = save_dir.replace('\\','/')
@@ -335,12 +334,10 @@ class Laboratory:
         cur_exp_path = self._save_dir + folder_time_stamp
         Path(cur_exp_path).mkdir(parents=True, exist_ok=True)
 
-        #TODO: Write the sweeping code to appropriately nest folders or perform data-passing
         self._time_stamp_begin = time.time()
         self._time_stamps = [(0,0),]
         self._prog_bar_str = ''
         ret_vals = expt_obj._run(cur_exp_path, sweep_vars, ping_iteration=self._update_progress_bar, **kwargs)
-        #TODO: Add flag to get/save for live-plotting
 
         #Save the experiment configuration
         self.save_experiment_configs(cur_exp_path)

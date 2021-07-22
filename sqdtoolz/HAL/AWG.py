@@ -114,6 +114,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
         return self._awg_chan_list[:]
 
     def set_trigger_source_all(self, trig_src_obj, trig_pol = 1):
+        assert isinstance(trig_src_obj, TriggerOutput) or trig_src_obj == None, "Must supply a valid Trigger Output object (i.e. digital trigger output like a marker)."
         for cur_ch in self._awg_chan_list:
             cur_ch.set_trigger_source(trig_src_obj, trig_pol)
 

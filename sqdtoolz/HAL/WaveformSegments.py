@@ -73,6 +73,7 @@ class WFS_Group(WaveformSegmentBase):
         self._abs_time = time_len   #_abs_time is the total absolute time (if -1, the duration is the sum of the individual time segment durations)
         self._wfm_segs = wfm_segs
         self._validate_wfm_segs()
+        #TODO: Add this class to the unit-testing and have it thoroughly tested...
 
     @property
     def Duration(self):
@@ -113,7 +114,7 @@ class WFS_Group(WaveformSegmentBase):
         t0_ind = 0
         for cur_wfm_seg in self._wfm_segment_list:
             #TODO: Preallocate - this is a bit inefficient...
-            final_wfm = np.concatenate((final_wfms, cur_wfm_seg.get_waveform(self._sample_rate, t0_ind, ch_index)))
+            final_wfm = np.concatenate((final_wfm, cur_wfm_seg.get_waveform(self._sample_rate, t0_ind, ch_index)))
             t0_ind += final_wfm.size
 
         #Reset segment to be elastic
@@ -133,7 +134,6 @@ class WFS_Constant(WaveformSegmentBase):
         assert config_dict['Type'] == cls.__name__, "Configuration dictionary has the wrong type."
         for cur_key in ["Name", "Duration", "Value"]:
             assert cur_key in config_dict, "Configuration dictionary does not have the key: " + cur_key
-        #TODO: Fix the functionality here.
         if config_dict['Mod Func']['Name'] == '':
             wfmt_obj = None
         else:

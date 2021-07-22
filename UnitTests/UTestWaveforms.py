@@ -306,6 +306,67 @@ assert awg_wfm.get_valid_length_from_pts(12) == [16e-9, 16e-9], "Valid time leng
 assert awg_wfm.get_valid_length_from_pts(16) == [16e-9, 16e-9], "Valid time lengths for a given time are incorrect."
 assert awg_wfm.get_valid_length_from_pts(5) == [8e-9, 8e-9], "Valid time lengths for a given time are incorrect."
 
+
+#
+#Test WFM_Group
+#
+#Default test with an elastic segment
+awg_wfm = WaveformAWG("Wfm1", new_lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9, total_time=227e-9)
+awg_wfm.clear_segments()
+awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, -1, 0.0))
+awg_wfm.add_waveform_segment(WFS_Gaussian("init", new_lab.WFMT('IQmod').apply(), 20e-9, 0.5-0.1))
+awg_wfm.add_waveform_segment(WFS_Constant("zero1", None, 30e-9, 0.1))
+awg_wfm.add_waveform_segment(WFS_Gaussian("init2", None, 45e-9, 0.5-0.1))
+awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 77e-9, 0.0))
+awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
+wfm_mod = np.vstack(awg_wfm.get_raw_waveforms())
+init_stencil = np.s_[10:30]
+temp = wfm_unmod*1.0
+omega = 2*np.pi*new_lab.WFMT('IQmod').IQFrequency
+temp[0, init_stencil] *= np.cos(omega*1e-9*(np.arange(20) + 10))
+temp[1, init_stencil] *= np.sin(omega*1e-9*(np.arange(20) + 10))
+assert np.max(np.abs(temp - wfm_mod)) < ERR_TOL, "Default waveform compilation failed."
+#
+#Test a basic WFS_Group construct
+awg_wfm = WaveformAWG("Wfm1", new_lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9, total_time=227e-9)
+awg_wfm.clear_segments()
+awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, -1, 0.0))
+awg_wfm.add_waveform_segment(WFS_Gaussian("init", new_lab.WFMT('IQmod').apply(), 20e-9, 0.5-0.1))
+awg_wfm.add_waveform_segment(WFS_Group("TestGroup", [
+                                WFS_Constant("zero1", None, 30e-9, 0.1),
+                                WFS_Gaussian("init2", None, 45e-9, 0.5-0.1)
+                                ]))
+awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 77e-9, 0.0))
+awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
+wfm_mod = np.vstack(awg_wfm.get_raw_waveforms())
+init_stencil = np.s_[10:30]
+temp = wfm_unmod*1.0
+omega = 2*np.pi*new_lab.WFMT('IQmod').IQFrequency
+temp[0, init_stencil] *= np.cos(omega*1e-9*(np.arange(20) + 10))
+temp[1, init_stencil] *= np.sin(omega*1e-9*(np.arange(20) + 10))
+assert np.max(np.abs(temp - wfm_mod)) < ERR_TOL, "WFS_Group failed in waveform compilation."
+#
+#Test a basic WFS_Group construct with elastic time-frame
+awg_wfm = WaveformAWG("Wfm1", new_lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9, total_time=227e-9)
+awg_wfm.clear_segments()
+awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, -1, 0.0))
+awg_wfm.add_waveform_segment(WFS_Gaussian("init", new_lab.WFMT('IQmod').apply(), 20e-9, 0.5-0.1))
+awg_wfm.add_waveform_segment(WFS_Group("TestGroup", [
+                                WFS_Constant("zero1", None, -1, 0.1),
+                                WFS_Gaussian("init2", None, 45e-9, 0.5-0.1)
+                                ], time_len=75e-9))
+awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 77e-9, 0.0))
+awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
+wfm_mod = np.vstack(awg_wfm.get_raw_waveforms())
+init_stencil = np.s_[10:30]
+temp = wfm_unmod*1.0
+omega = 2*np.pi*new_lab.WFMT('IQmod').IQFrequency
+temp[0, init_stencil] *= np.cos(omega*1e-9*(np.arange(20) + 10))
+temp[1, init_stencil] *= np.sin(omega*1e-9*(np.arange(20) + 10))
+assert np.max(np.abs(temp - wfm_mod)) < ERR_TOL, "WFS_Group failed in waveform compilation."
+
+
+
 # import matplotlib.pyplot as plt
 # plt.plot(wfm_mod[0,:])
 # plt.plot(temp[0,:])

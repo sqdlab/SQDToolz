@@ -22,7 +22,7 @@ class ExpRabi(Experiment):
         self._SPEC_qubit = SPEC_qubit
 
         #Calculate default load-time via T1 of qubit or default to 40e-6
-        def_load_time = self._SPEC_qubit['T1']
+        def_load_time = self._SPEC_qubit[transition + ' T1'].Value * 4
         if def_load_time == 0:
             def_load_time = 40e-6
         #Override the load-time if one is specified explicitly
@@ -76,10 +76,10 @@ class ExpRabi(Experiment):
             self._param_rabi_decay_time.Value = 1.0 / dpkt['decay_rate']
 
         if self._transition == 'GE':
-            self._SPEC_qubit['GE X-Gate Amplitude'].Value = 0.5/self._param_rabi_frequency
+            self._SPEC_qubit['GE X-Gate Amplitude'].Value = 0.5/dpkt['frequency']
             self._SPEC_qubit['GE X-Gate Time'].Value = self.drive_time
         else:
-            self._SPEC_qubit['EF X-Gate Amplitude'].Value = 0.5/self._param_rabi_frequency
+            self._SPEC_qubit['EF X-Gate Amplitude'].Value = 0.5/dpkt['frequency']
             self._SPEC_qubit['EF X-Gate Time'].Value = self.drive_time
 
         dpkt['fig'].show()

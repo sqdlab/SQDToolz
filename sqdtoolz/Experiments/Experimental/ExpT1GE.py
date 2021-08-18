@@ -17,20 +17,20 @@ class ExpT1GE(Experiment):
         self._SPEC_qubit = SPEC_qubit
 
         #Calculate default load-time via T1 of qubit or default to 40e-6
-        def_load_time = self._SPEC_qubit['T1']
+        def_load_time = self._SPEC_qubit['GE T1'].Value * 4
         if def_load_time == 0:
             def_load_time = 40e-6
         #Override the load-time if one is specified explicitly
         self.load_time = kwargs.get('load_time', 40e-6)
 
         #Calculate X-Gate amplitude
-        def_X_ampl = self._SPEC_qubit['GE X-Gate Amplitude']
+        def_X_ampl = self._SPEC_qubit['GE X-Gate Amplitude'].Value
         #Override the tip-amplitude if one is specified explicitly
         self.X_ampl = kwargs.get('X_amplitude', def_X_ampl)
         assert self.X_ampl != 0, "X-amplitude is zero. Either supply a X_amplitude or have \'GE X-Gate Amplitude\' inside the qubit SPEC to be non-zero (e.g. run Rabi first?)."
 
         #Calculate tipping time
-        def_X_time = self._SPEC_qubit['GE X-Gate Time']
+        def_X_time = self._SPEC_qubit['GE X-Gate Time'].Value
         #Override the tip-time if one is specified explicitly
         self.X_time = kwargs.get('X_time', def_X_time)
         assert self.X_time != 0, "X-time is zero. Either supply a X_time or have \'GE X-Gate Time\' inside the qubit SPEC to be non-zero (e.g. run Rabi first?)."
@@ -80,7 +80,7 @@ class ExpT1GE(Experiment):
         if self._param_decay_time:
             self._param_decay_time.Value = dpkt['decay_time']
 
-        self._SPEC_qubit['GE T1'] = dpkt['decay_time']
+        self._SPEC_qubit['GE T1'].Value = dpkt['decay_time']
 
         dpkt['fig'].show()
         

@@ -2,6 +2,7 @@ from sqdtoolz.Experiment import*
 from sqdtoolz.HAL.WaveformGeneric import*
 from sqdtoolz.HAL.WaveformSegments import*
 from sqdtoolz.Utilities.DataFitting import*
+from sqdtoolz.Experiments.Experimental.ExpCalibGE import*
 
 class ExpRamseyGE(Experiment):
     def __init__(self, name, expt_config, wfmt_qubit_drive, range_waits, SPEC_qubit, iq_indices = [0,1], **kwargs):
@@ -37,9 +38,18 @@ class ExpRamseyGE(Experiment):
         assert self.tip_time != 0, "Tip-time is zero. Either supply a tip_time or have \'GE X-Gate Time\' inside the qubit SPEC to be non-zero (e.g. run Rabi first?)."
 
         self.readout_time = kwargs.get('readout_time', 2e-6)
-    
+
+        self.normalise_data = kwargs.get('normalise', False)
+        assert isinstance(self.normalise_data, bool), 'Argument \'normalise\' must be boolean.'
+        self.normalise_reps = kwargs.get('normalise_reps', 5)
+
     def _run(self, file_path, sweep_vars=[], **kwargs):
         assert len(sweep_vars) == 0, "Cannot specify sweeping variables in this experiment."
+
+        if self.normalise_data:
+            self.norm_expt = ExpCalibGE('GE Calibration', self._expt_config, self._wfmt_qubit_drive, self.normalise_reps, self._SPEC_qubit, self._iq_indices,
+                                        load_time = self.load_time, readout_time = self.readout_time, drive_time = self.tip_time)
+            self.norm_expt._run(file_path, data_file_index=0, **kwargs)
 
         self._expt_config.init_instruments()
 
@@ -76,7 +86,18 @@ class ExpRamseyGE(Experiment):
         data_y = np.sqrt(arr[:,self._iq_indices[0]]**2 + arr[:,self._iq_indices[1]]**2)
 
         dfit = DFitSinusoid()
-        dpkt = dfit.get_fitted_plot(data_x, data_y, 'Drive Amplitude', 'IQ Amplitude')
+        if self.normalise_data:
+            data_raw_IQ = np.vstack([ arr[:,self._iq_indices[0]], arr[:,self._iq_indices[1]] ]).T
+            fig, axs = plt.subplots(ncols=2, gridspec_kw={'width_ratios':[2,1]})
+            fig.set_figheight(5); fig.set_figwidth(15)
+            data_y = self.norm_expt.normalise_data(data_raw_IQ, ax=axs[1])
+
+            dpkt = dfit.get_fitted_plot(data_x, data_y, 'Drive Amplitude', 'IQ Amplitude', fig, axs[0])
+            axs[0].set_xlabel('Wait time'); axs[0].set_ylabel('Normalised Population')
+            axs[0].grid(b=True, which='minor'); axs[0].grid(b=True, which='major', color='k');
+        else:
+            data_y = np.sqrt(arr[:,self._iq_indices[0]]**2 + arr[:,self._iq_indices[1]]**2)
+            dpkt = dfit.get_fitted_plot(data_x, data_y, 'Drive Amplitude', 'IQ Amplitude')
 
         #Commit to parameters...
         if self._param_ramsey_frequency:
@@ -92,5 +113,8 @@ class ExpRamseyGE(Experiment):
         #     self._SPEC_qubit['EF X-Gate Time'].Value = self.drive_time
 
         print(dpkt)
-        dpkt['fig'].show()
+        if self.normalise_data:
+            fig.show()
+        else:
+            dpkt['fig'].show()
         

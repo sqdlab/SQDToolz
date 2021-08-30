@@ -142,7 +142,7 @@ class TimingPlot:
             
             self.fig.tight_layout()
 
-    def finalise_plot(self, total_time, x_units, title, max_segment_size_threshold = 50):
+    def finalise_plot(self, total_time, x_units, title, max_segment_size_threshold = 100):
         #Gather the feature time-stamps (e.g. changes, beginnings/ends)
         x_vals = [x[0] for x in self._cur_pulses] + [np.array([x.x1, x.x2]) for x in self._cur_rects] + [np.array([x[0].x1, x[0].x2]) for x in self._cur_rectplots]
         x_vals = np.sort(np.unique(np.concatenate(x_vals)))
@@ -152,10 +152,10 @@ class TimingPlot:
 
         if len(seg_lens) > 50 or np.max(seg_lens) < max_segment_size_threshold:
             #Default plotting - give up if there are a ton of segments or if there are not strange scaling on the plots...
-            self._plot_stretched(self, total_time, x_units, title)
+            self._plot_stretched(total_time, x_units, title)
         else:
             #Fancy axis cutting!
-            keep_size = max_segment_size_threshold*0.5 * np.min(seg_lens_raw)
+            keep_size = 0.5 * np.min(seg_lens_raw)
             #Gather regions which need to be cut
             cut_inds = np.array(np.where(seg_lens >= max_segment_size_threshold))[0]
             
@@ -167,6 +167,7 @@ class TimingPlot:
             width_ratios = np.array([x[1]-x[0] for x in xints])
             width_ratios /= np.sum(width_ratios)
             width_ratios /= np.min(width_ratios)
+            width_ratios = np.clip(width_ratios, 0, 2)
             axs = self.fig.subplots(1, cut_inds.size + 1, gridspec_kw={'width_ratios': width_ratios})
             self.fig.subplots_adjust(wspace=0.05)
             for m, ax in enumerate(axs):
@@ -175,8 +176,14 @@ class TimingPlot:
                 if m > 0:
                     ax.spines['left'].set_visible(False)
                     ax.set_yticks([])
+                if m % 2 == 1:
+                    ax.xaxis.tick_top()
                 ax.set_xlim((xints[m][0], xints[m][1]))
+                ax.ticklabel_format(useOffset=False)
                 ax.set_ylim((-self.bar_width, self.num_channels + self.bar_width))  #Otherwise, one must use sharey=True on subplots
+            axs[0].set_yticks(range(len(self.yticklabels)))
+            axs[0].set_yticklabels(self.yticklabels, size=12)
+
         
             #Plot digital pulses
             for cur_plot in self._cur_pulses:
@@ -214,13 +221,13 @@ class TimingPlot:
 
         return self.fig
 
-tp = TimingPlot()
-tp.goto_new_row('test1')
-tp.add_digital_pulse_sampled(np.array([0,0,1,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0]), 1e-9, 1e-9)
-tp.add_digital_pulse([(0.0, 0), (5e-9, 1), (10e-9, 0)], 20e-9, 1)
-tp.goto_new_row('test2')
-tp.add_rectangle(1e-9, 490e-9)
-tp.add_rectangle_with_plot(500e-9, 1e-6, np.sin(np.linspace(0,10,100))*0.5+0.5)
-tp.finalise_plot(1e-6, 'ns', 'test').show()
-input('Press ENTER')
+# tp = TimingPlot()
+# tp.goto_new_row('test1')
+# tp.add_digital_pulse_sampled(np.array([0,0,1,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0]), 1e-9, 1e-9)
+# tp.add_digital_pulse([(0.0, 0), (5e-9, 1), (10e-9, 0)], 20e-9, 1)
+# tp.goto_new_row('test2')
+# tp.add_rectangle(10e-9, 4900e-9)
+# tp.add_rectangle_with_plot(5000e-9, 10e-6, np.sin(np.linspace(0,10,100))*0.5+0.5)
+# tp.finalise_plot(10e-6, 'ns', 'test').show()
+# input('Press ENTER')
 

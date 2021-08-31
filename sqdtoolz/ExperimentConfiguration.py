@@ -301,15 +301,19 @@ class ExperimentConfiguration:
         if self._total_time < 2e-6:
             scale_fac = 1e9
             plt_units = 'ns'
+            min_tol = 0.2
         elif self._total_time < 2e-3:
             scale_fac = 1e6
             plt_units = 'us'
+            min_tol = 0.001
         elif self._total_time < 2:
             scale_fac = 1e3
             plt_units = 'ms'
+            min_tol = 1e-6
         else:
             scale_fac = 1
             plt_units = 's'
+            min_tol = 1e-9
 
         tp = TimingPlot()
 
@@ -370,4 +374,4 @@ class ExperimentConfiguration:
             else:
                 assert False, "The \'Type\' key in the dictionary returned on calling the function _get_timing_diagram_info is invalid."
 
-        return tp.finalise_plot(self._total_time*scale_fac, plt_units, f'Configuration: {self.Name}')
+        return tp.finalise_plot(self._total_time*scale_fac, plt_units, f'Configuration: {self.Name}', tol=min_tol)

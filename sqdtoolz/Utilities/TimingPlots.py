@@ -66,7 +66,9 @@ class TimingPlot:
         #Calculate smallest feature size...
         self.min_feature_size = min(self.min_feature_size, xEnd-xStart)
 
-    def add_digital_pulse_sampled(self, vals01, xStart, pts2xVals):
+    def add_digital_pulse_sampled(self, vals01, xStart, pts2xVals):       
+        vals01 = np.append(np.array(vals01), vals01[-1])
+
         yOff = self.num_channels
         xVals = [xStart]
         yVals = [vals01[0]]
@@ -142,10 +144,17 @@ class TimingPlot:
             
             self.fig.tight_layout()
 
-    def finalise_plot(self, total_time, x_units, title, max_segment_size_threshold = 100):
+    def finalise_plot(self, total_time, x_units, title, max_segment_size_threshold = 100, tol=0.001):
         #Gather the feature time-stamps (e.g. changes, beginnings/ends)
         x_vals = [x[0] for x in self._cur_pulses] + [np.array([x.x1, x.x2]) for x in self._cur_rects] + [np.array([x[0].x1, x[0].x2]) for x in self._cur_rectplots]
-        x_vals = np.sort(np.unique(np.concatenate(x_vals)))
+        x_vals = np.concatenate(x_vals)
+
+        #np.unique does not work due to floating-point issues.
+        a = x_vals
+        i = np.argsort(a.flat)
+        d = np.append(True, np.diff(a.flat[i]))
+        x_vals = a.flat[i[d>tol]]
+
         #Find portions with long segments
         seg_lens_raw = x_vals[1:] - x_vals[:-1]
         seg_lens = seg_lens_raw / np.min(seg_lens_raw)
@@ -256,7 +265,7 @@ class TimingPlot:
 # tp.add_rectangle(10e-9, 4900e-9)
 # tp.goto_new_row('test3')
 # tp.add_rectangle_with_plot(2000e-9, 10e-6, np.sin(np.linspace(0,10,100))*0.5+0.5)
-# tp.finalise_plot(10e-6, 'ns', 'test').show()
+# tp.finalise_plot(10e-6, 'ns', 'test', tol=1e-9).show()
 
 # tp = TimingPlot()
 # tp.goto_new_row('test1')
@@ -270,6 +279,6 @@ class TimingPlot:
 # tp.goto_new_row('test4')
 # tp.add_rectangle_with_plot(45e-6, 45e-6+20e-9, np.sin(np.linspace(0,10,100))*0.5+0.5)
 # tp.add_rectangle_with_plot(45e-6+20e-9, 50e-6, 0*np.sin(np.linspace(0,10,100))*0.5+0.5)
-# tp.finalise_plot(50e-6, 'ns', 'test').show()
+# tp.finalise_plot(50e-6, 'ns', 'test', tol=1e-9).show()
 # input('Press ENTER')
 

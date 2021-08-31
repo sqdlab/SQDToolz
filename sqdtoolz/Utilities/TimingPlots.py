@@ -23,12 +23,12 @@ class TimingPlot:
             self.y1 = y1
             self.y2 = y2
         
-        def gen_rectangle(self, shade=True):
+        def gen_rectangle(self, shade=True, colour='white'):
             x0 = (self.x1, self.y1)
             if shade:
-                return patches.Rectangle( x0, self.x2-self.x1, self.y2-self.y1, facecolor='white', edgecolor='black', hatch = '///')
+                return patches.Rectangle( x0, self.x2-self.x1, self.y2-self.y1, facecolor=colour, edgecolor='black', hatch = '///')
             else:
-                return patches.Rectangle( x0, self.x2-self.x1, self.y2-self.y1, facecolor='white', edgecolor='black')
+                return patches.Rectangle( x0, self.x2-self.x1, self.y2-self.y1, facecolor=colour, edgecolor='black')
 
     def add_rectangle(self, xStart, xEnd):
         '''
@@ -158,11 +158,38 @@ class TimingPlot:
             keep_size = 0.5 * np.min(seg_lens_raw)
             #Gather regions which need to be cut
             cut_inds = np.array(np.where(seg_lens >= max_segment_size_threshold))[0]
-            
-            xints = [[0, x_vals[cut_inds[0]]-keep_size]]
-            if cut_inds.size > 1:
-                xints += [[x_vals[cut_inds[c]+1]-keep_size, x_vals[cut_inds[c+1]]+keep_size] for c in range(len(cut_inds)-1)]
-            xints += [[x_vals[cut_inds[-1]+1]-keep_size, total_time]]
+
+            xints = []
+            divider_axes = []   #Just the boundary between two long segments that have each been cut!
+            x_vals = np.append(x_vals, total_time)
+            for c in range(len(cut_inds)+1):
+                if c == 0:
+                    ind_start = 0
+                else:
+                    ind_start = cut_inds[c-1]+1
+                t_start = x_vals[ind_start]
+                #
+                if c == len(cut_inds):
+                    ind_end = len(seg_lens)-1
+                    t_end = total_time
+                else:
+                    ind_end = cut_inds[c]
+                    t_end = x_vals[ind_end]
+                #
+                if ind_end - ind_start > 0:
+                    mean_size = np.mean(seg_lens_raw[ind_start:ind_end])
+                else:
+                    mean_size = np.min(seg_lens_raw)
+                    if c < len(cut_inds):
+                        divider_axes += [c]
+                #Adjust starting point to eat into the previous cut segment
+                if ind_start > 0:
+                    t_start -= min(mean_size*0.5, (x_vals[cut_inds[c-1]+1]-x_vals[cut_inds[c-1]])*0.5)
+                #Adjust ending point to eat into the next cut segment
+                if c < len(cut_inds):
+                    t_end += min(mean_size*0.5, (x_vals[cut_inds[c]+1]-x_vals[cut_inds[c]])*0.5)
+                #
+                xints += [[t_start,t_end]]
 
             width_ratios = np.array([x[1]-x[0] for x in xints])
             width_ratios /= np.sum(width_ratios)
@@ -178,11 +205,14 @@ class TimingPlot:
                     ax.set_yticks([])
                 if m % 2 == 1:
                     ax.xaxis.tick_top()
+                if m in divider_axes:
+                    ax.set_xticks([ x_vals[cut_inds[m]] ])
                 ax.set_xlim((xints[m][0], xints[m][1]))
                 ax.ticklabel_format(useOffset=False)
                 ax.set_ylim((-self.bar_width, self.num_channels + self.bar_width))  #Otherwise, one must use sharey=True on subplots
             axs[0].set_yticks(range(len(self.yticklabels)))
             axs[0].set_yticklabels(self.yticklabels, size=12)
+            self.fig.set_figwidth(15)
 
         
             #Plot digital pulses
@@ -192,19 +222,16 @@ class TimingPlot:
             #Plot rectangles
             for cur_rect in self._cur_rects:
                 for m, ax in enumerate(axs):
-                    if (xints[m][0] <= cur_rect.x1 and cur_rect.x1 <= xints[m][1]) or (xints[m][0] <= cur_rect.x2 and cur_rect.x2 <= xints[m][1]):
-                        ax.add_patch(cur_rect.gen_rectangle(True))
+                    ax.add_patch(cur_rect.gen_rectangle(True))
             #Plot rectangles
-            for cur_plot in self._cur_rectplots:
+            self._cur_rectplots.sort(key=lambda x: (x[0].y1, x[0].x1))    #Sort the rectangles in increasing y and then x to aid in colour coding...
+            cols = ['lightyellow', 'powderblue', 'thistle']
+            for p_ind, cur_plot in enumerate(self._cur_rectplots):
                 cur_rect = cur_plot[0]
-                plotted_first = False
                 for m, ax in enumerate(axs):
-                    if (xints[m][0] <= cur_rect.x1 and cur_rect.x1 <= xints[m][1]) or (xints[m][0] <= cur_rect.x2 and cur_rect.x2 <= xints[m][1]):
-                        ax.add_patch(cur_rect.gen_rectangle(False))
-                        if not plotted_first:
-                            cur_x_vals = np.linspace(cur_rect.x1, cur_rect.x1 + keep_size, cur_plot[1][0].size)
-                            ax.plot(cur_x_vals, cur_plot[1][1], 'k')
-                        plotted_first = True
+                    ax.add_patch(cur_rect.gen_rectangle(False, cols[p_ind % len(cols)]))
+                    cur_x_vals = np.linspace(max(xints[m][0], cur_rect.x1), min(xints[m][1], cur_rect.x2), cur_plot[1][0].size)
+                    ax.plot(cur_x_vals, cur_plot[1][1], 'k')
 
             
             #Plot the cut-slashes (inspired by: https://stackoverflow.com/questions/32185411/break-in-x-axis-of-matplotlib)
@@ -227,7 +254,22 @@ class TimingPlot:
 # tp.add_digital_pulse([(0.0, 0), (5e-9, 1), (10e-9, 0)], 20e-9, 1)
 # tp.goto_new_row('test2')
 # tp.add_rectangle(10e-9, 4900e-9)
-# tp.add_rectangle_with_plot(5000e-9, 10e-6, np.sin(np.linspace(0,10,100))*0.5+0.5)
+# tp.goto_new_row('test3')
+# tp.add_rectangle_with_plot(2000e-9, 10e-6, np.sin(np.linspace(0,10,100))*0.5+0.5)
 # tp.finalise_plot(10e-6, 'ns', 'test').show()
+
+# tp = TimingPlot()
+# tp.goto_new_row('test1')
+# tp.add_digital_pulse_sampled(np.array([0,0,1,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0]), 1e-9, 1e-9)
+# tp.add_digital_pulse([(0.0, 0), (5e-9, 1), (10e-9, 0)], 20e-9, 1)
+# tp.goto_new_row('test2')
+# tp.add_rectangle(46e-6, 50e-6)
+# tp.goto_new_row('test3')
+# tp.add_rectangle_with_plot(0, 4e-6, 0*np.sin(np.linspace(0,10,100))*0.5+0.5)
+# tp.add_rectangle_with_plot(4e-6, 45e-6, 0*np.sin(np.linspace(0,10,100))*0.5+0.5)
+# tp.goto_new_row('test4')
+# tp.add_rectangle_with_plot(45e-6, 45e-6+20e-9, np.sin(np.linspace(0,10,100))*0.5+0.5)
+# tp.add_rectangle_with_plot(45e-6+20e-9, 50e-6, 0*np.sin(np.linspace(0,10,100))*0.5+0.5)
+# tp.finalise_plot(50e-6, 'ns', 'test').show()
 # input('Press ENTER')
 

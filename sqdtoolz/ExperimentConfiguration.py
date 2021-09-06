@@ -189,7 +189,7 @@ class ExperimentConfiguration:
             awg_hal.null_all_markers()
         #Now settle the output markers
         for cur_dig in wfm_gen.digitals:
-            assert cur_dig in self._dict_wfm_map['digital'], f"There is no mapping for digital waveform \'{cur_wave}\'"
+            assert cur_dig in self._dict_wfm_map['digital'], f"There is no mapping for digital waveform \'{cur_dig}\'"
             if 'refWaveform' in wfm_gen.digitals[cur_dig]:
                 pass
                 cur_mkr = self._lab._get_resolved_obj(self._dict_wfm_map['digital'][cur_dig])

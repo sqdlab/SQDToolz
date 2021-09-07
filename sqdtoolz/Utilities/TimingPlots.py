@@ -149,6 +149,8 @@ class TimingPlot:
         x_vals = [x[0] for x in self._cur_pulses] + [np.array([x.x1, x.x2]) for x in self._cur_rects] + [np.array([x[0].x1, x[0].x2]) for x in self._cur_rectplots]
         x_vals = np.concatenate(x_vals)
 
+        assert np.max(x_vals) <= total_time, "The time values within the plot exceed the total_time parameter."
+
         #np.unique does not work due to floating-point issues.
         a = x_vals
         i = np.argsort(a.flat)

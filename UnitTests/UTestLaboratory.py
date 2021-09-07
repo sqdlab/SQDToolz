@@ -366,6 +366,7 @@ for cur_val in new_lab.VAR("myFreq").array(cur_arr):
 #
 new_lab.HAL('dum_acq').set_trigger_source(None)
 new_lab.HAL('dum_acq').set_data_processor(None)
+new_lab.HAL('ddg').get_trigger_output('A').TrigPulseLength = 10e-8
 ExperimentConfiguration('testConf', new_lab, 1.0, ['ddg'], 'dum_acq')
 #
 new_lab.group_open("test_group")

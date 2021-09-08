@@ -275,6 +275,9 @@ class Laboratory:
         if not (instrID in self._station.components):
             self._station.load_instrument(instrID)
             self._activated_instruments += [instrID]
+    
+    def release_all_instruments(self):
+        self._station.close_all_registered_instruments()
 
     def _get_instrument(self, instrID):
         if type(instrID) is list:

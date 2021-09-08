@@ -98,8 +98,20 @@ class FileIOReader:
             self.param_vals[cur_ind] = self.hdf5_file["parameters"][cur_param][1:]
 
     def get_numpy_array(self):
-        cur_shape = [len(x) for x in self.param_vals] + [len(self.dep_params)]
-        return self.dset[:].reshape(tuple(x for x in cur_shape))
+        if not self.hdf5_file is None:
+            cur_shape = [len(x) for x in self.param_vals] + [len(self.dep_params)]
+            return self.dset[:].reshape(tuple(x for x in cur_shape))
+        else:
+            assert False, "The reader has released the file - create a new FileIOReader instance to extract data."
+            return np.array([])
+    
+    def release(self):
+        if not self.hdf5_file is None:
+            self.dset = None
+            self.hdf5_file.close()
+            self.file_path = ''
+            self.folder_path = ''
+            self.hdf5_file = None
 
 class FileIODirectory:
     class plt_object:
@@ -230,6 +242,10 @@ class FileIODirectory:
                         break
                 uniform_inners += [param_uniform]
             self.uniform_indices += uniform_inners
+        
+        #Release the HDF5 reader files...
+        for cur_file in cur_files:
+            cur_file[0].release()
 
     @classmethod
     def fromReader(cls, obj_FileIOReader):

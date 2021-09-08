@@ -766,6 +766,6 @@ class TestSweeps(unittest.TestCase):
         shutil.rmtree('test_save_dir')
 
 if __name__ == '__main__':
-    temp = TestSweeps()
-    temp.test_Exp()
+    # temp = TestSweeps()
+    # temp.test_Exp()
     unittest.main()

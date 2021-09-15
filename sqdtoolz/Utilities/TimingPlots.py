@@ -145,6 +145,9 @@ class TimingPlot:
             self.fig.tight_layout()
 
     def finalise_plot(self, total_time, x_units, title, max_segment_size_threshold = 100, tol=0.001):
+        if len(self._cur_pulses) + len(self._cur_rects) + len(self._cur_rectplots) == 0:
+            return plt.figure()
+
         #Gather the feature time-stamps (e.g. changes, beginnings/ends)
         x_vals = [x[0] for x in self._cur_pulses] + [np.array([x.x1, x.x2]) for x in self._cur_rects] + [np.array([x[0].x1, x[0].x2]) for x in self._cur_rectplots]
         x_vals = np.concatenate(x_vals)

@@ -52,7 +52,7 @@ class DFitSinusoid:
     def __init__(self):
         pass
 
-    def get_fitted_plot(self, data_x, data_y, xLabel="", yLabel=""):
+    def get_fitted_plot(self, data_x, data_y, xLabel="", yLabel="", fig=None, axs=None):
         def func(x, a, gamma, f, phi, c):
             return a * np.exp(-x*gamma) * np.cos(2*np.pi*f*x + phi) + c
 
@@ -78,10 +78,11 @@ class DFitSinusoid:
 
         #Calculate with decay
         popt, pcov = scipy.optimize.curve_fit(func, data_x, data_y, [a0, gamma0, f0, phi0, c0],
-                                            bounds=([0.1*a0, -5*(xMax-xMin), 0.5/(xMax-xMin),       -np.pi, yMin],
-                                                    [1.2*a0,  5*(xMax-xMin), 0.5/np.abs(np.min(dx)), np.pi, yMax]))
+                                            bounds=([0.1*a0, -5/(xMax-xMin), 0.5/(xMax-xMin),       -np.pi, yMin],
+                                                    [1.2*a0,  5/(xMax-xMin), 0.5/np.abs(np.min(dx)), np.pi, yMax]))
 
-        fig, axs = plt.subplots(1)
+        if fig == None:
+            fig, axs = plt.subplots(1)
         axs.plot(data_x, data_y, 'kx')
         axs.plot(data_x, func(data_x, *popt), 'r-')
         axs.set_xlabel(xLabel)
@@ -102,7 +103,7 @@ class DFitExponential:
     def __init__(self):
         pass
 
-    def get_fitted_plot(self, data_x, data_y, xLabel="", rise = False):
+    def get_fitted_plot(self, data_x, data_y, xLabel="", rise = False, fig=None, axs=None):
         def func(x, a, c, tau):
             return a * np.exp(-x/tau) + c
 
@@ -130,7 +131,8 @@ class DFitExponential:
             popt, pcov = scipy.optimize.curve_fit(func, data_x, data_y, [a0, c0, tau0],
                                              bounds=([0, yMin, 0.01*tau0], [2.0*a0, yMax, tau0*10]))
 
-        fig, axs = plt.subplots(1)
+        if fig == None:
+            fig, axs = plt.subplots(1)
         axs.plot(data_x, data_y, 'kx')
         axs.plot(data_x, func(data_x, *popt), 'r-')
         axs.set_xlabel(xLabel)

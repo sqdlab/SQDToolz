@@ -101,7 +101,8 @@ class ProcessorGPU(DataProcessor):
         for cur_proc in self.pipeline_end:
             ret_data = cur_proc.process_data(ret_data)
         #Drain the GPU memory and transfer to CPU before processing next data packet...
-        for cur_ch in ret_data['data'].keys():
+        dict_keys = [x for x in ret_data['data'].keys()]
+        for cur_ch in dict_keys:
             cp_arr = ret_data['data'].pop(cur_ch)
             ret_data['data'][cur_ch] = cp.asnumpy(cp_arr)
             del cp_arr
@@ -141,9 +142,11 @@ class ProcessorGPU(DataProcessor):
         self.pipeline_end.clear()
 
     def add_stage(self, ProcNodeGPUobj):
+        assert isinstance(ProcNodeGPUobj, ProcNodeGPU), "Can only add GPU Processing stages in a GPU Processor."
         self.pipeline.append(ProcNodeGPUobj)
 
     def add_stage_end(self, ProcNodeGPUobj):
+        assert isinstance(ProcNodeGPUobj, ProcNodeGPU), "Can only add GPU Processing stages in a GPU Processor."
         self.pipeline_end.append(ProcNodeGPUobj)
 
     def __str__(self):

@@ -37,7 +37,6 @@ class Laboratory:
         else:
             self._station = qc.Station(config_file=instr_config_file)
         self._instr_config_file = instr_config_file
-        #TODO: Add initialiser for load last file in save_dir thing...
 
         #Convert Windows backslashes into forward slashes (should be compatible with MAC/Linux then...)
         self._save_dir = save_dir.replace('\\','/')
@@ -100,6 +99,7 @@ class Laboratory:
         else:
             #Go through the directories in reverse chronological order (presuming data-stamped folders)
             dirs = [x[0] for x in os.walk(self._save_dir)]  #Walk gives a tuple: (dirpath, dirnames, filenames)
+            dirs.sort()
 
         for cur_cand_dir in dirs[::-1]:
             cur_dir = cur_cand_dir.replace('\\','/')
@@ -275,6 +275,9 @@ class Laboratory:
         if not (instrID in self._station.components):
             self._station.load_instrument(instrID)
             self._activated_instruments += [instrID]
+    
+    def release_all_instruments(self):
+        self._station.close_all_registered_instruments()
 
     def _get_instrument(self, instrID):
         if type(instrID) is list:
@@ -288,6 +291,23 @@ class Laboratory:
         else:
             assert instrID in self._station.components, f"Instrument by the name {instrID} has not been loaded. Call load_instrument on it first."
             return self._station.components[instrID]
+
+    def print_HALs(self):
+        print("Laboratory HALs:")
+        for hal_ID in self._hal_objs:
+            print(f"\t{hal_ID} (Type: {self.HAL(hal_ID).__class__.__name__})")
+    def print_PROCs(self):
+        print("Laboratory PROCs:")
+        for proc_name in self._processors:
+            print(f"\t{proc_name} (Type: {self.PROC(proc_name).__class__.__name__})")
+    def print_WFMTs(self):
+        print("Laboratory WFMTs:")
+        for wfmt_name in self._waveform_transforms:
+            print(f"\t{wfmt_name} (Type: {self.WFMT(wfmt_name).__class__.__name__})")
+    def print_SPECs(self):
+        print("Laboratory SPECs:")
+        for spec_name in self._specifications:
+            print(f"\t{spec_name}")
 
 
     def group_open(self, group_name):
@@ -317,12 +337,7 @@ class Laboratory:
         cur_exp_path = self._save_dir + folder_time_stamp
         Path(cur_exp_path).mkdir(parents=True, exist_ok=True)
 
-        #TODO: Write the sweeping code to appropriately nest folders or perform data-passing
-        self._time_stamp_begin = time.time()
-        self._time_stamps = [(0,0),]
-        self._prog_bar_str = ''
         ret_vals = expt_obj._run(cur_exp_path, sweep_vars, ping_iteration=self._update_progress_bar, **kwargs)
-        #TODO: Add flag to get/save for live-plotting
 
         #Save the experiment configuration
         self.save_experiment_configs(cur_exp_path)
@@ -441,12 +456,19 @@ class Laboratory:
     def update_state(self):
         if self.UpdateStateEnabled:
             self.save_laboratory_config(self._save_dir, '_last_state.txt')
+            self.save_variables(self._save_dir, '_last_vars.txt')
     def open_browser(self):
         cur_dir = os.path.dirname(os.path.realpath(__file__)).replace('\\','/')
         drive = cur_dir[0:2]
         os.system(f'start \"temp\" cmd /k \"{drive} && cd \"{cur_dir}/Utilities\" && python ExperimentViewer.py \"{self._save_dir}\"\"')
 
-    def _update_progress_bar(self, val_pct):
+    def _update_progress_bar(self, val_pct=0, reset=False):
+        if reset:
+            self._time_stamp_begin = time.time()
+            self._time_stamps = [(0,0),]
+            self._prog_bar_str = ''
+            return
+
         self._time_stamps += [(val_pct, time.time())]
 
         ts = np.array([x[1] for x in self._time_stamps])

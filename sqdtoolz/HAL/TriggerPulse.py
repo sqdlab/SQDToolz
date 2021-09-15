@@ -90,6 +90,10 @@ class Trigger(TriggerOutput):
         return self._name
 
     @property
+    def Parent(self):
+        return (self._parent, None)
+
+    @property
     def TrigPulseDelay(self):
         return self._instrTrig.TrigPulseDelay
     @TrigPulseDelay.setter

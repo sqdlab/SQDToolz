@@ -281,6 +281,7 @@ from sqdtoolz.HAL.Processors.ProcessorCPU import*
 from sqdtoolz.HAL.Processors.CPU.CPU_DDC import*
 from sqdtoolz.HAL.Processors.CPU.CPU_FIR import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Mean import*
+from sqdtoolz.HAL.Processors.CPU.CPU_FFT import*
 import matplotlib.pyplot as plt
 import time
 
@@ -297,8 +298,8 @@ def runme():
     new_digi.NumSamples = 2**19#(2**13)#2**8+2**7)
     new_digi.NumRepetitions = 1
 
-    new_digi.NumRepetitions = 4096
-    new_digi.NumSegments = 3
+    new_digi.NumRepetitions = 5
+    new_digi.NumSegments = 1
     new_digi.NumSamples = 512
 
     # term = new_digi._param32bit(30130)
@@ -311,6 +312,7 @@ def runme():
     # myProc.add_stage(CPU_Mean('sample'))
     # myProc.add_stage(CPU_Mean('segment'))
     # myProc.add_stage_end(CPU_Mean('repetition'))
+    myProc.add_stage(CPU_FFT())
 
     a = new_digi.get_data(data_processor=myProc)
     b = new_digi.get_data(data_processor=myProc)

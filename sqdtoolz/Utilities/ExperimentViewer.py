@@ -7,6 +7,8 @@ import os
 import json
 import sys
 
+from numpy import isin
+
 class ListBoxScrollBar:
     def __init__(self, parent_ui_element):
         self.frame = Frame(master=parent_ui_element)
@@ -85,6 +87,76 @@ class ListBoxScrollBar:
         self.select_index(cur_ind, generate_selection_event)
 
 class ExperimentViewer:
+    class DashboardGroup:
+        class ElemSimpleLabel:
+            def __init__(self, parent):
+                self.lbl = Label(parent, text = "", justify=LEFT)
+                self.lbl.pack(side=LEFT)
+            
+            def set_text_col(self, text, bg_col):
+                self.lbl['text'] = text
+                self.lbl['bg'] = bg_col
+
+        class ElemLabelListBox:
+            def __init__(self, parent):
+                self.frame = Frame(parent)
+                self.frame.pack(side=LEFT)
+                self.lbl = Label(self.frame, text="", justify=LEFT)
+                self.lstbx = ListBoxScrollBar(self.frame)
+            
+            def set_text_col_list(self, text, bg_col, list_elems):
+                self.lbl['text'] = text
+                self.lbl['bg'] = bg_col
+                self.lstbx.update_vals(list_elems)
+                #
+                self.frame.columnconfigure(0, weight=1)
+                self.frame.rowconfigure(0, weight=0)
+                self.frame.rowconfigure(1, weight=1)
+                self.lbl.grid(row=0, column=0, sticky='news')
+                self.lstbx.frame.grid(row=1, column=0, sticky='news')
+        class ElemListBox:
+            def __init__(self, parent):
+                self.lstbx = ListBoxScrollBar(parent)
+                self.lstbx.frame.pack(fill=BOTH, expand=1)
+            
+            def set_list(self, list_elems):
+                self.lstbx.update_vals(list_elems)
+
+        def __init__(self, root, group_name):
+            self.entries = []
+            self.frame = LabelFrame(master=root, text = group_name)
+            ExperimentViewer.DashboardGroup.ElemSimpleLabel
+
+        def _populate_elements(self, elem_type, num_elem):
+            #Trim off any elements that are not of the given type...
+            for cur_elem in self.entries:
+                if not isinstance(cur_elem, elem_type):
+                    while len(self.entries) > 0:
+                        kill_elem = self.entries.pop(0)
+                        kill_elem.pack_forget()
+                    break
+
+            while num_elem < len(self.entries) and len(self.entries) > 0:
+                kill_elem = self.entries.pop(0)
+                kill_elem.pack_forget()
+            while num_elem > len(self.entries):
+                self.entries += [elem_type(self.frame)]
+
+        def set_simple_labels(self, cur_str_and_cols):
+            self._populate_elements(ExperimentViewer.DashboardGroup.ElemSimpleLabel, len(cur_str_and_cols))
+            for ind, cur_lbl in enumerate(cur_str_and_cols):
+                self.entries[ind].set_text_col(cur_lbl[0], cur_lbl[1])
+
+        def set_simple_label_list(self, cur_str_and_cols_list):
+            self._populate_elements(ExperimentViewer.DashboardGroup.ElemLabelListBox, len(cur_str_and_cols_list))
+            for ind, cur_lbl in enumerate(cur_str_and_cols_list):
+                self.entries[ind].set_text_col_list(cur_lbl[0], cur_lbl[1], cur_lbl[2])
+
+        def set_simple_list(self, cur_list):
+            self._populate_elements(ExperimentViewer.DashboardGroup.ElemListBox, len(cur_list))
+            for ind, cur_list in enumerate(cur_list):
+                self.entries[ind].set_list(cur_list)
+    
     def __init__(self, path):
         self.root = tk.Tk()
         self.root.wm_title("SQDToolz experiment visualisation tool")
@@ -102,12 +174,31 @@ class ExperimentViewer:
         self.parent_expt_comp = self.tab_expt_comp
 
         #Create Dashboard Groups:
-        self.dash_MWs = self._create_dashboard_group("Microwave Sources")
-        self.dash_ATTENs = self._create_dashboard_group("Attenuators")
-        self.dash_VOLTs = self._create_dashboard_group("Voltage Sources")
-        self.dash_SWs = self._create_dashboard_group("Switches")
-        self.dash_WFMTs = self._create_dashboard_group("Waveform Transformations")
-        self.dash_SPECs = self._create_dashboard_group("Experiment Specifications")
+        self.dash_MWs = ExperimentViewer.DashboardGroup(self.parent_dashboard, "Microwave Sources")
+        self.dash_WFMs = ExperimentViewer.DashboardGroup(self.parent_dashboard, "Waveforms")
+        self.dash_VOLTs = ExperimentViewer.DashboardGroup(self.parent_dashboard, "Voltage Sources")
+        
+        frame_grp1 = Frame(master=self.parent_dashboard)
+        self.dash_ATTENs = ExperimentViewer.DashboardGroup(frame_grp1, "Attenuators")
+        self.dash_ATTENs.frame.pack(side=LEFT)
+        self.dash_SWs = ExperimentViewer.DashboardGroup(frame_grp1, "Switches")
+        self.dash_SWs.frame.pack(side=LEFT)
+
+        frame_grp2 = Frame(master=self.parent_dashboard)
+        self.dash_WFMTs = ExperimentViewer.DashboardGroup(frame_grp2, "Waveform Transformations")
+        self.dash_WFMTs.frame.pack(side=LEFT)
+        self.dash_SPECs = ExperimentViewer.DashboardGroup(frame_grp2, "Experiment Specifications")
+        self.dash_SPECs.frame.pack(side=LEFT)
+
+        
+        self.dash_VARs = ExperimentViewer.DashboardGroup(self.parent_dashboard, "Variables")
+        self.dash_VARs.frame.pack(side=LEFT, fill=BOTH, expand=1)
+        
+        self.dash_MWs.frame.pack(side=TOP)
+        self.dash_WFMs.frame.pack(side=TOP)
+        frame_grp1.pack(side=TOP)
+        self.dash_VOLTs.frame.pack(side=TOP)
+        frame_grp2.pack(side=TOP)
 
         self.pw_main_LR_UI = PanedWindow(orient =tk.HORIZONTAL, master=self.parent_expt_comp, sashwidth=3, bg = "#000077", bd = 0)
         frame_left = Frame(master=self.pw_main_LR_UI)
@@ -168,8 +259,6 @@ class ExperimentViewer:
         self.pw_main_LR_UI.update()
         self.pw_main_LR_UI.sash_place(0, 110, 0)
 
-        dirs = [x[0] for x in os.walk(self._path)]
-
         cur_date_folders = next(os.walk(self._path))[1]
         for cur_date_folder in cur_date_folders:
             tree_folder_date =self.trvw_expts.insert("", "end", text=cur_date_folder)
@@ -182,7 +271,6 @@ class ExperimentViewer:
                 if not os.path.isfile(cur_path_data + "/laboratory_configuration.txt"):
                     continue
                 self.trvw_expts.insert(tree_folder_date, "end", text=cur_data_folder, tags=cur_path_data)
-
 
         while True:
             #Read JSON file for latest configuration...
@@ -200,11 +288,24 @@ class ExperimentViewer:
             cur_sws = []
             cur_volts = []
             cur_attens = []
+            cur_wfms = []
             for cur_hal in data['HALs']:
                 cur_str = ""
+                cur_list = []
                 for cur_key in cur_hal:
                     if isinstance(cur_hal[cur_key], str) or isinstance(cur_hal[cur_key], float) or isinstance(cur_hal[cur_key], int) or isinstance(cur_hal[cur_key], bool):
                         cur_str += f"{cur_key}: {self._get_units(cur_hal[cur_key])}\n"
+                    elif cur_key == "WaveformSegments": #Custom processing for AWG waveforms...
+                        # cur_str += "Segments:\n"
+                        for cur_seg in cur_hal[cur_key]:
+                            if "Value" in cur_seg:
+                                ampl_val = self._get_units(cur_seg["Value"])
+                            elif "Amplitude" in cur_seg:
+                                ampl_val = self._get_units(cur_seg["Amplitude"])
+                            else:
+                                ampl_val = ""
+                            #Trim the WFS_ in the Type...
+                            cur_list += [f'\t{cur_seg["Name"]}, [{cur_seg["Type"][4:]}], {self._get_units(cur_seg["Duration"])}s, {ampl_val}\n']
                 
                 #Get state-colours based on the Output key...
                 cur_on_key = ''
@@ -228,6 +329,8 @@ class ExperimentViewer:
                     cur_volts += [(cur_str[:-1], col)]    #:-1 is to remove the last \n
                 if cur_hal['Type'] == 'GENatten':
                     cur_attens += [(cur_str[:-1], col)]    #:-1 is to remove the last \n
+                if cur_hal['Type'] == 'WaveformAWG':
+                    cur_wfms += [(cur_str[:-1], col, cur_list)]    #:-1 is to remove the last \n
 
             cur_wfmts = []
             for cur_wfmt in data['WFMTs']:
@@ -252,15 +355,29 @@ class ExperimentViewer:
                 cur_specs += [(cur_str[:-1], col)]
 
             #Setup the dashboard of labels...
-            self._set_frame_labels(self.dash_MWs, cur_mws)
-            self._set_frame_labels(self.dash_VOLTs, cur_volts)
-            self._set_frame_labels(self.dash_SWs, cur_sws)
-            self._set_frame_labels(self.dash_ATTENs, cur_attens)
-            self._set_frame_labels(self.dash_WFMTs, cur_wfmts)
-            self._set_frame_labels(self.dash_SPECs, cur_specs)
-            
-            
-            self.trvw_expts
+            self.dash_MWs.set_simple_labels(cur_mws)
+            self.dash_VOLTs.set_simple_labels(cur_volts)
+            self.dash_SWs.set_simple_labels(cur_sws)
+            self.dash_ATTENs.set_simple_labels(cur_attens)
+            self.dash_WFMs.set_simple_label_list(cur_wfms)
+            self.dash_WFMTs.set_simple_labels(cur_wfmts)
+            self.dash_SPECs.set_simple_labels(cur_specs)
+
+            #Read JSON file for latest variables...
+            file_state = self._path + "_last_vars.txt"
+            if not os.path.isfile(file_state):
+                continue
+            try:    #Needs try-catch as the file may be written to while being read - abort/ignore if it's being updated...
+                with open(file_state) as json_file:
+                    data = json.load(json_file)
+            except:
+                continue
+
+            cur_vars = []
+            for cur_var in data:
+                cur_vars += [f"{cur_var}: {self._get_units(data[cur_var]['Value'])}\n"]
+            # self.dash_VARs.set_simple_labels([(cur_str[:-1], 'white')])
+            self.dash_VARs.set_simple_list([cur_vars])
 
             try:
                 self.root.update()
@@ -303,21 +420,6 @@ class ExperimentViewer:
         }
         ret_dict['frame'].pack()
         return ret_dict
-
-    def _set_frame_labels(self, dashboard_group, cur_str_and_cols):
-        lbl_list = dashboard_group['label_entries']
-        parent = dashboard_group['frame']
-        while len(cur_str_and_cols) < len(lbl_list) and len(lbl_list) > 0:
-            kill_lbl = lbl_list.pop(0)
-            kill_lbl.pack_forget()
-        while len(cur_str_and_cols) > len(lbl_list):
-            new_lbl = Label(parent, text = "", justify=LEFT)
-            new_lbl.pack(side=LEFT)
-            lbl_list += [new_lbl]
-        for ind, cur_lbl in enumerate(cur_str_and_cols):
-            lbl_list[ind]['text'] = cur_lbl[0]
-            lbl_list[ind]['bg'] = cur_lbl[1]
-
 
     def _event_trvw_expts_selected(self, event):
         for selected_item in self.trvw_expts.selection():
@@ -408,5 +510,5 @@ if __name__ == '__main__':
     if len(sys.argv) >= 2:
         print(sys.argv[1])
         ExperimentViewer(sys.argv[1]).main_loop()
-    # ExperimentViewer('Z:/Data/sqdtoolz_test/').main_loop()
+    # ExperimentViewer(r'Z:\Data\EH_QuantumClock_V2\\').main_loop()
 

@@ -107,7 +107,7 @@ class AWGOutputChannel(TriggerInput):
         return {'Type' : 'AnalogueSampled', 'Period' : self._parent_waveform_obj.Duration, 'Data' : seg_dicts}
 
     def set_trigger_source(self, trig_src_obj, trig_pol = -1):
-        #TODO: Consider error-checking here
+        assert isinstance(trig_src_obj, TriggerOutput) or trig_src_obj == None, "Must supply a valid Trigger Output object (i.e. digital trigger output like a marker)."
         self._trig_src_obj = trig_src_obj
         if trig_pol != -1:
             self.InputTriggerEdge = trig_pol
@@ -178,7 +178,6 @@ class AWGOutputMarker(TriggerOutput, TriggerInput):
 
     @property
     def Name(self):
-        #TODO: Look to make all name properties to start with capital letters...
         return self._name
 
     @property

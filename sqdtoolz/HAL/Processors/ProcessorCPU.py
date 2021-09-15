@@ -18,6 +18,8 @@ from sqdtoolz.HAL.Processors.CPU.CPU_FIR import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Integrate import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Max import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Mean import*
+from sqdtoolz.HAL.Processors.CPU.CPU_Max_Min import*
+
 
 
 class ProcessorCPU(DataProcessor):

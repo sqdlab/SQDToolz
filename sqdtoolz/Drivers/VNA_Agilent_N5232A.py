@@ -12,7 +12,7 @@ from qcodes import (
 class VNA_Agilent_N5232A(VisaInstrument):
     def __init__(self, name, address, **kwargs):
         super().__init__(name, address, terminator='\n', **kwargs)
-
+        self._data_processor = None
         #By default we are working with the channel number 1, so SENSe<cnum>: if all queries is just SENSe1: ...
         
         
@@ -413,6 +413,10 @@ class VNA_Agilent_N5232A(VisaInstrument):
         for cur_meas_name, cur_meas in cur_meas_traces:
             ret_data['data'][f'{cur_meas}_real'] = np.vstack(ret_data['data'][f'{cur_meas}_real'])
             ret_data['data'][f'{cur_meas}_imag'] = np.vstack(ret_data['data'][f'{cur_meas}_imag'])
+        
+        if self._data_processor is not None:
+            self._data_processor.push_data(ret_data)
+            return self._data_processor.get_all_data()
         return ret_data
 
     def abort(self):

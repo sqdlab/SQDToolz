@@ -211,8 +211,10 @@ class TestColdReload(unittest.TestCase):
         self.lab.save_laboratory_config('UnitTests/')
 
     def cleanup(self):
+        self.lab.release_all_instruments()
+        self.lab = None
         os.remove('UnitTests/experiment_configurations.txt')
-        os.remove('UnitTests/laboratory_configuration.txt')         
+        os.remove('UnitTests/laboratory_configuration.txt')
         shutil.rmtree('test_save_dir')
 
     def arr_equality(self, arr1, arr2):
@@ -615,6 +617,10 @@ class TestSweeps(unittest.TestCase):
         self.lab.WFMT("IQmod").IQdcOffset = (9,1)
         self.lab.WFMT("IQmod").IQUpperSideband = False
 
+    def cleanup(self):
+        self.lab.release_all_instruments()
+        self.lab = None
+
     def arr_equality(self, arr1, arr2):
         if arr1.size != arr2.size:
             return False
@@ -649,6 +655,7 @@ class TestSweeps(unittest.TestCase):
             m += 1
         
         shutil.rmtree('test_save_dir')
+        self.cleanup()
 
     def test_Exp(self):
         self.initialise()
@@ -684,6 +691,7 @@ class TestSweeps(unittest.TestCase):
         assert assert_found, "Experiment class did not catch an error when passing a sweeping-variable with an empty list..."
 
         shutil.rmtree('test_save_dir')
+        self.cleanup()
 
     def test_ExpSweepAndFullColdReload(self):
         self.initialise()
@@ -711,6 +719,13 @@ class TestSweeps(unittest.TestCase):
         assert self.arr_equality(amalg_res.param_vals[0], np.array([1,2,3])), "The extracted FileIODirectory object has incorrect right sweeping values."
         assert self.arr_equality(amalg_res.param_vals[1], np.array([4,7,8])), "The extracted FileIODirectory object has incorrect right sweeping values."
         assert amalg_res.param_names[0:2] == ["myFreq", "testAmpl"], "The extracted FileIODirectory object has incorrect right sweeping parameter names."
+        #Test time-stamps are spaced appropriately...
+        ts = amalg_res.get_time_stamps()
+        ts_exps = []
+        for m in np.arange(3):
+            for n in np.arange(3):
+                ts_exps += [ ts[m][n][0][0][0] ]
+        assert np.sum(np.diff(ts_exps)/1e6) >= 8, "The time-stamps do not differ by at least 1s per experimental trace."
         res.release()
 
         #
@@ -764,8 +779,9 @@ class TestSweeps(unittest.TestCase):
         assert self.lab.WFMT("IQmod").IQUpperSideband == False, "WaveformTransformation property incorrectly set"
 
         shutil.rmtree('test_save_dir')
+        self.cleanup()
 
 if __name__ == '__main__':
-    # temp = TestSweeps()
-    # temp.test_Exp()
+    temp = TestSweeps()
+    temp.test_ExpSweepAndFullColdReload()
     unittest.main()

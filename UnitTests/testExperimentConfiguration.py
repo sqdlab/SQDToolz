@@ -43,6 +43,10 @@ class TestHALInstantiation(unittest.TestCase):
         awg_wfm2 = WaveformAWG("Wfm2", self.lab, [('virAWG', 'CH3'), ('virAWG', 'CH4')], 1e9)
         hal_mw = GENmwSource("MW-Src", self.lab, 'virMWS', 'CH1')
 
+    def cleanup(self):
+        self.lab.release_all_instruments()
+        self.lab = None
+
     def test_Reinstantiation(self):
         self.initialise()
         hal_ddg = self.lab.HAL('ddg')
@@ -99,6 +103,7 @@ class TestHALInstantiation(unittest.TestCase):
             assert_found = True
             # assert arr_act.size == 0, "There are erroneous trigger edges found in the current configuration."
         assert assert_found, "Reinstantiation was possible with a different channel configuration..."
+        self.cleanup()
 
     def test_ACQ_params(self):
         self.initialise()
@@ -107,7 +112,8 @@ class TestHALInstantiation(unittest.TestCase):
         assert self.lab.HAL('dum_acq').NumRepetitions == 10, "ACQ HAL did not properly enter the number of repetitions."
         assert self.lab.HAL('dum_acq').NumSegments == 2, "ACQ HAL did not properly enter the number of segments."
         assert self.lab.HAL('dum_acq').NumSamples == 30, "ACQ HAL did not properly enter the number of samples."
-
+        
+        self.cleanup()
 
     def test_get_trigger_edges(self):
         self.initialise()
@@ -273,6 +279,8 @@ class TestHALInstantiation(unittest.TestCase):
         assert self.arr_equality(arr_act_segs[:,0], arr_exp[:,0]), "Incorrect trigger segment intervals returned by the get_trigger_edges function on including 2 AWGs."
         assert self.arr_equality(arr_act_segs[:,1], arr_exp[:,1]), "Incorrect trigger segment intervals returned by the get_trigger_edges function on including 2 AWGs."
         hal_acq.InputTriggerEdge = 1
+        
+        self.cleanup()
 
     def test_MWsource(self):
         self.initialise()
@@ -401,6 +409,8 @@ class TestHALInstantiation(unittest.TestCase):
         hal_acq.InputTriggerEdge = 1
         self.lab._get_instrument('virMWS').get_output('CH1').TriggerInputEdge = 1
 
+        self.cleanup()
+
     def test_AWG_Mapping(self):
         self.initialise()
         hal_ddg = self.lab.HAL('ddg')
@@ -445,7 +455,6 @@ class TestHALInstantiation(unittest.TestCase):
         awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('C'))
         awg_wfm2.set_trigger_source_all(awg_wfm.get_output_channel(0).marker(1))
         hal_acq.set_trigger_source(awg_wfm2.get_output_channel(0).marker(0))
-
 
         #
         #Test waveform-update and mapping
@@ -609,6 +618,7 @@ class TestHALInstantiation(unittest.TestCase):
             # assert arr_act.size == 0, "There are erroneous trigger edges found in the current configuration."
         assert assert_found, "Function update_waveforms failed to trigger an assertion error when feeding waveforms of different size while demanding reference marker segments amongst each other."
 
+        self.cleanup()
 class TestSaveLoad(unittest.TestCase):
     def initialise(self):
         self.lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir/')
@@ -624,6 +634,10 @@ class TestSaveLoad(unittest.TestCase):
         awg_wfm = WaveformAWG("Wfm1", self.lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9)
         awg_wfm2 = WaveformAWG("Wfm2", self.lab, [('virAWG', 'CH3'), ('virAWG', 'CH4')], 1e9)
         hal_mw = GENmwSource("MW-Src", self.lab, 'virMWS', 'CH1')
+
+    def cleanup(self):
+        self.lab.release_all_instruments()
+        self.lab = None
 
     def test_SaveLoadHALs(self):
         self.initialise()
@@ -790,6 +804,7 @@ class TestSaveLoad(unittest.TestCase):
         assert awg_wfm.get_waveform_segment('zero22').Duration == 77e-9*3, "Property incorrectly reloaded in AWG Waveform Segment."
 
         shutil.rmtree('test_save_dir')
+        self.cleanup()
 
     def test_ReinitialisationSaveCopy(self):
         self.initialise()
@@ -984,6 +999,7 @@ class TestSaveLoad(unittest.TestCase):
         os.remove('UnitTests/laboratory_configuration.txt') 
                 
         shutil.rmtree('test_save_dir')
+        self.cleanup()
 
 
 if __name__ == '__main__':

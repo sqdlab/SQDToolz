@@ -31,6 +31,10 @@ class TestSegments(unittest.TestCase):
 
         self.lab.load_instrument('virAWG')
         awg_wfm = WaveformAWG("Wfm1", self.lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9)
+    
+    def cleanup(self):
+        self.lab.release_all_instruments()
+        self.lab = None
 
     def arr_equality(self, arr1, arr2):
         if arr1.size != arr2.size:
@@ -270,6 +274,7 @@ class TestSegments(unittest.TestCase):
         assert self.arr_equality(temp, wfm_mod), "The IQ waveform was incorrectly compiled when changing phase in a previous waveform segment with 2 frequencies in play."
 
         shutil.rmtree('test_save_dir')
+        self.cleanup()
 
     def test_Group(self):
         self.initialise()
@@ -352,6 +357,7 @@ class TestSegments(unittest.TestCase):
         assert self.arr_equality(temp, wfm_mod), "WFS_Group failed in waveform compilation."
 
         shutil.rmtree('test_save_dir')
+        self.cleanup()
 
 class TestAWGChecks(unittest.TestCase):
     def initialise(self):
@@ -359,6 +365,10 @@ class TestAWGChecks(unittest.TestCase):
 
         self.lab.load_instrument('virAWG')
         awg_wfm = WaveformAWG("Wfm1", self.lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9)
+    
+    def cleanup(self):
+        self.lab.release_all_instruments()
+        self.lab = None
 
     def test_MemoryChecks(self):
         self.initialise()
@@ -423,6 +433,7 @@ class TestAWGChecks(unittest.TestCase):
         awg_wfm.prepare_final()
 
         shutil.rmtree('test_save_dir')
+        self.cleanup()
 
     def test_ValidLengthFunctions(self):
         self.initialise()
@@ -439,6 +450,7 @@ class TestAWGChecks(unittest.TestCase):
         assert awg_wfm.get_valid_length_from_pts(5) == [8e-9, 8e-9], "Valid time lengths for a given time are incorrect."
 
         shutil.rmtree('test_save_dir')
+        self.cleanup()
 
 
 if __name__ == '__main__':

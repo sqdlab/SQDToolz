@@ -275,6 +275,9 @@ class Laboratory:
         if not (instrID in self._station.components):
             self._station.load_instrument(instrID)
             self._activated_instruments += [instrID]
+    
+    def release_all_instruments(self):
+        self._station.close_all_registered_instruments()
 
     def _get_instrument(self, instrID):
         if type(instrID) is list:
@@ -334,9 +337,6 @@ class Laboratory:
         cur_exp_path = self._save_dir + folder_time_stamp
         Path(cur_exp_path).mkdir(parents=True, exist_ok=True)
 
-        self._time_stamp_begin = time.time()
-        self._time_stamps = [(0,0),]
-        self._prog_bar_str = ''
         ret_vals = expt_obj._run(cur_exp_path, sweep_vars, ping_iteration=self._update_progress_bar, **kwargs)
 
         #Save the experiment configuration
@@ -462,7 +462,13 @@ class Laboratory:
         drive = cur_dir[0:2]
         os.system(f'start \"temp\" cmd /k \"{drive} && cd \"{cur_dir}/Utilities\" && python ExperimentViewer.py \"{self._save_dir}\"\"')
 
-    def _update_progress_bar(self, val_pct):
+    def _update_progress_bar(self, val_pct=0, reset=False):
+        if reset:
+            self._time_stamp_begin = time.time()
+            self._time_stamps = [(0,0),]
+            self._prog_bar_str = ''
+            return
+
         self._time_stamps += [(val_pct, time.time())]
 
         ts = np.array([x[1] for x in self._time_stamps])

@@ -5,6 +5,8 @@ from h5py._hl.files import File
 import numpy as np
 import itertools
 
+from datetime import datetime
+
 import matplotlib.pyplot as plt
 import matplotlib.collections
 from numpy.core.fromnumeric import argsort
@@ -59,13 +61,22 @@ class FileIOWriter:
                 arr[:] = np.nan
                 self._dset = self._hf.create_dataset("data", data=arr, compression="gzip")
                 self._dset_ind = 0
+                #Time-stamps (usually length 27 bytes)
+                self._ts_len = len( np.datetime_as_string(np.datetime64(datetime.now()),timezone='UTC').encode('utf-8') )
+                arr = np.array([np.datetime64()]*arr_size, dtype=f'S{self._ts_len}')
+                self._dsetTS = self._hf.create_dataset("timeStamps", data=arr, compression="gzip")
                 
                 self._hf.swmr_mode = True
 
     def push_datapkt(self, data_pkt, sweep_vars):
         self._init_hdf5(sweep_vars, data_pkt)
 
-        self._dset[self._dset_ind*self._datapkt_size : (self._dset_ind+1)*self._datapkt_size] = np.vstack([data_pkt['data'][x].flatten() for x in self._meas_chs]).T
+        cur_data = np.vstack([data_pkt['data'][x].flatten() for x in self._meas_chs]).T
+        self._dset[self._dset_ind*self._datapkt_size : (self._dset_ind+1)*self._datapkt_size] = cur_data
+        #Trick taken from here: https://stackoverflow.com/questions/68443753/datetime-storing-in-hd5-database
+        cur_times = [np.datetime64(datetime.now())] * cur_data.shape[0]
+        utc_strs = np.array( [np.datetime_as_string(n,timezone='UTC').encode('utf-8') for n in cur_times] )
+        self._dsetTS[self._dset_ind*self._datapkt_size : (self._dset_ind+1)*self._datapkt_size] = utc_strs
         self._dset_ind += 1
         self._dset.flush()
     
@@ -80,6 +91,10 @@ class FileIOReader:
         self.folder_path = os.path.dirname(filepath)
         self.hdf5_file = h5py.File(filepath, 'r', libver='latest', swmr=True)
         self.dset = self.hdf5_file["data"]
+        if 'timeStamps' in self.hdf5_file:
+            self.dsetTS = self.hdf5_file["timeStamps"]
+        else:
+            self.dsetTS = None
 
         #Extract the independent variables (the group "parameters" holds the 1D arrays representing the individual parameter values)
         self.param_names = [x for x in self.hdf5_file["parameters"].keys()]
@@ -98,8 +113,31 @@ class FileIOReader:
             self.param_vals[cur_ind] = self.hdf5_file["parameters"][cur_param][1:]
 
     def get_numpy_array(self):
-        cur_shape = [len(x) for x in self.param_vals] + [len(self.dep_params)]
-        return self.dset[:].reshape(tuple(x for x in cur_shape))
+        if not self.hdf5_file is None:
+            cur_shape = [len(x) for x in self.param_vals] + [len(self.dep_params)]
+            return self.dset[:].reshape(tuple(x for x in cur_shape))
+        else:
+            assert False, "The reader has released the file - create a new FileIOReader instance to extract data."
+            return np.array([])
+    
+    def get_time_stamps(self):
+        if not self.hdf5_file is None:
+            assert not self.dsetTS is None, "There are no time-stamps in this data file. It was probably created before the time-stamp feature was implemented in SQDToolz."
+            cur_shape = [len(x) for x in self.param_vals]
+            cur_data = self.dsetTS[:]
+            cur_data = np.array([np.datetime64(x) for x in cur_data])
+            return cur_data.reshape(tuple(x for x in cur_shape))
+        else:
+            assert False, "The reader has released the file - create a new FileIOReader instance to extract data."
+            return np.array([])
+    
+    def release(self):
+        if not self.hdf5_file is None:
+            self.dset = None
+            self.hdf5_file.close()
+            self.file_path = ''
+            self.folder_path = ''
+            self.hdf5_file = None
 
 class FileIODirectory:
     class plt_object:
@@ -208,10 +246,23 @@ class FileIODirectory:
                 cur_arrays += [cur_file[0].get_numpy_array()]
             cur_data = np.concatenate(cur_arrays)
 
+            #Process time-stamps (assuming that if the first file supports it, then the remaining shall as well...)
+            if cur_file[0].dsetTS is not None:
+                cur_arrays_ts = [cur_file[0].get_time_stamps() for cur_file in cur_files]
+                self._ts_valid = True
+            else:
+                self._ts_valid = False
+            cur_arrays_ts = np.concatenate(cur_arrays_ts)
+
             self.param_names = cur_param_names_outer + cur_param_names_inner
             self.param_vals = cur_param_vals_outer + cur_param_vals_inner
             self._cur_data = cur_data.reshape(tuple( [x.size for x in self.param_vals] + [len(self.dep_params)] ))
+            self._cur_data_ts = cur_arrays_ts.reshape(tuple( [x.size for x in self.param_vals] ))
         else:
+            #TIME STAMPS ARE CURRENTLY UNSUPPORTED FOR NON-UNIFORM INDEXING
+            #TODO: Give support for time-stamps in non-uniform indexing...
+            self._ts_valid = False
+
             #The dataset is non-uniform, so don't reshape the lists...
             self.param_names = cur_param_names_outer + cur_param_names_inner
             self.param_vals = cur_param_vals_outer
@@ -230,6 +281,10 @@ class FileIODirectory:
                         break
                 uniform_inners += [param_uniform]
             self.uniform_indices += uniform_inners
+        
+        #Release the HDF5 reader files...
+        for cur_file in cur_files:
+            cur_file[0].release()
 
     @classmethod
     def fromReader(cls, obj_FileIOReader):
@@ -237,6 +292,10 @@ class FileIODirectory:
 
     def get_numpy_array(self):
         return self._cur_data
+
+    def get_time_stamps(self):
+        assert self._ts_valid, "Time-stamps are not present or supported for this directory."
+        return self._cur_data_ts
 
     def get_rects_from_nonuniform_index(self, second_axis_param, slicing_indices_dict, non_uniform_on_x = True):
         assert self.uniform_indices.count(False) == 1, "This function only supports 1 nonuniform index."

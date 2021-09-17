@@ -11,7 +11,9 @@ The main data lives inside the dataset called `data` which is a 2D array:
 
 For example, if one sweeps across 10 points in frequency, 9 points in flux and 8 points in power, then the data array would have 720 rows in which one may slice it via the usual meshgrid convention. That is, one may effectively reshape the array via `np.reshape(data_array, (10,9,8, num_outputs))` (noting that `num_outputs` is the number of columns in the initial array) and then start indexing it via frequency, flux and power to obtain the values across the channel outputs via a final index across the columns.
 
-Thus, to deconstruct the data array, one requires the slicing indices (along with the indexing parameter names) and the channel output names across the column indices. This information is stored in the HDF5 file over two data groups:
+Similarly, there is a dataset called `timeStamps` which is a 2D array of bytes in which each row stores a fixed-length string of bytes desginating a numpy-datetime64 object (typically 27 columns). The rows can be sliced exactly in the same manner as the `data` dataset.
+
+Thus, to deconstruct the data or time-stamp arrays, one requires the slicing indices (along with the indexing parameter names) and the channel output names across the column indices. This information is stored in the HDF5 file over two data groups:
 
 - `parameters` (the independent variables)
     - Holds the indexing parameters needed to slice the rows of the data array
@@ -23,6 +25,4 @@ Thus, to deconstruct the data array, one requires the slicing indices (along wit
     - Since HDF5 does not natively support the storage of string arrays, the names of the output channels corresponding to the data columns are given in datasets
     - Each dataset's name corresponds to the channel output name
     - Since HDF5's specification does not guarantee the preservation of dataset ordering, the dimensional slicing index, is stored in the data as a singleton.
-
-
 

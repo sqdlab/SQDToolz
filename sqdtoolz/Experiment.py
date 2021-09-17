@@ -36,6 +36,7 @@ class Experiment:
     def _run(self, file_path, sweep_vars=[], **kwargs):
         delay = kwargs.get('delay', 0.0)
         ping_iteration = kwargs.get('ping_iteration')
+        ping_iteration(reset=True)
         
         data_file_index = kwargs.get('data_file_index', -1)
         if data_file_index >= 0:

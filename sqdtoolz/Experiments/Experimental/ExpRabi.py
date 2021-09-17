@@ -62,6 +62,7 @@ class ExpRabi(Experiment):
         kwargs['skip_init_instruments'] = True
 
         self._cur_param_name = self._temp_vars[0].Name
+        self._file_path = file_path
         return super()._run(file_path, sweep_vars, **kwargs)
 
     def _post_process(self, data):
@@ -104,6 +105,8 @@ class ExpRabi(Experiment):
 
         if self.normalise_data:
             fig.show()
+            fig.savefig(self._file_path + 'fitted_plot.png')
         else:
             dpkt['fig'].show()
+            dpkt['fig'].savefig(self._file_path + 'fitted_plot.png')
         

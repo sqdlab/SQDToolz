@@ -12,6 +12,6 @@ instruments:
       pxi_slot: 3
     parameters:
       AWG.CH1.trig_src:
-        initial_value: 'TRG1'
+        initial_value: 'NONE' #'TRG1'
       AWG.CH2.trig_src:
-        initial_value: 'TRG1'
+        initial_value: 'NONE' #'TRG1'

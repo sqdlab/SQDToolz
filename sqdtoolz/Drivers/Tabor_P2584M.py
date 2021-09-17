@@ -11,6 +11,8 @@ from qcodes.instrument.parameter import ManualParameter
 import numpy as np
 from functools import partial
 
+from copy import deepcopy
+
 class AWG_TaborP2584M_channel(InstrumentChannel):
     def __init__(self, parent:Instrument, name:str, channel: int) -> None:
         super().__init__(parent, name)
@@ -167,6 +169,8 @@ class TaborP2584M_AWG(InstrumentChannel):
         for ch_ind, ch_name in enumerate(self._ch_list):
             cur_channel = AWG_TaborP2584M_channel(self, ch_name, ch_ind+1)
             self.add_submodule(ch_name, cur_channel)
+            cur_channel.marker1_output(True)
+            cur_channel.marker2_output(True)
         self._used_memory_segments = [None]*2
 
         self._sequence_lens = [None]*4
@@ -479,6 +483,53 @@ class TaborP2584M_ACQ(InstrumentChannel):
         self._last_mem_frames_samples = (self.NumRepetitions, self.NumSegments, self.NumSamples)
         self._parent._chk_err('after allocating readout ACQ memory.')
 
+    def get_frame_data(self):
+        #Read all frames from Memory
+        #
+        #Choose which frames to read (all in this example)
+        self._parent._set_cmd(':DIG:DATA:SEL', 'ALL')
+        #Choose what to read (only the frame-data without the header in this example)
+        self._parent._set_cmd(':DIG:DATA:TYPE', 'HEAD')
+        header_size = 72
+        number_of_frames = self.NumSegments*self.NumRepetitions
+        num_bytes = number_of_frames * header_size
+
+        wav2 = np.zeros(num_bytes, dtype=np.uint8)
+        rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav2, num_bytes)
+        self._parent._chk_err('in reading frame data.')
+
+        #print(wav2)
+
+        trig_loc = np.zeros(number_of_frames,np.uint32)
+        I_dec= np.zeros(number_of_frames,np.int32)
+        Q_dec= np.zeros(number_of_frames,np.int64)
+        for i in range(number_of_frames):
+            idx = i* header_size
+            trigPos = wav2[idx]
+            gateLen = wav2[idx+1]
+            minVpp = wav2[idx+2] & 0xFFFF
+            maxVpp = wav2[idx+2] & 0xFFFF0000 >> 16
+            timeStamp = wav2[idx+3] + wav2[idx+4] << 32
+            decisionReal =  (wav2[idx+20]) + (wav2[idx+21] <<8) + \
+                            (wav2[idx+22] << 16) + (wav2[idx+23] <<24) + \
+                            (wav2[idx+24] << 32) + (wav2[idx+25] <<40) + \
+                            (wav2[idx+26] << 48)+ (wav2[idx+27] << 56)
+            Q_dec[i]= decisionReal
+            decisionIm = (wav2[idx+28]) + (wav2[idx+29] <<8) + (wav2[idx+30] << 16) + (wav2[idx+31] << 24)
+            I_dec[i]= decisionIm
+            outprint = 'header# {0}\n'.format(i)
+            outprint += 'TriggerPos: {0}\n'.format(trigPos)
+            outprint += 'GateLength: {0}\n'.format(gateLen)
+            outprint += 'Min Amp: {0}\n'.format(minVpp)
+            outprint += 'Max Amp: {0}\n'.format(maxVpp)
+            outprint += 'Min TimeStamp: {0}\n'.format(timeStamp)
+            outprint += 'Decision: {0} + j* {1}\n'.format(decisionReal,decisionIm)
+            print(outprint)
+            
+        dec_vals = Q_dec + 1j*I_dec #No idea about the inversion...
+        return dec_vals
+
+
     def get_data(self, **kwargs):
         assert self.NumSamples % 48 == 0, "The number of samples must be divisible by 48 if in DUAL mode."
 
@@ -520,7 +571,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
         self._parent._chk_err('after actual acquisition.')
         
         #May require fudge wait to keep Tabor happy
-        #time.sleep(1)
+        # time.sleep(1)
 
         #Read all frames from Memory
         #
@@ -537,13 +588,15 @@ class TaborP2584M_ACQ(InstrumentChannel):
         # Read the data that was captured by channel 1:
         self._parent._set_cmd(':DIG:CHAN:SEL', 1)
         wavlen = num_bytes // 2
-        wav1 = np.zeros(wavlen, dtype=np.uint16)
+        wav1 = np.zeros(wavlen, dtype=np.uint32)
         rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav1, num_bytes)
+        wav1 = deepcopy(wav1).reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)
         #
         # Read the data that was captured by channel 2:
         self._parent._set_cmd(':DIG:CHAN:SEL', 2)
         wavlen = num_bytes // 2
-        wav2 = np.zeros(wavlen, dtype=np.uint16)
+        wav2 = np.zeros(wavlen, dtype=np.uint32)
+        wav2 = deepcopy(wav2).reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)
         rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav2, num_bytes)
 
         self._parent._chk_err('after downloading the ACQ data from the FGPA DRAM.')
@@ -552,8 +605,8 @@ class TaborP2584M_ACQ(InstrumentChannel):
         ret_val = {
                     'parameters' : ['repetition', 'segment', 'sample'],
                     'data' : {
-                                'ch1' : wav1.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples),
-                                'ch2' : wav2.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples),
+                                'ch1' : wav1,
+                                'ch2' : wav2,
                              },
                     'misc' : {'SampleRates' : [self.SampleRate]*2}
                 }

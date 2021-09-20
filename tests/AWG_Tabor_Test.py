@@ -38,16 +38,29 @@ new_lab.load_instrument('TaborAWG')
 
 WFMT_ModulationIQ("QubitFreqMod", new_lab, 100e6)
 
-awg_wfm_q = WaveformAWG("Waveform 2 CH", new_lab, [(['TaborAWG', 'AWG'], 'CH1'),(['TaborAWG', 'AWG'], 'CH2')], 1e9)
+# awg_wfm_q = WaveformAWG("Waveform 2 CH", new_lab, [(['TaborAWG', 'AWG'], 'CH1'),(['TaborAWG', 'AWG'], 'CH2')], 2e9)
+# read_segs = []
+# for m in range(4):
+#     awg_wfm_q.add_waveform_segment(WFS_Constant(f"init{m}", new_lab.WFMT('QubitFreqMod').apply(), 512e-9-384e-9, 0.5-0.1*m))#WFS_Gaussian
+#     awg_wfm_q.add_waveform_segment(WFS_Cosine(f"zero1{m}", None, 512e-9+384e-9, 0.05, 200e6))
+#     awg_wfm_q.add_waveform_segment(WFS_Constant(f"init2{m}", new_lab.WFMT('QubitFreqMod').apply(), 512e-9, 0.0*(0.5-0.1*m)))
+#     awg_wfm_q.add_waveform_segment(WFS_Constant(f"zero2{m}", None, 576e-9, 0.0))
+#     read_segs += [f"init{m}"]
+
+awg_wfm_q = WaveformAWG("CosSrc", new_lab, [(['TaborAWG', 'AWG'], 'CH3'),(['TaborAWG', 'AWG'], 'CH4')], 1e9, total_time=1024e-9)
 read_segs = []
-for m in range(4):
-    awg_wfm_q.add_waveform_segment(WFS_Constant(f"init{m}", new_lab.WFMT('QubitFreqMod').apply(), 512e-9-384e-9, 0.5-0.1*m))#WFS_Gaussian
-    awg_wfm_q.add_waveform_segment(WFS_Constant(f"zero1{m}", None, 512e-9+384e-9, 0.01*m))
-    awg_wfm_q.add_waveform_segment(WFS_Constant(f"init2{m}", new_lab.WFMT('QubitFreqMod').apply(), 512e-9, 0.0*(0.5-0.1*m)))
-    awg_wfm_q.add_waveform_segment(WFS_Constant(f"zero2{m}", None, 576e-9, 0.0))
-    read_segs += [f"init{m}"]
+new_lab.HAL('CosSrc').add_waveform_segment(WFS_Cosine("LO1", None, 100e-9, 0.05, 100e6))
+new_lab.HAL('CosSrc').add_waveform_segment(WFS_Cosine("LO2", None, 100e-9, 0.05, 200e6))
+new_lab.HAL('CosSrc').add_waveform_segment(WFS_Cosine("LO3", None, 100e-9, 0.05, 300e6))
+new_lab.HAL('CosSrc').add_waveform_segment(WFS_Constant("True Pad", None, -1, 0.00))
+
+new_lab.HAL('CosSrc').get_output_channel(0).marker(0).set_markers_to_segments(['LO1'])
+new_lab.HAL('CosSrc').get_output_channel(0).marker(1).set_markers_to_segments(['LO1'])
+new_lab.HAL('CosSrc').get_output_channel(1).marker(0).set_markers_to_segments(['LO2'])
+new_lab.HAL('CosSrc').get_output_channel(1).marker(1).set_markers_to_segments(['LO3'])
+
 # awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments(["init0","init2"])
-awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments(read_segs)
+# awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments(read_segs)
 awg_wfm_q.prepare_initial()
 awg_wfm_q.prepare_final()
 
@@ -66,29 +79,32 @@ awg_wfm_q.get_output_channel(1).Output = True
 
 #Connected M1 to TRIG1 and AWG-CH1 to ADC-CH1
 
-instr = new_lab._get_instrument('TaborAWG')
+# instr = new_lab._get_instrument('TaborAWG')
 
-instr._set_cmd(':DSP:STOR1', 'DSP1')
-instr._chk_err("")
-instr._set_cmd(':DIG:DDC:MODE', 'COMPlex')
-instr._set_cmd(':DIG:DDC:CFR1', 100e6)
+# # instr._set_cmd(':DSP:STOR1', 'DIRECT1')
+# # instr._set_cmd(':DSP:STOR2', 'DIRECT2')
 
-#Set DSP Path 1 to IQ
-instr._set_cmd(':DSP:DEC:IQP:SEL', 1)
-instr._chk_err("")
-# instr._set_cmd(':DSP:DEC:IQP:INP', 'IQ')
-instr._set_cmd(':DSP:DEC:IQP:INP', 'AMPH')
-instr._chk_err("")
+# instr._set_cmd(':DSP:STOR1', 'DSP1')
+# instr._chk_err("")
+# instr._set_cmd(':DIG:DDC:MODE', 'COMPlex')
+# instr._set_cmd(':DIG:DDC:CFR1', 100e6)
 
-instr._set_cmd(':DSP:DEC:FRAM', 240)
-instr._chk_err("")
-instr._set_cmd(':DSP:DEC:IQP:OUTP', 'THR')
-instr._chk_err("")
+# #Set DSP Path 1 to IQ
+# instr._set_cmd(':DSP:DEC:IQP:SEL', 1)
+# instr._chk_err("")
+# # instr._set_cmd(':DSP:DEC:IQP:INP', 'IQ')
+# instr._set_cmd(':DSP:DEC:IQP:INP', 'AMPH')
+# instr._chk_err("")
 
-#Try some MATH operations
-instr._set_cmd(':DSP:MATH:OPERation', 'I1, -2, 10')   #Scale Offset
-instr._set_cmd(':DSP:MATH:OPERation', 'Q1, 1, 0')
-instr._chk_err("")
+# instr._set_cmd(':DSP:DEC:FRAM', 240)
+# instr._chk_err("")
+# instr._set_cmd(':DSP:DEC:IQP:OUTP', 'THR')
+# instr._chk_err("")
+
+# #Try some MATH operations
+# instr._set_cmd(':DSP:MATH:OPERation', 'I1, -2, 10')   #Scale Offset
+# instr._set_cmd(':DSP:MATH:OPERation', 'Q1, 1, 0')
+# instr._chk_err("")
 
 acq_module = ACQ("TabourACQ", new_lab, ['TaborAWG', 'ACQ'])
 acq_module.NumSamples = 480
@@ -101,7 +117,7 @@ myProc.add_stage(CPU_FIR([{'Type' : 'low', 'Taps' : 40, 'fc' : 10e6, 'Win' : 'ha
 # acq_module.set_data_processor(myProc)
 
 leData = acq_module.get_data()
-leDecisions = instr.ACQ.get_frame_data()
+# leDecisions = instr.ACQ.get_frame_data()
 
 import matplotlib.pyplot as plt
 for r in range(2):

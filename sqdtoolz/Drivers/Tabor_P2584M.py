@@ -54,6 +54,7 @@ class AWG_TaborP2584M_channel(InstrumentChannel):
                 get_cmd=partial(self._get_mkr_cmd, ':MARK?', cur_mkr),
                 set_cmd=partial(self._set_mkr_cmd, ':MARK', cur_mkr),
                 val_mapping={True: 'ON', False: 'OFF'})
+            getattr(self, f'marker{cur_mkr}_output')(True)  #Default state is ON
             self._set_mkr_cmd(':MARK:VOLT:PTOP', cur_mkr, 1.2)
 
 
@@ -395,6 +396,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
     def __init__(self, parent):
         super().__init__(parent, 'ACQ')
         self._parent = parent
+        self._ch_states = [False, False] # Stores which channels are enabled.
 
         self.add_parameter(
             'sample_rate', label='Sample Rate', unit='Hz',
@@ -419,12 +421,18 @@ class TaborP2584M_ACQ(InstrumentChannel):
         # Enable capturing data from channel 1
         self._parent._set_cmd(':DIG:CHAN:SEL', 1)
         self._parent._set_cmd(':DIG:CHAN:STATE', 'ENAB')
+        self._ch_states[0] = True
+
         # Select the external-trigger as start-capturing trigger:
         self._parent._set_cmd(':DIG:TRIG:SOURCE', 'EXT')
+        self._parent._set_cmd(':DIG:TRIG:TYPE', 'EDGE')
 
         # Enable capturing data from channel 2
         self._parent._set_cmd(':DIG:CHAN:SEL', 2)
         self._parent._set_cmd(':DIG:CHAN:STATE', 'ENAB')
+        self._ch_states[1] = True
+
+
         # Select the external-trigger as start-capturing trigger:
         self._parent._set_cmd(':DIG:TRIG:SOURCE', 'EXT')
 
@@ -467,6 +475,23 @@ class TaborP2584M_ACQ(InstrumentChannel):
     @TriggerInputEdge.setter
     def TriggerInputEdge(self, pol):
         self.trigPolarity(pol)
+
+    @property
+    def AvailableChannels(self):
+        return 2
+
+    @property
+    def ChannelStates(self):
+        return self._ch_states
+    @ChannelStates.setter
+    def ChannelStates(self, ch_states):
+        TABOR_DIG_CHANNEL_STATES = ['DIS', 'ENAB']
+        assert len(ch_states) == 2, "There are 2 channel states that must be specified."
+        for i, state in enumerate(ch_states):
+            self._parent._set_cmd(':DIG:CHAN:SEL', i+1)
+            self._parent._set_cmd(':DIG:CHAN:STATE', TABOR_DIG_CHANNEL_STATES[state])
+            self._ch_states[i] = state
+            #TODO: If using both channels, then ensure it does the DUAL-mode setting here!
 
     def _allocate_frame_memory(self):
         # Allocate four frames of 4800 samples
@@ -582,20 +607,20 @@ class TaborP2584M_ACQ(InstrumentChannel):
         #
         # Get the total data size (in bytes)
         resp = self._parent._get_cmd(':DIG:DATA:SIZE?')
-        num_bytes = np.uint32(resp)
+        num_bytes = np.uint64(resp)
         #print('Total size in bytes: ' + resp)
         #
         # Read the data that was captured by channel 1:
         self._parent._set_cmd(':DIG:CHAN:SEL', 1)
         wavlen = num_bytes // 2
-        wav1 = np.zeros(wavlen, dtype=np.uint32)
+        wav1 = np.zeros(int(wavlen), dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE
         rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav1, num_bytes)
         wav1 = deepcopy(wav1).reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)
         #
         # Read the data that was captured by channel 2:
         self._parent._set_cmd(':DIG:CHAN:SEL', 2)
         wavlen = num_bytes // 2
-        wav2 = np.zeros(wavlen, dtype=np.uint32)
+        wav2 = np.zeros(int(wavlen), dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE
         wav2 = deepcopy(wav2).reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)
         rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav2, num_bytes)
 

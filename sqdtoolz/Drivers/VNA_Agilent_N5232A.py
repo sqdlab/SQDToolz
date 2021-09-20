@@ -343,7 +343,15 @@ class VNA_Agilent_N5232A(VisaInstrument):
                 for cur_meas_name, cur_meas in cur_meas_traces:
                     self.write(f'CALC:PAR:SEL \'{cur_meas_name}\'')
                     #Note that SDATA just means complex-valued...
-                    s_data_raw = self.ask('CALC:DATA? SDATA').split(',')
+                    got_data_without_errors = False
+                    while not got_data_without_errors:
+                        try:
+                            s_data_raw = self.ask('CALC:DATA? SDATA').split(',')
+                            got_data_without_errors = True
+                        except UnicodeDecodeError:
+                            print('Unicode error in VNA')
+                            got_data_without_errors = False
+
                     s_data_raw = np.array(list(map(float, s_data_raw)))
                     ret_data['data'][f'{cur_meas}_real'] += [ s_data_raw[::2] ]
                     ret_data['data'][f'{cur_meas}_imag'] += [ s_data_raw[1::2] ]

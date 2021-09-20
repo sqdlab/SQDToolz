@@ -117,7 +117,11 @@ class ExperimentConfiguration:
         cur_config = {'HALs' : [], 'PROCs' : [], 'RepetitionTime' : self.RepetitionTime, 'WaveformMapping' : self._dict_wfm_map, 'SPECs' : self._list_spec_names}
 
         #Prepare the dictionary of HAL configurations
-        for cur_hal in self._list_HALs + [self._hal_ACQ]:
+        list_hals = self._list_HALs
+        if self._hal_ACQ is not None:
+            list_hals += [self._hal_ACQ]
+
+        for cur_hal in list_hals:
             if cur_hal != None:
                 cur_config['HALs'].append(cur_hal._get_current_config())
 
@@ -136,7 +140,10 @@ class ExperimentConfiguration:
         #TODO: Check if these checks here are probably overkill and possibly obsolete?
         for cur_dict in conf['HALs']:
             found_hal = False
-            for cur_hal in self._list_HALs + [self._hal_ACQ]:
+            list_hals = self._list_HALs
+            if self._hal_ACQ is not None:
+                list_hals += [self._hal_ACQ]
+            for cur_hal in list_hals:
                 if cur_hal == None:
                     continue
                 if cur_hal.Name == cur_dict['Name']:
@@ -237,12 +244,16 @@ class ExperimentConfiguration:
         self.save_config()
 
     def prepare_instruments(self):
-        for cur_hal in self._list_HALs + [self._hal_ACQ]:
-            if not cur_hal.ManualActivation:
-                cur_hal.activate()
-
         #TODO: Write rest of this with error checking
-        list_hals = self._list_HALs + [self._hal_ACQ]
+
+        list_hals = self._list_HALs
+        if self._hal_ACQ is not None:
+            list_hals += [self._hal_ACQ]
+
+        for cur_hal in list_hals:
+            if cur_hal is not None and not cur_hal.ManualActivation:
+                cur_hal.activate()
+        
         for cur_hal in list_hals:
             #TODO: Write concurrence/change checks to better optimise AWG...
             cur_hal.prepare_initial()
@@ -250,14 +261,21 @@ class ExperimentConfiguration:
             cur_hal.prepare_final()
 
     def makesafe_instruments(self):
-        for cur_hal in self._list_HALs + [self._hal_ACQ]:
+        list_hals = self._list_HALs
+        if self._hal_ACQ is not None:
+            list_hals += [self._hal_ACQ]
+        for cur_hal in list_hals:
             if not cur_hal.ManualActivation:
                 cur_hal.deactivate()
 
     def get_data(self):
         #TODO: Pack the data appropriately if using multiple ACQ objects (coordinating their starts/finishes perhaps?)
         cur_acq = self._hal_ACQ
-        return cur_acq.get_data()
+        if cur_acq is not None:
+            return cur_acq.get_data()
+        else:
+            return {'parameters':['None'],
+                    'data':{'dummy_ch': np.array([0])}}
 
     def get_trigger_edges(self, obj_trigger_input):
         assert isinstance(obj_trigger_input, TriggerInput), "The argument obj_trigger_input must be a TriggerInput object; that is, a genuine digital trigger input."
@@ -318,7 +336,12 @@ class ExperimentConfiguration:
         tp = TimingPlot()
 
         disp_objs = []
-        for cur_hal in self._list_HALs + [self._hal_ACQ]:
+
+        list_hals = self._list_HALs
+        if self._hal_ACQ is not None:
+            list_hals += [self._hal_ACQ]
+
+        for cur_hal in list_hals:
             if isinstance(cur_hal, TriggerInputCompatible):
                 disp_objs += cur_hal._get_all_trigger_inputs()
             elif isinstance(cur_hal, TriggerOutputCompatible):

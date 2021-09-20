@@ -205,3 +205,55 @@ class WFS_Gaussian(WaveformSegmentBase):
         cur_dict['Amplitude'] = self._amplitude
         cur_dict['Num SD'] = self._num_sd
         return cur_dict
+
+class WFS_Cosine(WaveformSegmentBase):
+    def __init__(self, name, transform_func, time_len, amplitude=0.0, frequency=0.0, phase=0.0):
+        super().__init__(name, transform_func, time_len)
+        self._amplitude = amplitude
+        self._frequency = frequency
+        self._phase = phase
+
+    @classmethod
+    def fromConfigDict(cls, config_dict):
+        assert 'Type' in config_dict, "Configuration dictionary does not have the key: type"
+        assert config_dict['Type'] == cls.__name__, "Configuration dictionary has the wrong type."
+        for cur_key in ["Name", "Duration", "Amplitude", "Frequency", "Phase"]:
+            assert cur_key in config_dict, "Configuration dictionary does not have the key: " + cur_key
+        if config_dict['Mod Func']['Name'] == '':
+            wfmt_obj = None
+        else:
+            wfmt_obj = WaveformTransformationArgs(config_dict['Mod Func']['Name'], config_dict['Mod Func']['Args'])
+        return cls(config_dict["Name"], wfmt_obj, config_dict["Duration"], config_dict["Amplitude"], config_dict["Frequency"], config_dict["Phase"])
+
+    @property
+    def Amplitude(self):
+        return self._amplitude
+    @Amplitude.setter
+    def Amplitude(self, ampl_val):
+        self._amplitude = ampl_val
+
+    @property
+    def Frequency(self):
+        return self._frequency
+    @Frequency.setter
+    def Frequency(self, freq_val):
+        self._frequency = freq_val
+
+    @property
+    def Phase(self):
+        return self._phase
+    @Phase.setter
+    def Phase(self, phase_val):
+        self._phase = phase_val
+
+    def _get_waveform(self, fs, t0_ind, ch_index):
+        t_vals = np.arange(self.NumPts(fs)) / fs
+        return self.Amplitude * np.cos(2*np.pi*self.Frequency * t_vals + self.Phase)
+
+    def _get_current_config(self):
+        cur_dict = WaveformSegmentBase._get_current_config(self)
+        cur_dict['Duration'] = self.Duration
+        cur_dict['Amplitude'] = self._amplitude
+        cur_dict['Frequency'] = self._frequency
+        cur_dict['Phase'] = self._phase
+        return cur_dict

@@ -840,7 +840,7 @@ class TEProteusInst(object):
                 warnings.warn(wrnmsg)
                 cmd = str('*CLS').encode()
                 str_ptr = ct.c_char_p(cmd)
-                self._admin.tep_send_scpi(
+                self._admin._tep_send_scpi(
                     self._commptr, str_ptr, resp_buf, max_resp_len)
 
         return ret_code

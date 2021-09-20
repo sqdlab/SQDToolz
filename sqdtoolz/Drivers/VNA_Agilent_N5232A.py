@@ -349,7 +349,7 @@ class VNA_Agilent_N5232A(VisaInstrument):
                             s_data_raw = self.ask('CALC:DATA? SDATA').split(',')
                             got_data_without_errors = True
                         except UnicodeDecodeError:
-                            print('Unicode error in VNA')
+                            # print('Unicode error in VNA')
                             got_data_without_errors = False
 
                     s_data_raw = np.array(list(map(float, s_data_raw)))

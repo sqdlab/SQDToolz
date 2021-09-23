@@ -416,7 +416,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
         self.sample_rate(2.0e9)
 
         # Set Trigger level to 0.5V
-        self._parent._set_cmd(':DIG:TRIG:LEV1', 0.0)
+        self._parent._set_cmd(':DIG:TRIG:LEV1', 0.05)
 
         # Enable capturing data from channel 1
         self._parent._set_cmd(':DIG:CHAN:SEL', 1)

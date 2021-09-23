@@ -569,7 +569,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
         self._parent._chk_err('after clearing memory.')
 
         #Fudged sleep required to keep Tabor happy?!
-        time.sleep(1)
+        # time.sleep(1)
 
         # Stop the digitizer's capturing machine (to be on the safe side)
         self._parent._set_cmd(':DIG:INIT', 'OFF')
@@ -582,7 +582,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
         while done == 0:
             resp = self._parent._get_cmd(":DIG:ACQuire:FRAM:STATus?")
             resp_items = resp.split(',')
-            done = int(resp_items[1])
+            done = int(resp_items[3]) > 0
             #print("{0}. {1}".format(done, resp_items))
             loopcount += 1
             if loopcount == 1000:

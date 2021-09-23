@@ -10,13 +10,13 @@ class MWS_WFSynthHDProV2_Channel(InstrumentChannel):
         
         self.add_parameter(name='power', label='Output Power', unit='dBm',
                            get_cmd=partial(self._get_cmd, 'W?'),
-                           set_cmd=partial(self._set_cmd, 'W'),
+                           set_cmd=partial(self._set_cmd_trunc_power, 'W'),
                            get_parser=float,
                            vals=vals.Numbers(-60, 20))
         #Note that the instrument gives frequency in MHz...
         self.add_parameter('frequency', label='Output Frequency', unit='Hz',
                             get_cmd=partial(self._get_cmd, 'f?'),
-                            set_cmd=partial(self._set_cmd, 'f'),
+                            set_cmd=partial(self._set_cmd_trunc_freq),
                             get_parser=lambda x: float(x)*1.0e6,
                             set_parser=lambda x: float(x)/1.0e6,
                             vals=vals.Numbers(10e6, 24e9))
@@ -68,10 +68,20 @@ class MWS_WFSynthHDProV2_Channel(InstrumentChannel):
         self._parent.write(f'C{self._chan_ind}')
         #Perform command
         self._parent.write(f'{cmd}{val}')
+    def _set_cmd_trunc_freq(self, val):
+        #Perform channel-select
+        self._parent.write(f'C{self._chan_ind}')
+        #Perform command
+        self._parent.write('f' + ('%013.7f'%val))
+    def _set_cmd_trunc_power(self, cmd, val):
+        #Perform channel-select
+        self._parent.write(f'C{self._chan_ind}')
+        #Perform command
+        self._parent.write(cmd + ('%06.3f'%val))
 
     @property
     def Output(self):
-        return self.output()
+        return self.output() == 'ON'
     @Output.setter
     def Output(self, boolVal):
         if boolVal:
@@ -144,9 +154,34 @@ class MWS_WFSynthHDProV2(VisaInstrument):
             self.add_submodule(ch_name, cur_channel)
             self._source_outputs[ch_name] = cur_channel
 
+        self.add_parameter('REF_Source',
+                            get_cmd=partial(self._get_cmd, 'x?'),
+                            set_cmd=partial(self._set_cmd, 'x'),
+                            set_parser=int,
+                            val_mapping={'INT':  1, 'EXT': 0})
+
+        self.add_parameter('EXT_REF_frequency', label='External REF Frequency', unit='Hz',
+                            get_cmd=partial(self._get_cmd, '*?'),
+                            set_cmd=self._set_cmd_ref_freq,
+                            get_parser=lambda x: float(x)*1.0e6,
+                            set_parser=lambda x: float(x)/1.0e6,
+                            vals=vals.Numbers(10e6, 100e6))
+        self.EXT_REF_frequency()
+
     def get_output(self, identifier):
         return self._source_outputs[identifier]
 
     def get_all_outputs(self):
         return [(x,self._source_outputs[x]) for x in self._source_outputs]
 
+    def get_idn(self):
+        #Otherwise, it will send *IDN and cahnge the sample clock!
+        return {'vendor': 'Windfreak', 'model': 'HDProV2', 'serial': None, 'firmware': None}
+
+    #NEED THESE BECAUSE QCODES INSERTS \n etc...
+    def _get_cmd(self, cmd):
+        return self.ask(f'{cmd}')
+    def _set_cmd(self, cmd, val):
+        self.write(f'{cmd}{val}')
+    def _set_cmd_ref_freq(self, val):
+        self.write('*' + ('%07.3f'%val))

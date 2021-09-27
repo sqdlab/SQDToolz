@@ -37,6 +37,7 @@ class Experiment:
         delay = kwargs.get('delay', 0.0)
         ping_iteration = kwargs.get('ping_iteration')
         ping_iteration(reset=True)
+        disable_progress_bar = kwargs.get('disable_progress_bar', False)
         
         data_file_index = kwargs.get('data_file_index', -1)
         if data_file_index >= 0:
@@ -86,7 +87,8 @@ class Experiment:
                 time.sleep(delay)
                 data = self._expt_config.get_data()
                 data_file.push_datapkt(data, sweep_vars)
-                ping_iteration((ind_coord+1)/sweep_grids.shape[0])
+                if not disable_progress_bar:
+                    ping_iteration((ind_coord+1)/sweep_grids.shape[0])
 
         data_file.close()
         self._expt_config.makesafe_instruments()

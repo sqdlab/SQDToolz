@@ -582,10 +582,11 @@ class TaborP2584M_ACQ(InstrumentChannel):
         while done == 0:
             resp = self._parent._get_cmd(":DIG:ACQuire:FRAM:STATus?")
             resp_items = resp.split(',')
-            done = int(resp_items[3]) > 0
+            check_sniffer = int(resp_items[3])
+            done = int(resp_items[1])
             #print("{0}. {1}".format(done, resp_items))
             loopcount += 1
-            if loopcount == 1000:
+            if loopcount == 1000 and check_sniffer == 0:    #As in nothing captured over 1000 check-loops...
                 #print("No Trigger was detected")
                 assert False, "No trigger detected during the acquisiton sniffing window."
                 done = 1  

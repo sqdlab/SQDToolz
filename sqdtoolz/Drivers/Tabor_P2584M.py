@@ -665,6 +665,20 @@ class Tabor_P2584M(Instrument):
         self._inst.send_scpi_cmd( "*CLS")
         self._inst.send_scpi_cmd( "*RST")
 
+        #ENSURE THAT THE REF-IN IS CONNECTED TO Rb Oven if using EXT 10MHz source!
+        self.add_parameter(
+            'ref_osc_src', label='Reference Oscillator Source',
+            get_cmd=partial(self._get_cmd, ':ROSC:SOUR?'),
+            set_cmd=partial(self._set_cmd, ':ROSC:SOUR'),
+            val_mapping={'INT': 'INT', 'EXT': 'EXT'}
+            )
+        self.add_parameter(
+            'ref_osc_freq', label='Reference Oscillator Frequency', unit='Hz',
+            get_cmd=partial(self._get_cmd, ':ROSC:FREQ?'),
+            set_cmd=partial(self._set_cmd, ':ROSC:FREQ'),
+            val_mapping={10e6: '10M', 100e6: '100M'}
+            )
+
         #Add the AWG and ACQ submodules to cordon off the different sub-instrument properties...
         self.add_submodule('AWG', TaborP2584M_AWG(self))    #!!!NOTE: If this name is changed from 'AWG', make sure to change it in the TaborP2584M_AWG class initializer!
         self.add_submodule('ACQ', TaborP2584M_ACQ(self))    #!!!NOTE: If this name is changed from 'ACQ', make sure to change it in the TaborP2584M_ACQ class initializer!

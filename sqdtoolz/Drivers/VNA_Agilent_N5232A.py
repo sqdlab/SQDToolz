@@ -293,6 +293,17 @@ class VNA_Agilent_N5232A(VisaInstrument):
             self.write(f'CALC:PAR:EXT {cur_name}, {cur_s_str}')
             self.write(f'DISP:WIND:TRAC{i+1}:FEED {cur_name}')
 
+    def ask(self, *args, **kwargs):
+        got_data_without_errors = False
+        while not got_data_without_errors:
+            try:
+                final_data = super().ask(*args, **kwargs)
+                got_data_without_errors = True
+            except UnicodeDecodeError:
+                # print('Unicode error in VNA')
+                got_data_without_errors = False
+        return final_data
+
     def get_data(self):
         #Just check what data traces are being measured at the moment just in case...
         cur_meas_traces = self.ask('CALC:PAR:CAT:EXT?').strip('"').split(',')
@@ -344,14 +355,7 @@ class VNA_Agilent_N5232A(VisaInstrument):
                     self.write(f'CALC:PAR:SEL \'{cur_meas_name}\'')
                     #Note that SDATA just means complex-valued...
                     got_data_without_errors = False
-                    while not got_data_without_errors:
-                        try:
-                            s_data_raw = self.ask('CALC:DATA? SDATA').split(',')
-                            got_data_without_errors = True
-                        except UnicodeDecodeError:
-                            # print('Unicode error in VNA')
-                            got_data_without_errors = False
-
+                    s_data_raw = self.ask('CALC:DATA? SDATA').split(',')
                     s_data_raw = np.array(list(map(float, s_data_raw)))
                     ret_data['data'][f'{cur_meas}_real'] += [ s_data_raw[::2] ]
                     ret_data['data'][f'{cur_meas}_imag'] += [ s_data_raw[1::2] ]

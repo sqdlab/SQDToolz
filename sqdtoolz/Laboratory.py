@@ -31,7 +31,7 @@ class customJSONencoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 class Laboratory:
-    def __init__(self, instr_config_file, save_dir):
+    def __init__(self, instr_config_file, save_dir, using_VS_Code=False):
         if instr_config_file == "":
             self._station = qc.Station()
         else:
@@ -43,6 +43,11 @@ class Laboratory:
         self._group_dir = {'Dir':"", 'InitDir':"", 'SweepQueue':[]}
 
         Path(self._save_dir).mkdir(parents=True, exist_ok=True)
+
+        if using_VS_Code:
+            self._prog_bar_char = ""
+        else:
+            self._prog_bar_char = "\r"
 
         self._hal_objs = {}
         self._processors = {}
@@ -504,7 +509,7 @@ class Laboratory:
         else:
             total_time = f"Total time: {total_time:.2f}s"
         
-        self._prog_bar_str = self._printProgressBar(int(val_pct*100), 100, suffix=f"{total_time}, {time_left}", prev_str=self._prog_bar_str)
+        self._prog_bar_str = self._printProgressBar(int(val_pct*100), 100, suffix=f"{total_time}, {time_left}", prev_str=self._prog_bar_str, printEnd = self._prog_bar_char)
 
         #Use the progress-bar ping as an opportunity to dump the current state of the instruments if update is enabled...
         self.update_state()

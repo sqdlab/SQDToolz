@@ -41,6 +41,8 @@ class ExpT1GE(Experiment):
         self.normalise_data = kwargs.get('normalise', False)
         assert isinstance(self.normalise_data, bool), 'Argument \'normalise\' must be boolean.'
         self.normalise_reps = kwargs.get('normalise_reps', 5)
+
+        self._expect_rise=kwargs.get('expect_rise',True)    #Only for unnormalised fitting
     
     def _run(self, file_path, sweep_vars=[], **kwargs):
         assert len(sweep_vars) == 0, "Cannot specify sweeping variables in this experiment."
@@ -95,7 +97,7 @@ class ExpT1GE(Experiment):
             axs[0].grid(b=True, which='minor'); axs[0].grid(b=True, which='major', color='k')
         else:
             data_y = np.sqrt(arr[:,self._iq_indices[0]]**2 + arr[:,self._iq_indices[1]]**2)
-            dpkt = dfit.get_fitted_plot(data_x, data_y, rise=True)
+            dpkt = dfit.get_fitted_plot(data_x, data_y, rise=self._expect_rise)
 
         #Commit to parameters...
         if self._param_decay_time:

@@ -117,7 +117,7 @@ class ExperimentConfiguration:
         cur_config = {'HALs' : [], 'PROCs' : [], 'RepetitionTime' : self.RepetitionTime, 'WaveformMapping' : self._dict_wfm_map, 'SPECs' : self._list_spec_names}
 
         #Prepare the dictionary of HAL configurations
-        list_hals = self._list_HALs
+        list_hals = self._list_HALs[:]
         if self._hal_ACQ is not None:
             list_hals += [self._hal_ACQ]
 
@@ -140,7 +140,7 @@ class ExperimentConfiguration:
         #TODO: Check if these checks here are probably overkill and possibly obsolete?
         for cur_dict in conf['HALs']:
             found_hal = False
-            list_hals = self._list_HALs
+            list_hals = self._list_HALs[:]
             if self._hal_ACQ is not None:
                 list_hals += [self._hal_ACQ]
             for cur_hal in list_hals:
@@ -246,7 +246,7 @@ class ExperimentConfiguration:
     def prepare_instruments(self):
         #TODO: Write rest of this with error checking
 
-        list_hals = self._list_HALs
+        list_hals = self._list_HALs[:]
         if self._hal_ACQ is not None:
             list_hals += [self._hal_ACQ]
 
@@ -261,7 +261,7 @@ class ExperimentConfiguration:
             cur_hal.prepare_final()
 
     def makesafe_instruments(self):
-        list_hals = self._list_HALs
+        list_hals = self._list_HALs[:]
         if self._hal_ACQ is not None:
             list_hals += [self._hal_ACQ]
         for cur_hal in list_hals:
@@ -337,7 +337,7 @@ class ExperimentConfiguration:
 
         disp_objs = []
 
-        list_hals = self._list_HALs
+        list_hals = self._list_HALs[:]
         if self._hal_ACQ is not None:
             list_hals += [self._hal_ACQ]
 

@@ -314,7 +314,7 @@ class AWGOutputMarker(TriggerOutput, TriggerInput):
 
     def get_trigger_times(self, input_trig_pol=1):
         if self._marker_status == 'None':
-            return []
+            return ([],[])
 
         assert input_trig_pol == 0 or input_trig_pol == 1, "Trigger polarity must be 0 or 1 for negative or positive edge/polarity."
 

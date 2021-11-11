@@ -1,6 +1,6 @@
-from sqdtoolz.HAL.Processors.ProcessorCPU import ProcNodeCPU
+from sqdtoolz.HAL.Processors.ProcessorGPU import ProcNodeGPU
 
-class CPU_Duplicate(ProcNodeCPU):
+class GPU_Duplicate(ProcNodeGPU):
     def __init__(self, reps):
         self.reps = reps
 

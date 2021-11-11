@@ -402,7 +402,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
             'sample_rate', label='Sample Rate', unit='Hz',
             get_cmd=partial(self._parent._get_cmd, ':DIG:FREQ?'),
             set_cmd=partial(self._parent._set_cmd, ':DIG:FREQ'),
-            vals=vals.Numbers(100e6, 2.0e9),
+            vals=vals.Numbers(800e6, 2.7e9),
             get_parser=float)
 
         self.add_parameter('trigPolarity', label='Trigger Input Polarity', 
@@ -410,6 +410,12 @@ class TaborP2584M_ACQ(InstrumentChannel):
             get_cmd=partial(self._parent._get_cmd, ':DIG:TRIG:SLOP?'),
             set_cmd=partial(self._parent._set_cmd, ':DIG:TRIG:SLOP'),
             val_mapping={1: 'POS', 0: 'NEG'})
+
+        self.add_parameter(
+            'blocksize', label='Blocksize',
+            parameter_class=ManualParameter,
+            initial_value=2**6,
+            vals=vals.Numbers())
 
         # Setup the digitizer in two-channels mode
         self._parent._set_cmd(':DIG:MODE', 'DUAL')
@@ -554,11 +560,61 @@ class TaborP2584M_ACQ(InstrumentChannel):
         dec_vals = Q_dec + 1j*I_dec #No idea about the inversion...
         return dec_vals
 
+    def process_block(self, block_idx, cur_processor, blocksize):
+        if block_idx == 0:
+            #Choose what to read (only the frame-data without the header in this example)
+            self._parent._set_cmd(':DIG:DATA:TYPE', 'FRAM')
+            #Choose which frames to read (all in this example)
+            self._parent._set_cmd(':DIG:DATA:SEL', 'FRAM')
+            
+
+            self._parent._set_cmd(':DIG:DATA:FRAM', f'{1},{blocksize*self.NumSegments}')
+            #
+            # Get the total data size (in bytes)
+            resp = self._parent._get_cmd(':DIG:DATA:SIZE?')
+            # self.num_bytes = 4176*np.uint64(resp)
+            # self.num_bytes = np.uint64(resp)
+            # print(resp, self.num_bytes, 'hi', self._parent._get_cmd(':DIG:DATA:FRAM?'))
+
+            # wavlen = int(self.num_bytes // 2)
+            wavlen = int(blocksize*self.NumSegments*self.NumSamples)
+            self.num_bytes = np.uint64(10)
+            # print(self.num_bytes)
+            wav1 = np.zeros(wavlen, dtype=np.int32)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE
+            wav1 = wav1.reshape(blocksize, self.NumSegments, self.NumSamples)
+            wav2 = np.zeros(wavlen, dtype=np.int32)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE
+            wav2 = wav2.reshape(blocksize, self.NumSegments, self.NumSamples)
+            self.wav1 = wav1
+            self.wav2 = wav2
+
+        # Select the frames to read
+        self._parent._set_cmd(':DIG:DATA:FRAM', f'{1+block_idx*blocksize},{blocksize}')
+        # Read from channel 1
+        self._parent._set_cmd(':DIG:CHAN:SEL', 1)
+        rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', self.wav1, self.num_bytes)
+        # read from channel 2
+        self._parent._set_cmd(':DIG:CHAN:SEL', 2)
+        rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', self.wav2, self.num_bytes)
+        # Check errors
+        self._parent._chk_err('after downloading the ACQ data from the FGPA DRAM.')
+
+        #TODO: Write some blocked caching code here (like with the M4i)...
+        ret_val = {
+                    'parameters' : ['repetition', 'segment', 'sample'],
+                    'data' : {
+                                'ch1' : self.wav1.astype(np.int32),
+                                'ch2' : self.wav2.astype(np.int32),
+                                },
+                    'misc' : {'SampleRates' : [self.SampleRate/16]*2}
+                }
+        cur_processor.push_data(ret_val)
 
     def get_data(self, **kwargs):
+        blocksize = min(self.blocksize(), self.NumRepetitions)
         assert self.NumSamples % 48 == 0, "The number of samples must be divisible by 48 if in DUAL mode."
 
         cur_processor = kwargs.get('data_processor', None)
+        # print(cur_processor)
 
         if self._last_mem_frames_samples[0] != self.NumRepetitions or self._last_mem_frames_samples[1] != self.NumSegments or self._last_mem_frames_samples[2] != self.NumSamples:
             self._allocate_frame_memory()
@@ -568,18 +624,14 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
         self._parent._chk_err('after clearing memory.')
 
-        #Fudged sleep required to keep Tabor happy?!
-        # time.sleep(1)
-
-        # Stop the digitizer's capturing machine (to be on the safe side)
-        self._parent._set_cmd(':DIG:INIT', 'OFF')
-        # Start the digitizer's capturing machine
+        self._parent._chk_err('before')
         self._parent._set_cmd(':DIG:INIT', 'ON')
-
+        self._parent._chk_err('dig:on')
+        
         #Poll for status bit
         loopcount = 0
-        done = 0
-        while done == 0:
+        check_sniffer = 0
+        while check_sniffer < blocksize:
             resp = self._parent._get_cmd(":DIG:ACQuire:FRAM:STATus?")
             resp_items = resp.split(',')
             check_sniffer = int(resp_items[3])
@@ -589,57 +641,57 @@ class TaborP2584M_ACQ(InstrumentChannel):
             if loopcount == 1000 and check_sniffer == 0:    #As in nothing captured over 1000 check-loops...
                 #print("No Trigger was detected")
                 assert False, "No trigger detected during the acquisiton sniffing window."
-                done = 1  
+                done = 1
 
-        # Stop the digitizer's capturing machine (to be on the safe side)
-        self._parent._set_cmd(':DIG:INIT', 'OFF')
-
-        self._parent._chk_err('after actual acquisition.')
-        
-        #May require fudge wait to keep Tabor happy
-        # time.sleep(1)
-
-        #Read all frames from Memory
-        #
-        #Choose which frames to read (all in this example)
-        self._parent._set_cmd(':DIG:DATA:SEL', 'ALL')
-        #Choose what to read (only the frame-data without the header in this example)
-        self._parent._set_cmd(':DIG:DATA:TYPE', 'FRAM')
-        #
-        # Get the total data size (in bytes)
-        resp = self._parent._get_cmd(':DIG:DATA:SIZE?')
-        num_bytes = np.uint64(resp)
-        #print('Total size in bytes: ' + resp)
-        #
-        # Read the data that was captured by channel 1:
-        self._parent._set_cmd(':DIG:CHAN:SEL', 1)
-        wavlen = num_bytes // 2
-        wav1 = np.zeros(int(wavlen), dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE
-        rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav1, num_bytes)
-        wav1 = deepcopy(wav1).reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)
-        #
-        # Read the data that was captured by channel 2:
-        self._parent._set_cmd(':DIG:CHAN:SEL', 2)
-        wavlen = num_bytes // 2
-        wav2 = np.zeros(int(wavlen), dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE
-        wav2 = deepcopy(wav2).reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)
-        rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav2, num_bytes)
-
-        self._parent._chk_err('after downloading the ACQ data from the FGPA DRAM.')
-
-        #TODO: Write some blocked caching code here (like with the M4i)...
-        ret_val = {
-                    'parameters' : ['repetition', 'segment', 'sample'],
-                    'data' : {
-                                'ch1' : wav1,
-                                'ch2' : wav2,
-                             },
-                    'misc' : {'SampleRates' : [self.SampleRate]*2}
-                }
         if cur_processor:
-            cur_processor.push_data(ret_val)
+            self.process_block(0, cur_processor, blocksize)
+            block_idx = 1
+            while block_idx*blocksize < self.NumRepetitions*self.NumSegments:
+                self.process_block(block_idx, cur_processor, blocksize)
+                block_idx += 1
             return cur_processor.get_all_data()
         else:
+            done = 0
+            while not done:
+                done = int(self._parent._get_cmd(":DIG:ACQuire:FRAM:STATus?").split(',')[3])
+            # Stop the digitizer's capturing machine (to be on the safe side)
+            self._parent._set_cmd(':DIG:INIT', 'OFF')
+
+            self._parent._chk_err('after actual acquisition.')
+            #Choose which frames to read (all in this example)
+            self._parent._set_cmd(':DIG:DATA:SEL', 'ALL')
+            #Choose what to read (only the frame-data without the header in this example)
+            self._parent._set_cmd(':DIG:DATA:TYPE', 'FRAM')
+            #
+            # Get the total data size (in bytes)
+            resp = self._parent._get_cmd(':DIG:DATA:SIZE?')
+            num_bytes = np.uint64(resp)
+            print(num_bytes, 'hi', self._parent._get_cmd(':DIG:DATA:FRAM?'))
+
+            wavlen = int(num_bytes // 2)
+            wav1 = np.zeros(wavlen, dtype=np.uint32)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE
+            wav1 = wav1.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)
+            wav2 = np.zeros(wavlen, dtype=np.uint32)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE
+            wav2 = wav2.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)
+
+            # Read from channel 1
+            self._parent._set_cmd(':DIG:CHAN:SEL', 1)
+            rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav1, num_bytes)
+            # read from channel 2
+            self._parent._set_cmd(':DIG:CHAN:SEL', 2)
+            rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav2, num_bytes)
+            # Check errors
+            self._parent._chk_err('after downloading the ACQ data from the FGPA DRAM.')
+
+            #TODO: Write some blocked caching code here (like with the M4i)...
+            ret_val = {
+                        'parameters' : ['repetition', 'segment', 'sample'],
+                        'data' : {
+                                    'ch1' : wav1.astype(np.int32),
+                                    'ch2' : wav2.astype(np.int32),
+                                    },
+                        'misc' : {'SampleRates' : [self.SampleRate]*2}
+                    }
             return ret_val
 
 class Tabor_P2584M(Instrument):

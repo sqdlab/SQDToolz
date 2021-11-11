@@ -79,15 +79,23 @@ awg_wfm_q.get_output_channel(1).Output = True
 
 #Connected M1 to TRIG1 and AWG-CH1 to ADC-CH1
 
-# instr = new_lab._get_instrument('TaborAWG')
+instr = new_lab._get_instrument('TaborAWG')
 
-# # instr._set_cmd(':DSP:STOR1', 'DIRECT1')
-# # instr._set_cmd(':DSP:STOR2', 'DIRECT2')
 
-# instr._set_cmd(':DSP:STOR1', 'DSP1')
-# instr._chk_err("")
-# instr._set_cmd(':DIG:DDC:MODE', 'COMPlex')
-# instr._set_cmd(':DIG:DDC:CFR1', 100e6)
+instr._set_cmd(':DIG:MODE', 'DUAL')
+instr._set_cmd(':DIG:FREQ', 2500e6)
+instr._set_cmd(':DIG:CHAN', 'CH1')
+instr._set_cmd(':DIG:DDC:MODE', 'COMPlex')
+instr._set_cmd(':DIG:CHAN', 'CH2')
+instr._set_cmd(':DIG:DDC:MODE', 'COMPlex')
+instr._set_cmd(':DIG:DDC:CFR1', 100e6)
+instr._set_cmd(':DIG:DDC:CFR2', 100e6)
+instr._chk_err("")
+
+instr._set_cmd(':DSP:STOR1', 'DIRECT1')
+instr._set_cmd(':DSP:STOR2', 'DIRECT2')
+
+instr._set_cmd(':DSP:STOR1', 'DSP1')
 
 # #Set DSP Path 1 to IQ
 # instr._set_cmd(':DSP:DEC:IQP:SEL', 1)

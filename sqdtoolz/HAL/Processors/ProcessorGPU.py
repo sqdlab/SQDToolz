@@ -32,7 +32,11 @@ from sqdtoolz.HAL.Processors.GPU.GPU_FIR import*
 from sqdtoolz.HAL.Processors.GPU.GPU_Integrate import*
 from sqdtoolz.HAL.Processors.GPU.GPU_Max import*
 from sqdtoolz.HAL.Processors.GPU.GPU_Mean import*
-
+from sqdtoolz.HAL.Processors.GPU.GPU_Duplicate import*
+from sqdtoolz.HAL.Processors.GPU.GPU_Slice import*
+from sqdtoolz.HAL.Processors.GPU.GPU_Rename import*
+from sqdtoolz.HAL.Processors.GPU.GPU_ChannelSum import*
+from sqdtoolz.HAL.Processors.GPU.GPU_ConstantArithmetic import*
 
 
 class ProcessorGPU(DataProcessor):

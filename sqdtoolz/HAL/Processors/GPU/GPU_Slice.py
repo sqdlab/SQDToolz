@@ -1,7 +1,7 @@
-from sqdtoolz.HAL.Processors.ProcessorCPU import ProcNodeCPU
+from sqdtoolz.HAL.Processors.ProcessorGPU import ProcNodeGPU
 from copy import copy
 
-class CPU_Slice(ProcNodeCPU):
+class GPU_Slice(ProcNodeGPU):
     def __init__(self, slices=[(None,None,None)], axis=2):
         self.slices = slices
         self.axis = axis
@@ -16,15 +16,15 @@ class CPU_Slice(ProcNodeCPU):
         init_sample_rates = data_pkt['misc'].pop('SampleRates', None)
         final_sample_rates = []
         for ch_ind, cur_ch in enumerate(init_keys):
-            cur_data_cpu = data_pkt['data'].pop(cur_ch)
-            cur_slices = [slice(None,None,None) for _ in range(len(cur_data_cpu.shape)-1)]
+            cur_data_gpu = ProcNodeGPU.check_conv_to_cupy_array(data_pkt['data'].pop(cur_ch))
+            cur_slices = [slice(None,None,None) for _ in range(len(cur_data_gpu.shape)-1)]
             for s_idx, s in enumerate(self.slices):
                 slices = copy(cur_slices)
                 slices.insert(self.axis, slice(*s))
-                data_pkt['data'][f'{cur_ch}_slice{s_idx}'] = cur_data_cpu[tuple(slices)]
+                data_pkt['data'][f'{cur_ch}_slice{s_idx}'] = cur_data_gpu[tuple(slices)]
                 if init_sample_rates is not None:
                     final_sample_rates.append(init_sample_rates[ch_ind])
-            del cur_data_cpu    #Perhaps necessary - well it's no time for caution...
+            del cur_data_gpu    #Perhaps necessary - well it's no time for caution...
         data_pkt['misc']['SampleRates'] = final_sample_rates
 
         return data_pkt

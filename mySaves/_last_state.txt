@@ -1,7 +1,0 @@
-{
-    "ActiveInstruments": [],
-    "HALs": [],
-    "PROCs": [],
-    "WFMTs": [],
-    "SPECs": []
-}

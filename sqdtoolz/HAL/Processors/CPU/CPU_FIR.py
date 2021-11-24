@@ -57,8 +57,8 @@ class CPU_FIR(ProcNodeCPU):
 
             return data_pkt
 
-        def apply_fir(self, data, fir_coeffs):
-            return scipy.ndimage.convolve1d(data, fir_coeffs)
+    def apply_fir(self, data, fir_coeffs):
+        return scipy.ndimage.convolve1d(data, fir_coeffs)
 
     def _get_current_config(self):
         return {

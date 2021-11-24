@@ -11,9 +11,10 @@ import matplotlib.pyplot as plt
 import matplotlib.collections
 from numpy.core.fromnumeric import argsort
 class FileIOWriter:
-    def __init__(self, filepath):
+    def __init__(self, filepath, **kwargs):
         self._filepath = filepath
         self._hf = None
+        self.store_timestamps = kwargs.get('store_timestamps', True)
 
     def _init_hdf5(self, sweep_vars, data_pkt):
         if self._hf == None:
@@ -56,15 +57,16 @@ class FileIOWriter:
                     self._datapkt_size = np.prod(list(param_sizes))
 
                 data_array_shape = [x[1].size for x in sweep_vars] + list(param_sizes)
-                arr_size = np.prod(data_array_shape)
+                arr_size = int(np.prod(data_array_shape))
                 arr = np.zeros((arr_size, len(data_pkt['data'].keys())))
                 arr[:] = np.nan
                 self._dset = self._hf.create_dataset("data", data=arr, compression="gzip")
                 self._dset_ind = 0
                 #Time-stamps (usually length 27 bytes)
-                self._ts_len = len( np.datetime_as_string(np.datetime64(datetime.now()),timezone='UTC').encode('utf-8') )
-                arr = np.array([np.datetime64()]*arr_size, dtype=f'S{self._ts_len}')
-                self._dsetTS = self._hf.create_dataset("timeStamps", data=arr, compression="gzip")
+                if self.store_timestamps:
+                    self._ts_len = len( np.datetime_as_string(np.datetime64(datetime.now()),timezone='UTC').encode('utf-8') )
+                    arr = np.array([np.datetime64()]*arr_size, dtype=f'S{self._ts_len}')
+                    self._dsetTS = self._hf.create_dataset("timeStamps", data=arr, compression="gzip")
                 
                 self._hf.swmr_mode = True
 
@@ -73,10 +75,11 @@ class FileIOWriter:
 
         cur_data = np.vstack([data_pkt['data'][x].flatten() for x in self._meas_chs]).T
         self._dset[self._dset_ind*self._datapkt_size : (self._dset_ind+1)*self._datapkt_size] = cur_data
-        #Trick taken from here: https://stackoverflow.com/questions/68443753/datetime-storing-in-hd5-database
-        cur_times = [np.datetime64(datetime.now())] * cur_data.shape[0]
-        utc_strs = np.array( [np.datetime_as_string(n,timezone='UTC').encode('utf-8') for n in cur_times] )
-        self._dsetTS[self._dset_ind*self._datapkt_size : (self._dset_ind+1)*self._datapkt_size] = utc_strs
+        if self.store_timestamps:
+            #Trick taken from here: https://stackoverflow.com/questions/68443753/datetime-storing-in-hd5-database
+            cur_times = [np.datetime64(datetime.now())] * cur_data.shape[0]
+            utc_strs = np.array( [np.datetime_as_string(n,timezone='UTC').encode('utf-8') for n in cur_times] )
+            self._dsetTS[self._dset_ind*self._datapkt_size : (self._dset_ind+1)*self._datapkt_size] = utc_strs
         self._dset_ind += 1
         self._dset.flush()
     

@@ -5,6 +5,8 @@ class CPU_DDC(ProcNodeCPU):
     def __init__(self, ddc_freqs):
         #DDC variables
         self._ddc_freqs = ddc_freqs
+        #A data store of current cosine|sine CuPy arrays used for DDC with each entry formatted as: (num-samples, sample-rate, ddc-frequency, cosine-array, sine-array)
+        self._ddc_cossin_arrays = []
 
     @classmethod
     def fromConfigDict(cls, config_dict):
@@ -18,8 +20,8 @@ class CPU_DDC(ProcNodeCPU):
 
         #Process DDC on a per-channel basis
         init_keys = [x for x in data_pkt['data'].keys()]
-        #A data store of current cosine|sine CuPy arrays used for DDC with each entry formatted as: (num-samples, sample-rate, ddc-frequency, cosine-array, sine-array)
-        self._ddc_cossin_arrays = [(0, 0, 0, None, None) for x in init_keys]
+        if len(self._ddc_cossin_arrays) == 0:
+            self._ddc_cossin_arrays = [(0, 0, 0, None, None) for x in init_keys]
         init_sample_rates = data_pkt['misc'].pop('SampleRates', None)
         final_sample_rates = []
         for ch_ind, cur_ch in enumerate(init_keys):

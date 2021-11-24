@@ -34,5 +34,5 @@ class GPU_ChannelSum(ProcNodeGPU):
     def _get_current_config(self):
         return {
             'Type'  : self.__class__.__name__,
-            'Repetitions' : self.channels
+            'Channels' : self.channels
         }

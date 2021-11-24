@@ -38,7 +38,6 @@ from sqdtoolz.HAL.Processors.GPU.GPU_Rename import*
 from sqdtoolz.HAL.Processors.GPU.GPU_ChannelSum import*
 from sqdtoolz.HAL.Processors.GPU.GPU_ConstantArithmetic import*
 
-
 class ProcessorGPU(DataProcessor):
     def __init__(self, proc_name, lab, pipeline_main = [], pipeline_end = []):
         super().__init__(proc_name, lab)

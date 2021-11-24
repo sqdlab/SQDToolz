@@ -45,7 +45,8 @@ class Experiment:
         else:
             data_file_name = 'data.h5'
 
-        data_file = FileIOWriter(file_path + data_file_name)
+        store_timestamps = kwargs.get('store_timestamps', True)
+        data_file = FileIOWriter(file_path + data_file_name, store_timestamps=store_timestamps)
 
         if not kwargs.get('skip_init_instruments', False):
             self._expt_config.init_instruments()

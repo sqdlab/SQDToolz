@@ -338,7 +338,6 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
             cur_wfm_type = globals()[cur_wfm_type]
             new_wfm_seg = cur_wfm_type.fromConfigDict(cur_wfm)
             new_wfm_seg.Parent = (self, 'w')
-            new_wfm_seg._lab = self._lab
             self._wfm_segment_list.append(new_wfm_seg)
 
     def plot_waveforms(self, overlap=False):

@@ -44,7 +44,7 @@ class WaveformSegmentBase:
         cur_wfm = self._get_waveform(lab, fs, t0_ind, ch_index)
         #Transform if necessary:      
         if self._transform_func:
-            return self._lab.WFMT(self._transform_func.wfmt_name).modify_waveform(cur_wfm, fs, t0_ind, ch_index, **self._transform_func.kwargs)
+            return lab.WFMT(self._transform_func.wfmt_name).modify_waveform(cur_wfm, fs, t0_ind, ch_index, **self._transform_func.kwargs)
         else:
             return cur_wfm
 
@@ -68,10 +68,39 @@ class WaveformSegmentBase:
 
 class WFS_Group(WaveformSegmentBase):
     def __init__(self, name, wfm_segs, time_len=-1, transform_func=None):
+        #Check names are unique...
+        cur_seg_names = []
+        seg_names = [x.Name for x in wfm_segs]
+        for cur_name in seg_names:
+            assert not cur_name in cur_seg_names, f"Waveform segments within a WFS_Group must be unique (more than one segment is named \'{cur_name}\')"
+            cur_seg_names += [cur_name]
+        
         super().__init__(name, transform_func, time_len)
         self._abs_time = time_len   #_abs_time is the total absolute time (if -1, the duration is the sum of the individual time segment durations)
         self._wfm_segs = wfm_segs
         self._validate_wfm_segs()
+
+    @classmethod
+    def fromConfigDict(cls, config_dict):
+        assert 'Type' in config_dict, "Configuration dictionary does not have the key: type"
+        assert config_dict['Type'] == cls.__name__, "Configuration dictionary has the wrong type."
+        for cur_key in ["Name", "Duration", "WaveformSegments"]:
+            assert cur_key in config_dict, "Configuration dictionary does not have the key: " + cur_key
+        #TODO: Fix the functionality here.
+        if config_dict['Mod Func']['Name'] == '':
+            wfmt_obj = None
+        else:
+            wfmt_obj = WaveformTransformationArgs(config_dict['Mod Func']['Name'], config_dict['Mod Func']['Args'])
+        #Compile inner waveforms
+        cur_wfm_segs = []
+        for cur_wfm in config_dict['WaveformSegments']:
+            cur_wfm_type = cur_wfm['Type']
+            assert cur_wfm_type in globals(), cur_wfm_type + " is not in the current namespace. If the class does not exist in WaveformSegments include wherever it lives by importing it in AWG.py."
+            cur_wfm_type = globals()[cur_wfm_type]
+            new_wfm_seg = cur_wfm_type.fromConfigDict(cur_wfm)
+            new_wfm_seg.Parent = (cls, 'w')
+            cur_wfm_segs.append(new_wfm_seg)
+        return cls(config_dict["Name"], cur_wfm_segs, config_dict["Duration"], wfmt_obj)
 
     @property
     def Duration(self):
@@ -83,6 +112,15 @@ class WFS_Group(WaveformSegmentBase):
     def Duration(self, len_seconds):
         self._abs_time = len_seconds
     
+    def get_waveform_segment(self, wfm_segment_name):
+        the_seg = None
+        for cur_seg in self._wfm_segs:
+            if cur_seg.Name == wfm_segment_name:
+                the_seg = cur_seg
+                break
+        assert the_seg != None, "Waveform Segment of name " + wfm_segment_name + " is not present in the list of Waveform Segments inside this WFS_Group segment."
+        return the_seg
+
     def _validate_wfm_segs(self):
         elastic_segs = []
         for ind_wfm, cur_wfm_seg in enumerate(self._wfm_segs):
@@ -120,6 +158,12 @@ class WFS_Group(WaveformSegmentBase):
             self._wfm_segs[elas_seg_ind].Duration = -1
         
         return final_wfm
+
+    def _get_current_config(self):
+        cur_dict = WaveformSegmentBase._get_current_config(self)
+        cur_dict['Duration'] = self._abs_time
+        cur_dict['WaveformSegments'] = [x._get_current_config() for x in self._wfm_segs]
+        return cur_dict
 
 class WFS_Constant(WaveformSegmentBase):
     def __init__(self, name, transform_func, time_len, value=0.0):

@@ -359,6 +359,64 @@ class TestSegments(unittest.TestCase):
         shutil.rmtree('test_save_dir')
         self.cleanup()
 
+    def test_SaveReload(self):
+        self.initialise()
+        self.lab.load_instrument('virACQ')
+        hal_acq = ACQ("dum_acq", self.lab, 'virACQ')
+
+        awg_wfm = self.lab.HAL("Wfm1")
+        read_segs = []
+        read_segs2 = []
+        awg_wfm.clear_segments()
+        awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, 10e-9, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init", None, 20e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero1", None, 30e-9, 0.1))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init2", None, 45e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 77e-9, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
+        read_segs += ["init"]
+        read_segs2 += ["zero2"]
+        awg_wfm.get_output_channel(0).marker(1).set_markers_to_segments(read_segs)
+        awg_wfm.get_output_channel(1).marker(0).set_markers_to_segments(read_segs2)
+        #Gather initial arrays
+        wfm_unmod = np.vstack(awg_wfm.get_raw_waveforms())
+        #Modulations
+        WFMT_ModulationIQ('IQmod', self.lab, 47e7)
+        WFMT_ModulationIQ('IQmod2', self.lab, 13e7)
+        #Test a basic WFS_Group construct with elastic time-frame
+        awg_wfm = WaveformAWG("Wfm1", self.lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9, total_time=227e-9)
+        awg_wfm.clear_segments()
+        awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, -1, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init", self.lab.WFMT('IQmod').apply(), 20e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Group("TestGroup", [
+                                        WFS_Constant("zero1", None, -1, 0.1),
+                                        WFS_Gaussian("init2", None, 45e-9, 0.5-0.1)
+                                        ], time_len=75e-9))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 77e-9, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
+        wfm_mod = np.vstack(awg_wfm.get_raw_waveforms())
+        init_stencil = np.s_[10:30]
+        temp = wfm_unmod*1.0
+        omega = 2*np.pi*self.lab.WFMT('IQmod').IQFrequency
+        temp[0, init_stencil] *= np.cos(omega*1e-9*(np.arange(20) + 10))
+        temp[1, init_stencil] *= np.sin(omega*1e-9*(np.arange(20) + 10))
+        #
+        assert self.arr_equality(temp, wfm_mod), "WFS_Group failed in waveform compilation."
+               
+        expConfig = ExperimentConfiguration('testConf', self.lab, 1.0, ['Wfm1'], 'dum_acq')
+        # leConfig = expConfig.save_config()
+
+        awg_wfm.clear_segments()
+        awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, -1, 0.0))
+        wfm_mod = np.vstack(awg_wfm.get_raw_waveforms())
+        assert not self.arr_equality(temp, wfm_mod), "The waveform randomly compiles correctly even though it has been redone."
+        expConfig.init_instruments()
+        wfm_mod = np.vstack(awg_wfm.get_raw_waveforms())
+        assert self.arr_equality(temp, wfm_mod), "The waveform was not constructed properly on reloading."
+
+        shutil.rmtree('test_save_dir')
+        self.cleanup()
+
 class TestAWGChecks(unittest.TestCase):
     def initialise(self):
         self.lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir/')

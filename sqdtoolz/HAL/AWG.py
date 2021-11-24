@@ -138,6 +138,11 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
     def NumPts(self):
         return round(self.Duration * self._sample_rate)
 
+    def set_total_time(self, total_time):
+        self._total_time = total_time
+    def set_valid_total_time(self, min_time):
+        self.set_total_time(self.get_valid_length_from_time(min_time)[0])
+
     def get_valid_length_from_pts(self, num_pts):
         ret_vals = []
         for ind, cur_awg_chan in enumerate(self._awg_chan_list):

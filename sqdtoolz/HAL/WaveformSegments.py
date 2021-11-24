@@ -121,7 +121,7 @@ class WFS_Group(WaveformSegmentBase):
         assert the_seg != None, "Waveform Segment of name " + wfm_segment_name + " is not present in the list of Waveform Segments inside this WFS_Group segment."
         return the_seg
 
-    def _validate_wfm_segs(self):
+    def _validate_wfm_segs(self, fs=-1):
         elastic_segs = []
         for ind_wfm, cur_wfm_seg in enumerate(self._wfm_segs):
             if cur_wfm_seg.Duration == -1:
@@ -132,18 +132,29 @@ class WFS_Group(WaveformSegmentBase):
         if self._abs_time > 0 and len(elastic_segs) == 0:
             assert sum([x.Duration for x in self._wfm_segs]) == self._abs_time, "Sum of waveform segment durations do not match the total specified waveform group time. Consider making one of the segments elastic by setting its duration to be -1."
         
+        if fs == -1:
+            return  #i.e. just for pure validation and no calculation purposes...
+
         #Return the elastic segment index
         if len(elastic_segs) > 0:
-            return elastic_segs[0]
+            elas_seg_ind = elastic_segs[0]
+            #On the rare case where the segments won't fit the overall size by being too little (e.g. 2.4, 2.4, 4.2 adds up to 9, but rounding
+            #the sampled segments yields 2, 2, 4 which adds up to 8) or too large (e.g. 2.6, 2.6, 3.8 adds up to 9, but rounding the sampled
+            #segments yields 3, 3, 4 which adds up to 10), the elastic-time must be carefully calculated from the total number of sample points
+            #rather than the durations!
+            elastic_time = self._abs_time*fs - sum([self._wfm_segs[x].NumPts(fs) for x in range(len(self._wfm_segs)) if x != elas_seg_ind])
+            elastic_time = elastic_time / fs
+
+            return (elas_seg_ind, elastic_time)
         else:
-            return -1
+            return (-1,-1)
 
     def _get_waveform(self, lab, fs, t0_ind, ch_index):
-        elas_seg_ind = self._validate_wfm_segs()
+        elas_seg_ind, elastic_time = self._validate_wfm_segs(fs)
         
         #Calculate and set the elastic time segment
         if elas_seg_ind != -1:  #Note that self._abs_time > 0
-            self._wfm_segs[elas_seg_ind].Duration = self._abs_time - (sum([x.Duration for x in self._wfm_segs])+1)    #Negate the -1 segment
+            self._wfm_segs[elas_seg_ind].Duration = elastic_time    #Negate the -1 segment
 
         #Concatenate the individual waveform segments
         final_wfm = np.array([])

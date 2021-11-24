@@ -356,6 +356,25 @@ class TestSegments(unittest.TestCase):
         temp[1, init_stencil] *= np.sin(omega*1e-9*(np.arange(20) + 10))
         assert self.arr_equality(temp, wfm_mod), "WFS_Group failed in waveform compilation."
 
+        #An interesting edge-case
+        wait_times = np.linspace(1e-9,2e-6,49)
+        WaveformAWG("wfmRabi", self.lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1.25e9)
+        self.lab.HAL("wfmRabi").set_valid_total_time((wait_times.size+1)*50e-6)
+        self.lab.HAL("wfmRabi").clear_segments()
+        read_segs = []
+        for m, cur_wait in enumerate(wait_times):
+            self.lab.HAL("wfmRabi").add_waveform_segment(WFS_Group("TestGroup", [
+                                                    WFS_Constant(f"init{m}", None, -1, 0.0),
+                                                    WFS_Gaussian(f"tip{m}", self.lab.WFMT('IQmod').apply(phase=0), 40e-9, 1),
+                                                    WFS_Constant(f"wait{m}", None, cur_wait, 0.0),
+                                                    WFS_Gaussian(f"untip{m}", self.lab.WFMT('IQmod').apply(), 40e-9, 2),
+                                                    WFS_Constant(f"pad{m}", None, 5e-9, 0.0)
+                                                ], time_len=46e-6))
+            self.lab.HAL("wfmRabi").add_waveform_segment(WFS_Constant(f"read{m}", None, 4e-6, 0.0))
+            read_segs += [f"read{m}"]
+        self.lab.HAL("wfmRabi").add_waveform_segment(WFS_Constant("init_pad", None, -1, 0.0))
+        self.lab.HAL("wfmRabi").get_raw_waveforms()
+
         shutil.rmtree('test_save_dir')
         self.cleanup()
 

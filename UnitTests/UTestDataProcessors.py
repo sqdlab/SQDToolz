@@ -6,23 +6,26 @@ from sqdtoolz.HAL.Processors.CPU.CPU_FIR import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Mean import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Integrate import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Max import*
+TEST_CPU = True
 
-from sqdtoolz.HAL.Processors.ProcessorGPU import*
-from sqdtoolz.HAL.Processors.GPU.GPU_DDC import*
-from sqdtoolz.HAL.Processors.GPU.GPU_FIR import*
-from sqdtoolz.HAL.Processors.GPU.GPU_Mean import*
-from sqdtoolz.HAL.Processors.GPU.GPU_Integrate import*
-from sqdtoolz.HAL.Processors.GPU.GPU_Max import*
+try:
+    from sqdtoolz.HAL.Processors.ProcessorGPU import*
+    from sqdtoolz.HAL.Processors.ProcessorGPU import*
+    from sqdtoolz.HAL.Processors.GPU.GPU_DDC import*
+    from sqdtoolz.HAL.Processors.GPU.GPU_FIR import*
+    from sqdtoolz.HAL.Processors.GPU.GPU_Mean import*
+    from sqdtoolz.HAL.Processors.GPU.GPU_Integrate import*
+    from sqdtoolz.HAL.Processors.GPU.GPU_Max import*
+    TEST_GPU = True
+except ModuleNotFoundError:
+    pass
 
 import random
-
 import matplotlib.pyplot as plt
 
 new_lab = Laboratory('', 'savedir')
 
 INCLUDE_PLOTS = False
-TEST_CPU = True
-TEST_GPU = True
 
 ###################################################
 ####################TESTING CPU####################

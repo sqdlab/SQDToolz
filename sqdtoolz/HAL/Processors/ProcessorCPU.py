@@ -21,7 +21,7 @@ from sqdtoolz.HAL.Processors.CPU.CPU_Mean import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Duplicate import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Slice import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Rename import*
-from sqdtoolz.HAL.Processors.CPU.CPU_ChannelSum import*
+from sqdtoolz.HAL.Processors.CPU.CPU_ChannelArithmetic import*
 from sqdtoolz.HAL.Processors.CPU.CPU_ConstantArithmetic import*
 
 from sqdtoolz.HAL.Processors.CPU.CPU_FFT import*

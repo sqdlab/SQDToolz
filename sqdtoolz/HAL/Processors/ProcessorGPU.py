@@ -35,7 +35,7 @@ from sqdtoolz.HAL.Processors.GPU.GPU_Mean import*
 from sqdtoolz.HAL.Processors.GPU.GPU_Duplicate import*
 from sqdtoolz.HAL.Processors.GPU.GPU_Slice import*
 from sqdtoolz.HAL.Processors.GPU.GPU_Rename import*
-from sqdtoolz.HAL.Processors.GPU.GPU_ChannelSum import*
+from sqdtoolz.HAL.Processors.GPU.GPU_ChannelArithmetic import*
 from sqdtoolz.HAL.Processors.GPU.GPU_ConstantArithmetic import*
 
 

@@ -7,15 +7,14 @@ class CPU_ConstantArithmetic(ProcNodeCPU):
 
         Inputs:
             - constant - the constant (float)
-            - operation - '+', '-', '*', '/'
-            - channels - List of hannels to operate on. None means all channels
+            - operation - '+', '-', '*', '/', '%'
+            - channels - List of channels to operate on. None means all channels
         '''
-        self.operations = ['+', '-', '*', '/', '<<', '>>']
+        self.operations = ['+', '-', '*', '/', '%']
         self.constant = constant
         assert operation in self.operations, f"The operation {operation} is not permitted. Choose from {self.operations}"
         self.operation = operation
         self.channels = channels
-        
 
     @classmethod
     def fromConfigDict(cls, config_dict):
@@ -30,10 +29,8 @@ class CPU_ConstantArithmetic(ProcNodeCPU):
             data *= constant
         elif operation == '/':
             data /= constant
-        elif operation == '<<':
-            data = data<<constant
-        elif operation == '>>':
-            data = data>>constant
+        elif operation == '%':
+            data = data % constant
         return data
     
     def process_data(self, data_pkt, **kwargs):

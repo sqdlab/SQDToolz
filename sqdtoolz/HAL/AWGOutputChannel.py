@@ -84,7 +84,7 @@ class AWGOutputChannel(TriggerInput):
             else:
                 cur_dict['Duration'] = cur_wfm_seg.Duration
             #TODO: Use _get_waveform to yield the unmodified waveform (i.e. just envelope) if some flag is set
-            cur_y = cur_wfm_seg.get_waveform(sample_rate, t0, self._ch_index)
+            cur_y = cur_wfm_seg.get_waveform(self._parent_waveform_obj._lab, sample_rate, t0, self._ch_index)
             t0 += cur_wfm_seg.NumPts(sample_rate) / sample_rate
             if elas_seg_ind == m:
                 cur_wfm_seg.Duration = -1

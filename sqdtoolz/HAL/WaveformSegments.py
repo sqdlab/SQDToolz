@@ -8,7 +8,6 @@ class WaveformSegmentBase:
             assert isinstance(transform_func, WaveformTransformationArgs), "Transformation function specified incorrectly - remember to call apply() on the WFMT object..."
         self._transform_func = transform_func
         self._duration = duration
-        self._lab = None    #Should be set by the AWG class when required...
 
     @property
     def Name(self):
@@ -24,11 +23,11 @@ class WaveformSegmentBase:
     def Duration(self, len_seconds):
         self._duration = len_seconds
 
-    def reset_waveform_transforms(self):
+    def reset_waveform_transforms(self, lab):
         if self._transform_func:
-            return self._lab.WFMT(self._transform_func.wfmt_name).initialise_for_new_waveform()
+            return lab.WFMT(self._transform_func.wfmt_name).initialise_for_new_waveform()
 
-    def get_waveform(self, fs, t0_ind, ch_index):
+    def get_waveform(self, lab, fs, t0_ind, ch_index):
         '''
         Returns the final waveform; that is, after applying the modification function.
 
@@ -42,14 +41,14 @@ class WaveformSegmentBase:
         
         Returns a numpy array of points representing the total waveform.
         '''
-        cur_wfm = self._get_waveform(fs, t0_ind, ch_index)
+        cur_wfm = self._get_waveform(lab, fs, t0_ind, ch_index)
         #Transform if necessary:      
         if self._transform_func:
             return self._lab.WFMT(self._transform_func.wfmt_name).modify_waveform(cur_wfm, fs, t0_ind, ch_index, **self._transform_func.kwargs)
         else:
             return cur_wfm
 
-    def _get_waveform(self, fs, t0_ind, ch_index):
+    def _get_waveform(self, lab, fs, t0_ind, ch_index):
         assert False, "Waveform Segment classes must implement a get_waveform function."
 
     def _get_current_config(self):
@@ -101,7 +100,7 @@ class WFS_Group(WaveformSegmentBase):
         else:
             return -1
 
-    def _get_waveform(self, fs, t0_ind, ch_index):
+    def _get_waveform(self, lab, fs, t0_ind, ch_index):
         elas_seg_ind = self._validate_wfm_segs()
         
         #Calculate and set the elastic time segment
@@ -113,7 +112,7 @@ class WFS_Group(WaveformSegmentBase):
         t0_ind = 0
         for cur_wfm_seg in self._wfm_segs:
             #TODO: Preallocate - this is a bit inefficient...
-            final_wfm = np.concatenate((final_wfm, cur_wfm_seg.get_waveform(fs, t0_ind, ch_index)))
+            final_wfm = np.concatenate((final_wfm, cur_wfm_seg.get_waveform(lab, fs, t0_ind, ch_index)))
             t0_ind += final_wfm.size
 
         #Reset segment to be elastic
@@ -146,7 +145,7 @@ class WFS_Constant(WaveformSegmentBase):
     def Value(self, const_val):
         self._value = const_val
 
-    def _get_waveform(self, fs, t0_ind, ch_index):
+    def _get_waveform(self, lab, fs, t0_ind, ch_index):
         return np.zeros(round(self.NumPts(fs))) + self._value
 
     def _get_current_config(self):
@@ -185,7 +184,7 @@ class WFS_Gaussian(WaveformSegmentBase):
     def _gauss(x):
         return np.exp(-x*x / (2*self._sigma*self._sigma))
 
-    def _get_waveform(self, fs, t0_ind, ch_index):
+    def _get_waveform(self, lab, fs, t0_ind, ch_index):
         n = self.NumPts(fs)
         #Generate the sample points on the Gaussian (start and end points are the same)
         sample_points = np.linspace(-self._num_sd, self._num_sd, int(np.round(n)))
@@ -246,7 +245,7 @@ class WFS_Cosine(WaveformSegmentBase):
     def Phase(self, phase_val):
         self._phase = phase_val
 
-    def _get_waveform(self, fs, t0_ind, ch_index):
+    def _get_waveform(self, lab, fs, t0_ind, ch_index):
         t_vals = np.arange(self.NumPts(fs)) / fs
         return self.Amplitude * np.cos(2*np.pi*self.Frequency * t_vals + self.Phase)
 

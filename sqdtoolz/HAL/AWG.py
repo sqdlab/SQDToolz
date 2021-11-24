@@ -224,12 +224,12 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
         for cur_ch in range(len(self._awg_chan_list)):
             #Reset any waveform modulation commands for a new sequence construction...
             for cur_wfm_seg in self._wfm_segment_list:
-                cur_wfm_seg.reset_waveform_transforms()
+                cur_wfm_seg.reset_waveform_transforms(self._lab)
             t0 = 0
             #Concatenate the individual waveform segments
             for cur_wfm_seg in self._wfm_segment_list:
                 #TODO: Preallocate - this is a bit inefficient...
-                final_wfms[cur_ch] = np.concatenate((final_wfms[cur_ch], cur_wfm_seg.get_waveform(self._sample_rate, t0, cur_ch)))
+                final_wfms[cur_ch] = np.concatenate((final_wfms[cur_ch], cur_wfm_seg.get_waveform(self._lab, self._sample_rate, t0, cur_ch)))
                 t0 = final_wfms[cur_ch].size
             #Scale the waveform via the global scale-factor...
             final_wfms[cur_ch] *= self._global_factor

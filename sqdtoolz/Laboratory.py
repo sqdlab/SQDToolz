@@ -236,6 +236,7 @@ class Laboratory:
         if wfmt_name in self._waveform_transforms:
             return self._waveform_transforms[wfmt_name]
         else:
+            print(f'Warning: WFMT {wfmt_name} has not been initialised!')
             return None
 
     def _register_VAR(self, hal_var):
@@ -247,6 +248,7 @@ class Laboratory:
         if param_name in self._variables:
             return self._variables[param_name]
         else:
+            print(f'Warning: VAR {param_name} has not been initialised!')
             return None
 
     def _register_SPEC(self, spec):
@@ -269,6 +271,7 @@ class Laboratory:
         if expt_config_name in self._expt_configs:
             return self._expt_configs[expt_config_name]
         else:
+            print(f'Warning: CONFIG {expt_config_name} has not been initialised!')
             return None
 
     def add_instrument(self, instrObj):

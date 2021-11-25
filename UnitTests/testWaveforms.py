@@ -355,6 +355,45 @@ class TestSegments(unittest.TestCase):
         temp[0, init_stencil] *= np.cos(omega*1e-9*(np.arange(20) + 10))
         temp[1, init_stencil] *= np.sin(omega*1e-9*(np.arange(20) + 10))
         assert self.arr_equality(temp, wfm_mod), "WFS_Group failed in waveform compilation."
+        #
+        #Test marker decomposition...
+        awg_wfm = WaveformAWG("Wfm1", self.lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9, total_time=227e-9)
+        awg_wfm.clear_segments()
+        awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, -1, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init", self.lab.WFMT('IQmod').apply(), 20e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Group("TestGroup", [
+                                        WFS_Constant("zero1", None, -1, 0.1),
+                                        WFS_Gaussian("init2", None, 45e-9, 0.5-0.1)
+                                        ], time_len=75e-9))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 77e-9, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
+        awg_wfm.get_output_channel(0).marker(0).set_markers_to_segments([ 'init', ['TestGroup','init2'], 'init3' ])
+        raw_mkrs = awg_wfm.get_output_channel(0).marker(0).get_raw_marker_waveform()
+        exp_mkrs = np.array( [0]*10 + [1]*20  +  [0]*30 + [1]*45  +  [0]*77 + [1]*45 )
+        assert self.arr_equality(raw_mkrs, exp_mkrs), "WFS_Group failed in marker compilation."
+        #
+        #Test marker decomposition in nested WFS_Groups...
+        awg_wfm = WaveformAWG("Wfm1", self.lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9, total_time=237e-9)
+        awg_wfm.clear_segments()
+        awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, -1, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init", self.lab.WFMT('IQmod').apply(), 20e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Group("TestGroup", [
+                                        WFS_Constant("zero1", None, -1, 0.1),
+                                        WFS_Gaussian("init2", None, 45e-9, 0.5-0.1)
+                                        ], time_len=75e-9))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 77e-9, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Group("TestGroup2", [
+                                        WFS_Group("Sub1", [
+                                            WFS_Constant("zero1", None, 3e-9, 0.1),
+                                            WFS_Gaussian("init2", None, 2e-9, 0.5-0.1)
+                                            ], time_len=5e-9),
+                                        WFS_Gaussian("init2", None, 5e-9, 0.5-0.1)
+                                        ], time_len=10e-9))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
+        awg_wfm.get_output_channel(0).marker(0).set_markers_to_segments([ 'init', ['TestGroup','init2'], 'init3', ['TestGroup2', 'Sub1', 'init2'] ])
+        raw_mkrs = awg_wfm.get_output_channel(0).marker(0).get_raw_marker_waveform()
+        exp_mkrs = np.array( [0]*10 + [1]*20  +  [0]*30 + [1]*45  +  [0]*77 +    [0]*3+[1]*2+[0]*5    + [1]*45 )
+        assert self.arr_equality(raw_mkrs, exp_mkrs), "WFS_Group failed in marker compilation in a nested case."
 
         #An interesting edge-case
         wait_times = np.linspace(1e-9,2e-6,49)

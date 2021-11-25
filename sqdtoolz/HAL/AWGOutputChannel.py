@@ -190,10 +190,14 @@ class AWGOutputMarker(TriggerOutput, TriggerInput):
         for cur_seg_name in list_seg_names:
             found_seg = None
             for cur_seg_chk in self._parent_waveform_obj._wfm_segment_list:
-                if cur_seg_chk.Name == cur_seg_name:
+                if type(cur_seg_name) == list:
+                    cur_check = cur_seg_name[0]
+                else:
+                    cur_check = cur_seg_name
+                if cur_seg_chk.Name == cur_check:
                     found_seg = cur_seg_chk
                     break
-            assert found_seg != None, "WaveformSegment " + cur_seg_name + " has not been added to this Waveform sequence."
+            assert found_seg != None, "WaveformSegment " + cur_check + " has not been added to this Waveform sequence."
         self._marker_seg_list = list_seg_names[:] #Copy over the list
 
     def set_markers_to_arbitrary(self, arb_mkr_list):

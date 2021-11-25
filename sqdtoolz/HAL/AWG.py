@@ -177,12 +177,32 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
         if elas_seg_ind != -1:
             self._wfm_segment_list[elas_seg_ind].Duration = elastic_time
 
+        const_segs = []
+        dict_segs = {}
+        for cur_seg in segments:
+            if type(cur_seg) == list:
+                if len(cur_seg) == 0:
+                    const_segs += [cur_seg] #TODO: Check if is an error condition to end up here?
+                
+                cur_queue = cur_seg[1:]
+                if len(cur_queue) == 1:
+                    cur_queue = cur_queue[0]
+                
+                if not cur_seg[0] in dict_segs:
+                    dict_segs[cur_seg[0]] = [cur_queue]
+                else:
+                    dict_segs[cur_seg[0]] += [cur_queue]
+            else:
+                const_segs += [cur_seg]
+
         final_wfm = np.zeros(int(np.round(self.NumPts)), dtype=np.ubyte)
         cur_ind = 0
         for cur_seg in self._wfm_segment_list:
             cur_len = cur_seg.NumPts(self._sample_rate)
-            if cur_seg.Name in segments:
+            if cur_seg.Name in const_segs:
                 final_wfm[cur_ind:cur_ind+cur_len] = 1
+            elif cur_seg.Name in dict_segs: #i.e. another segment with children like WFS_Group
+                final_wfm[cur_ind:cur_ind+cur_len] = cur_seg._get_marker_waveform_from_segments(dict_segs[cur_seg.Name], self._sample_rate)
             cur_ind += cur_len
         
         #Reset segment to be elastic

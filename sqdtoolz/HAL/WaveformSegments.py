@@ -65,6 +65,9 @@ class WaveformSegmentBase:
         else:
             cur_dict['Mod Func'] = {'Name' : self._transform_func.wfmt_name, 'Args' : self._transform_func.kwargs}
         return cur_dict
+    
+    def _get_marker_waveform_from_segments(self, segments):
+        assert False, "This waveform segment does not have children to index on markers."
 
 class WFS_Group(WaveformSegmentBase):
     def __init__(self, name, wfm_segs, time_len=-1, transform_func=None):
@@ -120,6 +123,46 @@ class WFS_Group(WaveformSegmentBase):
                 break
         assert the_seg != None, "Waveform Segment of name " + wfm_segment_name + " is not present in the list of Waveform Segments inside this WFS_Group segment."
         return the_seg
+
+    def _get_marker_waveform_from_segments(self, segments, fs):
+        #Temporarily set the Duration of Elastic time-segment...
+        elas_seg_ind, elastic_time = self._validate_wfm_segs(fs)
+        if elas_seg_ind != -1:
+            self._wfm_segs[elas_seg_ind].Duration = elastic_time
+
+        const_segs = []
+        dict_segs = {}
+        for cur_seg in segments:
+            if type(cur_seg) == list:
+                if len(cur_seg) == 0:
+                    const_segs += [cur_seg] #TODO: Check if is an error condition to end up here?
+                
+                cur_queue = cur_seg[1:]
+                if len(cur_queue) == 1:
+                    cur_queue = cur_queue[0]
+                
+                if not cur_seg[0] in dict_segs:
+                    dict_segs[cur_seg[0]] = [cur_queue]
+                else:
+                    dict_segs[cur_seg[0]] += [cur_queue]
+            else:
+                const_segs += [cur_seg]
+
+        final_wfm = np.zeros(int(np.round(self.NumPts(fs))), dtype=np.ubyte)
+        cur_ind = 0
+        for cur_seg in self._wfm_segs:
+            cur_len = cur_seg.NumPts(fs)
+            if cur_seg.Name in const_segs:
+                final_wfm[cur_ind:cur_ind+cur_len] = 1
+            elif cur_seg.Name in dict_segs: #i.e. another segment with children like WFS_Group
+                final_wfm[cur_ind:cur_ind+cur_len] = cur_seg._get_marker_waveform_from_segments(dict_segs[cur_seg.Name], fs)
+            cur_ind += cur_len
+        
+        #Reset segment to be elastic
+        if elas_seg_ind != -1:
+            self._wfm_segs[elas_seg_ind].Duration = -1
+    
+        return final_wfm
 
     def _validate_wfm_segs(self, fs=-1):
         elastic_segs = []

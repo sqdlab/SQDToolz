@@ -55,7 +55,7 @@ class CPU_FIR(ProcNodeCPU):
             data_pkt['data'][cur_ch] = self.apply_fir(cur_data_gpu, self._fir_arrays[ch_ind][5])
             del cur_data_gpu #Perhaps necessary - well it's no time for caution...
 
-            return data_pkt
+        return data_pkt
 
     def apply_fir(self, data, fir_coeffs):
         return scipy.ndimage.convolve1d(data, fir_coeffs)

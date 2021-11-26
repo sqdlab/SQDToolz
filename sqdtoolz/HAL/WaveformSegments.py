@@ -205,7 +205,7 @@ class WFS_Group(WaveformSegmentBase):
         for cur_wfm_seg in self._wfm_segs:
             #TODO: Preallocate - this is a bit inefficient...
             final_wfm = np.concatenate((final_wfm, cur_wfm_seg.get_waveform(lab, fs, t0_ind, ch_index)))
-            t0_ind += final_wfm.size
+            t0_ind = final_wfm.size
 
         #Reset segment to be elastic
         if elas_seg_ind != -1:

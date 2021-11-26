@@ -65,22 +65,3 @@ class CPU_FIR(ProcNodeCPU):
             'Type'  : self.__class__.__name__,
             'FIRspecs' : self._fir_specs
         }
-
-class CPU_MultiplySum(CPU_FIR):
-    def __init__(self, fir_specs=[{ 'Type': 'low','fc': None,'Win': 'hamming' }]):
-        '''
-        A general FIR filter with number of taps equal to number of samples (assumed to be the last axis)
-        is applied across different channels in the input dataset and summed across samples.
-        This returns one sample.
-
-        The input fir_specs is a per-channel list specifying the parameters in a DICTIONARY with the keys:
-            - Type - Specifying whether it is a low or high pass filter via the strings: 'low' or 'high'
-            - fc   - Cutoff frequency of the filter. If None, lowest cutoff possible is used.
-            - Win  - The filter window (e.g. 'hamming') as fed into the function scipy.signal.firwin
-        '''
-        for i in range(len(fir_specs)):
-            fir_specs[i]['Taps'] = None
-        super().__init__(fir_specs=fir_specs)
-
-    def apply_fir(self, data, fir_coeffs):
-        return np.sum(data*fir_coeffs, axis=-1)

@@ -16,7 +16,7 @@ setuptools.setup(
         "Programming Language :: Python :: 3 :: ONLY",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.7',
+    python_requires='>=3.9',
     keywords='control toolbox, timing',
     install_requires=['numpy','qcodes>=0.21.0','matplotlib','scipy','pyvisa-py'],
     package_data={

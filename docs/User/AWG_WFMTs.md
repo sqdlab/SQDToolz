@@ -2,11 +2,13 @@
 
 The application of waveform transformations is highlighted in the [AWG HAL section](AWG_Pulse_Building.md). Note that the waveform transformations are defined in `sqdtoolz/HAL/WaveformTransformations.py` with each object prefixed with `WFMT_`.
 
-The different waveform transformations available in SQDToolz are highlighted in this page.
+The different waveform transformations available in SQDToolz are highlighted in this page:
 
-## WFMT_ModulationIQ
+- [ModulationIQ](#modulationiq)
 
-This transformation applies to a two-channel waveform in which the first and second channels represent the I and Q channels of an IQ-modulated waveform:
+## ModulationIQ
+
+`WFMT_ModulationIQ` applies to a two-channel waveform in which the first and second channels represent the I and Q channels of an IQ-modulated waveform:
 
 <img src="https://render.githubusercontent.com/render/math?math=I(t)=A\cos(2\pi f t%2B\phi)%2BI_{dc}">
 

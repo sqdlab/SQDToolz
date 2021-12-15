@@ -35,12 +35,13 @@ The Gaussian lineshape is constructed from a normalised Gaussian for the given s
 
 <img src="https://render.githubusercontent.com/render/math?math=G(x)=\exp\left(-\tfrac{x^2}{\sigma^2}\right)">
 
-in which <img src="https://render.githubusercontent.com/render/math?math=x"> is taken from <img src="https://render.githubusercontent.com/render/math?math=-\sigma"> to <img src="https://render.githubusercontent.com/render/math?math=%2B\sigma">. Then the horizontal axis is scaled across the samples over the given duration. Then the waveform is vertically moved down such that the start and end points are zero. Then the vertical centre is scaled to match the prescribed amplitude.
+in which <img src="https://render.githubusercontent.com/render/math?math=x"> is taken from <img src="https://render.githubusercontent.com/render/math?math=-\sigma"> to <img src="https://render.githubusercontent.com/render/math?math=%2B\sigma">. Then the horizontal axis is scaled across the samples over the given duration. Then the waveform is vertically moved down such that the start and end points are zero. Finally, the vertical centre is scaled to match the prescribed amplitude.
 
 The `WFS_Gaussian` object consists of the properties:
 
 - `Duration` - length of waveform
 - `Amplitude` - the height of the Gaussian waveform
+- `NumStdDev` - number of standard deviations <img src="https://render.githubusercontent.com/render/math?math=\sigma"> taken on either side of the Gaussian
 
 ## WFS Cosine
 

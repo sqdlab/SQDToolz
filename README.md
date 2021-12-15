@@ -2,6 +2,12 @@
 
 This is a toolbox to control and run a experiments by synchronising AWGs and Digitizers via a Pulser device. This was designed to supersede UQTools, keeping simplicity, scalability and efficiency in check. It is a wrapper over QCoDeS and has other key functionality such as timing control, pulse generation and shaping, data + configuration storage and retrieval, which are not present in QCoDeS.
 
+There are two classes of documentation provided for this stack:
+
+- [User documentation](docs/User/Readme.md)
+- [Developer documentation](docs/Developer/Readme.md)
+
+
 ## Installation instructions:
 
 The installation is done by cloning the repository and running the setup file via pip. Note that it is done in the editable mode so that one may modify the stack and push changes to GIT without upsetting the pip package manager. Two possible modes are given here depending on whether one uses Anaconda or normal Python:
@@ -55,10 +61,7 @@ Now (noting that the command line is still inside the active virtual environment
 ```
 pip install -e sqdtoolz
 ```
-
-### Using Anaconda
-
-Start Anaconda prompt and run
+This should install all required dependencies.
 
 ## Basic design overview:
 
@@ -100,3 +103,4 @@ Note that the folder may also include other files such as fitted plots if the de
 - Structural types supported via `ExperimentSpecification`. For example, a qubit type can hold parameters such as its drive frequency, optimal drive amplitude/time for Pauli-X Gates, T1 time etc.
 
 It should be noted that experiments can automatically interface with parameters (either inside `ExperimentSpecification` or normal `Variable` objects). For example, a Rabi experiment will automatically fit the resulting oscillations to update the currently optimal drive amplitude and time for Pauli-X gates on a given qubit. Thus, one may run cascades of experiments in an automated sequence. A usual sequence might be to run a Rabi experiment (update the currently optimal tipping $\pi/2$ amplitude), run a more optimal Ramsey experiment (update the detuning frequency) and finally run a T1 experiment with the optimal qubit drive parameters. This three-experiment combination could be run in a loop with all **parameters being updated and saved automatically in real-time**. Using the experiment grouping functionality, one may group all said experiments into a single time-stamped folder with the data IO retrieval functionality present to automatically amalgamate all results across multiple experiments (e.g. this is useful when trying to collate all T1 values when generating T1-statistics).
+

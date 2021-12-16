@@ -143,6 +143,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
     def set_valid_total_time(self, min_time):
         #TODO: Make this more general - e.g. if using a Keysight that requires one set of constraints and
         #a Tektronix on the other channel with a different set of constraints, the valid time must reflect that!!!
+        #TODO: May have to change the sample-rate model to be a list of sample-rates? NumPts is a function of sample-rate after all...
         self.set_total_time(self.get_valid_length_from_time(min_time)[0])
 
     def get_valid_length_from_pts(self, num_pts):

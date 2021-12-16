@@ -1,6 +1,6 @@
 # SQDTOOLz
 
-This is a toolbox to control and run a experiments by synchronising AWGs and Digitizers via a Pulser device. This was designed to supersede UQTools, keeping simplicity, scalability and efficiency in check. It is a wrapper over QCoDeS and has other key functionality such as timing control, pulse generation and shaping, data + configuration storage and retrieval, which are not present in QCoDeS.
+This is a toolbox to control instruments to run a general lab experiments. This was designed to supersede *UQTools*, keeping simplicity, scalability and efficiency in check. It currently uses QCoDeS to communicate with the instruments, while providing higher level functionality such as timing control, pulse generation, automatic parameter updates and data/configuration storage.
 
 There are two classes of documentation provided for this stack:
 

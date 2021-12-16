@@ -1,6 +1,11 @@
 # AWG Waveform Transformations
 
-The application of waveform transformations is highlighted in the [AWG HAL section](AWG_Pulse_Building.md). Note that the waveform transformations are defined in `sqdtoolz/HAL/WaveformTransformations.py` with each object prefixed with `WFMT_`.
+The application of waveform transformations is highlighted in the [AWG HAL section](AWG_Pulse_Building.md). Note that the waveform transformations are defined in `sqdtoolz/HAL/WaveformTransformations.py` with each object prefixed with `WFMT_`. All waveform transformation objects must register onto a `Laboratory` object passed on creation. Thus, given a `Laboratory` object `lab`, a given waveform transformation can be accessed via the `WFMT(...)` function:
+
+```python
+#Get the waveform transformation registered under the name QubitDrive
+wfmt = lab.WFMT("QubitDrive")
+```
 
 The different waveform transformations available in SQDToolz are highlighted in this page:
 
@@ -26,6 +31,7 @@ Note that the IQ modulation phase *ɸ* is controlled automatically by the engine
 
 
 ```python
+#Object creation requires a unique name, the Laboratory object and the initial modulation frequency.
 WFMT_ModulationIQ('IQmod', lab, 100e6)
 ...
 #Reset phase of IQ moduation to 0.5 radians

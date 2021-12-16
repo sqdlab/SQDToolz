@@ -23,7 +23,7 @@ lab.load_instrument('keysightAWG')
 
 ...
 
-#(A) - Define the modulation waveform transformation
+#(A) - Define the modulation waveform transformation (100MHz IQ modulation in this case)
 WFMT_ModulationIQ('IQmod', lab, 100e6)
 
 #(B) - Defining the main instrument HAL for the AWG
@@ -41,7 +41,7 @@ lab.HAL("Wfm1").get_output_channel(0).marker(1).set_markers_to_segments(["Read"]
 ```
 
 The waveform HAL is uniquely named as `"Wfm1"`. The actual waveform is built by adding waveform segments. Note a common syntax for waveform segment objects (the objects with the prefix `WFS_`) all start with a name which must be unique within the waveform. The code has a few notable other features:
-- (A) - A waveform-transformation, when passed onto a waveform segment, transforms the final segment waveform. In this case, the `WFMT_ModulationIQ` automatically maps the envelope waveform onto the two channels with I and Q sinusoidal waveforms.
+- (A) - A waveform-transformation, when passed onto a waveform segment, transforms the final segment waveform. In this case, the `WFMT_ModulationIQ` automatically maps the envelope waveform onto the two channels with I and Q sinusoidal waveforms. The object itself can be accessed via `lab.WFMT("IQmod")` for it registers itself to `lab`.
 - (B) - Defines the actual Waveform AWG HAL with the sample-rate set to 1GSPS. Note that it takes in a list of instrument and channel-name tuples. Here it forms the overall charge-line waveform using CH1 from a Tektronix AWG and CH3 from a Keysight AWG. The engine takes care of the underlying details!
 - (C) - Using a `WFS_Constant` type, a basic 40μs is done by outputting zero on both channels.
 - (D) - The IQ drive is done with a Gaussian envelope defined by `WFS_Gaussian`. The drive-envelope is 20ns long and 0.1V in amplitude. The application of the actual IQ modulation is given by the command `lab.WFMT("IQmod").apply()` which accesses the previously defined transformation `"IQmod"` to apply the 100MHz drive.

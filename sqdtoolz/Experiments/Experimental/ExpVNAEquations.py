@@ -16,13 +16,18 @@ class ExpVNAEquations(Experiment):
         self._equations = equations
         self._s_params = s_params
         self._instr_vna = expt_config._hal_ACQ._instr_vna
-        self._expt_config.get_data = self.get_data
+        
 
         self.pdiv = kwargs.pop('pdiv', 10)
         self.rlev = kwargs.pop('rlev', -40)
 
     def _run(self, file_path, sweep_vars=[], **kwargs):
-        return super()._run(file_path, sweep_vars, **kwargs)
+        old_get_data = self._expt_config.get_data
+        self._expt_config.get_data = self.get_data
+        ret_data = super()._run(file_path, sweep_vars, **kwargs)
+        self._expt_config.get_data = old_get_data
+        return ret_data
+
 
     def get_data(self):
         x_var_name = 'frequency'

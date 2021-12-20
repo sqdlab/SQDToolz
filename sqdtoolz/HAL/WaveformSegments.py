@@ -279,6 +279,13 @@ class WFS_Gaussian(WaveformSegmentBase):
     def Amplitude(self, ampl_val):
         self._amplitude = ampl_val
 
+    @property
+    def NumStdDev(self):
+        return self._num_sd
+    @NumStdDev.setter
+    def NumStdDev(self, num_sd):
+        self._num_sd = num_sd
+
     def _get_waveform(self, lab, fs, t0_ind, ch_index):
         n = self.NumPts(fs)
         #Generate the sample points on the Gaussian (start and end points are the same)

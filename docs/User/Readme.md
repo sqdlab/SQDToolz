@@ -12,4 +12,6 @@ Main structure:
     - [Creating ExperimentConfiguration objects](Exp_Config_Basic.md)
     - [Using ExperimentSpecifications objects](Exp_Config_SPEC.md)
     - [Using Waveform Mappers](Exp_Config_WFMMAP.md)
-
+- Take experiment configurations and run an `Experiment` object:
+    - [Overview of general workflow](Exp_Overview.md)
+    - [Customising experiments and other advanced functionality](Exp_Custom.md)

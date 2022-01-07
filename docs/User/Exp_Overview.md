@@ -29,20 +29,21 @@ Experiments can be run via (assuming a `Laboratory` object called `lab`):
 
 ``` python
 #Create experiment object (it's temporary and not stored in lab)
-exp = Experiment("Rabi", new_lab.CONFIG('AutoExp'))
+exp = Experiment("Rabi", lab.CONFIG('AutoExp'))
 #Run experiment without sweeping parameters:
 result = lab.run_single(exp)
 #Run experiment with sweeping parameters:
-result = lab.run_single(exp, [(new_lab.VAR("wait_time"), np.arange(0,100e-9,10e-9))])
+result = lab.run_single(exp, [(lab.VAR("wait_time"), np.arange(0,100e-9,10e-9))])
 ```
 
 The result on running the experiment is a file created with the time-stamp and the prescribed experiment name. It will have the data stored in a HDF5 file with the returned result being a `FileIOReader` object to said file. Internally, the following set of subroutines are performed by the engine:
 
 ![ExpRun](Exp_Overview_Run.drawio.svg)
 
-The mechanics of sweeping, running cascaded experiments (to put grouped experiments into a single folder) and pre-written automatic experiments are highlighted in the next [document](Exp_Custom.md). Now, in general, note that:
+The mechanics of sweeping, running cascaded experiments (to put grouped experiments into a single folder) and pre-written automatic experiments are highlighted in the next [document](Exp_Sweep.md). Now, in general, note that:
 
 - Instrument preparation is taken to match the HAL parameters that were present when creating the `ExperimentConfiguration` object
 - The AWGs are automatically programmed only if necessary. For example, if the subsequent sweeping iterations do not change the waveform, then the AWG will not be unnecessarily reprogrammed.
+- The SPEC parameters are set **after** the engine first sets all instrument HAL parameters. Thus, any settings in the `ExperimentSpecification` objects will overwrite linked HAL parameters.
 - The `LaboratoryConfiguration.txt` file stores the HAL parameters right in the end; so the instrument settings will correspond to the final sweeping point.
 - Most experiments store the points dynamically on finishing a given sweeping point. As its done in SWMR mode, one may view/analyse the data with realtime live-plotting tools such as [SQDViz](https://github.com/sqdlab/SQDViz).

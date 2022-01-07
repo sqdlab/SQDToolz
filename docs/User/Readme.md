@@ -14,4 +14,6 @@ Main structure:
     - [Using Waveform Mappers](Exp_Config_WFMMAP.md)
 - Take experiment configurations and run an `Experiment` object:
     - [Overview of general workflow](Exp_Overview.md)
-    - [Customising experiments and other advanced functionality](Exp_Custom.md)
+    - [Sweeping parameters in experiments](Exp_Sweep.md)
+    - [Cascading and grouping multiple experiments](Exp_CascadeGroup.md)
+    - [Automated experiments](Exp_Automated.md)

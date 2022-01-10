@@ -1,5 +1,6 @@
 from numpy import pi
 from qcodes import Instrument, InstrumentChannel, VisaInstrument, validators as vals
+import logging
 
 class DG645Channel(InstrumentChannel):
     '''
@@ -22,6 +23,7 @@ class DG645Channel(InstrumentChannel):
                            get_cmd='LOFF?{}'.format(channel),
                            set_cmd='LOFF {},{}'.format(channel, '{:f}'),
                            get_parser=float, vals=vals.Numbers(-2., 2.))
+        self.offset(0.0)
         self.add_parameter('trigPolarity', label='Pulse Polarity', 
                            docstring='Polarity of the output. Use with care.',
                            get_cmd='LPOL?{}'.format(channel),
@@ -80,10 +82,17 @@ class DG645Channel(InstrumentChannel):
 
     @property
     def TrigEnable(self):
-        return True     #Not implementing any output enable/disable...
+        return self.amplitude() == 2.5
     @TrigEnable.setter
     def TrigEnable(self, val):
-        pass     #Not implementing any output enable/disable...
+        logging.debug('The implementation of turning the trigger on and off should be reviewed.')
+        if val:
+            self.amplitude(2.5)
+            self.offset(0.0)
+        else:
+            self.amplitude(0.5)
+            self.offset(-0.5)
+
 
     @property
     def TrigPulseLength(self):

@@ -1,6 +1,8 @@
-from numpy import pi
+import numpy as np
 from qcodes import Instrument, InstrumentChannel, VisaInstrument
 import qcodes.utils.validators as valids
+
+import time
 
 import Pyro4
 
@@ -124,8 +126,53 @@ class ETHFPGA(Instrument):
         self._set('fir_gain1', gain)
         self._set('fir_gain2', gain)
 
+        self._ch_states = (True, False)
+        self._num_segs = 1
+        self._num_reps = 1
+        self._trigger_edge = 1
+
+    def _set_fir(self, gain=1.0, bandwidth=0.1):
+        ''' program a chebychev low-pass filter with a given bandwidth and gain '''
+        # bandwidth=0.1
+        # gain=1.0
+        bandwidths = [0.001, 0.02, 0.04, 0.06, 0.08, 0.1, 0.12, 0.14, 0.16, 0.18, 
+                      0.2, 0.22, 0.24, 0.26, 0.28, 0.3, 0.32, 0.34, 0.36, 0.38, 0.4]
+        bandwidth = min(bandwidths, key=lambda x: abs(x - bandwidth))
+        # exclude parameters that are not present in the current mode
+        self._set('fir_engine', 'library')
+        self._set('fir_library_file', r'C:/QTLab/custom_plugins/FPGA/filters/chebLP_ASYM40_FilterLib001.txt')
+        self._set('fir_filter', 'lp fs={0:g} 40tap cheb(g=2.5)'.format(bandwidth))
+        self._set('fir_gain1', gain)
+        self._set('fir_gain2', gain)
+
     def _set_app(self, appname):
         result = self._proxy.set_app(self._remote_name, appname)
+        if appname == 'TVMODEV2':
+            self._call('set_app', 'TVMODEV02')
+
+            self._set('mem_hold', False),
+            self._set('ddc_adc1', 'ADC1')
+            self._set('ddc_if1', '25MHz')
+            self._set('ddc_adc2', 'ADC2')
+            self._set('ddc_if2', '25MHz')
+            # default math: measure complex voltage
+            self._set('math_f1', '1(a*b)')
+            self._set('math_a1', 'I1 + iQ1')
+            self._set('math_b1', '1*')
+            self._set('math_f2', '1(a*b)')
+            self._set('math_a2', 'I2 + iQ2')
+            self._set('math_b2', '1*')
+            # boxcar FIR filter (refine with ctx_fpga_fir)
+            self._set('fir_engine', 'boxcar')
+            self._set('fir_integration', 'none')
+            self._set('fir_post_filtering', False)
+            # tv mode: 248 samples, 40ns per sample, <~ 10us per trace
+            self._set('tv_decimation', 4)
+            self._set('tv_samples', 4096)
+            self._set('tv_averages', 1)
+            # tv mode: one segment, one channel
+            self._set('tv_segments', 1)
+            self._set('tv_use_seq_start', False)
         return result
     
     def _get(self, pname, **kwargs):
@@ -138,7 +185,7 @@ class ETHFPGA(Instrument):
     
     def _call(self, pname, *args, **kwargs):
         result =  self._proxy.ins_call(self._remote_name, pname, args, kwargs)
-#         return result
+        # return result
         try:
             return pickle.loads(bytes(result, encoding='utf-8'), encoding='bytes')
         except TypeError:
@@ -156,6 +203,28 @@ class ETHFPGA(Instrument):
         return list(set(attrs))
 
     @property
+    def ChannelStates(self):
+        return self._ch_states
+    @ChannelStates.setter
+    def ChannelStates(self, ch_states):
+        assert len(ch_states) == 2, "There are 2 channel states that must be specified."
+        assert ch_states[0] != False, "This instrument only supports either CH1 or CH1&CH2 modes."
+
+        self._set('tv_two_channel_mode', ch_states[1])
+        self._ch_states = ch_states
+
+    @property
+    def AvailableChannels(self):
+        return 2
+
+    @property
+    def SampleRate(self):
+        return self._call('get_sample_rate') / self.tv_decimation() #Decimation can't be zero :P
+    @SampleRate.setter
+    def SampleRate(self, frequency_hertz):
+        return  #Does nothing...
+
+    @property
     def NumSamples(self):
         return self._get('tv_samples')
     @NumSamples.setter
@@ -164,10 +233,25 @@ class ETHFPGA(Instrument):
 
     @property
     def NumSegments(self):
-        return self._get('tv_segments')
+        return self._num_segs
     @NumSegments.setter
-    def NumSegments(self, num_reps):
-        self._set('tv_segments', num_reps)
+    def NumSegments(self, num_segs):
+        self._num_segs = num_segs
+
+    @property
+    def NumRepetitions(self):
+        return self._num_reps
+    @NumRepetitions.setter
+    def NumRepetitions(self, num_reps):
+        self._num_reps = num_reps
+
+    @property
+    def TriggerInputEdge(self):
+        return self._trigger_edge
+    @TriggerInputEdge.setter
+    def TriggerInputEdge(self, pol):
+        self._trigger_edge = 1  #Always setting to positive edge...
+        #self._trigger_edge = pol   #TODO: Check if input trigger polarity can be set on this instrument
 
     #TODO: WRITE A DDC PROPERTY - look up ddc_if2 and ddc_adc1 as well...
     # @property
@@ -177,21 +261,64 @@ class ETHFPGA(Instrument):
     # def DdcIfFrequency(self, freqHertz):
     #     self._set('ddc_adc1', freqHertz)
 
-    @property
-    def SampleRate(self):
-        return self._call('get_sample_rate')
-
     
-    @property
-    def TriggerInputEdge(self):
-        return 1    #Always positive edge
+    # @property
+    # def TriggerInputEdge(self):
+    #     return 1    #Always positive edge
     # @TriggerInputEdge.setter
     # def TriggerInputEdge(self, pol):
     #     self._trigger_edge = pol
-    
-    
-    def get_data(self, **kwargs):
+
+    def _start(self, **kwargs):
+        self._set('trigger_src_shot',0) #Sample Trigger
+        self._set('trigger_src_ddc',0)  #DDC Trigger (it means something)
+
+        if self.NumSegments > 1:
+            #Set SEQ Trigger Mode
+            self._set('tv_use_seq_start',True)
+            self._set('trigger_src_seq_start', 3)    #Using User Pin 4 for SEQ Trigger
+        else:
+            self._set('tv_use_seq_start',False)
+            self._set('trigger_src_seq_start', 0)
+
+        total_frames = self.NumRepetitions*self.NumSegments
+        self._set('tv_segments', total_frames)
+
+    def _acquire(self):
         #channels, segments, samples
         return self._call('get_data_blocking')
-        
 
+    def _stop(self, final_data, **kwargs):
+        cur_processor = kwargs.get('data_processor', None)
+        channels, segments, samples = final_data.shape
+        
+        if channels == 1:
+            ch1_data = final_data[0].reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)
+            data_pkt = {
+                'parameters' : ['repetition', 'segment', 'sample'],
+                'data' : { 'ch1_I' : np.real(ch1_data), 'ch1_Q' : np.imag(ch1_data) },
+                'misc' : {'SampleRates' : [self.SampleRate]*2}
+            }
+        else:
+            ch1_data = final_data[0].reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)
+            ch2_data = final_data[1].reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)
+            data_pkt = {
+                'parameters' : ['repetition', 'segment', 'sample'],
+                'data' : { 'ch1_I' : np.real(ch1_data), 'ch1_Q' : np.imag(ch1_data),
+                           'ch2_I' : np.real(ch2_data), 'ch2_Q' : np.imag(ch2_data) },
+                'misc' : {'SampleRates' : [self.SampleRate]*4}
+            }
+        
+        if cur_processor is None:
+            return data_pkt
+        else:
+            cur_processor.push_data(data_pkt)
+            return cur_processor.get_all_data()
+    
+    def get_data(self, **kwargs):
+        self._start(**kwargs)
+
+        #channels, segments, samples
+        final_data = self._acquire()
+
+        return self._stop(final_data, **kwargs)

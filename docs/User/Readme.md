@@ -10,6 +10,7 @@ Main structure:
         - [Waveform Transformations](AWG_WFMTs.md)
 - Combine HAL settings to form `ExperimentConfiguration` objects:
     - [Creating ExperimentConfiguration objects](Exp_Config_Basic.md)
+    - [Defining Variables](Var_Defns.md)
     - [Using ExperimentSpecifications objects](Exp_Config_SPEC.md)
     - [Using Waveform Mappers](Exp_Config_WFMMAP.md)
 - Take experiment configurations and run an `Experiment` object:

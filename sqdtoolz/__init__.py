@@ -5,7 +5,10 @@ from sqdtoolz.ExperimentSpecification import*
 from sqdtoolz.Variable import*
 
 from sqdtoolz.HAL.DDG import DDG
-from sqdtoolz.HAL.MultiACQ import MultiACQ
+try:
+    from sqdtoolz.HAL.MultiACQ import MultiACQ
+except ModuleNotFoundError:
+    pass
 from sqdtoolz.HAL.ACQ import ACQ
 from sqdtoolz.HAL.AWG import WaveformAWG #TODO: Refactor this - RB is angry
 from sqdtoolz.HAL.GENmwSource import GENmwSource

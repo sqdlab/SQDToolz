@@ -1,3 +1,4 @@
+from calendar import c
 from sqdtoolz.Variable import*
 import json
 
@@ -77,6 +78,18 @@ class ExperimentSpecification:
             obj = self._lab._get_resolved_obj(self._cur_mappings[cur_entry]['Destination'])
             if obj != None:
                 setattr(obj, self._cur_mappings[cur_entry]['Property'], self._cur_mappings[cur_entry]['Value'])
+
+    def _get_targets(self):
+        ret_targets = []
+        for cur_entry in self._cur_mappings:
+            if len(self._cur_mappings[cur_entry]['Destination']) == 0:
+                continue
+            cur_obj_type = self._cur_mappings[cur_entry]['Destination'][0][1]
+            if cur_obj_type == 'VAR':
+                ret_targets += self._lab._get_resolved_obj(self._cur_mappings[cur_entry]['Destination'])._get_written_targets()
+            else:
+                ret_targets += [(self._cur_mappings[cur_entry]['Destination'], self._cur_mappings[cur_entry]['Property'])]
+        return ret_targets
 
     def __str__(self):
         cur_str = ""

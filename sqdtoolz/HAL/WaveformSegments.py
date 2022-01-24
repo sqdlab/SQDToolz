@@ -1,7 +1,8 @@
 import numpy as np
 from sqdtoolz.HAL.WaveformTransformations import*
+from sqdtoolz.HAL.HALbase import LockableProperties
 
-class WaveformSegmentBase:
+class WaveformSegmentBase(LockableProperties):
     def __init__(self, name, transform_func, duration):
         self._name = name
         if transform_func:

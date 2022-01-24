@@ -1,8 +1,9 @@
 from sqdtoolz.HAL.TriggerPulse import*
 import numpy as np
 from scipy import signal
+from sqdtoolz.HAL.HALbase import LockableProperties
 
-class AWGOutputChannel(TriggerInput):
+class AWGOutputChannel(TriggerInput, LockableProperties):
     def __init__(self, lab, instr_awg_name, channel_name, ch_index, parent_awg_waveform):
         self._instr_awg_name = instr_awg_name
         self._channel_name = channel_name
@@ -162,7 +163,7 @@ class AWGOutputChannel(TriggerInput):
         for ind, cur_mark_dict in enumerate(dict_config['Markers']):
             self._awg_mark_list[ind]._set_current_config(cur_mark_dict)
 
-class AWGOutputMarker(TriggerOutput, TriggerInput):
+class AWGOutputMarker(TriggerOutput, TriggerInput, LockableProperties):
     def __init__(self, parent_waveform_obj, awg_output_ch, name, ch_index):
         self._parent_waveform_obj = parent_waveform_obj
         self._awg_output_ch = awg_output_ch

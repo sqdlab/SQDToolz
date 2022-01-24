@@ -57,6 +57,20 @@ class VariableBase:
     def _set_current_config(self, dict_config):
         raise NotImplementedError()
 
+    def _get_written_objs(self):
+        raise NotImplementedError()
+    
+    def _get_written_targets(self):
+        cur_list = self._get_written_objs()
+        ret_list = []
+        for cur_obj in cur_list:
+            if isinstance(cur_obj, VariableBase):
+                ret_list += cur_obj._get_written_targets()
+            else:
+                ret_list += [cur_obj]
+        #TODO: Write check for recursive loops or infinite loops.
+        return ret_list
+
     def linspace(self, start_val, stop_val, num_pts):
         #Good reference: https://stackoverflow.com/questions/42743053/what-happens-when-closing-a-loop-using-an-infinite-iterable
         try:
@@ -116,7 +130,10 @@ class VariableInternal(VariableBase):
     def _set_current_config(self, dict_config):
         assert dict_config['Type'] == self.__class__.__name__
         self._val = dict_config['Value']
-    
+
+    def _get_written_objs(self):
+        return []
+
 class VariableProperty(VariableBase):
     def __init__(self, name, lab, sqdtoolz_obj, prop_name, **kwargs):
         super().__init__(name, lab)
@@ -169,6 +186,9 @@ class VariableProperty(VariableBase):
         self._obj_res_list = dict_config['ResList']
         self._prop = dict_config['Property']
 
+    def _get_written_objs(self):
+        return [(self._obj_res_list, self._prop)]
+
 class VariablePropertyTransient:
     def __init__(self, name, sqdtoolz_obj, prop_name):
         self._name = name
@@ -191,6 +211,10 @@ class VariablePropertyTransient:
 
     def set_raw(self, value):
         setattr(self._sqdtoolz_obj, self._prop_name, value)
+
+    def _get_written_objs(self):
+        print("How did this even get called?")
+        return []   #Shouldn't actually get called?
 
 class VariableSpaced(VariableBase):
     def __init__(self, name, lab, var_1, var_2, space_val):
@@ -228,6 +252,9 @@ class VariableSpaced(VariableBase):
         self._var_2 = dict_config['Var2']
         self.space_val = dict_config['Space']
 
+    def _get_written_objs(self):
+        return [self._lab.VAR(self._var_1), self._lab.VAR(self._var_2)]
+
 class VariableDifferential(VariableBase):
     def __init__(self, name, lab, var_1, var_2):
         super().__init__(name, lab)
@@ -261,6 +288,9 @@ class VariableDifferential(VariableBase):
         self._var_1 = dict_config['Var1']
         self._var_2 = dict_config['Var2']
 
+    def _get_written_objs(self):
+        return [self._lab.VAR(self._var_1), self._lab.VAR(self._var_2)]
+
 class VariableMappedProperty(VariableProperty):
     def __init__(self, name, lab, sqdtoolz_obj, prop_name, mapping, **kwargs):
         super().__init__(name, lab, sqdtoolz_obj, prop_name, **kwargs)
@@ -292,4 +322,7 @@ class VariableMappedProperty(VariableProperty):
         super()._set_current_config(dict_config)
         self.mapping = dict_config["Mapping"]
         self.inv_mapping = {v: k for k, v in self.mapping.items()}
+
+    def _get_written_objs(self):
+        return []
 

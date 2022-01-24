@@ -475,6 +475,15 @@ class TestColdReload(unittest.TestCase):
         expConfig.init_instruments()
         assert self.lab.HAL('MW-Src').Frequency == 5.8, "HAL property incorrectly loaded from ExperimentSpecification."
         #
+        #Following construct is used to track how many times a given parameter is set...
+        prev_func = GENmwSource.Frequency.fset
+        def freq_func(self, val):
+            if not hasattr(self, 'num_set_freq'):
+                self.num_set_freq = 0
+            self.num_set_freq += 1
+            prev_func(self, val)
+        GENmwSource.Frequency = property(GENmwSource.Frequency.fget, freq_func)
+        #
         expConfig = ExperimentConfiguration('testConf4', self.lab, 1.0, ['MW-Src', 'MW-Src2'], None, ['cavity'])
         VariableProperty('SrcFreq', self.lab, self.lab.HAL("MW-Src"), 'Frequency')
         VariableProperty('DncFreq', self.lab, self.lab.HAL("MW-Src2"), 'Frequency')
@@ -485,19 +494,29 @@ class TestColdReload(unittest.TestCase):
         self.lab.SPEC('cavity').set_destination('Frequency', self.lab.VAR('cavFreq'))
         assert self.lab.VAR('SrcFreq').Value == 15, "HAL property incorrectly set."
         assert self.lab.VAR('DncFreq').Value == 18.5, "HAL property incorrectly set."
+        assert self.lab.HAL('MW-Src').num_set_freq == 1, "HAL got set more times than expected."
+        assert self.lab.HAL('MW-Src2').num_set_freq == 1, "HAL got set more times than expected."
         expConfig.init_instruments()
         assert self.lab.VAR('SrcFreq').Value == 5.8, "HAL property incorrectly loaded from ExperimentSpecification."
         assert self.lab.VAR('DncFreq').Value == 9.3, "HAL property incorrectly loaded from ExperimentSpecification."
+        assert self.lab.HAL('MW-Src').num_set_freq == 2, "HAL got set more times than expected."
+        assert self.lab.HAL('MW-Src2').num_set_freq == 2, "HAL got set more times than expected."
         self.lab.VAR('DncFreq').Value = 21
         assert self.lab.VAR('SrcFreq').Value == 5.8, "HAL property incorrectly set."
         assert self.lab.VAR('DncFreq').Value == 21, "HAL property incorrectly set."
+        assert self.lab.HAL('MW-Src').num_set_freq == 2, "HAL got set more times than expected."
+        assert self.lab.HAL('MW-Src2').num_set_freq == 3, "HAL got set more times than expected."
         expConfig.init_instruments()
         assert self.lab.VAR('SrcFreq').Value == 5.8, "HAL property incorrectly loaded from ExperimentSpecification."
         assert self.lab.VAR('DncFreq').Value == 9.3, "HAL property incorrectly loaded from ExperimentSpecification."
+        assert self.lab.HAL('MW-Src').num_set_freq == 3, "HAL got set more times than expected."
+        assert self.lab.HAL('MW-Src2').num_set_freq == 4, "HAL got set more times than expected."
         self.lab.VAR('SrcFreq').Value = 24
         self.lab.VAR('DncFreq').Value = 21
         assert self.lab.VAR('SrcFreq').Value == 24, "HAL property incorrectly set."
         assert self.lab.VAR('DncFreq').Value == 21, "HAL property incorrectly set."
+        assert self.lab.HAL('MW-Src').num_set_freq == 4, "HAL got set more times than expected."
+        assert self.lab.HAL('MW-Src2').num_set_freq == 5, "HAL got set more times than expected."
         #
         self.lab.save_laboratory_config('UnitTests/', 'laboratory_configuration4.txt')
         self.lab.save_variables('UnitTests\\')
@@ -782,6 +801,8 @@ class TestSweeps(unittest.TestCase):
         self.cleanup()
 
 if __name__ == '__main__':
+    temp = TestColdReload()
+    temp.test_SPECs()
     temp = TestSweeps()
     temp.test_ExpSweepAndFullColdReload()
     unittest.main()

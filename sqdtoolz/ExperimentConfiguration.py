@@ -230,13 +230,32 @@ class ExperimentConfiguration:
         return ret_trans_vars
 
     def init_instruments(self):
+        cur_spec_targets = []
+        #Get all parameters all ExperimentSpecifications will set
+        for cur_spec in self._list_spec_names:
+            spec_obj = self._lab.SPEC(cur_spec)
+            if spec_obj != None:
+                cur_spec_targets += spec_obj._get_targets()
+        #Lock the properties that are to be set by the SPEC
+        for cur_target in cur_spec_targets:
+            cur_obj = self._lab._get_resolved_obj(cur_target[0])
+            cur_obj._property_lock(cur_target[1])
+
         #Setup HALs and PROCs...
         self.update_config(self._init_config)
+
+        #Unlock properties that are to be set by SPEC
+        for cur_target in cur_spec_targets:
+            cur_obj = self._lab._get_resolved_obj(cur_target[0])
+            cur_obj._property_unlock(cur_target[1])
+
         #Setup SPECs...
         for cur_spec in self._list_spec_names:
             spec_obj = self._lab.SPEC(cur_spec)
             if spec_obj != None:
                 spec_obj.commit_entries()
+        
+
 
     def edit(self):
         self.init_instruments()

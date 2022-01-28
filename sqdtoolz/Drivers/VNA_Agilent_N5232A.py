@@ -11,10 +11,14 @@ from qcodes import (
          
 class VNA_Agilent_N5232A(VisaInstrument):
     def __init__(self, name, address, **kwargs):
-        super().__init__(name, address, terminator='\n', **kwargs)
+        super().__init__(name, address, terminator='\n', timeout=60, **kwargs)
         self._data_processor = None
         #By default we are working with the channel number 1, so SENSe<cnum>: if all queries is just SENSe1: ...
         
+        if 'P9373' in self.ask('*IDN?'):
+            self._is_big_endian = True
+        else:
+            self._is_big_endian = False
         
         # Acquisition parameters
         self.add_parameter(
@@ -302,6 +306,7 @@ class VNA_Agilent_N5232A(VisaInstrument):
             except UnicodeDecodeError:
                 # print('Unicode error in VNA')
                 got_data_without_errors = False
+                # print('UnicodeDecodeError!')
         return final_data
 
     def get_data(self):
@@ -328,7 +333,10 @@ class VNA_Agilent_N5232A(VisaInstrument):
         #Strange behaviour when running the benchmark in the end is that ascii is the fastest at ~49ms per point (15 in total) while
         #bin32/bin64 are the same speed at ~59ms?!?! So there's no speed difference in transferring more data and yet it's faster to
         #transfer and encode ascii data?!
-        mode = 'ascii'
+        if self.SweepPoints > 2001:
+            mode = 'bin32'
+        else:
+            mode = 'ascii'
 
         if mode == 'ascii':
             self.write('FORM:DATA ASCii,0')
@@ -355,6 +363,7 @@ class VNA_Agilent_N5232A(VisaInstrument):
                     self.write(f'CALC:PAR:SEL \'{cur_meas_name}\'')
                     #Note that SDATA just means complex-valued...
                     got_data_without_errors = False
+                    # s_data_raw = self.visa_handle.query_ascii_values('CALC:DATA? SDATA', separator=',')
                     s_data_raw = self.ask('CALC:DATA? SDATA').split(',')
                     s_data_raw = np.array(list(map(float, s_data_raw)))
                     ret_data['data'][f'{cur_meas}_real'] += [ s_data_raw[::2] ]
@@ -387,10 +396,13 @@ class VNA_Agilent_N5232A(VisaInstrument):
                 for cur_meas_name, cur_meas in cur_meas_traces:
                     self.write(f'CALC:PAR:SEL \'{cur_meas_name}\'')
                     #Note that SDATA just means complex-valued...
-                    s_data_raw = self.visa_handle.query_binary_values('CALC:DATA? SDATA', datatype=u'f')
+                    s_data_raw = self.visa_handle.query_binary_values('CALC:DATA? SDATA', datatype=u'f', is_big_endian=self._is_big_endian, expect_termination=True)
                     ret_data['data'][f'{cur_meas}_real'] += [ s_data_raw[::2] ]
                     ret_data['data'][f'{cur_meas}_imag'] += [ s_data_raw[1::2] ]
-            ret_data['parameter_values'][x_var_name] = self.visa_handle.query_binary_values('CALC:X?', datatype=u'f')
+            # self.visa_handle.read_raw()
+            self.ask('*OPC?')
+            ret_data['parameter_values'][x_var_name] = np.array(self.visa_handle.query_binary_values('CALC:X?', datatype=u'f', is_big_endian=self._is_big_endian))
+            self.ask('*OPC?')
         elif mode == 'bin64':
             #Set data-type to be float-32 - can be 64 as well...
             self.write('FORM:DATA REAL,64')
@@ -417,10 +429,10 @@ class VNA_Agilent_N5232A(VisaInstrument):
                 for cur_meas_name, cur_meas in cur_meas_traces:
                     self.write(f'CALC:PAR:SEL \'{cur_meas_name}\'')
                     #Note that SDATA just means complex-valued...
-                    s_data_raw = self.visa_handle.query_binary_values('CALC:DATA? SDATA', datatype=u'd')
+                    s_data_raw = self.visa_handle.query_binary_values('CALC:DATA? SDATA', datatype=u'd', is_big_endian=self._is_big_endian)
                     ret_data['data'][f'{cur_meas}_real'] += [ s_data_raw[::2] ]
                     ret_data['data'][f'{cur_meas}_imag'] += [ s_data_raw[1::2] ]
-            ret_data['parameter_values'][x_var_name] = self.visa_handle.query_binary_values('CALC:X?', datatype=u'd')
+            ret_data['parameter_values'][x_var_name] = np.array(self.visa_handle.query_binary_values('CALC:X?', datatype=u'd', is_big_endian=self._is_big_endian))
 
         for cur_meas_name, cur_meas in cur_meas_traces:
             ret_data['data'][f'{cur_meas}_real'] = np.vstack(ret_data['data'][f'{cur_meas}_real'])

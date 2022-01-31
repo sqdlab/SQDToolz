@@ -2,8 +2,9 @@ from calendar import c
 from sqdtoolz.Variable import*
 import json
 
-import importlib.resources as pkg_resources
+import pkg_resources
 from sqdtoolz import ExperimentSpecifications
+import os
 
 
 class ExperimentSpecification:
@@ -26,8 +27,10 @@ class ExperimentSpecification:
         if lab._register_SPEC(self):
             self._cur_mappings = {}
         if init_specs != "":
-            data = pkg_resources.read_text(ExperimentSpecifications, init_specs + '.json')
-            data = json.loads(data)
+            avail_templates = ExperimentSpecification._get_avail_SPEC_templates()
+            assert init_specs in avail_templates, f"Cannot find template \'{init_specs}\'. No parameters have been initialised."
+            with open(avail_templates[init_specs]) as json_file:
+                data = json.load(json_file)
             for cur_key in data:
                 self.add(cur_key, data[cur_key])
 
@@ -58,11 +61,17 @@ class ExperimentSpecification:
         return None
 
     def add(self, entry_name, value, dest_obj = None, dest_prop_name = ""):
-        self._cur_mappings[entry_name] = {'Value' : value, 'Destination' : self._lab._resolve_sqdobj_tree(dest_obj), 'Property' : dest_prop_name}
+        self._cur_mappings[entry_name] = {'Value' : value}
+        self._lab._resolve_sqdobj_tree(dest_obj)
+        if dest_obj != None:
+            self.set_destination(entry_name, dest_obj, dest_prop_name)
+        else:
+            self._cur_mappings[entry_name]['Destination'] = self._lab._resolve_sqdobj_tree(None)
+            self._cur_mappings[entry_name]['Property'] = ""
     
     def set_destination(self, entry_name, dest_obj, dest_prop_name = ""):
         assert entry_name in self._cur_mappings, f"Entry \'{entry_name}\' does not exist and must first be added via the \'add\' function."
-        if isinstance(dest_obj, VariableBase):
+        if isinstance(dest_obj, VariableBase) and dest_prop_name == "":
             dest_prop_name = 'Value'
         self._cur_mappings[entry_name]['Destination'] = self._lab._resolve_sqdobj_tree(dest_obj)
         self._cur_mappings[entry_name]['Property'] = dest_prop_name
@@ -110,3 +119,26 @@ class ExperimentSpecification:
     
     def _set_current_config(self, config_dict):
         self._cur_mappings = config_dict['Entries']
+
+    @staticmethod
+    def _get_avail_SPEC_templates():
+        template_dir = pkg_resources.resource_filename('sqdtoolz.ExperimentSpecifications', '')
+        template_dir = template_dir.replace('\\','/')+'/'
+
+        templates = [pos_json for pos_json in os.listdir(template_dir) if pos_json.endswith('.json')]
+        #Note that the :-5 is to remove the .json specifier...
+        return {x[:-5] : template_dir+x for x in templates}
+
+    @staticmethod
+    def list_SPEC_templates(verbose=False):
+        avail_templates = ExperimentSpecification._get_avail_SPEC_templates()
+        ret_str = ""
+        for cur_template in avail_templates:
+            ret_str += cur_template
+            if verbose:
+                with open(avail_templates[cur_template]) as json_file:
+                    data = json.load(json_file)
+                for cur_key in data:
+                    ret_str += f"\n  {cur_key} : {data[cur_key]}"
+            ret_str += '\n'
+        print(ret_str)

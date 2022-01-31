@@ -8,6 +8,9 @@ Main structure:
     - [AWG Pulse Building](AWG_Pulse_Building.md)
         - [Waveform Segments](AWG_WFS.md)
         - [Waveform Transformations](AWG_WFMTs.md)
+    - Setting up acquisition and real-time processing:
+        - Setting up Acquisition
+        - Setting up real-time processing
 - Combine HAL settings to form `ExperimentConfiguration` objects:
     - [Creating ExperimentConfiguration objects](Exp_Config_Basic.md)
     - [Defining Variables](Var_Defns.md)
@@ -18,3 +21,10 @@ Main structure:
     - [Sweeping parameters in experiments](Exp_Sweep.md)
     - [Cascading and grouping multiple experiments](Exp_CascadeGroup.md)
     - [Automated experiments](Exp_Automated.md)
+- Retrieve and analyse the data returned from an experiment:
+    - [Data retrieval](Data_IO.md)
+    - Data processing
+
+
+Other advanced use-cases:
+- [Non-uniform data sampling](ACQ_NonUniformDataSampling.md)

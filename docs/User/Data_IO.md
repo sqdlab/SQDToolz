@@ -36,10 +36,10 @@ The data is typically packed as an ND-array. To slice/index the array, one may q
   ['power', 'frequency']
 
 #Get parameter values corresponding to each slicing axis
-leData.param_vals
->>> [array([-5, -10, -15, -20, -25, -30]),
-     array([0., 2000, 4000, ...,
-            998000, 1000000])]
+>>> leData.param_vals
+  [array([-5, -10, -15, -20, -25, -30]),
+   array([0., 2000, 4000, ...,
+          998000, 1000000])]
 
 #Get dependent parameters (that is, the last few slicing indices)
 >>> leData.param_names

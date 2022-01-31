@@ -8,9 +8,12 @@ Main structure:
     - [AWG Pulse Building](AWG_Pulse_Building.md)
         - [Waveform Segments](AWG_WFS.md)
         - [Waveform Transformations](AWG_WFMTs.md)
-    - Setting up acquisition and real-time processing:
-        - Setting up Acquisition
-        - Setting up real-time processing
+    - Data acquisition:
+        - [Basic ACQ HAL](ACQ.md)
+        - VNA
+    - Setting up real-time processing
+        - CPU Processors
+        - GPU Processors
 - Combine HAL settings to form `ExperimentConfiguration` objects:
     - [Creating ExperimentConfiguration objects](Exp_Config_Basic.md)
     - [Defining Variables](Var_Defns.md)

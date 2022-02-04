@@ -44,10 +44,7 @@ class Laboratory:
 
         Path(self._save_dir).mkdir(parents=True, exist_ok=True)
 
-        if using_VS_Code:
-            self._prog_bar_char = ""
-        else:
-            self._prog_bar_char = "\r"
+        self._using_VS_Code = using_VS_Code
 
         self._hal_objs = {}
         self._processors = {}
@@ -433,7 +430,7 @@ class Laboratory:
 
 
     @staticmethod
-    def _printProgressBar(iteration, total, prefix = '', suffix = '', decimals = 1, length = 50, fill = '█', printEnd = "\r", prev_str=''):
+    def _printProgressBar(iteration, total, prefix = '', suffix = '', decimals = 1, length = 50, fill = '█', printEnd = "\r", prev_str='', using_vs_code=False):
         """
         Call in a loop to create terminal progress bar
         @params:
@@ -454,7 +451,11 @@ class Laboratory:
         #The \033[K%s is to erase the entire line instead of leaving stuff behind when the string gets smaller... Except that doesn't work in Jupyter
         #https://github.com/jupyter/notebook/issues/4749 - so back to using the manual erasure...
         print(' '*len(prev_str), end = printEnd)
-        ret_str = f'\033[K%s\r{prefix} |{bar}| {percent}% {suffix}'
+        if using_vs_code:
+            magic_prefix = '\033[K\r'
+        else:
+            magic_prefix = '\033[K%s\r'
+        ret_str = f'{magic_prefix}{prefix} |{bar}| {percent}% {suffix}'
         print(ret_str, end = printEnd)
         # Print New Line on Complete
         if iteration == total: 
@@ -512,7 +513,12 @@ class Laboratory:
         else:
             total_time = f"Total time: {total_time:.2f}s"
         
-        self._prog_bar_str = self._printProgressBar(int(val_pct*100), 100, suffix=f"{total_time}, {time_left}", prev_str=self._prog_bar_str, printEnd = self._prog_bar_char)
+        if self._using_VS_Code:
+            prog_bar_char = ""
+        else:
+            prog_bar_char = "\r"
+
+        self._prog_bar_str = self._printProgressBar(int(val_pct*100), 100, suffix=f"{total_time}, {time_left}", prev_str=self._prog_bar_str, printEnd = prog_bar_char, using_vs_code=self._using_VS_Code)
 
         #Use the progress-bar ping as an opportunity to dump the current state of the instruments if update is enabled...
         self.update_state()

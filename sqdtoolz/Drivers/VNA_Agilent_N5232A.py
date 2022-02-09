@@ -15,10 +15,10 @@ class VNA_Agilent_N5232A(VisaInstrument):
         self._data_processor = None
         #By default we are working with the channel number 1, so SENSe<cnum>: if all queries is just SENSe1: ...
         
-        if 'P9373' in self.ask('*IDN?'):
-            self._is_big_endian = True
-        else:
-            self._is_big_endian = False
+        # if 'P9373' in self.ask('*IDN?'):
+        self._is_big_endian = True
+        # else:
+        #     self._is_big_endian = False
         
         # Acquisition parameters
         self.add_parameter(

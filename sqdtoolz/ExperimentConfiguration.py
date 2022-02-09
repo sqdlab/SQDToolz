@@ -177,7 +177,10 @@ class ExperimentConfiguration:
         #Convert marker objects into guids...
         if 'digital' in self._dict_wfm_map:
             for cur_dig in self._dict_wfm_map['digital']:
-                self._dict_wfm_map['digital'][cur_dig] = self._lab._resolve_sqdobj_tree(self._dict_wfm_map['digital'][cur_dig])
+                if isinstance(self._dict_wfm_map['digital'][cur_dig], list):
+                    self._dict_wfm_map['digital'][cur_dig] = [self._lab._resolve_sqdobj_tree(x) for x in self._dict_wfm_map['digital'][cur_dig]]                        
+                else:
+                    self._dict_wfm_map['digital'][cur_dig] = [self._lab._resolve_sqdobj_tree(self._dict_wfm_map['digital'][cur_dig])]
         self._init_config['WaveformMapping'] = self._dict_wfm_map
 
     def update_waveforms(self, wfm_gen, var_requests=[]):
@@ -197,24 +200,26 @@ class ExperimentConfiguration:
         #Now settle the output markers
         for cur_dig in wfm_gen.digitals:
             assert cur_dig in self._dict_wfm_map['digital'], f"There is no mapping for digital waveform \'{cur_dig}\'"
+            cur_targets = self._dict_wfm_map['digital'][cur_dig]
             if 'refWaveform' in wfm_gen.digitals[cur_dig]:
-                pass
-                cur_mkr = self._lab._get_resolved_obj(self._dict_wfm_map['digital'][cur_dig])
+                for cur_target in cur_targets:
+                    cur_mkr = self._lab._get_resolved_obj(cur_target)
 
-                cur_mkr_awg = self._dict_wfm_map['digital'][cur_dig][0][0]
-                cur_ref_awg = self._dict_wfm_map['waveforms'][ wfm_gen.digitals[cur_dig]['refWaveform'] ]
-                if cur_mkr_awg == cur_ref_awg:
-                    cur_mkr.set_markers_to_segments(wfm_gen.digitals[cur_dig]['segments'])
-                else:
-                    mkr_wfm = self._lab.HAL(cur_ref_awg)._get_marker_waveform_from_segments(wfm_gen.digitals[cur_dig]['segments'])
-                    assert mkr_wfm.size == self._lab.HAL(cur_mkr_awg).NumPts, "When setting a marker on a given waveform using reference segments from another waveforms, the two waveforms must be the same size."
-                    cur_mkr.set_markers_to_arbitrary(mkr_wfm)
+                    cur_mkr_awg = cur_target[0][0]
+                    cur_ref_awg = self._dict_wfm_map['waveforms'][ wfm_gen.digitals[cur_dig]['refWaveform'] ]
+                    if cur_mkr_awg == cur_ref_awg:
+                        cur_mkr.set_markers_to_segments(wfm_gen.digitals[cur_dig]['segments'])
+                    else:
+                        mkr_wfm = self._lab.HAL(cur_ref_awg)._get_marker_waveform_from_segments(wfm_gen.digitals[cur_dig]['segments'])
+                        assert mkr_wfm.size == self._lab.HAL(cur_mkr_awg).NumPts, "When setting a marker on a given waveform using reference segments from another waveforms, the two waveforms must be the same size."
+                        cur_mkr.set_markers_to_arbitrary(mkr_wfm)
             else:
-                cur_trig = self._lab._get_resolved_obj(self._dict_wfm_map['digital'][cur_dig])
-                cur_trig.set_markers_to_trigger()
-                cur_trig.TrigPulseDelay = wfm_gen.digitals[cur_dig]['trig_delay']
-                cur_trig.TrigPulseLength = wfm_gen.digitals[cur_dig]['trig_length']
-                cur_trig.TrigPolarity = wfm_gen.digitals[cur_dig]['trig_polarity']
+                for cur_target in cur_targets:
+                    cur_trig = self._lab._get_resolved_obj(cur_target)
+                    cur_trig.set_markers_to_trigger()
+                    cur_trig.TrigPulseDelay = wfm_gen.digitals[cur_dig]['trig_delay']
+                    cur_trig.TrigPulseLength = wfm_gen.digitals[cur_dig]['trig_length']
+                    cur_trig.TrigPolarity = wfm_gen.digitals[cur_dig]['trig_polarity']
         #Now calculate and return any variable requests...
         ret_trans_vars = []
         for cur_var_req in var_requests:

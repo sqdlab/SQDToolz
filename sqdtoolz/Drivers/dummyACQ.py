@@ -5,11 +5,19 @@ class DummyACQ(Instrument):
     '''
     Dummy driver to emulate an ACQ instrument.
     '''
-    def __init__(self, name, **kwargs):
+    def __init__(self, name, blow_up_path='', **kwargs):
         super().__init__(name, **kwargs) #No address...
 
         # #A 10ns output SYNC
         # self.add_submodule('SYNC', SyncTriggerPulse(10e-9, lambda : True, lambda x:x))
+
+        if blow_up_path != '':
+            f = open(blow_up_path, "r")
+            f.read()
+            f.close()
+            f = open(blow_up_path, "a")
+            f.write("bar")
+            f.close()
 
         self._num_samples = 10
         self._num_segs = 1

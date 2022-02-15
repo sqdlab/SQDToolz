@@ -202,6 +202,8 @@ class Laboratory:
                 ret_obj = ret_obj._get_child(res_list[m])
         return ret_obj
 
+    def _HAL_exists(self, hal_name):
+        return hal_name in self._hal_objs
     def _register_HAL(self, hal_obj):
         if not (hal_obj.Name in self._hal_objs):
             self._hal_objs[hal_obj.Name] = hal_obj
@@ -277,7 +279,15 @@ class Laboratory:
 
     def load_instrument(self, instrID):
         # assert not (instrID in self._station.components), f"Instrument by the name {instrID} has already been loaded."
-        if not (instrID in self._station.components):
+        if not (instrID in self._activated_instruments):
+            #Check if the instrument is in the station, but unregistered (i.e. it crashed during initialisation). If so, remove it...
+            #ALSO NOTE:
+            #   QCoDeS does this awful thing where it stores the instruments inside the Instrument class attribute - i.e. one cannot run
+            #   multiple QCoDeS instances at once in a given kernel! Anyway, it stores its own list of instruments that may not appear in
+            #   components if initialisation fails...
+            if instrID in qc.Instrument._all_instruments:
+                instr = qc.Instrument.find_instrument(instrID)
+                instr.close()
             self._station.load_instrument(instrID)
             self._activated_instruments += [instrID]
     

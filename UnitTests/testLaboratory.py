@@ -20,6 +20,7 @@ from sqdtoolz.HAL.Processors.CPU.CPU_Mean import*
 
 import numpy as np
 import shutil
+import os.path
 
 import unittest
 
@@ -28,6 +29,27 @@ class TestColdReload(unittest.TestCase):
         self.lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir/')
 
         self.lab.load_instrument('virACQ')
+
+        #Test the case where an instrument fails initialisation - i.e. load_instrument fails; reloading should call its constructor...
+        fname = "test_save_dir/blowup.txt"
+        if os.path.isfile(fname):
+            os.remove(fname)
+        try:
+            self.lab.load_instrument('virACQblowup')
+        except FileNotFoundError:
+            try:
+                hal_acq = ACQ("acq_blowup", self.lab, 'virACQblowup')
+            except AssertionError:
+                f = open(fname, "w")
+                f.write("foo")
+                f.close()
+                self.lab.load_instrument('virACQblowup')
+                hal_acq = ACQ("acq_blowup", self.lab, 'virACQblowup')
+                #Check constructor ran for 'virACQblowup'...     
+                f = open(fname, "r")
+                assert f.read() == "foobar", "The constructor for the QCoDeS instrument failed to rerun after failing once"
+                f.close()
+
         self.lab.load_instrument('virDDG')
         self.lab.load_instrument('virAWG')
         self.lab.load_instrument('virMWS')

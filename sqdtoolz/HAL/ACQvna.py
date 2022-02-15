@@ -4,9 +4,9 @@ class ACQvna(HALbase):
     def __init__(self, hal_name, lab, instr_vna):
         #NOTE: the driver is presumed to be a single-pole many-throw switch (i.e. only one circuit route at a time).
         HALbase.__init__(self, hal_name)
-        if lab._register_HAL(self):
-            self._instr_id = instr_vna
-            self._instr_vna = lab._get_instrument(instr_vna)
+        self._instr_id = instr_vna
+        self._instr_vna = lab._get_instrument(instr_vna)
+        lab._register_HAL(self)
 
     @classmethod
     def fromConfigDict(cls, config_dict, lab):

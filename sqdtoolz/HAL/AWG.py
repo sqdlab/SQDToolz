@@ -9,7 +9,7 @@ from sqdtoolz.HAL.WaveformSegments import*
 class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
     def __init__(self, hal_name, lab, awg_channel_tuples, sample_rate, total_time=-1, global_factor = 1.0):
         HALbase.__init__(self, hal_name)
-        if lab._register_HAL(self):
+        if not lab._HAL_exists(hal_name):
             #awg_channel_tuples is given as (instr_AWG_name, channel_name)
             self._awg_chan_list = []
             assert isinstance(awg_channel_tuples, list), "The parameter awg_channel_tuples must be a LIST of TUPLEs of form (instr_AWG_name, channel_name)."
@@ -37,6 +37,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
         
         self._lab = lab
         self._cur_prog_waveforms = [None]*len(awg_channel_tuples)
+        lab._register_HAL(self)
 
     @classmethod
     def fromConfigDict(cls, config_dict, lab):

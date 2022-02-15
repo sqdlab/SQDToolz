@@ -824,7 +824,7 @@ class TestSweeps(unittest.TestCase):
 
 if __name__ == '__main__':
     temp = TestColdReload()
-    temp.test_SPECs()
+    temp.test_LabAndExpConfigs() #test_SPECs()
     temp = TestSweeps()
     temp.test_ExpSweepAndFullColdReload()
     unittest.main()

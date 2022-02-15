@@ -96,13 +96,6 @@ class TestHALInstantiation(unittest.TestCase):
         assert hal_mw.hidden == 'hello', "Could not plant hidden attribute"
         hal_mw = GENmwSource("MW-Src", self.lab, 'virMWS', 'CH1')
         assert hasattr(hal_mw, 'hidden') and hal_mw.hidden == 'hello', "Reinstantiation is creating a new object..."
-        assert_found = False
-        try:
-            GENmwSource("MW-Src", self.lab, 'virMWS', 'CH2')
-        except AssertionError:
-            assert_found = True
-            # assert arr_act.size == 0, "There are erroneous trigger edges found in the current configuration."
-        assert assert_found, "Reinstantiation was possible with a different channel configuration..."
         self.cleanup()
 
     def test_ACQ_params(self):
@@ -1003,6 +996,6 @@ class TestSaveLoad(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    # temp = TestHALInstantiation()
-    # temp.test_AWG_Mapping()
+    temp = TestHALInstantiation()
+    temp.test_AWG_Mapping()
     unittest.main()

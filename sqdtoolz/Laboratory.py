@@ -45,6 +45,7 @@ class Laboratory:
         Path(self._save_dir).mkdir(parents=True, exist_ok=True)
 
         self._using_VS_Code = using_VS_Code
+        self._cur_message = ''
 
         self._hal_objs = {}
         self._processors = {}
@@ -134,28 +135,44 @@ class Laboratory:
             new_expt_config = ExperimentConfiguration(cur_expt_config, self, 0, cur_hals, acq_hal)
             new_expt_config.update_config(config_dict[cur_expt_config], False)
     
+    def _print_message(self, message):
+        self._cur_message = message
+        print(self._cur_message, end='\r')
+    def _erase_line(self):
+        print(" " * len(self._cur_message), end='\r')
+
     def cold_reload_labconfig(self, config_dict):
         for cur_instr in config_dict['ActiveInstruments']:
+            self._print_message(f"Loading QCoDeS Instrument: {cur_instr}")
             self.load_instrument(cur_instr)
+            self._erase_line()
         #Create the HALs
         for dict_cur_hal in config_dict['HALs']:
+            self._print_message(f"Loading HAL: {dict_cur_hal['Name']}")
             cur_class_name = dict_cur_hal['Type']
             globals()[cur_class_name].fromConfigDict(dict_cur_hal, self)
+            self._erase_line()
         #Load parameters (including trigger relationships) onto the HALs
         for dict_cur_hal in config_dict['HALs']:
             cur_hal_name = dict_cur_hal['Name']
             self._hal_objs[cur_hal_name]._set_current_config(dict_cur_hal, self)
         #Create and load the PROCs
         for dict_cur_proc in config_dict['PROCs']:
+            self._print_message(f"Loading PROC: {dict_cur_proc['Name']}")
             cur_class_name = dict_cur_proc['Type']
             globals()[cur_class_name].fromConfigDict(dict_cur_proc, self)
+            self._erase_line()
         #Create and load the WFMTs
         for dict_cur_wfmt in config_dict['WFMTs']:
+            self._print_message(f"Loading WFMT: {dict_cur_wfmt['Name']}")
             cur_class_name = dict_cur_wfmt['Type']
             globals()[cur_class_name].fromConfigDict(dict_cur_wfmt, self)
+            self._erase_line()
         #Create and load the SPECs
         for dict_cur_spec in config_dict['SPECs']:
+            self._print_message(f"Loading SPEC: {dict_cur_spec['Name']}")
             ExperimentSpecification(dict_cur_spec["Name"], self)._set_current_config(dict_cur_spec)
+            self._erase_line()
 
     def makesafe_HALs(self):
         for cur_hal in self._hal_objs:
@@ -209,10 +226,12 @@ class Laboratory:
             self._hal_objs[hal_obj.Name] = hal_obj
             return True
         return False
-    def HAL(self, hal_ID):
+    def HAL(self, hal_ID, disable_warning=False):
         if hal_ID in self._hal_objs:
             return self._hal_objs[hal_ID]
         else:
+            if not disable_warning:
+                print(f'Warning: HAL {hal_ID} has not been initialised!')
             return None
 
     def _register_PROC(self, proc):
@@ -220,10 +239,12 @@ class Laboratory:
             self._processors[proc.Name] = proc
             return True
         return False
-    def PROC(self, proc_name):
+    def PROC(self, proc_name, disable_warning=False):
         if proc_name in self._processors:
             return self._processors[proc_name]
         else:
+            if not disable_warning:
+                print(f'Warning: PROC {proc_name} has not been initialised!')
             return None
 
     def _register_WFMT(self, wfmt):
@@ -231,11 +252,12 @@ class Laboratory:
             self._waveform_transforms[wfmt.Name] = wfmt
             return True
         return False
-    def WFMT(self, wfmt_name):
+    def WFMT(self, wfmt_name, disable_warning=False):
         if wfmt_name in self._waveform_transforms:
             return self._waveform_transforms[wfmt_name]
         else:
-            print(f'Warning: WFMT {wfmt_name} has not been initialised!')
+            if not disable_warning:
+                print(f'Warning: WFMT {wfmt_name} has not been initialised!')
             return None
 
     def _register_VAR(self, hal_var):
@@ -243,11 +265,12 @@ class Laboratory:
             self._variables[hal_var.Name] = hal_var
             return True
         return False
-    def VAR(self, param_name):
+    def VAR(self, param_name, disable_warning=False):
         if param_name in self._variables:
             return self._variables[param_name]
         else:
-            print(f'Warning: VAR {param_name} has not been initialised!')
+            if not disable_warning:
+                print(f'Warning: VAR {param_name} has not been initialised!')
             return None
 
     def _register_SPEC(self, spec):
@@ -255,10 +278,12 @@ class Laboratory:
             self._specifications[spec.Name] = spec
             return True
         return False
-    def SPEC(self, spec_name):
+    def SPEC(self, spec_name, disable_warning=False):
         if spec_name in self._specifications:
             return self._specifications[spec_name]
         else:
+            if not disable_warning:
+                print(f'Warning: SPEC {spec_name} has not been initialised!')
             return None
 
     def _register_CONFIG(self, expt_config):
@@ -266,11 +291,12 @@ class Laboratory:
             self._expt_configs[expt_config.Name] = expt_config
             return True
         return False
-    def CONFIG(self, expt_config_name):
+    def CONFIG(self, expt_config_name, disable_warning=False):
         if expt_config_name in self._expt_configs:
             return self._expt_configs[expt_config_name]
         else:
-            print(f'Warning: CONFIG {expt_config_name} has not been initialised!')
+            if not disable_warning:
+                print(f'Warning: CONFIG {expt_config_name} has not been initialised!')
             return None
 
     def add_instrument(self, instrObj):

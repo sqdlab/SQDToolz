@@ -96,7 +96,7 @@ class Experiment:
 
         return FileIOReader(file_path + data_file_name)
 
-    def save_config(self, save_dir, name_time_diag, name_expt_params, sweep_queue = []):
+    def save_config(self, save_dir, name_time_diag, name_expt_params, sweep_queue = [], file_index = 0):
         #Save a PNG of the Timing Plot
         lePlot = self._expt_config.plot()
         lePlot.savefig(save_dir + name_time_diag + '.png')
@@ -106,7 +106,8 @@ class Experiment:
             'Name' : self.Name,
             'Type' : self.__class__.__name__,
             'Config' : self._expt_config.Name,
-            'Sweeps' : sweep_queue
+            'Sweeps' : sweep_queue,
+            'FileIndex' : file_index
         }
         with open(save_dir + name_expt_params, 'w') as outfile:
             json.dump(dict_expt_params, outfile, indent=4)

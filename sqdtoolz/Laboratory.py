@@ -40,7 +40,7 @@ class Laboratory:
 
         #Convert Windows backslashes into forward slashes (should be compatible with MAC/Linux then...)
         self._save_dir = save_dir.replace('\\','/')
-        self._group_dir = {'Dir':"", 'InitDir':"", 'SweepQueue':[]}
+        self._group_dir = {'Dir':"", 'InitDir':"", 'SweepQueue':[], 'ExptIndex' : -1}
 
         Path(self._save_dir).mkdir(parents=True, exist_ok=True)
 
@@ -355,11 +355,13 @@ class Laboratory:
         self._group_dir['Dir'] = group_name
         self._group_dir['InitDir'] = ""
         self._group_dir['SweepQueue'] = []
+        self._group_dir['ExptIndex'] = -1
 
     def group_close(self):
         self._group_dir['Dir'] = ""
         self._group_dir['InitDir'] = ""
         self._group_dir['SweepQueue'] = []
+        self._group_dir['ExptIndex'] = -1
 
     def _sweep_enqueue(self, var_name):
         self._group_dir['SweepQueue'].append(var_name)
@@ -370,6 +372,7 @@ class Laboratory:
         #Get time-stamp
         if self._group_dir['Dir'] == "":
             folder_time_stamp = datetime.now().strftime(f"%Y-%m-%d/%H%M%S-" + expt_obj.Name + "/")
+            self._group_dir['ExptIndex'] = -1
         else:
             if self._group_dir['InitDir'] == "":
                 self._group_dir['InitDir'] = datetime.now().strftime(f"%Y-%m-%d/%H%M%S-{self._group_dir['Dir']}/")
@@ -379,11 +382,12 @@ class Laboratory:
         Path(cur_exp_path).mkdir(parents=True, exist_ok=True)
 
         ret_vals = expt_obj._run(cur_exp_path, sweep_vars, ping_iteration=self._update_progress_bar, **kwargs)
+        self._group_dir['ExptIndex'] += 1
 
         #Save the experiment configuration
         self.save_experiment_configs(cur_exp_path)
         #Save experiment-specific experiment-configuration data (i.e. timing diagram)
-        expt_obj.save_config(cur_exp_path, 'timing_diagram', 'experiment_parameters.txt', self._group_dir['SweepQueue'])
+        expt_obj.save_config(cur_exp_path, 'timing_diagram', 'experiment_parameters.txt', self._group_dir['SweepQueue'], self._group_dir['ExptIndex'])
 
         #Run postprocessing
         expt_obj._post_process(ret_vals)

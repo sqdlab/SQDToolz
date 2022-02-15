@@ -171,6 +171,9 @@ class FileIODirectory:
         #Collect all relevant similar files...
         cur_dir_files = [x[0] for x in os.walk(self._main_dir)][1:]
         cur_files = []
+        self.folders = []
+        self.folders_ignored = []
+        no_file_index = False
         for cur_folder in cur_dir_files:
             #Check that the suffix of the folder name matches...
             if not os.path.basename(cur_folder).endswith(self._cur_dir_suffix):
@@ -179,10 +182,13 @@ class FileIODirectory:
             #Check that the relevant data and attribute files exist...
             filepath = cur_folder +'/' + self._cur_file_name
             if not os.path.isfile(cur_folder +'/' + self._cur_file_name):
+                self.folders_ignored += [cur_folder]
                 continue
             if not os.path.isfile(cur_folder +'/' + 'experiment_parameters.txt'):
+                self.folders_ignored += [cur_folder]
                 continue
             if not os.path.isfile(cur_folder +'/' + 'laboratory_parameters.txt'):
+                self.folders_ignored += [cur_folder]
                 continue
 
             #Collect the information and add it to a list (note that the giant numpy array is not read in here...)...
@@ -190,11 +196,23 @@ class FileIODirectory:
             with open(cur_folder +'/' + 'experiment_parameters.txt') as json_file:
                 data = json.load(json_file)
                 var_names = data['Sweeps']
+                if not no_file_index and 'FileIndex' in data:
+                    cur_file_index = data['FileIndex']
+                else:
+                    cur_file_index = 0
+                    no_file_index = True
             with open(cur_folder +'/' + 'laboratory_parameters.txt') as json_file:
                 data = json.load(json_file)
                 var_vals = [data[x]['Value'] for x in var_names]
 
-            cur_files += [(cur_file, var_names, var_vals)]
+            cur_files += [(cur_file, var_names, var_vals, cur_file_index, cur_folder)]
+
+        #Correct for the arbitrary nature of the folder order given by: os.walk
+        if no_file_index:
+            print("Running FileIODirectory on files generated in legacy version of SQDToolz may cause the files to load to be in a mixed order.")
+        else:
+            cur_files = sorted(cur_files, key=lambda x: x[3])
+        self.folders = [x[4] for x in cur_files]
 
         self.non_uniform = False
 
@@ -235,12 +253,12 @@ class FileIODirectory:
             sweep_grids = np.array(sweep_grids).T.reshape(-1,num_cols)
             if np.array_equal(sweep_grid, sweep_grids):
                 #cur_param_names_outer = cur_param_names_outer
-                cur_param_vals_outer = unique_vals
+                self._cur_param_vals_outer = unique_vals
             else:
                 same_sweep_vars_outer_loop = False
         if not same_sweep_vars_outer_loop:
             cur_param_names_outer = ['DirFileNo']
-            cur_param_vals_outer = [np.arange(len(cur_files))]
+            self._cur_param_vals_outer = [np.arange(len(cur_files))]
 
         if not self.non_uniform:
             #The sampling is uniform and thus, one can amalgamate all datasets into one giant numpy array!
@@ -258,7 +276,7 @@ class FileIODirectory:
             cur_arrays_ts = np.concatenate(cur_arrays_ts)
 
             self.param_names = cur_param_names_outer + cur_param_names_inner
-            self.param_vals = cur_param_vals_outer + cur_param_vals_inner
+            self.param_vals = self._cur_param_vals_outer + cur_param_vals_inner
             self._cur_data = cur_data.reshape(tuple( [x.size for x in self.param_vals] + [len(self.dep_params)] ))
             self._cur_data_ts = cur_arrays_ts.reshape(tuple( [x.size for x in self.param_vals] ))
         else:
@@ -268,7 +286,7 @@ class FileIODirectory:
 
             #The dataset is non-uniform, so don't reshape the lists...
             self.param_names = cur_param_names_outer + cur_param_names_inner
-            self.param_vals = cur_param_vals_outer
+            self.param_vals = self._cur_param_vals_outer
 
             self._cur_data = [{'param_vals':x[0].param_vals, 'data':x[0].get_numpy_array()} for x in cur_files]
             #Setup the indexing to match the outer sweeping parameters...
@@ -295,6 +313,24 @@ class FileIODirectory:
 
     def get_numpy_array(self):
         return self._cur_data
+
+    def get_var_dict_arrays(self, return_slicing_params = False):
+        ret_dict = {}
+        array_shape = [x.size for x in self._cur_param_vals_outer]
+        array_size = np.prod(array_shape)
+        for m, cur_folder in enumerate(self.folders):
+            with open(cur_folder +'/' + 'laboratory_parameters.txt') as json_file:
+                data = json.load(json_file)
+                for cur_var in data.keys():
+                    if not cur_var in ret_dict:
+                        ret_dict[cur_var] = np.empty((array_size,))
+                    ret_dict[cur_var][m] = data[cur_var]['Value']
+        for cur_var in ret_dict:
+            ret_dict[cur_var] = ret_dict[cur_var].reshape(tuple(array_shape))
+        if return_slicing_params:
+            return ret_dict, self.param_names[:len(self._cur_param_vals_outer)]
+        else:
+            return ret_dict
 
     def get_time_stamps(self):
         assert self._ts_valid, "Time-stamps are not present or supported for this directory."
@@ -379,4 +415,7 @@ class FileIODirectory:
 # pltObj.set_z_array(np.sqrt(pltObj.z_values[:,0]**2+pltObj.z_values[:,1]**2))
 # pltObj.add_to_axis(ax)
 # plt.show()
+# b=0
+
+# a = FileIODirectory(r'test_save_dir\2022-02-15\193832-test_group\193834-test\data.h5')
 # b=0

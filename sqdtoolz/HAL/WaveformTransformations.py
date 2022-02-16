@@ -1,11 +1,11 @@
 import numpy as np
-
+from sqdtoolz.HAL.LockableProperties import LockableProperties
 class WaveformTransformationArgs:
     def __init__(self, wfmt_name, kwargs):
         self.wfmt_name = wfmt_name
         self.kwargs = kwargs
 
-class WaveformTransformation:
+class WaveformTransformation(LockableProperties):
     def __init__(self, name):
         self._name = name
 

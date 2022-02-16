@@ -109,7 +109,7 @@ class DFitExponential:
     def __init__(self):
         pass
 
-    def get_fitted_plot(self, data_x, data_y, xLabel="", rise = False, fig=None, axs=None):
+    def get_fitted_plot(self, data_x, data_y, xLabel="", rise = False, fig=None, axs=None, dontplot=False):
         def func(x, a, c, tau):
             return a * np.exp(-x/tau) + c
 
@@ -137,12 +137,15 @@ class DFitExponential:
             popt, pcov = scipy.optimize.curve_fit(func, data_x, data_y, [a0, c0, tau0],
                                              bounds=([0, yMin, 0.01*tau0], [2.0*a0, yMax, tau0*10]))
 
-        if fig == None:
-            fig, axs = plt.subplots(1)
-        axs.plot(data_x, data_y, 'kx')
-        axs.plot(data_x, func(data_x, *popt), 'r-')
-        axs.set_xlabel(xLabel)
-        axs.set_ylabel('IQ Amplitude')
+        if not dontplot:
+            if fig == None:
+                fig, axs = plt.subplots(1)
+            axs.plot(data_x, data_y, 'kx')
+            axs.plot(data_x, func(data_x, *popt), 'r-')
+            axs.set_xlabel(xLabel)
+            axs.set_ylabel('IQ Amplitude')
+        else:
+            fig = None
 
         datapkt = {
             'amplitude' : np.abs(popt[0]),

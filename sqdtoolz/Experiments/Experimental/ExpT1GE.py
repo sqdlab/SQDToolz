@@ -17,6 +17,8 @@ class ExpT1GE(Experiment):
 
         self._SPEC_qubit = SPEC_qubit
 
+        self._dont_show_plot = kwargs.get('dont_show_plot', False)
+
         #Calculate default load-time via T1 of qubit or default to 40e-6
         def_load_time = self._SPEC_qubit['GE T1'].Value * 4
         if def_load_time == 0:
@@ -88,7 +90,7 @@ class ExpT1GE(Experiment):
         dfit = DFitExponential()
         if self.normalise_data:
             data_raw_IQ = np.vstack([ arr[:,self._iq_indices[0]], arr[:,self._iq_indices[1]] ]).T
-            fig, axs = plt.subplots(ncols=2, gridspec_kw={'width_ratios':[2,1]})
+            fig, axs = plt.subplots(ncols=2, gridspec_kw={'width_ratios':[2,1]}, clear=True, num=1)
             fig.set_figheight(5); fig.set_figwidth(15)
             data_y = self.norm_expt.normalise_data(data_raw_IQ, ax=axs[1])
 
@@ -107,9 +109,11 @@ class ExpT1GE(Experiment):
 
         print(dpkt)
         if self.normalise_data:
-            fig.show()
+            if not self._dont_show_plot:
+                fig.show()
             fig.savefig(self._file_path + 'fitted_plot.png')
         else:
-            dpkt['fig'].show()
+            if not self._dont_show_plot:
+                dpkt['fig'].show()
             dpkt['fig'].savefig(self._file_path + 'fitted_plot.png')
               

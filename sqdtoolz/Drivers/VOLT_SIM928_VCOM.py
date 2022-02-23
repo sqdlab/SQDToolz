@@ -131,14 +131,14 @@ class VOLT_SIM928_VCOM(VisaInstrument):
         super().write_raw(cmd + '\n')
     def ask_raw(self, cmd: str):
         ret_str = super().ask_raw(cmd + '\n').strip()
-        while(True):
-            try:
-                if ret_str == '':
-                    ret_str += super().ask_raw('').strip()
-                else:
-                    break
-            except:
-                break
+        if ret_str == '': #'\r\n':
+            ret_str += super().ask_raw('').strip()                
+        # while(True):
+        #     try:
+        #         else:
+        #             break
+        #     except:
+        #         break
         return ret_str.strip()
 
     def get_output(self, slot_id):
@@ -193,7 +193,7 @@ class VOLT_SIM928_VCOM(VisaInstrument):
         """
         msg = 'SNDT {},"{}"'.format(i, cmd)
         self.write(msg)
-        time.sleep(1000e-3)
+        time.sleep(100e-3)
         msg = 'GETN? {},128'.format(i)
         msg = self.ask(msg)
         # first read consumes the terminator of the message from the submodule,

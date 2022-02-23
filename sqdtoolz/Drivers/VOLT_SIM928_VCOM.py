@@ -103,7 +103,7 @@ class VOLT_SIM928_VCOM(VisaInstrument):
             instrument's JSON snapshot.
     """
 
-    def __init__(self, name, address, gpib_slot, **kwargs):
+    def __init__(self, name, address, **kwargs):
         super().__init__(name, address, **kwargs)
         
         self.write('*DCL')  # device clear

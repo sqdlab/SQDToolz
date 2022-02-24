@@ -73,7 +73,13 @@ class SIM928_ChannelModule(InstrumentChannel):
         
     @property
     def Voltage(self):
-        return self.voltage()
+        while(True):
+            try:
+                ret_val = self.voltage()
+                break
+            except:
+                continue
+        return ret_val
     @Voltage.setter
     def Voltage(self, val):
         self.voltage(val)

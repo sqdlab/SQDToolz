@@ -233,7 +233,7 @@ class ExperimentViewer:
         #
         lblFrm_specs.rowconfigure(0, weight=1)
         lblFrm_specs.columnconfigure(0, weight=1)
-        lblFrm_specs.columnconfigure(1, weight=1)
+        lblFrm_specs.columnconfigure(1, weight=0)
         #################
 
 
@@ -401,7 +401,7 @@ class ExperimentViewer:
                         dest = f"({dest[0][1]}: {dest[0][0]})"
                     else:
                         dest = ""
-                    cur_str = f"{cur_key}: {cur_spec['Entries'][cur_key]['Value']} {dest}"
+                    cur_str = f"{cur_key}: {self._get_units(cur_spec['Entries'][cur_key]['Value'])} {dest}"
                     if cur_key in cur_attrs:
                         self.dash_SPECs.item(cur_attrs[cur_key], text=cur_str, tags=[cur_key])
                     else:
@@ -565,5 +565,4 @@ if __name__ == '__main__':
         print(sys.argv[1])
         ExperimentViewer(sys.argv[1]).main_loop()
     # ExperimentViewer(r'Z:\Data\EH_QuantumClock_V2\\').main_loop()
-    ExperimentViewer(r'D:\WorkUQ\Other Projects\VNA Chevrons\\').main_loop()
 

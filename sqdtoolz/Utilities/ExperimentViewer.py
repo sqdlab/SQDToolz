@@ -173,26 +173,28 @@ class ExperimentViewer:
         self.parent_dashboard = self.tab_dashboard
         self.parent_expt_comp = self.tab_expt_comp
 
+        self.pw_dash_LR_UI = PanedWindow(orient =tk.HORIZONTAL, master=self.parent_dashboard, sashwidth=3, bg = "#000077", bd = 0)
+        self.frame_dash_left = Frame(master=self.pw_dash_LR_UI)
+        frame_dash_right = Frame(master=self.pw_dash_LR_UI)
+        self.pw_dash_LR_UI.add(self.frame_dash_left,stretch='always')
+        self.pw_dash_LR_UI.add(frame_dash_right,stretch='always')
+        #
+        self.pw_dash_LR_UI.pack(expand = 1, fill ="both")
+
         #Create Dashboard Groups:
-        self.dash_MWs = ExperimentViewer.DashboardGroup(self.parent_dashboard, "Microwave Sources")
-        self.dash_WFMs = ExperimentViewer.DashboardGroup(self.parent_dashboard, "Waveforms")
-        self.dash_VOLTs = ExperimentViewer.DashboardGroup(self.parent_dashboard, "Voltage Sources")
+        self.dash_MWs = ExperimentViewer.DashboardGroup(frame_dash_right, "Microwave Sources")
+        self.dash_WFMs = ExperimentViewer.DashboardGroup(frame_dash_right, "Waveforms")
+        self.dash_VOLTs = ExperimentViewer.DashboardGroup(frame_dash_right, "Voltage Sources")
         
-        frame_grp1 = Frame(master=self.parent_dashboard)
+        frame_grp1 = Frame(master=frame_dash_right)
         self.dash_ATTENs = ExperimentViewer.DashboardGroup(frame_grp1, "Attenuators")
         self.dash_ATTENs.frame.pack(side=LEFT)
         self.dash_SWs = ExperimentViewer.DashboardGroup(frame_grp1, "Switches")
         self.dash_SWs.frame.pack(side=LEFT)
 
-        frame_grp2 = Frame(master=self.parent_dashboard)
+        frame_grp2 = Frame(master=frame_dash_right)
         self.dash_WFMTs = ExperimentViewer.DashboardGroup(frame_grp2, "Waveform Transformations")
         self.dash_WFMTs.frame.pack(side=LEFT)
-        self.dash_SPECs = ExperimentViewer.DashboardGroup(frame_grp2, "Experiment Specifications")
-        self.dash_SPECs.frame.pack(side=LEFT)
-
-        
-        self.dash_VARs = ExperimentViewer.DashboardGroup(self.parent_dashboard, "Variables")
-        self.dash_VARs.frame.pack(side=LEFT, fill=BOTH, expand=1)
         
         self.dash_MWs.frame.pack(side=TOP)
         self.dash_WFMs.frame.pack(side=TOP)
@@ -200,31 +202,74 @@ class ExperimentViewer:
         self.dash_VOLTs.frame.pack(side=TOP)
         frame_grp2.pack(side=TOP)
 
+
+        ###############################
+        # VAR AND SPEC DISPLAY ON LHS #
+        #
+        self.pw_dash_VARSPEC = PanedWindow(orient =tk.VERTICAL, master=self.frame_dash_left, sashwidth=3, bg = "#000077", bd = 0)
+        frame_var_spec_up = Frame(master=self.pw_dash_VARSPEC)
+        frame_var_spec_down = Frame(master=self.pw_dash_VARSPEC)
+        self.pw_dash_VARSPEC.add(frame_var_spec_up,stretch='always')
+        self.pw_dash_VARSPEC.add(frame_var_spec_down,stretch='always')
+        self.pw_dash_VARSPEC.pack(expand = 1, fill ="both")
+        # frame_var_spec_up.pack(expand=1, fill="both")
+        # frame_var_spec_down.pack(expand=1, fill="both")
+        #
+        self.dash_VARs = ExperimentViewer.DashboardGroup(frame_var_spec_up, "Variables")
+        self.dash_VARs.frame.pack(expand=1, fill="both")
+        #
+        #
+        lblFrm_specs = LabelFrame(frame_var_spec_down, text="Experiment Specifications")
+        lblFrm_specs.pack(expand=1, fill="both")
+        self.dash_SPECs = ttk.Treeview(lblFrm_specs, show=["tree"])
+        self.dash_SPECs["columns"]=("#0",)
+        self.dash_SPECs.column("#0", minwidth=0, stretch=tk.NO)
+        # self.dash_SPECs.heading("#0",text="Experiment Specifications",anchor=tk.W)
+        self.dash_SPECs.grid(row=0, column=0, sticky='news')
+        dash_SPECs_sb = ttk.Scrollbar(lblFrm_specs, orient="vertical", command=self.dash_SPECs.yview)
+        dash_SPECs_sb.grid(row=0, column=1, sticky='news')
+        self.dash_SPECs.configure(yscrollcommand=dash_SPECs_sb.set)
+        # self.trvw_expts.bind('<<TreeviewSelect>>', self._event_trvw_expts_selected)
+        #
+        lblFrm_specs.rowconfigure(0, weight=1)
+        lblFrm_specs.columnconfigure(0, weight=1)
+        lblFrm_specs.columnconfigure(1, weight=1)
+        #################
+
+
         self.pw_main_LR_UI = PanedWindow(orient =tk.HORIZONTAL, master=self.parent_expt_comp, sashwidth=3, bg = "#000077", bd = 0)
-        frame_left = Frame(master=self.pw_main_LR_UI)
+        self.expts_frame_left = Frame(master=self.pw_main_LR_UI)
         frame_right = Frame(master=self.pw_main_LR_UI)
-        self.pw_main_LR_UI.add(frame_left,stretch='always')
+        self.pw_main_LR_UI.add(self.expts_frame_left,stretch='always')
         self.pw_main_LR_UI.add(frame_right,stretch='always')
         #
         self.pw_main_LR_UI.pack(expand = 1, fill ="both")
 
-        self.trvw_expts = ttk.Treeview(frame_left, show=["tree"])
+        self.trvw_expts = ttk.Treeview(self.expts_frame_left, show=["tree"])
         self.trvw_expts["columns"]=("#0",)
         self.trvw_expts.column("#0", width=150, minwidth=0, stretch=tk.NO)
         self.trvw_expts.heading("#0",text="Experiments",anchor=tk.W)
-        self.trvw_expts.grid(row=0, column=0, columnspan=2, sticky='news')
+        self.trvw_expts.grid(row=0, column=0, sticky='news')
         self.trvw_expts.bind('<<TreeviewSelect>>', self._event_trvw_expts_selected)
+        trvw_expts_sb = ttk.Scrollbar(self.expts_frame_left, orient="vertical", command=self.trvw_expts.yview)
+        trvw_expts_sb.grid(row=0, column=1, sticky='news')
+        self.trvw_expts.configure(yscrollcommand=trvw_expts_sb.set)
         #
+        frm_btns = Frame(self.expts_frame_left)
         self.cur_sel_trvw = ''
-        self.btn_open_file = Button(master=frame_left, text ="Open Config", command = self._event_btn_open_file)
-        self.btn_open_file.grid(row=1, column=0, sticky='ns')
-        self.btn_open_folder = Button(master=frame_left, text ="Open Folder", command = self._event_btn_open_folder)
-        self.btn_open_folder.grid(row=1, column=1, sticky='ns')
+        self.btn_open_file = Button(master=frm_btns, text ="Open Config", command = self._event_btn_open_file)
+        self.btn_open_file.grid(row=0, column=0, sticky='ns')
+        self.btn_open_folder = Button(master=frm_btns, text ="Open Folder", command = self._event_btn_open_folder)
+        self.btn_open_folder.grid(row=0, column=1, sticky='ns')
+        frm_btns.grid(row=1, column=0, columnspan=2, sticky='ns')
+        frm_btns.rowconfigure(0, weight=1)
+        frm_btns.columnconfigure(0, weight=1)
+        frm_btns.columnconfigure(1, weight=1)
         #
-        frame_left.rowconfigure(0, weight=1)
-        frame_left.rowconfigure(1, weight=0)
-        frame_left.columnconfigure(0, weight=1)
-        frame_left.columnconfigure(1, weight=1)
+        self.expts_frame_left.rowconfigure(0, weight=1)
+        self.expts_frame_left.rowconfigure(1, weight=0)
+        self.expts_frame_left.columnconfigure(0, weight=1)
+        self.expts_frame_left.columnconfigure(1, weight=0)
         #
         # frame_left.grid(row=0, column=0, sticky='news')
 
@@ -270,7 +315,7 @@ class ExperimentViewer:
                 cur_path_data = cur_path_date + '/' + cur_data_folder
                 if not os.path.isfile(cur_path_data + "/laboratory_configuration.txt"):
                     continue
-                self.trvw_expts.insert(tree_folder_date, "end", text=cur_data_folder, tags=cur_path_data)
+                self.trvw_expts.insert(tree_folder_date, "end", text=cur_data_folder, tags=[cur_path_data])
 
         while True:
             #Read JSON file for latest configuration...
@@ -341,18 +386,26 @@ class ExperimentViewer:
                 col = 'white'
                 cur_wfmts += [(cur_str[:-1], col)]
 
-            cur_specs = []
+            cur_elems_in_view = {self.dash_SPECs.item(child)['text'] : child for child in self.dash_SPECs.get_children()}
+            self.dash_SPECs.column("#0", width=self.frame_dash_left.winfo_width(), minwidth=0, stretch=tk.NO)
             for cur_spec in data['SPECs']:
-                cur_str = f"Name: {cur_spec['Name']}\n"
+                if cur_spec['Name'] in cur_elems_in_view:
+                    tree_cur_spec = cur_elems_in_view[cur_spec['Name']]
+                else:
+                    tree_cur_spec = self.dash_SPECs.insert("", "end", text=cur_spec['Name'])
+                
+                cur_attrs = {self.dash_SPECs.item(x)['tags'][0] : x for x in self.dash_SPECs.get_children(tree_cur_spec)}
                 for cur_key in cur_spec['Entries']:
                     dest = cur_spec['Entries'][cur_key]['Destination']
                     if len(dest) > 0:
                         dest = f"({dest[0][1]}: {dest[0][0]})"
                     else:
                         dest = ""
-                    cur_str += f"{cur_key}: {cur_spec['Entries'][cur_key]['Value']} {dest}\n"
-                col = 'white'
-                cur_specs += [(cur_str[:-1], col)]
+                    cur_str = f"{cur_key}: {cur_spec['Entries'][cur_key]['Value']} {dest}"
+                    if cur_key in cur_attrs:
+                        self.dash_SPECs.item(cur_attrs[cur_key], text=cur_str, tags=[cur_key])
+                    else:
+                        self.dash_SPECs.insert(tree_cur_spec, "end", text=cur_str, tags=[cur_key])
 
             #Setup the dashboard of labels...
             self.dash_MWs.set_simple_labels(cur_mws)
@@ -361,7 +414,8 @@ class ExperimentViewer:
             self.dash_ATTENs.set_simple_labels(cur_attens)
             self.dash_WFMs.set_simple_label_list(cur_wfms)
             self.dash_WFMTs.set_simple_labels(cur_wfmts)
-            self.dash_SPECs.set_simple_labels(cur_specs)
+
+            self.trvw_expts.column("#0", width=self.expts_frame_left.winfo_width(), minwidth=0, stretch=tk.NO)
 
             #Read JSON file for latest variables...
             file_state = self._path + "_last_vars.txt"
@@ -511,4 +565,5 @@ if __name__ == '__main__':
         print(sys.argv[1])
         ExperimentViewer(sys.argv[1]).main_loop()
     # ExperimentViewer(r'Z:\Data\EH_QuantumClock_V2\\').main_loop()
+    ExperimentViewer(r'D:\WorkUQ\Other Projects\VNA Chevrons\\').main_loop()
 

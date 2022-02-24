@@ -55,7 +55,6 @@ class Laboratory:
         self._waveform_transforms = {}
         self._activated_instruments = []
         self._update_state = True
-        self.update_state()
 
     @property
     def UpdateStateEnabled(self):
@@ -97,29 +96,35 @@ class Laboratory:
                     self._variables[cur_key] = globals()[cur_dict['Type']].fromConfigDict(cur_key, cur_dict, self)
 
     def cold_reload_last_configuration(self, folder_dir = ""):
-        if folder_dir != "":
-            dirs = [folder_dir]
+        if os.path.isfile(self._save_dir + "_last_state.txt") and os.path.isfile(self._save_dir + "_last_vars.txt") and os.path.isfile(self._save_dir + "_last_exp_configs.txt"):
+            self.cold_reload_labconfig(self._load_json_file(self._save_dir + "_last_state.txt"))
+            self.cold_reload_experiment_configurations(self._load_json_file(self._save_dir + "_last_exp_configs.txt"))
+            self.update_variables_from_last_expt(self._save_dir + "_last_vars.txt")
+            #Don't need to run update_state as it's already there!
         else:
-            #Go through the directories in reverse chronological order (presuming data-stamped folders)
-            dirs = [x[0] for x in os.walk(self._save_dir)]  #Walk gives a tuple: (dirpath, dirnames, filenames)
-            dirs.sort()
+            if folder_dir != "":
+                dirs = [folder_dir]
+            else:
+                #Go through the directories in reverse chronological order (presuming data-stamped folders)
+                dirs = [x[0] for x in os.walk(self._save_dir)]  #Walk gives a tuple: (dirpath, dirnames, filenames)
+                dirs.sort()
 
-        for cur_cand_dir in dirs[::-1]:
-            cur_dir = cur_cand_dir.replace('\\','/')
-            #Check current candidate directory has the required files
-            if not os.path.isfile(cur_dir + "/laboratory_configuration.txt"):
-                continue
-            if not os.path.isfile(cur_dir + "/experiment_configurations.txt"):
-                continue
-            if not os.path.isfile(cur_dir + "/laboratory_parameters.txt"):
-                continue
-            #If the files concurrently exist, then load the data...
-            self.cold_reload_labconfig(self._load_json_file(cur_dir + "/laboratory_configuration.txt"))
-            self.cold_reload_experiment_configurations(self._load_json_file(cur_dir + "/experiment_configurations.txt"))
-            self.update_variables_from_last_expt(cur_dir + "/laboratory_parameters.txt")
-            self.update_state()
-            return
-        assert False, "No valid previous experiment with all data files were found to be present."
+            for cur_cand_dir in dirs[::-1]:
+                cur_dir = cur_cand_dir.replace('\\','/')
+                #Check current candidate directory has the required files
+                if not os.path.isfile(cur_dir + "/laboratory_configuration.txt"):
+                    continue
+                if not os.path.isfile(cur_dir + "/experiment_configurations.txt"):
+                    continue
+                if not os.path.isfile(cur_dir + "/laboratory_parameters.txt"):
+                    continue
+                #If the files concurrently exist, then load the data...
+                self.cold_reload_labconfig(self._load_json_file(cur_dir + "/laboratory_configuration.txt"))
+                self.cold_reload_experiment_configurations(self._load_json_file(cur_dir + "/experiment_configurations.txt"))
+                self.update_variables_from_last_expt(cur_dir + "/laboratory_parameters.txt")
+                self.update_state()
+                return
+            assert False, "No valid previous experiment with all data files were found to be present."
 
     def cold_reload_experiment_configurations(self, config_dict):
         for cur_expt_config in config_dict:
@@ -506,6 +511,7 @@ class Laboratory:
         if self.UpdateStateEnabled:
             self.save_laboratory_config(self._save_dir, '_last_state.txt')
             self.save_variables(self._save_dir, '_last_vars.txt')
+            self.save_experiment_configs(self._save_dir, '_last_exp_configs.txt')
     def open_browser(self):
         cur_dir = os.path.dirname(os.path.realpath(__file__)).replace('\\','/')
         drive = cur_dir[0:2]

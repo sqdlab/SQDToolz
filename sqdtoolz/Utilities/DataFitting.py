@@ -182,3 +182,56 @@ class DFitMinMax2D:
 
         return datapkt
             
+class DFitCircle3D:
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def _minimize_perp_distance(x, y, z):
+        #Function taken from: https://stackoverflow.com/questions/35118419/wrong-result-for-best-fit-plane-to-set-of-points-with-scipy-linalg-lstsq
+        def cost_func(params, xyz):
+            a, b, c, d = params
+            x, y, z = xyz
+            length_squared = a**2 + b**2 + c**2
+            return ((a * x + b * y + c * z + d) ** 2 / length_squared).sum() 
+
+        def unit_length(params):
+            a, b, c, d = params
+            return a**2 + b**2 + c**2 - 1
+
+        #Constrain the vector perpendicular to the plane be of unit length
+        cons = ({'type':'eq', 'fun': unit_length})
+        sol = scipy.optimize.minimize(cost_func, [1,1,1,0], args=[x, y, z], constraints=cons)
+        return np.array(sol.x)
+    
+    @staticmethod
+    def _cart_to_polar(x,y,z):
+        r = np.sqrt(x*x + y*y + z*z)
+        phi = np.arctan2(y,x)
+        theta = np.arccos(z/r)
+        return phi, theta
+
+    def get_rotation_axis(self, data_x, data_y, data_z, is_polar = False):
+        '''
+        Returns the rotation axis for a given circle of points.
+        
+        Inputs:
+            - data_x, data_y, data_z - arrays of x, y and z coordinates of the circle of points.
+            - is_polar - (Default False) If True, the returned value is the phi and theta coordinates rather than a normalised R3 vector.
+        '''
+
+        norm_vec = DFitCircle3D._minimize_perp_distance(data_x, data_y, data_z)[:3]
+        centroid = np.array([np.mean(data_x), np.mean(data_y), np.mean(data_z)]).T
+
+        candTangent = np.vstack([data_x[1:]-data_x[:-1], data_y[1:]-data_y[:-1], data_z[1:]-data_z[:-1]]).T
+        candRadial = np.vstack([data_x[1:], data_y[1:], data_z[1:]]).T - centroid
+        
+        orientations = np.cross(candRadial, candTangent)
+        orientation = np.dot(orientations, norm_vec)
+        if np.mean(orientation) < 0:
+            norm_vec = -norm_vec
+        if is_polar:
+            return DFitCircle3D._cart_to_polar(*norm_vec)
+        else:
+            return norm_vec
+

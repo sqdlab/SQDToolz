@@ -197,6 +197,8 @@ class VOLT_SIM928_VCOM(VisaInstrument):
         Returns:
             The response string from the module.
         """
+        self.write('FLSH')  # flush port buffers
+        self.write('FLOQ')  # flush output queue
         msg = 'SNDT {},"{}"'.format(i, cmd)
         self.write(msg)
         time.sleep(100e-3)

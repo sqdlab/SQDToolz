@@ -96,7 +96,7 @@ class Laboratory:
                     self._variables[cur_key] = globals()[cur_dict['Type']].fromConfigDict(cur_key, cur_dict, self)
 
     def cold_reload_last_configuration(self, folder_dir = ""):
-        if os.path.isfile(self._save_dir + "_last_state.txt") and os.path.isfile(self._save_dir + "_last_vars.txt") and os.path.isfile(self._save_dir + "_last_exp_configs.txt"):
+        if folder_dir == "" and os.path.isfile(self._save_dir + "_last_state.txt") and os.path.isfile(self._save_dir + "_last_vars.txt") and os.path.isfile(self._save_dir + "_last_exp_configs.txt"):
             self.cold_reload_labconfig(self._load_json_file(self._save_dir + "_last_state.txt"))
             self.cold_reload_experiment_configurations(self._load_json_file(self._save_dir + "_last_exp_configs.txt"))
             self.update_variables_from_last_expt(self._save_dir + "_last_vars.txt")

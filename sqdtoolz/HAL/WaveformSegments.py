@@ -71,10 +71,14 @@ class WaveformSegmentBase(LockableProperties):
         assert False, "This waveform segment does not have children to index on markers."
 
 class WFS_Group(WaveformSegmentBase):
-    def __init__(self, name, wfm_segs, time_len=-1, transform_func=None):
+    def __init__(self, name, wfm_segs, time_len=-1, num_repeats = 1, transform_func=None):
         #Check names are unique...
         cur_seg_names = []
         seg_names = [x.Name for x in wfm_segs]
+        
+        assert isinstance(num_repeats, int) and num_repeats >= 0, "The parameter num_repeats must be a non-negative integer."
+        self._num_repeats = num_repeats
+
         for cur_name in seg_names:
             assert not cur_name in cur_seg_names, f"Waveform segments within a WFS_Group must be unique (more than one segment is named \'{cur_name}\')"
             cur_seg_names += [cur_name]
@@ -104,18 +108,26 @@ class WFS_Group(WaveformSegmentBase):
             new_wfm_seg = cur_wfm_type.fromConfigDict(cur_wfm)
             new_wfm_seg.Parent = (cls, 'w')
             cur_wfm_segs.append(new_wfm_seg)
-        return cls(config_dict["Name"], cur_wfm_segs, config_dict["Duration"], wfmt_obj)
+        num_repeats = config_dict.get('NumRepeats', 1)
+        return cls(config_dict["Name"], cur_wfm_segs, config_dict["Duration"], num_repeats, wfmt_obj)
 
     @property
     def Duration(self):
         if self._abs_time == -1:
-            return sum([x.Duration for x in self._wfm_segs])
+            return sum([x.Duration for x in self._wfm_segs]) * self._num_repeats
         else:
-            return self._abs_time
+            return self._abs_time * self._num_repeats
     @Duration.setter
     def Duration(self, len_seconds):
         self._abs_time = len_seconds
-    
+
+    @property
+    def NumRepeats(self):
+        return self._num_repeats
+    @NumRepeats.setter
+    def NumRepeats(self, const_val):
+        self._num_repeats = const_val
+
     def get_waveform_segment(self, wfm_segment_name):
         the_seg = None
         for cur_seg in self._wfm_segs:
@@ -151,13 +163,16 @@ class WFS_Group(WaveformSegmentBase):
 
         final_wfm = np.zeros(int(np.round(self.NumPts(fs))), dtype=np.ubyte)
         cur_ind = 0
-        for cur_seg in self._wfm_segs:
-            cur_len = cur_seg.NumPts(fs)
-            if cur_seg.Name in const_segs:
-                final_wfm[cur_ind:cur_ind+cur_len] = 1
-            elif cur_seg.Name in dict_segs: #i.e. another segment with children like WFS_Group
-                final_wfm[cur_ind:cur_ind+cur_len] = cur_seg._get_marker_waveform_from_segments(dict_segs[cur_seg.Name], fs)
-            cur_ind += cur_len
+        for m in range(self._num_repeats):
+            for cur_seg in self._wfm_segs:
+                cur_len = cur_seg.NumPts(fs)
+                if cur_len == 0:
+                    continue
+                if cur_seg.Name in const_segs:
+                    final_wfm[cur_ind:cur_ind+cur_len] = 1
+                elif cur_seg.Name in dict_segs: #i.e. another segment with children like WFS_Group
+                    final_wfm[cur_ind:cur_ind+cur_len] = cur_seg._get_marker_waveform_from_segments(dict_segs[cur_seg.Name], fs)
+                cur_ind += cur_len
         
         #Reset segment to be elastic
         if elas_seg_ind != -1:
@@ -202,11 +217,14 @@ class WFS_Group(WaveformSegmentBase):
 
         #Concatenate the individual waveform segments
         final_wfm = np.array([])
-        t0_ind = 0
-        for cur_wfm_seg in self._wfm_segs:
-            #TODO: Preallocate - this is a bit inefficient...
-            final_wfm = np.concatenate((final_wfm, cur_wfm_seg.get_waveform(lab, fs, t0_ind, ch_index)))
-            t0_ind = final_wfm.size
+        t0 = 0
+        for m in range(self._num_repeats):
+            for cur_wfm_seg in self._wfm_segs:
+                if cur_wfm_seg.NumPts(fs) == 0:
+                    continue
+                #TODO: Preallocate - this is a bit inefficient...
+                final_wfm = np.concatenate((final_wfm, cur_wfm_seg.get_waveform(lab, fs, t0_ind + t0, ch_index)))
+                t0 = final_wfm.size
 
         #Reset segment to be elastic
         if elas_seg_ind != -1:
@@ -217,6 +235,7 @@ class WFS_Group(WaveformSegmentBase):
     def _get_current_config(self):
         cur_dict = WaveformSegmentBase._get_current_config(self)
         cur_dict['Duration'] = self._abs_time
+        cur_dict['NumRepeats'] = self._num_repeats
         cur_dict['WaveformSegments'] = [x._get_current_config() for x in self._wfm_segs]
         return cur_dict
 

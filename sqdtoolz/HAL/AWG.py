@@ -203,6 +203,8 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
         cur_ind = 0
         for cur_seg in self._wfm_segment_list:
             cur_len = cur_seg.NumPts(self._sample_rate)
+            if cur_len == 0:
+                continue
             if cur_seg.Name in const_segs:
                 final_wfm[cur_ind:cur_ind+cur_len] = 1
             elif cur_seg.Name in dict_segs: #i.e. another segment with children like WFS_Group
@@ -257,6 +259,8 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
             t0 = 0
             #Concatenate the individual waveform segments
             for cur_wfm_seg in self._wfm_segment_list:
+                if cur_wfm_seg.NumPts(self.SampleRate) == 0:
+                    continue
                 #TODO: Preallocate - this is a bit inefficient...
                 final_wfms[cur_ch] = np.concatenate((final_wfms[cur_ch], cur_wfm_seg.get_waveform(self._lab, self._sample_rate, t0, cur_ch)))
                 t0 = final_wfms[cur_ch].size

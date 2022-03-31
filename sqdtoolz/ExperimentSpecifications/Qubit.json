@@ -2,6 +2,9 @@
     "Frequency GE" : 5e9,
     "Power" : -30,
 
+    "GE X/2-Gate Amplitude" : 0.0,
+    "GE X/2-Gate Time" : 20e-9,
+
     "GE X-Gate Amplitude" : 0.0,
     "GE X-Gate Time" : 20e-9,
 

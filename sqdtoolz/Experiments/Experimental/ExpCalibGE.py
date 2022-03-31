@@ -24,7 +24,7 @@ class ExpCalibGE(Experiment):
         self.load_time = kwargs.get('load_time', def_load_time)
 
         self.readout_time = kwargs.get('readout_time', 2e-6)
-        self.drive_time = kwargs.get('drive_time', 20e-9)
+        self.drive_time = kwargs.get('drive_time', self._SPEC_qubit['GE X-Gate Time'].Value)
 
         self.cur_data = None
     

@@ -120,6 +120,16 @@ class WFS_Group(WaveformSegmentBase):
     @Duration.setter
     def Duration(self, len_seconds):
         self._abs_time = len_seconds
+    
+    def NumPts(self, fs):
+        #Over-riding due to a subtle issue due to sample rates and individual durations... For example:
+        #   Duration of one unit = 4.5 => 5 samples
+        #   Duration of two units = 9 - i.e. not 10...
+        if self._abs_time == -1:
+            cur_time_1 = sum([x.Duration for x in self._wfm_segs])
+        else:
+            cur_time_1 = self._abs_time
+        return int(np.round(cur_time_1*fs)) * self._num_repeats
 
     @property
     def NumRepeats(self):

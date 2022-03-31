@@ -35,6 +35,8 @@ class ExpRabi(Experiment):
         self.normalise_data = kwargs.get('normalise', False)
         assert isinstance(self.normalise_data, bool), 'Argument \'normalise\' must be boolean.'
         self.normalise_reps = kwargs.get('normalise_reps', 5)
+
+        self._dont_update_values = kwargs.get('dont_update_values', False)
     
     def _run(self, file_path, sweep_vars=[], **kwargs):
         assert len(sweep_vars) == 0, "Cannot specify sweeping variables in this experiment."
@@ -96,12 +98,35 @@ class ExpRabi(Experiment):
         if self._param_rabi_decay_time:
             self._param_rabi_decay_time.Value = 1.0 / dpkt['decay_rate']
 
-        if self._transition == 'GE':
-            self._SPEC_qubit['GE X-Gate Amplitude'].Value = 0.5/dpkt['frequency']
-            self._SPEC_qubit['GE X-Gate Time'].Value = self.drive_time
-        else:
-            self._SPEC_qubit['EF X-Gate Amplitude'].Value = 0.5/dpkt['frequency']
-            self._SPEC_qubit['EF X-Gate Time'].Value = self.drive_time
+        if not self._dont_update_values:
+            if self._transition == 'GE':
+                if self.normalise_data:
+                    #Find X and X/2 amplitudes...
+                    n = np.ceil( dpkt['phase']/(2*np.pi) )
+                    amp_X = ( 2*n*np.pi - dpkt['phase'] ) / ( 2*np.pi * dpkt['frequency'] )
+                    amp_Xon2 = amp_X - 0.25 / dpkt['frequency']
+
+                    #Plot X and X/2 points on plot...
+                    axs[0].plot([amp_Xon2, amp_Xon2], [0,1], '-b')
+                    axs[0].plot([amp_X, amp_X], [0,1], '-b')
+                    axs[0].text(amp_Xon2, 0.5, '$\pi/2$')
+                    axs[0].text(amp_X, 0.5, '$\pi$')
+
+                    self._SPEC_qubit['GE X/2-Gate Amplitude'].Value = amp_Xon2
+                    self._SPEC_qubit['GE X/2-Gate Time'].Value = self.drive_time
+                    self._SPEC_qubit['GE X-Gate Amplitude'].Value = amp_X
+                    self._SPEC_qubit['GE X-Gate Time'].Value = self.drive_time
+                else:
+                    self._SPEC_qubit['GE X/2-Gate Amplitude'].Value = 0.25/dpkt['frequency']
+                    self._SPEC_qubit['GE X/2-Gate Time'].Value = self.drive_time
+                    self._SPEC_qubit['GE X-Gate Amplitude'].Value = 0.5/dpkt['frequency']
+                    self._SPEC_qubit['GE X-Gate Time'].Value = self.drive_time
+            else:
+                assert False, 'Ask Developer about the EF :P'
+                self._SPEC_qubit['EF X-Gate Amplitude'].Value = 0.5/dpkt['frequency']
+                self._SPEC_qubit['EF X-Gate Time'].Value = self.drive_time
+                self._SPEC_qubit['EF X-Gate Amplitude'].Value = 0.25/dpkt['frequency']
+                self._SPEC_qubit['EF X-Gate Time'].Value = self.drive_time
 
         if self.normalise_data:
             fig.show()
@@ -109,4 +134,3 @@ class ExpRabi(Experiment):
         else:
             dpkt['fig'].show()
             dpkt['fig'].savefig(self._file_path + 'fitted_plot.png')
-        

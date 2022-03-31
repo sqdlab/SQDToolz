@@ -98,8 +98,13 @@ class Laboratory:
     def cold_reload_last_configuration(self, folder_dir = ""):
         if folder_dir == "" and os.path.isfile(self._save_dir + "_last_state.txt") and os.path.isfile(self._save_dir + "_last_vars.txt") and os.path.isfile(self._save_dir + "_last_exp_configs.txt"):
             self.cold_reload_labconfig(self._load_json_file(self._save_dir + "_last_state.txt"))
+            self._print_message(f"Loading all Experiment Configurations")
             self.cold_reload_experiment_configurations(self._load_json_file(self._save_dir + "_last_exp_configs.txt"))
+            self._erase_line()
+            self._print_message(f"Loading all Variables")
             self.update_variables_from_last_expt(self._save_dir + "_last_vars.txt")
+            self._erase_line()
+            self._print_message(f"Cold Reload Complete")
             #Don't need to run update_state as it's already there!
         else:
             if folder_dir != "":

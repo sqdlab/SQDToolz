@@ -23,9 +23,15 @@ new_lab = Laboratory(instr_config_file = "tests\\AWG_N8241A_TestMS.yaml", save_d
 # - Also using an external 10MHz reference on the AWG...
 
 #Sample Clock
-new_lab.load_instrument('SGS100A')
-freq_module = GENmwSource('MW_sample_clock', new_lab, 'SGS100A', 'RFOUT')
-freq_module.Output = True
+# new_lab.load_instrument('SGS100A')
+# freq_module = GENmwSource('MW_sample_clock', new_lab, 'SGS100A', 'RFOUT')
+# freq_module.Output = True
+new_lab.load_instrument('MWS_Windfreak')#
+GENmwSource("MW_smplclk", new_lab, 'MWS_Windfreak', 'RFoutA')
+new_lab.HAL('MW_smplclk').Frequency = 1.25e9
+new_lab.HAL('MW_smplclk').Output = True
+new_lab.HAL('MW_smplclk').Power = 6
+new_lab.HAL('MW_smplclk').ManualActivation=True
 
 #Ideally, the length and polarity are set to default values in the drivers via the YAML file - i.e. just set TrigPulseDelay
 new_lab.load_instrument('pulser')

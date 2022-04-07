@@ -162,10 +162,6 @@ class Laboratory:
             cur_class_name = dict_cur_hal['Type']
             globals()[cur_class_name].fromConfigDict(dict_cur_hal, self)
             self._erase_line()
-        #Load parameters (including trigger relationships) onto the HALs
-        for dict_cur_hal in config_dict['HALs']:
-            cur_hal_name = dict_cur_hal['Name']
-            self._hal_objs[cur_hal_name]._set_current_config(dict_cur_hal, self)
         #Create and load the PROCs
         for dict_cur_proc in config_dict['PROCs']:
             self._print_message(f"Loading PROC: {dict_cur_proc['Name']}")
@@ -183,6 +179,10 @@ class Laboratory:
             self._print_message(f"Loading SPEC: {dict_cur_spec['Name']}")
             ExperimentSpecification(dict_cur_spec["Name"], self)._set_current_config(dict_cur_spec)
             self._erase_line()
+        #Load parameters (including trigger relationships) onto the HALs
+        for dict_cur_hal in config_dict['HALs']:
+            cur_hal_name = dict_cur_hal['Name']
+            self._hal_objs[cur_hal_name]._set_current_config(dict_cur_hal, self)
 
     def makesafe_HALs(self):
         for cur_hal in self._hal_objs:

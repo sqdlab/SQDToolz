@@ -81,3 +81,17 @@ instruments:
         initial_value: 'OFF'
       RFOUT.pulsemod_source:
         initial_value: 'EXT'
+  MWS_Windfreak:
+    driver: sqdtoolz.Drivers.MWS_WFSynthHDProV2
+    type: MWS_WFSynthHDProV2
+    address: 'COM3'
+    enable_forced_reconnect: true
+    parameters:
+      RFoutA.frequency:
+        initial_value: 1e9
+      RFoutB.frequency:
+        initial_value: 1e9
+      REF_Source:
+        initial_value: 'EXT'
+      EXT_REF_frequency:
+        initial_value: 10e6

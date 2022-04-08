@@ -40,11 +40,12 @@ class Laboratory:
 
         #Convert Windows backslashes into forward slashes (should be compatible with MAC/Linux then...)
         self._save_dir = save_dir.replace('\\','/')
-        self._group_dir = {'Dir':"", 'InitDir':"", 'SweepQueue':[]}
+        self._group_dir = {'Dir':"", 'InitDir':"", 'SweepQueue':[], 'ExptIndex' : -1}
 
         Path(self._save_dir).mkdir(parents=True, exist_ok=True)
 
         self._using_VS_Code = using_VS_Code
+        self._cur_message = ''
 
         self._hal_objs = {}
         self._processors = {}
@@ -54,7 +55,6 @@ class Laboratory:
         self._waveform_transforms = {}
         self._activated_instruments = []
         self._update_state = True
-        self.update_state()
 
     @property
     def UpdateStateEnabled(self):
@@ -96,29 +96,40 @@ class Laboratory:
                     self._variables[cur_key] = globals()[cur_dict['Type']].fromConfigDict(cur_key, cur_dict, self)
 
     def cold_reload_last_configuration(self, folder_dir = ""):
-        if folder_dir != "":
-            dirs = [folder_dir]
+        if folder_dir == "" and os.path.isfile(self._save_dir + "_last_state.txt") and os.path.isfile(self._save_dir + "_last_vars.txt") and os.path.isfile(self._save_dir + "_last_exp_configs.txt"):
+            self.cold_reload_labconfig(self._load_json_file(self._save_dir + "_last_state.txt"))
+            self._print_message(f"Loading all Experiment Configurations")
+            self.cold_reload_experiment_configurations(self._load_json_file(self._save_dir + "_last_exp_configs.txt"))
+            self._erase_line()
+            self._print_message(f"Loading all Variables")
+            self.update_variables_from_last_expt(self._save_dir + "_last_vars.txt")
+            self._erase_line()
+            self._print_message(f"Cold Reload Complete")
+            #Don't need to run update_state as it's already there!
         else:
-            #Go through the directories in reverse chronological order (presuming data-stamped folders)
-            dirs = [x[0] for x in os.walk(self._save_dir)]  #Walk gives a tuple: (dirpath, dirnames, filenames)
-            dirs.sort()
+            if folder_dir != "":
+                dirs = [folder_dir]
+            else:
+                #Go through the directories in reverse chronological order (presuming data-stamped folders)
+                dirs = [x[0] for x in os.walk(self._save_dir)]  #Walk gives a tuple: (dirpath, dirnames, filenames)
+                dirs.sort()
 
-        for cur_cand_dir in dirs[::-1]:
-            cur_dir = cur_cand_dir.replace('\\','/')
-            #Check current candidate directory has the required files
-            if not os.path.isfile(cur_dir + "/laboratory_configuration.txt"):
-                continue
-            if not os.path.isfile(cur_dir + "/experiment_configurations.txt"):
-                continue
-            if not os.path.isfile(cur_dir + "/laboratory_parameters.txt"):
-                continue
-            #If the files concurrently exist, then load the data...
-            self.cold_reload_labconfig(self._load_json_file(cur_dir + "/laboratory_configuration.txt"))
-            self.cold_reload_experiment_configurations(self._load_json_file(cur_dir + "/experiment_configurations.txt"))
-            self.update_variables_from_last_expt(cur_dir + "/laboratory_parameters.txt")
-            self.update_state()
-            return
-        assert False, "No valid previous experiment with all data files were found to be present."
+            for cur_cand_dir in dirs[::-1]:
+                cur_dir = cur_cand_dir.replace('\\','/')
+                #Check current candidate directory has the required files
+                if not os.path.isfile(cur_dir + "/laboratory_configuration.txt"):
+                    continue
+                if not os.path.isfile(cur_dir + "/experiment_configurations.txt"):
+                    continue
+                if not os.path.isfile(cur_dir + "/laboratory_parameters.txt"):
+                    continue
+                #If the files concurrently exist, then load the data...
+                self.cold_reload_labconfig(self._load_json_file(cur_dir + "/laboratory_configuration.txt"))
+                self.cold_reload_experiment_configurations(self._load_json_file(cur_dir + "/experiment_configurations.txt"))
+                self.update_variables_from_last_expt(cur_dir + "/laboratory_parameters.txt")
+                self.update_state()
+                return
+            assert False, "No valid previous experiment with all data files were found to be present."
 
     def cold_reload_experiment_configurations(self, config_dict):
         for cur_expt_config in config_dict:
@@ -134,28 +145,44 @@ class Laboratory:
             new_expt_config = ExperimentConfiguration(cur_expt_config, self, 0, cur_hals, acq_hal)
             new_expt_config.update_config(config_dict[cur_expt_config], False)
     
+    def _print_message(self, message):
+        self._cur_message = message
+        print(self._cur_message, end='\r')
+    def _erase_line(self):
+        print(" " * len(self._cur_message), end='\r')
+
     def cold_reload_labconfig(self, config_dict):
         for cur_instr in config_dict['ActiveInstruments']:
+            self._print_message(f"Loading QCoDeS Instrument: {cur_instr}")
             self.load_instrument(cur_instr)
+            self._erase_line()
         #Create the HALs
         for dict_cur_hal in config_dict['HALs']:
+            self._print_message(f"Loading HAL: {dict_cur_hal['Name']}")
             cur_class_name = dict_cur_hal['Type']
             globals()[cur_class_name].fromConfigDict(dict_cur_hal, self)
+            self._erase_line()
         #Load parameters (including trigger relationships) onto the HALs
         for dict_cur_hal in config_dict['HALs']:
             cur_hal_name = dict_cur_hal['Name']
             self._hal_objs[cur_hal_name]._set_current_config(dict_cur_hal, self)
         #Create and load the PROCs
         for dict_cur_proc in config_dict['PROCs']:
+            self._print_message(f"Loading PROC: {dict_cur_proc['Name']}")
             cur_class_name = dict_cur_proc['Type']
             globals()[cur_class_name].fromConfigDict(dict_cur_proc, self)
+            self._erase_line()
         #Create and load the WFMTs
         for dict_cur_wfmt in config_dict['WFMTs']:
+            self._print_message(f"Loading WFMT: {dict_cur_wfmt['Name']}")
             cur_class_name = dict_cur_wfmt['Type']
             globals()[cur_class_name].fromConfigDict(dict_cur_wfmt, self)
+            self._erase_line()
         #Create and load the SPECs
         for dict_cur_spec in config_dict['SPECs']:
+            self._print_message(f"Loading SPEC: {dict_cur_spec['Name']}")
             ExperimentSpecification(dict_cur_spec["Name"], self)._set_current_config(dict_cur_spec)
+            self._erase_line()
 
     def makesafe_HALs(self):
         for cur_hal in self._hal_objs:
@@ -202,15 +229,19 @@ class Laboratory:
                 ret_obj = ret_obj._get_child(res_list[m])
         return ret_obj
 
+    def _HAL_exists(self, hal_name):
+        return hal_name in self._hal_objs
     def _register_HAL(self, hal_obj):
         if not (hal_obj.Name in self._hal_objs):
             self._hal_objs[hal_obj.Name] = hal_obj
             return True
         return False
-    def HAL(self, hal_ID):
+    def HAL(self, hal_ID, disable_warning=False):
         if hal_ID in self._hal_objs:
             return self._hal_objs[hal_ID]
         else:
+            if not disable_warning:
+                print(f'Warning: HAL {hal_ID} has not been initialised!')
             return None
 
     def _register_PROC(self, proc):
@@ -218,10 +249,12 @@ class Laboratory:
             self._processors[proc.Name] = proc
             return True
         return False
-    def PROC(self, proc_name):
+    def PROC(self, proc_name, disable_warning=False):
         if proc_name in self._processors:
             return self._processors[proc_name]
         else:
+            if not disable_warning:
+                print(f'Warning: PROC {proc_name} has not been initialised!')
             return None
 
     def _register_WFMT(self, wfmt):
@@ -229,11 +262,12 @@ class Laboratory:
             self._waveform_transforms[wfmt.Name] = wfmt
             return True
         return False
-    def WFMT(self, wfmt_name):
+    def WFMT(self, wfmt_name, disable_warning=False):
         if wfmt_name in self._waveform_transforms:
             return self._waveform_transforms[wfmt_name]
         else:
-            print(f'Warning: WFMT {wfmt_name} has not been initialised!')
+            if not disable_warning:
+                print(f'Warning: WFMT {wfmt_name} has not been initialised!')
             return None
 
     def _register_VAR(self, hal_var):
@@ -241,11 +275,12 @@ class Laboratory:
             self._variables[hal_var.Name] = hal_var
             return True
         return False
-    def VAR(self, param_name):
+    def VAR(self, param_name, disable_warning=False):
         if param_name in self._variables:
             return self._variables[param_name]
         else:
-            print(f'Warning: VAR {param_name} has not been initialised!')
+            if not disable_warning:
+                print(f'Warning: VAR {param_name} has not been initialised!')
             return None
 
     def _register_SPEC(self, spec):
@@ -253,10 +288,12 @@ class Laboratory:
             self._specifications[spec.Name] = spec
             return True
         return False
-    def SPEC(self, spec_name):
+    def SPEC(self, spec_name, disable_warning=False):
         if spec_name in self._specifications:
             return self._specifications[spec_name]
         else:
+            if not disable_warning:
+                print(f'Warning: SPEC {spec_name} has not been initialised!')
             return None
 
     def _register_CONFIG(self, expt_config):
@@ -264,11 +301,12 @@ class Laboratory:
             self._expt_configs[expt_config.Name] = expt_config
             return True
         return False
-    def CONFIG(self, expt_config_name):
+    def CONFIG(self, expt_config_name, disable_warning=False):
         if expt_config_name in self._expt_configs:
             return self._expt_configs[expt_config_name]
         else:
-            print(f'Warning: CONFIG {expt_config_name} has not been initialised!')
+            if not disable_warning:
+                print(f'Warning: CONFIG {expt_config_name} has not been initialised!')
             return None
 
     def add_instrument(self, instrObj):
@@ -277,7 +315,15 @@ class Laboratory:
 
     def load_instrument(self, instrID):
         # assert not (instrID in self._station.components), f"Instrument by the name {instrID} has already been loaded."
-        if not (instrID in self._station.components):
+        if not (instrID in self._activated_instruments):
+            #Check if the instrument is in the station, but unregistered (i.e. it crashed during initialisation). If so, remove it...
+            #ALSO NOTE:
+            #   QCoDeS does this awful thing where it stores the instruments inside the Instrument class attribute - i.e. one cannot run
+            #   multiple QCoDeS instances at once in a given kernel! Anyway, it stores its own list of instruments that may not appear in
+            #   components if initialisation fails...
+            if instrID in qc.Instrument._all_instruments:
+                instr = qc.Instrument.find_instrument(instrID)
+                instr.close()
             self._station.load_instrument(instrID)
             self._activated_instruments += [instrID]
     
@@ -319,11 +365,13 @@ class Laboratory:
         self._group_dir['Dir'] = group_name
         self._group_dir['InitDir'] = ""
         self._group_dir['SweepQueue'] = []
+        self._group_dir['ExptIndex'] = -1
 
     def group_close(self):
         self._group_dir['Dir'] = ""
         self._group_dir['InitDir'] = ""
         self._group_dir['SweepQueue'] = []
+        self._group_dir['ExptIndex'] = -1
 
     def _sweep_enqueue(self, var_name):
         self._group_dir['SweepQueue'].append(var_name)
@@ -334,6 +382,7 @@ class Laboratory:
         #Get time-stamp
         if self._group_dir['Dir'] == "":
             folder_time_stamp = datetime.now().strftime(f"%Y-%m-%d/%H%M%S-" + expt_obj.Name + "/")
+            self._group_dir['ExptIndex'] = -1
         else:
             if self._group_dir['InitDir'] == "":
                 self._group_dir['InitDir'] = datetime.now().strftime(f"%Y-%m-%d/%H%M%S-{self._group_dir['Dir']}/")
@@ -343,11 +392,12 @@ class Laboratory:
         Path(cur_exp_path).mkdir(parents=True, exist_ok=True)
 
         ret_vals = expt_obj._run(cur_exp_path, sweep_vars, ping_iteration=self._update_progress_bar, **kwargs)
+        self._group_dir['ExptIndex'] += 1
 
         #Save the experiment configuration
         self.save_experiment_configs(cur_exp_path)
         #Save experiment-specific experiment-configuration data (i.e. timing diagram)
-        expt_obj.save_config(cur_exp_path, 'timing_diagram', 'experiment_parameters.txt', self._group_dir['SweepQueue'])
+        expt_obj.save_config(cur_exp_path, 'timing_diagram', 'experiment_parameters.txt', self._group_dir['SweepQueue'], self._group_dir['ExptIndex'])
 
         #Run postprocessing
         expt_obj._post_process(ret_vals)
@@ -466,6 +516,7 @@ class Laboratory:
         if self.UpdateStateEnabled:
             self.save_laboratory_config(self._save_dir, '_last_state.txt')
             self.save_variables(self._save_dir, '_last_vars.txt')
+            self.save_experiment_configs(self._save_dir, '_last_exp_configs.txt')
     def open_browser(self):
         cur_dir = os.path.dirname(os.path.realpath(__file__)).replace('\\','/')
         drive = cur_dir[0:2]

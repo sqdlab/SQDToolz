@@ -4,10 +4,10 @@ class GENswitch(HALbase):
     def __init__(self, hal_name, lab, instr_switch):
         #NOTE: the driver is presumed to be a single-pole many-throw switch (i.e. only one circuit route at a time).
         HALbase.__init__(self, hal_name)
-        if lab._register_HAL(self):
-            self._instr_id = instr_switch
-            self._instr_switch = lab._get_instrument(instr_switch)
-            self._switch_contacts = self._instr_switch.get_all_switch_contacts()
+        self._instr_id = instr_switch
+        self._instr_switch = lab._get_instrument(instr_switch)
+        self._switch_contacts = self._instr_switch.get_all_switch_contacts()
+        lab._register_HAL(self)
 
     @classmethod
     def fromConfigDict(cls, config_dict, lab):

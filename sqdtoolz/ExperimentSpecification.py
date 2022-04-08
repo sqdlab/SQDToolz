@@ -46,7 +46,7 @@ class ExperimentSpecification:
             lab = args[1]
         assert lab.__class__.__name__ == 'Laboratory' and lab != None, "Lab parameter was not passed or does not exist as the second argument in the ExperimentSpecification initialisation?"
 
-        prev_exists = lab.SPEC(name)
+        prev_exists = lab.SPEC(name, True)
         if prev_exists:
             return prev_exists
         else:

@@ -1,11 +1,11 @@
 import numpy as np
-
+from sqdtoolz.HAL.LockableProperties import LockableProperties
 class WaveformTransformationArgs:
     def __init__(self, wfmt_name, kwargs):
         self.wfmt_name = wfmt_name
         self.kwargs = kwargs
 
-class WaveformTransformation:
+class WaveformTransformation(LockableProperties):
     def __init__(self, name):
         self._name = name
 
@@ -25,7 +25,7 @@ class WaveformTransformation:
             lab = args[1]
         assert lab.__class__.__name__ == 'Laboratory' and lab != None, "Lab parameter was not passed or does not exist as the second argument in the variable class initialisation?"
 
-        prev_exists = lab.WFMT(name)
+        prev_exists = lab.WFMT(name, True)
         if prev_exists:
             assert isinstance(prev_exists, cls), f"A different WFMT type ({prev_exists.__class__.__name__}) already exists by this name."
             return prev_exists

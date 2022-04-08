@@ -4,10 +4,10 @@ from sqdtoolz.HAL.HALbase import*
 class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
     def __init__(self, hal_name, lab, instr_acq_name):
         HALbase.__init__(self, hal_name)
+        self._instr_id = instr_acq_name
+        self._instr_acq = lab._get_instrument(instr_acq_name)
         if lab._register_HAL(self):
             #
-            self._instr_id = instr_acq_name
-            self._instr_acq = lab._get_instrument(instr_acq_name)
             self._trig_src_obj = None
             self.data_processor = None
 

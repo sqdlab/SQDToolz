@@ -84,4 +84,18 @@ Note that the ND-array of time-stamps is sliced over the independent sweeping pa
 
 The `FileIODirectory` class amalgamates multiple datasets of similar experiments into a single array. This saves the user from having to manually look up the directory names and having to loop over them and manually construct the resulting array. The details on its usage are best explained in the article on [grouped experiments](Exp_CascadeGroup.md).
 
-The syntax for data-retrieval in the `FileIODirectory` class is exactly the same as `FileIOReader`. For the handling of the case where the individual datasets are of different sizes, refer to the article on [Non-uniform data sampling](ACQ_NonUniformDataSampling.md).
+The syntax for data-retrieval in the `FileIODirectory` class is exactly the same as `FileIOReader`. Nonetheless, there are additional attributes of interest:
+
+- `folders` - Corresponds to the folders from which data has been extracted.
+- `folders_ignored` - Corresponds to the folders that were ignored during data extraction due to incomplete data or metadata (typically implies that the experiment failed to complete).
+- `non_uniform` - If `True`, it refers to [non-uniform data sampling](ACQ_NonUniformDataSampling.md).
+
+Note that the attribute `cur_folders` corresponds one-to-one with the resulting data array for the case where no sweeping variables have been used (in which case, the outer slicing variable is by a default index: `'DirFileNo'`).
+
+There are also additional functions of interest:
+
+- `get_var_dict_arrays()` - returns a dictionary across all available variable names. The value on each variable name in this dictionary is a numpy array corresponding to how the folders are sliced.
+
+TO BE WRITTEN IN MORE DETAIL.
+
+Finally, to handle the special case where the individual datasets are of different sizes, refer to the article on [Non-uniform data sampling](ACQ_NonUniformDataSampling.md).

@@ -1,0 +1,8 @@
+instruments:
+  sim_rack928:
+    driver: sqdtoolz.Drivers.VOLT_SIM928_VCOM
+    type: VOLT_SIM928_VCOM
+    address: 'COM4'
+    enable_forced_reconnect: true
+    # init:
+    #   gpib_slot: 2

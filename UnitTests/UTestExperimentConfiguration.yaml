@@ -2,6 +2,11 @@ instruments:
   virACQ:
     driver: sqdtoolz.Drivers.dummyACQ
     type: DummyACQ
+  virACQblowup:
+    driver: sqdtoolz.Drivers.dummyACQ
+    type: DummyACQ
+    init:
+      blow_up_path: 'test_save_dir/blowup.txt'
   virDDG:
     driver: sqdtoolz.Drivers.dummyDDG
     type: DummyDDG

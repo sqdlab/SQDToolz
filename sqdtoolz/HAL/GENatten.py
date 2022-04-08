@@ -3,10 +3,10 @@ from sqdtoolz.HAL.HALbase import*
 class GENatten(HALbase):
     def __init__(self, hal_name, lab, instr_atten_channel):
         HALbase.__init__(self, hal_name)
-        lab._register_HAL(self)
-        #
         self._instr_atten = lab._get_instrument(instr_atten_channel)
         self._instr_id = instr_atten_channel
+        #
+        lab._register_HAL(self)
 
     @classmethod
     def fromConfigDict(cls, config_dict, lab):

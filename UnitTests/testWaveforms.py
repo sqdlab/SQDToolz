@@ -276,6 +276,147 @@ class TestSegments(unittest.TestCase):
         shutil.rmtree('test_save_dir')
         self.cleanup()
 
+    def test_ZeroLength(self):
+        self.initialise()
+        awg_wfm = self.lab.HAL("Wfm1")
+        read_segs = []
+        read_segs2 = []
+        awg_wfm.clear_segments()
+        awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, 10e-9, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init", None, 20e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero1", None, 30e-9, 0.1))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init2", None, 45e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 77e-9, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
+        read_segs += ["init"]
+        read_segs2 += ["zero2"]
+        awg_wfm.get_output_channel(0).marker(1).set_markers_to_segments(read_segs)
+        awg_wfm.get_output_channel(1).marker(0).set_markers_to_segments(read_segs2)
+        #Gather initial arrays
+        wfm_unmod = np.vstack(awg_wfm.get_raw_waveforms())
+        #
+        #Modulations
+        WFMT_ModulationIQ('IQmod', self.lab, 47e7)
+        WFMT_ModulationIQ('IQmod2', self.lab, 13e7)
+
+        #Default test with an elastic segment
+        awg_wfm = WaveformAWG("Wfm1", self.lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9, total_time=227e-9)
+        awg_wfm.clear_segments()
+        awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, -1, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init", self.lab.WFMT('IQmod').apply(), 20e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero1", None, 30e-9, 0.1))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init2", None, 45e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 77e-9, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
+        wfm_mod = np.vstack(awg_wfm.get_raw_waveforms())
+        init_stencil = np.s_[10:30]
+        temp = wfm_unmod*1.0
+        omega = 2*np.pi*self.lab.WFMT('IQmod').IQFrequency
+        temp[0, init_stencil] *= np.cos(omega*1e-9*(np.arange(20) + 10))
+        temp[1, init_stencil] *= np.sin(omega*1e-9*(np.arange(20) + 10))
+        assert self.arr_equality(temp, wfm_mod), "Default waveform compilation failed."
+        #
+        #Test with a normal zero segment
+        awg_wfm = WaveformAWG("Wfm1", self.lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9, total_time=227e-9)
+        awg_wfm.clear_segments()
+        awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, -1, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init", self.lab.WFMT('IQmod').apply(), 20e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero1", None, 30e-9, 0.1))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init2", None, 45e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("ZEROLENGTH", None, 0e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 77e-9, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
+        wfm_mod = np.vstack(awg_wfm.get_raw_waveforms())
+        init_stencil = np.s_[10:30]
+        temp = wfm_unmod*1.0
+        omega = 2*np.pi*self.lab.WFMT('IQmod').IQFrequency
+        temp[0, init_stencil] *= np.cos(omega*1e-9*(np.arange(20) + 10))
+        temp[1, init_stencil] *= np.sin(omega*1e-9*(np.arange(20) + 10))
+        assert self.arr_equality(temp, wfm_mod), "Default waveform compilation failed."
+        #
+        #Test with a WFS_Group
+        awg_wfm = WaveformAWG("Wfm1", self.lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9, total_time=227e-9)
+        awg_wfm.clear_segments()
+        awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, -1, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init", self.lab.WFMT('IQmod').apply(), 20e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Group("TestGroup", [
+                                        WFS_Constant("zero1", None, 30e-9, 0.1),
+                                        WFS_Gaussian("ZEROLENGTH", None, 0e-9, 0.5-0.1),
+                                        WFS_Gaussian("init2", None, 45e-9, 0.5-0.1)
+                                        ]))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 77e-9, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
+        wfm_mod = np.vstack(awg_wfm.get_raw_waveforms())
+        init_stencil = np.s_[10:30]
+        temp = wfm_unmod*1.0
+        omega = 2*np.pi*self.lab.WFMT('IQmod').IQFrequency
+        temp[0, init_stencil] *= np.cos(omega*1e-9*(np.arange(20) + 10))
+        temp[1, init_stencil] *= np.sin(omega*1e-9*(np.arange(20) + 10))
+        assert self.arr_equality(temp, wfm_mod), "WFS_Group failed in waveform compilation."
+        #
+        #Test with a WFS_Group on zero repeats
+        awg_wfm = WaveformAWG("Wfm1", self.lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9, total_time=227e-9)
+        awg_wfm.clear_segments()
+        awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, -1, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init", self.lab.WFMT('IQmod').apply(), 20e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Group("TestGroup", [
+                                        WFS_Constant("zero1", None, 30e-9, 0.1),
+                                        WFS_Gaussian("ZEROLENGTH", None, 0e-9, 0.5-0.1),
+                                        WFS_Gaussian("init2", None, 45e-9, 0.5-0.1)
+                                        ]))
+        awg_wfm.add_waveform_segment(WFS_Group("TestGroupZERO", [
+                                        WFS_Constant("zero1", None, 30e-9, 0.1),
+                                        WFS_Gaussian("ZEROLENGTH", None, 0e-9, 0.5-0.1),
+                                        WFS_Gaussian("init2", None, 45e-9, 0.5-0.1)
+                                        ], num_repeats=0))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 77e-9, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
+        wfm_mod = np.vstack(awg_wfm.get_raw_waveforms())
+        init_stencil = np.s_[10:30]
+        temp = wfm_unmod*1.0
+        omega = 2*np.pi*self.lab.WFMT('IQmod').IQFrequency
+        temp[0, init_stencil] *= np.cos(omega*1e-9*(np.arange(20) + 10))
+        temp[1, init_stencil] *= np.sin(omega*1e-9*(np.arange(20) + 10))
+        assert self.arr_equality(temp, wfm_mod), "WFS_Group failed in waveform compilation."
+        #
+        #Test marker decomposition...
+        awg_wfm = WaveformAWG("Wfm1", self.lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9, total_time=227e-9)
+        awg_wfm.clear_segments()
+        awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, -1, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init", self.lab.WFMT('IQmod').apply(), 20e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Group("TestGroup", [
+                                        WFS_Constant("zero1", None, -1, 0.1),
+                                        WFS_Gaussian("init2", None, 45e-9, 0.5-0.1)
+                                        ], time_len=75e-9))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 77e-9, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("ZEROLENGTH", None, 0e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
+        awg_wfm.get_output_channel(0).marker(0).set_markers_to_segments([ 'init', 'ZEROLENGTH', ['TestGroup','init2'], 'init3' ])
+        raw_mkrs = awg_wfm.get_output_channel(0).marker(0).get_raw_marker_waveform()
+        exp_mkrs = np.array( [0]*10 + [1]*20  +  [0]*30 + [1]*45  +  [0]*77 + [1]*45 )
+        assert self.arr_equality(raw_mkrs, exp_mkrs), "WFS_Group failed in marker compilation."
+        #
+        #Test marker decomposition with zero inside the group!...
+        awg_wfm = WaveformAWG("Wfm1", self.lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9, total_time=227e-9)
+        awg_wfm.clear_segments()
+        awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, -1, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init", self.lab.WFMT('IQmod').apply(), 20e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Group("TestGroup", [
+                                        WFS_Constant("zero1", None, -1, 0.1),
+                                        WFS_Gaussian("init2", None, 45e-9, 0.5-0.1),
+                                        WFS_Gaussian("ZEROLENGTH", None, 0e-9, 0.5-0.1)
+                                        ], time_len=75e-9))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 77e-9, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("ZEROLENGTH", None, 0e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
+        awg_wfm.get_output_channel(0).marker(0).set_markers_to_segments([ 'init', 'ZEROLENGTH', ['TestGroup','init2'], ['TestGroup','ZEROLENGTH'], 'init3' ])
+        raw_mkrs = awg_wfm.get_output_channel(0).marker(0).get_raw_marker_waveform()
+        exp_mkrs = np.array( [0]*10 + [1]*20  +  [0]*30 + [1]*45  +  [0]*77 + [1]*45 )
+        assert self.arr_equality(raw_mkrs, exp_mkrs), "WFS_Group failed in marker compilation."
+
+        shutil.rmtree('test_save_dir')
+        self.cleanup()
+
     def test_Group(self):
         self.initialise()
         awg_wfm = self.lab.HAL("Wfm1")
@@ -294,6 +435,23 @@ class TestSegments(unittest.TestCase):
         awg_wfm.get_output_channel(1).marker(0).set_markers_to_segments(read_segs2)
         #Gather initial arrays
         wfm_unmod = np.vstack(awg_wfm.get_raw_waveforms())
+        #
+        awg_wfm.clear_segments()
+        awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, 10e-9, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init", None, 20e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero1", None, 30e-9, 0.1))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init2", None, 45e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero1R", None, 30e-9, 0.1))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init2R", None, 45e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 2e-9, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
+        read_segs += ["init"]
+        read_segs2 += ["zero2"]
+        awg_wfm.get_output_channel(0).marker(1).set_markers_to_segments(read_segs)
+        awg_wfm.get_output_channel(1).marker(0).set_markers_to_segments(read_segs2)
+        #Gather initial arrays
+        wfm_unmodRep2 = np.vstack(awg_wfm.get_raw_waveforms())
+        #
         #Modulations
         WFMT_ModulationIQ('IQmod', self.lab, 47e7)
         WFMT_ModulationIQ('IQmod2', self.lab, 13e7)
@@ -337,6 +495,25 @@ class TestSegments(unittest.TestCase):
         temp[1, init_stencil] *= np.sin(omega*1e-9*(np.arange(20) + 10))
         assert self.arr_equality(temp, wfm_mod), "WFS_Group failed in waveform compilation."
         #
+        #Test a basic WFS_Group construct with repeats
+        awg_wfm = WaveformAWG("Wfm1", self.lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9, total_time=227e-9)
+        awg_wfm.clear_segments()
+        awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, -1, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init", self.lab.WFMT('IQmod').apply(), 20e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Group("TestGroup", [
+                                        WFS_Constant("zero1", None, 30e-9, 0.1),
+                                        WFS_Gaussian("init2", None, 45e-9, 0.5-0.1)
+                                        ], num_repeats=2))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 2e-9, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
+        wfm_mod = np.vstack(awg_wfm.get_raw_waveforms())
+        init_stencil = np.s_[10:30]
+        temp = wfm_unmodRep2*1.0
+        omega = 2*np.pi*self.lab.WFMT('IQmod').IQFrequency
+        temp[0, init_stencil] *= np.cos(omega*1e-9*(np.arange(20) + 10))
+        temp[1, init_stencil] *= np.sin(omega*1e-9*(np.arange(20) + 10))
+        assert self.arr_equality(temp, wfm_mod), "WFS_Group failed in waveform compilation when using repeats."
+        #
         #Test a basic WFS_Group construct with elastic time-frame
         awg_wfm = WaveformAWG("Wfm1", self.lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9, total_time=227e-9)
         awg_wfm.clear_segments()
@@ -372,6 +549,22 @@ class TestSegments(unittest.TestCase):
         exp_mkrs = np.array( [0]*10 + [1]*20  +  [0]*30 + [1]*45  +  [0]*77 + [1]*45 )
         assert self.arr_equality(raw_mkrs, exp_mkrs), "WFS_Group failed in marker compilation."
         #
+        #Test marker decomposition when using repeats...
+        awg_wfm = WaveformAWG("Wfm1", self.lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9, total_time=227e-9)
+        awg_wfm.clear_segments()
+        awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, -1, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init", self.lab.WFMT('IQmod').apply(), 20e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Group("TestGroup", [
+                                        WFS_Constant("zero1", None, -1, 0.1),
+                                        WFS_Gaussian("init2", None, 45e-9, 0.5-0.1)
+                                        ], time_len=75e-9, num_repeats=2))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 2e-9, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
+        awg_wfm.get_output_channel(0).marker(0).set_markers_to_segments([ 'init', ['TestGroup','init2'], 'init3' ])
+        raw_mkrs = awg_wfm.get_output_channel(0).marker(0).get_raw_marker_waveform()
+        exp_mkrs = np.array( [0]*10 + [1]*20  +  ([0]*30 + [1]*45)*2  +  [0]*2 + [1]*45 )
+        assert self.arr_equality(raw_mkrs, exp_mkrs), "WFS_Group failed in marker compilation when using repeats."
+        #
         #Test marker decomposition in nested WFS_Groups...
         awg_wfm = WaveformAWG("Wfm1", self.lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9, total_time=237e-9)
         awg_wfm.clear_segments()
@@ -394,6 +587,29 @@ class TestSegments(unittest.TestCase):
         raw_mkrs = awg_wfm.get_output_channel(0).marker(0).get_raw_marker_waveform()
         exp_mkrs = np.array( [0]*10 + [1]*20  +  [0]*30 + [1]*45  +  [0]*77 +    [0]*3+[1]*2+[0]*5    + [1]*45 )
         assert self.arr_equality(raw_mkrs, exp_mkrs), "WFS_Group failed in marker compilation in a nested case."
+        #
+        #Test marker decomposition in nested WFS_Groups and repeats...
+        awg_wfm = WaveformAWG("Wfm1", self.lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9, total_time=387e-9)
+        awg_wfm.clear_segments()
+        awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, -1, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init", self.lab.WFMT('IQmod').apply(), 20e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Group("TestGroup", [
+                                        WFS_Constant("zero1", None, -1, 0.1),
+                                        WFS_Gaussian("init2", None, 45e-9, 0.5-0.1)
+                                        ], time_len=75e-9, num_repeats=3))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 77e-9, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Group("TestGroup2", [
+                                        WFS_Group("Sub1", [
+                                            WFS_Constant("zero1", None, 3e-9, 0.1),
+                                            WFS_Gaussian("init2", None, 2e-9, 0.5-0.1)
+                                            ], time_len=5e-9),
+                                        WFS_Gaussian("init2", None, 5e-9, 0.5-0.1)
+                                        ], time_len=10e-9))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
+        awg_wfm.get_output_channel(0).marker(0).set_markers_to_segments([ 'init', ['TestGroup','init2'], 'init3', ['TestGroup2', 'Sub1', 'init2'] ])
+        raw_mkrs = awg_wfm.get_output_channel(0).marker(0).get_raw_marker_waveform()
+        exp_mkrs = np.array( [0]*10 + [1]*20  +  ([0]*30 + [1]*45)*3  +  [0]*77 +    [0]*3+[1]*2+[0]*5    + [1]*45 )
+        assert self.arr_equality(raw_mkrs, exp_mkrs), "WFS_Group failed in marker compilation in a nested case when using repeats."
 
         #An interesting edge-case
         wait_times = np.linspace(1e-9,2e-6,49)
@@ -430,14 +646,16 @@ class TestSegments(unittest.TestCase):
         awg_wfm.add_waveform_segment(WFS_Gaussian("init", None, 20e-9, 0.5-0.1))
         awg_wfm.add_waveform_segment(WFS_Constant("zero1", None, 30e-9, 0.1))
         awg_wfm.add_waveform_segment(WFS_Gaussian("init2", None, 45e-9, 0.5-0.1))
-        awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 77e-9, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero1R", None, 30e-9, 0.1))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init2R", None, 45e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 2e-9, 0.0))
         awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
         read_segs += ["init"]
         read_segs2 += ["zero2"]
         awg_wfm.get_output_channel(0).marker(1).set_markers_to_segments(read_segs)
         awg_wfm.get_output_channel(1).marker(0).set_markers_to_segments(read_segs2)
         #Gather initial arrays
-        wfm_unmod = np.vstack(awg_wfm.get_raw_waveforms())
+        wfm_unmodR = np.vstack(awg_wfm.get_raw_waveforms())
         #Modulations
         WFMT_ModulationIQ('IQmod', self.lab, 47e7)
         WFMT_ModulationIQ('IQmod2', self.lab, 13e7)
@@ -449,12 +667,12 @@ class TestSegments(unittest.TestCase):
         awg_wfm.add_waveform_segment(WFS_Group("TestGroup", [
                                         WFS_Constant("zero1", None, -1, 0.1),
                                         WFS_Gaussian("init2", None, 45e-9, 0.5-0.1)
-                                        ], time_len=75e-9))
-        awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 77e-9, 0.0))
+                                        ], time_len=75e-9, num_repeats=2))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 2e-9, 0.0))
         awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
         wfm_mod = np.vstack(awg_wfm.get_raw_waveforms())
         init_stencil = np.s_[10:30]
-        temp = wfm_unmod*1.0
+        temp = wfm_unmodR*1.0
         omega = 2*np.pi*self.lab.WFMT('IQmod').IQFrequency
         temp[0, init_stencil] *= np.cos(omega*1e-9*(np.arange(20) + 10))
         temp[1, init_stencil] *= np.sin(omega*1e-9*(np.arange(20) + 10))
@@ -570,4 +788,5 @@ class TestAWGChecks(unittest.TestCase):
 
 
 if __name__ == '__main__':
+    TestSegments().test_ZeroLength()
     unittest.main()

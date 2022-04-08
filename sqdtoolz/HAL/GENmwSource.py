@@ -4,15 +4,11 @@ from sqdtoolz.HAL.TriggerPulse import*
 class GENmwSource(HALbase, TriggerInputCompatible, TriggerInput):
     def __init__(self, hal_name, lab, instr_mw_src_name, instr_mw_src_channel):
         HALbase.__init__(self, hal_name)
+        self._instr_mw_src_name = instr_mw_src_name
+        self._instr_mw_src_channel = instr_mw_src_channel
+        self._instr_mw_output = lab._get_instrument(instr_mw_src_name).get_output(instr_mw_src_channel)
         if lab._register_HAL(self):
-            #
-            self._instr_mw_src_name = instr_mw_src_name
-            self._instr_mw_src_channel = instr_mw_src_channel
-            self._instr_mw_output = lab._get_instrument(instr_mw_src_name).get_output(instr_mw_src_channel)
             self._trig_src_obj = None
-        else:
-            assert self._instr_mw_src_name == instr_mw_src_name, "Cannot reinstantiate a waveform by the same name, but different instrument configurations." 
-            assert self._instr_mw_src_channel == instr_mw_src_channel, "Cannot reinstantiate a waveform by the same name, but different channel configurations."
 
     @classmethod
     def fromConfigDict(cls, config_dict, lab):

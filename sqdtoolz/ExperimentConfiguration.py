@@ -59,7 +59,7 @@ class ExperimentConfiguration:
             lab = args[1]
         assert lab.__class__.__name__ == 'Laboratory' and lab != None, "Lab parameter was not passed or does not exist as the second argument in the variable class initialisation?"
 
-        prev_exists = lab.CONFIG(name)
+        prev_exists = lab.CONFIG(name, True)
         if prev_exists:
             return prev_exists
         else:
@@ -98,7 +98,7 @@ class ExperimentConfiguration:
         self._proc_configs = []
         if conf != None:
             for cur_dict in conf['HALs']:
-                if 'Processor' in cur_dict:
+                if 'Processor' in cur_dict and cur_dict['Processor'] != '':
                     cur_proc = self._lab.PROC(cur_dict['Processor'])
                     if cur_proc != None:
                         self._proc_configs += [cur_proc]

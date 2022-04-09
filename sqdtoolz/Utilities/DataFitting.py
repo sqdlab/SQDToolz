@@ -6,7 +6,7 @@ class DFitPeakLorentzian:
     def __init__(self):
         pass
 
-    def get_fitted_plot(self, data_x, data_y, xLabel="", dip = False, dontplot=False):
+    def get_fitted_plot(self, data_x, data_y, xLabel="", yLabel="IQ Amplitude", dip = False, axs=None, dontplot=False):
         def func(x, a, w, x0, c):
             return a * (0.5*w)**2/((x-x0)**2 + (0.5*w)**2) + c
 
@@ -34,11 +34,12 @@ class DFitPeakLorentzian:
 
         fig = None
         if not dontplot:
-            fig, axs = plt.subplots(1)
+            if axs == None:
+                fig, axs = plt.subplots(1)
             axs.plot(data_x, data_y, 'kx')
             axs.plot(data_x, func(data_x, *popt), 'r-')
             axs.set_xlabel(xLabel)
-            axs.set_ylabel('IQ Amplitude')
+            axs.set_ylabel(yLabel)
 
         datapkt = {
             'amplitude' : popt[0],
@@ -50,6 +51,74 @@ class DFitPeakLorentzian:
 
         return datapkt
             
+
+class DFitFanoResonance:
+    def __init__(self):
+        #It fits a dip according to the equation given in: https://en.wikipedia.org/wiki/Fano_resonance
+        pass
+
+    def get_fitted_plot(self, data_x, data_y, xLabel="", yLabel="IQ Amplitude", axs=None, dontplot=False):
+        def func(x, a, b, w, x0, c):
+            return a * (b*0.5*w+x-x0)**2/((x-x0)**2 + (0.5*w)**2) + c
+
+        xMin = np.min(data_x)
+        xMax = np.max(data_x)
+
+        dpkt = DFitPeakLorentzian().get_fitted_plot(data_x,data_y,dip=True,dontplot=True)
+
+        #Calculate initial guesses by fitting a normal Lorentzian...
+        c0 = dpkt['offset'] #0.5 * ( np.mean(data_y[:int(data_y.size*0.1)]) + np.mean(data_y[-int(data_y.size*0.1):]) )
+        w0 = dpkt['width'] #0.2 * (xMax - xMin)
+        a0 = dpkt['amplitude'] #np.min(data_y) - c0
+        x00 = dpkt['centre'] #data_x[np.argmin(data_y)]
+
+        r2 = 0
+        b0_tries = [-1,-0.1,0,0.1,1]
+        for b0 in b0_tries:
+            poptNew, pcov = scipy.optimize.curve_fit(func, data_x, data_y, [a0, b0, w0, x00, c0], #method='dogbox',
+                                                bounds=([1.5*a0, -np.inf, 0, xMin, -np.inf], [0, np.inf, 0.95*(xMax - xMin), xMax, np.inf]))
+            residuals = data_y- func(data_x, *poptNew)
+            ss_res = np.sum(residuals**2)
+            ss_tot = np.sum((data_y-np.mean(data_y))**2)
+            r2_new = 1 - (ss_res / ss_tot)
+            if r2_new > r2:
+                popt = poptNew
+                r2 = r2_new
+        
+        #Calculate maxima and minima...
+        w = popt[2]
+        b = popt[1]
+        x0 = popt[3]
+        x1 = 0.5*(2*x0-b*w)
+        x2 = (w+2*b*x0)/(2*b)
+        if func(x1, popt[0], b, w, x0, popt[4]) > func(x2, popt[0], b, w, x0, popt[4]):
+            xMinimum = x2
+            xMaximum = x1
+        else:
+            xMinimum = x1
+            xMaximum = x2
+
+        fig = None
+        if not dontplot:
+            if axs == None:
+                fig, axs = plt.subplots(1)
+            axs.plot(data_x, data_y, 'kx')
+            axs.plot(data_x, func(data_x, *popt), 'r-')
+            axs.set_xlabel(xLabel)
+            axs.set_ylabel(yLabel)
+
+        datapkt = {
+            'amplitude' : popt[0],
+            'FanoFac':popt[1],
+            'width' : popt[2],
+            'centre' : popt[3],
+            'offset' : popt[4],
+            'xMinimum': xMinimum,
+            'xMaximum': xMaximum,
+            'fig'   : fig
+        }
+
+        return datapkt
 
 class DFitSinusoid:
     def __init__(self):
@@ -222,6 +291,7 @@ class DFitCircle3D:
 
         norm_vec = DFitCircle3D._minimize_perp_distance(data_x, data_y, data_z)[:3]
         centroid = np.array([np.mean(data_x), np.mean(data_y), np.mean(data_z)]).T
+        # norm_vec = centroid*1.0
 
         candTangent = np.vstack([data_x[1:]-data_x[:-1], data_y[1:]-data_y[:-1], data_z[1:]-data_z[:-1]]).T
         candRadial = np.vstack([data_x[1:], data_y[1:], data_z[1:]]).T - centroid
@@ -235,3 +305,169 @@ class DFitCircle3D:
         else:
             return norm_vec
 
+class DFitNotchResonance:
+    def __init__(self):
+        #It fits a dip according to the equation given in: https://en.wikipedia.org/wiki/Fano_resonance
+        pass
+
+    def get_fitted_plot(self, freq_vals, i_vals, q_vals, **kwargs):
+        dont_plot_estimates = kwargs.get('dont_plot_estimates', False)
+        prop_detrend_start = kwargs.get('prop_detrend_start', 0.05)
+        prop_detrend_end = kwargs.get('prop_detrend_end', 0.05)
+
+        #Setup the axes...
+        if dont_plot_estimates:
+            fig = plt.figure(); fig.set_figwidth(20)#; fig.set_figheight(7)
+            #
+            axFitAmp = plt.subplot(1, 3, 1)
+            axFitPhs = plt.subplot(1, 3, 2)
+            axFitIQ  = plt.subplot(1, 3, 3)
+            #
+            axFitAmp.grid(); axFitPhs.grid(); axFitIQ.grid()
+        else:
+            fig = plt.figure(); fig.set_figwidth(20)#; fig.set_figheight(7)
+            #
+            axWidth = plt.subplot(2, 4, 1); axWidth.set_title('Estimate Peak Width')
+            axPhaseDetrend = plt.subplot(2, 4, 2)
+            axPhaseSlopeEst = plt.subplot(2, 4, 3)
+            axPhaseSlope = plt.subplot(2, 4, 4)
+            #
+            axFitAmp = plt.subplot(2, 3, 4)
+            axFitPhs = plt.subplot(2, 3, 5)
+            axFitIQ  = plt.subplot(2, 3, 6)
+            #
+            axWidth.grid(); axPhaseDetrend.grid(); axPhaseSlopeEst.grid(); axPhaseSlope.grid(); axFitAmp.grid(); axFitPhs.grid(); axFitIQ.grid()
+
+        #Width estimation
+        data_x, data_y = freq_vals, np.abs(i_vals + 1j*q_vals)
+        if dont_plot_estimates:
+            dpkt = DFitFanoResonance().get_fitted_plot(data_x, data_y**2, xLabel='Frequency (Hz)', yLabel='|IQ|^2', dontplot=True)
+        else:
+            dpkt = DFitFanoResonance().get_fitted_plot(data_x, data_y**2, xLabel='Frequency (Hz)', yLabel='|IQ|^2', axs=axWidth)
+        #
+        f0 = dpkt['xMinimum']
+        Ql0 = f0/dpkt['width']
+        a0 = np.sqrt(dpkt['offset'])
+
+        #Phase detrending estimation
+        phase_vals = np.unwrap(np.angle(i_vals + 1j*q_vals))
+        #Take the average of the lines fitted to the the starting and ending sections...
+        cut_ind = int(freq_vals.size*prop_detrend_start)
+        coefs1 = np.polyfit(freq_vals[0:cut_ind], phase_vals[0:cut_ind], 1)
+        cut_ind = int(freq_vals.size-freq_vals.size*prop_detrend_end)
+        coefs2 = np.polyfit(freq_vals[cut_ind:], phase_vals[cut_ind:], 1)
+        coefs = 0.5*(coefs1+coefs2)
+        #Plot the line...
+        poly1d_fn = np.poly1d(coefs)
+        if not dont_plot_estimates:
+            axPhaseDetrend.plot(freq_vals, phase_vals)
+            poly1d_fn0 = np.poly1d(coefs1)
+            axPhaseDetrend.plot(freq_vals, poly1d_fn0(freq_vals), 'k', alpha=0.5)
+            poly1d_fn0 = np.poly1d(coefs2)
+            axPhaseDetrend.plot(freq_vals, poly1d_fn0(freq_vals), 'k', alpha=0.5)
+            axPhaseDetrend.plot(freq_vals, poly1d_fn(freq_vals), 'r')
+            axPhaseDetrend.set_xlabel('Frequency (Hz)')
+            axPhaseDetrend.set_ylabel('Phase (rad)')
+            axPhaseDetrend.set_title('Estimate Phase Trend')
+        #
+        tau0 = coefs[0] / (2*np.pi)
+        alpha0 = coefs[1]
+
+        #Phase slope estimation
+        detrended_phase = phase_vals - poly1d_fn(freq_vals)
+        def smooth(y, box_pts):
+            box = np.ones(box_pts)/box_pts
+            y_smooth = np.convolve(y, box, mode='same')
+            return y_smooth
+        phase_derivs = np.diff(smooth(detrended_phase,5)) / np.diff(freq_vals)
+        dfit = DFitPeakLorentzian()
+        if dont_plot_estimates:
+            dpkt = dfit.get_fitted_plot(freq_vals[:-1], phase_derivs, xLabel='Frequency (Hz)', yLabel='Phase Slope (rad/Hz)', dip=False, dontplot=True)
+        else:
+            dpkt = dfit.get_fitted_plot(freq_vals[:-1], phase_derivs, xLabel='Frequency (Hz)', yLabel='Phase Slope (rad/Hz)', dip=False, axs=axPhaseSlopeEst)
+        ps = dpkt['amplitude']
+        #Plot the Detrended+Slope Estimate...
+        if not dont_plot_estimates:
+            axPhaseSlopeEst.set_title('Estimate Phase Slope')
+            axPhaseSlope.plot(freq_vals, phase_vals - poly1d_fn(freq_vals), alpha=0.5)
+            tempYlims = axPhaseSlope.get_ylim()
+            axPhaseSlope.plot(freq_vals, ps*(freq_vals-f0))
+            axPhaseSlope.set_ylim(tempYlims)
+            axPhaseSlope.set_xlabel('Frequency (Hz)')
+            axPhaseSlope.set_ylabel('Detrended Phase (rad)')
+            axPhaseSlope.set_title('Detrended Phase Slope')
+        #
+        Qc0 = Ql0*(f0*ps+2*Ql0)/(f0*ps)
+
+        #Estimate phi
+        # f0_ind = np.argmin(np.abs(freq_vals - f0))
+        # tan_arg_res = q_vals[f0_ind] / i_vals[f0_ind]
+        # #
+        # func_phi = lambda phi: (tan_arg_res-2*np.pi*f0*tau0-alpha0) * (Qc0-Ql0*np.cos(phi)) + Ql0*np.sin(phi)
+        # phi0 = scipy.optimize.fsolve(func_phi, 0)[0]
+        phi0 = 0.0
+
+        #Perform actual fitting...
+        def func(f, params):
+            a, tau, alpha, Ql, Qc, phi, f0 = params
+            a = np.abs(a)
+            Ql = np.abs(Ql)
+            Qc = np.abs(Qc)
+            return a*np.exp(1j*(2*np.pi*f*tau+alpha))*( 1-Ql/Qc*np.exp(1j*phi)/(1+2j*Ql*(f/f0-1)) )
+        def cost_func(params, iq_vals):
+            a, tau, alpha, Ql, Qc, phi, f0 = params
+            iq_valsC = iq_vals[0] + 1j*iq_vals[1]
+            func_vals = func(freq_vals, params)
+            # return ( (np.abs(iq_valsC)-np.abs(func_vals))**2/np.abs(iq_valsC)**2 ).sum() + ( (np.angle(iq_valsC)-np.angle(func_vals))**2/np.angle(iq_valsC)**2 ).sum() + 1000*np.heaviside(Ql-Qc,1)
+            # return (np.abs(iq_valsC - func_vals) * np.exp(-(freq_vals-f0)**2/(f0/Ql0)**2)).sum() + 1000*np.heaviside(Ql-Qc,1)
+            return (np.abs(iq_valsC - func_vals)).sum() + 1000*np.heaviside(Ql-Qc,1)
+        #
+        def get_min_max(val1, val2):
+            return min(val1,val2), max(val1,val2)
+        #Run it once to refine the estimate for tau0 and alpha0, then run it with the same i.c.s to refine the estimate...
+        for m in range(2):
+            if m == 1:
+                tau0, alpha0 = sol.x[1], sol.x[2]
+            init_conds = [a0, tau0, alpha0, Ql0, Qc0, phi0, f0]
+            sol = scipy.optimize.minimize(cost_func, init_conds, args=[i_vals, q_vals], method='Nelder-Mead',
+                                            bounds = [
+                                                get_min_max(a0*0.5,a0*2.0),
+                                                get_min_max(tau0*0.25,tau0*4.0),
+                                                get_min_max(alpha0*0.1,alpha0*10.0),
+                                                get_min_max(Ql0*0.2,Ql0*5.0),
+                                                get_min_max(Qc0*0.2,Qc0*5.0),
+                                                get_min_max(-np.pi,np.pi),
+                                                get_min_max((freq_vals[0]+f0)/2,(freq_vals[-1]+f0)/2)
+                                            ])
+
+        #Plot final fits...
+        axFitAmp.plot(freq_vals,np.abs(i_vals + 1j*q_vals), alpha=0.5)
+        axFitAmp.plot(freq_vals,np.abs(func(freq_vals, init_conds)))
+        axFitAmp.plot(freq_vals,np.abs(func(freq_vals, sol.x)))
+        axFitAmp.set_title('Fitted Amplitude'); axFitAmp.set_xlabel('Frequency (Hz)'); axFitAmp.set_ylabel('Amplitude')
+        #
+        axFitPhs.plot(freq_vals,phase_vals, alpha=0.5)
+        axFitPhs.plot(freq_vals,np.unwrap(np.angle(func(freq_vals, init_conds))))
+        axFitPhs.plot(freq_vals,np.unwrap(np.angle(func(freq_vals, sol.x))))
+        axFitPhs.set_title('Fitted Phase'); axFitPhs.set_xlabel('Frequency (Hz)'); axFitPhs.set_ylabel('Phase (rad)')
+        #
+        axFitIQ.plot(i_vals,q_vals, alpha=0.5)
+        axFitIQ.plot(np.real(func(freq_vals, init_conds)), np.imag(func(freq_vals, init_conds)))
+        axFitIQ.plot(np.real(func(freq_vals, sol.x)), np.imag(func(freq_vals, sol.x)))
+        axFitIQ.set_title('Fitted IQ'); axFitIQ.set_xlabel('I-Channel'); axFitIQ.set_ylabel('Q-Channel')
+
+        if not dont_plot_estimates:
+            fig.subplots_adjust(left=None, bottom=-1.1, right=None, top=None, wspace=None, hspace=None)
+
+        # print(init_conds)
+        # print(sol.x)
+        return {
+            'fres' : sol.x[6],
+            'Qi' : sol.x[4]*sol.x[3]/(sol.x[4]-sol.x[3]),
+            '|Qc|' : sol.x[4],
+            'Ql' : sol.x[3],
+            'arg(Qc)' : sol.x[5],
+            'tau': sol.x[1],
+            'alpha': sol.x[2],
+            'ampl' : sol.x[0]
+        }

@@ -173,14 +173,28 @@ class TaborP2584M_AWG(InstrumentChannel):
         super().__init__(parent, 'AWG')
         self._parent = parent
 
+        self.add_parameter(
+            'activeChannel', label='Currently Selected Channel', 
+            get_cmd=partial(self._parent._get_cmd, ':INST:CHAN?'),
+            set_cmd=partial(self._parent._set_cmd, ':INST:CHAN'), 
+            vals = vals.Enum(1, 2, 3, 4))
+
+        self.add_parameter(
+            'sample_rate', label='Sample Rate', unit='Hz',
+            get_cmd=partial(self._parent._get_cmd, ':SOUR:FREQ:RAST?'),
+            set_cmd=partial(self._parent._set_cmd, ':SOUR:FREQ:RAST'),
+            vals=vals.Numbers(1e9, 9e9),    #Note that this is a cheat using Nyquist trickery...
+            get_parser=float)
+
         # Reset memory in all output channels !CHECK!
         for m in range(4):
-            self._parent._set_cmd(':INST:CHAN', m+1)
+            self.activeChannel(m + 1)
+            #self._parent._set_cmd(':INST:CHAN', m+1)
             self._parent._send_cmd(':TRAC:DEL:ALL')        
 
         #Get the DAC mode (8 bits or 16 bits)
         dac_mode = self._parent._get_cmd(':SYST:INF:DAC?')
-        if dac_mode == 'M0':
+        if dac_mode == 'M0' :
             self._max_dac = 65535
             self._data_type = np.uint16 
         else:
@@ -195,13 +209,6 @@ class TaborP2584M_AWG(InstrumentChannel):
         #Get the available memory in bytes of wavform-data (per DDR):
         self._arbmem_capacity_bytes = int(self._parent._get_cmd(":TRACe:FREE?"))
         
-        self.add_parameter(
-            'sample_rate', label='Sample Rate', unit='Hz',
-            get_cmd=partial(self._parent._get_cmd, ':SOUR:FREQ:RAST?'),
-            set_cmd=partial(self._parent._set_cmd, ':SOUR:FREQ:RAST'),
-            vals=vals.Numbers(1e9, 9e9),    #Note that this is a cheat using Nyquist trickery...
-            get_parser=float)
-            
         #Setup triggering
         # self._set_cmd(':TRIG:SOUR:ENAB', 'TRG1')
         self._parent._set_cmd(':TRIG:SEL', 'TRG1')
@@ -258,37 +265,11 @@ class TaborP2584M_AWG(InstrumentChannel):
         else:
             return None
 
-    # def program_channel(self, chan_id, wfm_data, mkr_data = np.array([])):
-    #     chan_ind = self._ch_list.index(chan_id)
-    #     cur_chnl = self._get_channel_output(chan_id)
-
-    #     #Condition the waveform
-    #     cur_data = wfm_data
-    #     cur_amp = cur_chnl.Amplitude/2
-    #     cur_off = cur_chnl.Offset
-    #     cur_data = (cur_data - cur_off)/cur_amp
-        
-    #     #So channels 1 and 2 share segment memory and channels 3 and 4 share a separate bank of segment memory
-    #     #Idea is to use 1 segment for each waveform channel inside said bank...
-        
-    #     #Select channel
-    #     self._parent._set_cmd(':INST:CHAN', chan_ind+1)
-    #     #Delete and Define segment (noting that it's taken as 1 or 2 for channels 1|3 and 2|4 respectively...)
-    #     seg_id = int(chan_ind % 2 + 1)
-    #     self._parent._set_cmd('TRAC:DEL', seg_id)
-    #     self._parent._send_cmd(f':TRAC:DEF {seg_id}, {cur_data.size}')
-        
-    #     # self._send_data_to_memory(seg_id, cur_data)
-    #     self._send_data_to_memory(seg_id, cur_data, mkr_data)
-    #     self._program_task_table(chan_ind+1, [AWG_TaborP2584M_task(seg_id, 1, 1, cur_chnl.trig_src())])
-        
-    #     self._parent._set_cmd('FUNC:MODE', 'TASK')
-
     def prepare_waveform_memory(self, chan_id, seg_lens, **kwargs):
         """
         Method to prepare waveform for Tabor memory
-        @param chan_id: Id of teh channel to prepare memory for
-        @param seg_lens: 
+        @param chan_id: Id of the channel to prepare memory for
+        @param seg_lens: length of segments to program
         """
         chan_ind = self._ch_list.index(chan_id)
         self._sequence_lens[chan_ind] = seg_lens
@@ -304,7 +285,7 @@ class TaborP2584M_AWG(InstrumentChannel):
             return
 
         # Compute offsets of data if two channels sharing a memory banke are being used
-        #I.e. store it as CH1-Data, then CH2-Data. Similarly in the other memory bank, it's CH3-Data, then CH4-Data
+        # I.e. store it as CH1-Data, then CH2-Data. Similarly in the other memory bank, it's CH3-Data, then CH4-Data
         if self._sequence_lens[0] != None:
             self._seg_off_ch2 = len(self._sequence_lens[0])
         else:
@@ -323,7 +304,7 @@ class TaborP2584M_AWG(InstrumentChannel):
                 reset_remaining = False
             if self._sequence_lens[cur_ch_ind] != None:
                 #Select current channel
-                self._parent._set_cmd(':INST:CHAN', cur_ch_ind+1) #NOTE I'm assuming cur_ch_index is zero indexed adn teh command is 1 indexed, hence the +1
+                self._parent._set_cmd(':INST:CHAN', cur_ch_ind+1) #NOTE I'm assuming cur_ch_index is zero indexed adn the command is 1 indexed, hence the +1
                 for cur_len in self._sequence_lens[cur_ch_ind]:
                     self._parent._set_cmd(':TRACe:SEL', seg_id) # Select segment for clearing
                     cur_mem_len = self._parent._get_cmd(':TRAC:DEF:LENG?') # Find length of segment
@@ -346,6 +327,8 @@ class TaborP2584M_AWG(InstrumentChannel):
         cur_chnl = self._get_channel_output(chan_id)
 
         self._setup_memory_banks()
+
+        # Setup segment offsets
         if chan_ind == 1:
             seg_offset = self._seg_off_ch2
         elif chan_ind == 3:
@@ -378,6 +361,7 @@ class TaborP2584M_AWG(InstrumentChannel):
         #Select current channel
         self._parent._set_cmd(':INST:CHAN', channel_index)
         #Allocate a set number of rows for the task table
+        assert len(tasks) < 64*10e3, "The maximum amount of tasks that can be programmed is 64K"
         self._parent._set_cmd(':TASK:COMP:LENG', len(tasks))
 
         #Check that there is at most one trigger source and record it if applicable
@@ -555,15 +539,12 @@ class TaborP2584M_ACQ(InstrumentChannel):
             val_mapping = {"EDGE" : "EDGE", "GATE" : "GATE", "WEDGE" : "WEDGE", "WGATE" : "WGATE"})
 
         # Setup the digitizer in two-channels mode
-        #self._parent._set_cmd(':DIG:MODE', 'DUAL')
         self.mode('DUAL')
         self.sample_rate(2.0e9)
 
         # Set Trigger level to 0.5V
         self.trigger1Level(0.1)
         self.trigger2Level(0.1)
-        #self._parent._set_cmd(':DIG:TRIG:LEV1', 0.1)
-        #self._parent._set_cmd(':DIG:TRIG:LEV2', 0.1)
         
         # Set Channel range to max
         self.channel1Range(500)
@@ -575,28 +556,19 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
         # Enable capturing data from channel 1
         self.channel1State(1)
-        #self._parent._set_cmd(':DIG:CHAN:SEL', 1)
-        #self._parent._set_cmd(':DIG:CHAN:STATE', 'ENAB')
         self._ch_states[0] = True
+
+        # Enable capturing data from channel 2
+        self.channel2State(1)
+        self._ch_states[1] = True
 
         # Select the external-trigger as start-capturing trigger:
         self.trigger1Source("EXT")
         self.trigger2Source("EXT")
-        #self._parent._set_cmd(':DIG:TRIG:SOURCE', 'EXT')
         self.extTriggerType("EDGE")
-        #self._parent._set_cmd(':DIG:TRIG:TYPE', 'EDGE')
-
-        # Enable capturing data from channel 2
-        self.channel2State(1)
-        #self._parent._set_cmd(':DIG:CHAN:SEL', 2)
-        #self._parent._set_cmd(':DIG:CHAN:STATE', 'ENAB')
-        self._ch_states[1] = True
 
         self._dsp_channels = {"DDC1" : "OFF", "DDC2" : "OFF"}
 
-
-        # Select the external-trigger as start-capturing trigger:
-        self._parent._set_cmd(':DIG:TRIG:SOURCE', 'EXT')
 
         self._num_samples = 4800 # Number of samples per frame
         self._num_segs = 4 # Number of frames per repetition
@@ -679,13 +651,18 @@ class TaborP2584M_ACQ(InstrumentChannel):
         In DUAL mode the number of samples per frame should be a multiple of 48
         (96 for SINGLE mode)
         """
+        if (self.mode() == "DUAL") :
+            assert (self.NumSamples % 48) == 0, \
+                "In DUAL mode, number of samples must be an integer multiple of 48"
+        else :
+            assert (self.NumSamples % 96) == 0, \
+                "In SINGLE mode, number of samples must be an integer multiple of 96"
         # Allocate four frames of self.NumSample (defaults to 48000) 
         cmd = ':DIG:ACQuire:FRAM:DEF {0},{1}'.format(self.NumRepetitions*self.NumSegments, self.NumSamples) #NOTE Unsure as to where these members are set
         self._parent._send_cmd(cmd)
 
         # Select the frames for the capturing 
         # (all the four frames in this example)
-        #TODO: Optimise for repetitions!
         capture_first, capture_count = 1, self.NumRepetitions*self.NumSegments
         cmd = ":DIG:ACQuire:FRAM:CAPT {0},{1}".format(capture_first, capture_count)
         self._parent._send_cmd(cmd)
@@ -695,12 +672,16 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
     def get_frame_data(self):
         #Read all frames from Memory
-        #
+        # 
         #Choose which frames to read (all in this example)
         self._parent._set_cmd(':DIG:DATA:SEL', 'ALL')
         #Choose what to read (only the frame-data without the header in this example)
         self._parent._set_cmd(':DIG:DATA:TYPE', 'HEAD')
-        header_size = 72
+        if (self.mode() == "DUAL") :
+            # TODO : WHY IS THIS 72 and not 48 as mentioned in the manual
+            header_size = 72 # Header size taken from PG118 of manual #72
+        else : 
+            header_size = 96 # Header size taken from PG118 of manual
         number_of_frames = self.NumSegments*self.NumRepetitions
         num_bytes = number_of_frames * header_size
 
@@ -725,7 +706,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
                             (wav2[idx+24] << 32) + (wav2[idx+25] <<40) + \
                             (wav2[idx+26] << 48)+ (wav2[idx+27] << 56)
             Q_dec[i]= decisionReal
-            decisionIm = (wav2[idx+28]) + (wav2[idx+29] <<8) + (wav2[idx+30] << 16) + (wav2[idx+31] << 24)
+            decisionIm = (wav2[idx+28]) + (wav2[idx+29] << 8) + (wav2[idx+30] << 16) + (wav2[idx+31] << 24)
             I_dec[i]= decisionIm
             outprint = 'header# {0}\n'.format(i)
             outprint += 'TriggerPos: {0}\n'.format(trigPos)
@@ -743,12 +724,11 @@ class TaborP2584M_ACQ(InstrumentChannel):
         if block_idx == 0:
             #Choose what to read (only the frame-data without the header in this example)
             self._parent._set_cmd(':DIG:DATA:TYPE', 'FRAM')
-            #Choose which frames to read (all in this example)
-            self._parent._set_cmd(':DIG:DATA:SEL', 'FRAM')
+            #Choose which frames to read (One or more frames in this case)
+            self._parent._set_cmd(':DIG:DATA:SEL', 'FRAM') 
             
-
             self._parent._set_cmd(':DIG:DATA:FRAM', f'{1},{blocksize*self.NumSegments}')
-            #
+
             # Get the total data size (in bytes)
             resp = self._parent._get_cmd(':DIG:DATA:SIZE?')
             # self.num_bytes = 4176*np.uint64(resp)
@@ -758,6 +738,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
             # wavlen = int(self.num_bytes // 2)
             wavlen = int(blocksize*self.NumSegments*self.NumSamples)
             # print(self.num_bytes)
+            #TODO : Run a check on DSP before setting up the waves
             wav1 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
             wav1 = wav1.reshape(blocksize, self.NumSegments, self.NumSamples)
             wav2 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
@@ -848,7 +829,6 @@ class TaborP2584M_ACQ(InstrumentChannel):
         assert self.NumSamples % 48 == 0, "The number of samples must be divisible by 48 if in DUAL mode."
 
         cur_processor = kwargs.get('data_processor', None)
-        # print(cur_processor)
 
         if self._last_mem_frames_samples[0] != self.NumRepetitions or self._last_mem_frames_samples[1] != self.NumSegments or self._last_mem_frames_samples[2] != self.NumSamples:
             self._allocate_frame_memory()
@@ -865,7 +845,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
         #Poll for status bit
         loopcount = 0
         captured_frame_count = 0
-        while captured_frame_count < blocksize:
+        while captured_frame_count < blocksize: #NOTE : WHy is this being compared to repititions and not repititions * numFrames
             resp = self._parent._get_cmd(":DIG:ACQuire:FRAM:STATus?")
             resp_items = resp.split(',')
             captured_frame_count = int(resp_items[3])
@@ -877,14 +857,16 @@ class TaborP2584M_ACQ(InstrumentChannel):
                 assert False, "No trigger detected during the acquisiton sniffing window."
                 done = 1
 
+        # If processor is supplied apply it
         if cur_processor:
             self.process_block(0, cur_processor, blocksize)
             block_idx = 1
-            while block_idx*blocksize < self.NumRepetitions*self.NumSegments:
+            while block_idx*blocksize < self.NumRepetitions*self.NumSegments: # NOTE : some strange logic, perhaps tied to the logic above
                 self.process_block(block_idx, cur_processor, blocksize)
                 block_idx += 1
             return cur_processor.get_all_data()
         else:
+            # No processor supplied
             done = 0
             while not done:
                 done = int(self._parent._get_cmd(":DIG:ACQuire:FRAM:STATus?").split(',')[3])
@@ -900,7 +882,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
             # Get the total data size (in bytes)
             resp = self._parent._get_cmd(':DIG:DATA:SIZE?')
             num_bytes = np.uint64(resp)
-            print(num_bytes, 'hi', self._parent._get_cmd(':DIG:DATA:FRAM?'))
+            #print(num_bytes, 'hi', self._parent._get_cmd(':DIG:DATA:FRAM?'))
 
             wavlen = int(num_bytes // 2)
             wav1 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)

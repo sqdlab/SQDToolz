@@ -188,6 +188,7 @@ class AWGOutputMarker(TriggerOutput, TriggerInput, LockableProperties):
     def set_markers_to_segments(self, list_seg_names):
         self._marker_status = 'Segments'
         #Check the listed segments actually exist in the current list of WaveformSegment objects
+        assert len(self._parent_waveform_obj._wfm_segment_list) > 0, "Must add segments to the waveform before setting markers to segments."
         for cur_seg_name in list_seg_names:
             found_seg = None
             for cur_seg_chk in self._parent_waveform_obj._wfm_segment_list:

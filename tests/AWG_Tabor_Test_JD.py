@@ -128,11 +128,37 @@ def setup_acq_osc_tests(amp = 0.4, trigger = "EXT") :
     awg_wfm1.get_output_channel(0).Output = True
     awg_wfm2.get_output_channel(0).Output = True
 
+def setup_acq_full_osc_tests(amp = 0.2, trigger = "EXT") :
+    """
+    Function to setup CH1 and CH2 to output simple signals to acquires
+    """
+    # Waveform transformation
+    WFMT_ModulationIQ("OscMod", lab, 100e6)
+
+    # Setup waveforms
+    awg_wfm1 = WaveformAWG("Waveform CH1", lab,  [(['TaborAWG', 'AWG'], 'CH1')], 1e9)
+    awg_wfm2 = WaveformAWG("Waveform CH2", lab,  [(['TaborAWG', 'AWG'], 'CH2')], 1e9)
+
+    # Add Segments
+    awg_wfm1.add_waveform_segment(WFS_Constant(f"init", lab.WFMT('OscMod').apply(), 1024e-9, amp))
+    awg_wfm1.add_waveform_segment(WFS_Constant(f"init0", lab.WFMT('OscMod').apply(), 1024e-9, amp))
+    if (trigger == "EXT") :
+        awg_wfm1.get_output_channel(0).marker(0).set_markers_to_segments(["init"])
+
+    awg_wfm2.add_waveform_segment(WFS_Constant(f"init", lab.WFMT('OscMod').apply(), 2*1024e-9, amp))
+
+    # Prepare waveforms and output them
+    awg_wfm1.prepare_initial()
+    awg_wfm1.prepare_final()
+    awg_wfm2.prepare_initial()
+    awg_wfm2.prepare_final()
+
+    awg_wfm1.get_output_channel(0).Output = True
+    awg_wfm2.get_output_channel(0).Output = True
 
 def test_acq_driver_1(waveform_setup = setup_acq_const_tests) :
     """
     acquisition driver test 1 acquire a constant pulse from both channels
-    without trigger
     """
     waveform_setup()
     instr = lab._get_instrument('TaborAWG')
@@ -158,12 +184,375 @@ def test_acq_driver_1(waveform_setup = setup_acq_const_tests) :
             plt.plot(data)
     plt.show()  #!!!REMEMBER TO CLOSE THE PLOT WINDOW BEFORE CLOSING PYTHON KERNEL OR TABOR LOCKS UP (PC restart won't cut it - needs to be a chassis restart)!!!
 
-def test_acq_driver_2() :
+def test_acq_driver_2(lab, waveform_setup = setup_acq_const_tests) :
     """
+    acquisition driver test 1 acquire a constant pulse from both channels
+    with a processor being used in acquisition
     """
-    pass
+    proc = ProcessorCPU("DDC", lab)
+    proc.add_stage(CPU_DDC([100e6]*2))
+    proc.add_stage(CPU_FIR([{'Type' : 'low', 'Taps' : 40, 'fc' : 10e6, 'Win' : 'hamming'}]*4))
 
-test_acq_driver_1(waveform_setup = setup_acq_osc_tests)
+    waveform_setup()
+    instr = lab._get_instrument('TaborAWG')
+
+    acq_module = ACQ("TabourACQ", lab, ['TaborAWG', 'ACQ'])
+    acq_module.NumSegments = 2
+    acq_module.NumRepetitions = 2
+    acq_module.set_data_processor(proc)
+
+
+    leData = acq_module.get_data()
+    leDecisions = instr.ACQ.get_frame_data()
+
+    import matplotlib.pyplot as plt
+    for r in range(acq_module.NumRepetitions) :
+        for s in range(acq_module.NumSegments) :
+            data = leData['data']['ch1_I'][r][s][1::2]    #I
+            plt.plot(data)
+            data = leData['data']['ch1_Q'][r][s][0::2]    #Q
+            plt.plot(data)
+            data = leData['data']['ch2_I'][r][s][1::2]
+            plt.plot(data)
+            data = leData['data']['ch2_Q'][r][s][0::2]
+            plt.plot(data)
+    plt.show()  #!!!REMEMBER TO CLOSE THE PLOT WINDOW BEFORE CLOSING PYTHON KERNEL OR TABOR LOCKS UP (PC restart won't cut it - needs to be a chassis restart)!!!
+    input('Press ENTER to finish test.')
+
+def test_acq_driver_3(numSamples = 4800, numFrames = 4, numReps = 1, waveform_setup = setup_acq_const_tests) :
+    """
+    Varying repitition, numframes, and numSamples test
+    """
+    waveform_setup()
+    instr = lab._get_instrument('TaborAWG')
+
+    acq_module = ACQ("TabourACQ", lab, ['TaborAWG', 'ACQ'])
+    acq_module.NumSamples = numSamples
+    acq_module.NumSegments = numFrames
+    acq_module.NumRepetitions = numReps
+
+
+    leData = acq_module.get_data()
+    leDecisions = instr.ACQ.get_frame_data()
+
+    import matplotlib.pyplot as plt
+    for r in range(acq_module.NumRepetitions) :
+        for s in range(acq_module.NumSegments) :
+            data = leData['data']['ch1'][r][s][1::2]    #I
+            plt.plot(data, label = f'ch1-I-S:{s}-R:{r}')
+            data = leData['data']['ch1'][r][s][0::2]    #Q
+            plt.plot(data, label = f'ch1-Q-S:{s}-R:{r}')
+            data = leData['data']['ch2'][r][s][1::2]
+            plt.plot(data, label = f'ch2-I-S:{s}-R:{r}')
+            data = leData['data']['ch2'][r][s][0::2]
+            plt.plot(data, label = f'ch2-Q-S:{s}-R:{r}')
+    plt.legend(loc="upper right")
+    plt.show()
+    input('Press ENTER to finish test.')
+    
+def test_awg_driver_1() :
+    """
+    Test Single Channel (CH1) programming
+    """
+    # Waveform transformation
+    WFMT_ModulationIQ("OscMod", lab, 100e6)
+
+    # Setup waveforms
+    awg_wfm1 = WaveformAWG("Waveform CH1", lab,  [(['TaborAWG', 'AWG'], 'CH1')], 1e9)
+
+    # Add Segments
+    awg_wfm1.add_waveform_segment(WFS_Constant(f"init", lab.WFMT('OscMod').apply(), 512e-9-384e-9, 0.25))
+    awg_wfm1.add_waveform_segment(WFS_Constant(f"zero1", None, 512e-9+384e-9, 0.0))
+    awg_wfm1.add_waveform_segment(WFS_Constant(f"zero2", None, 576e-9, 0.0))
+    
+    # Setup trigger 
+    awg_wfm1.get_output_channel(0).marker(0).set_markers_to_segments(["init"])
+
+    # Prepare waveforms and output them
+    awg_wfm1.prepare_initial()
+    awg_wfm1.prepare_final()
+
+    # Set output channel to true
+    awg_wfm1.get_output_channel(0).Output = True
+
+    instr = lab._get_instrument('TaborAWG')
+
+    acq_module = ACQ("TabourACQ", lab, ['TaborAWG', 'ACQ'])
+    acq_module.NumSamples = 4800
+    acq_module.NumSegments = 1
+    acq_module.NumRepetitions = 1
+
+
+    leData = acq_module.get_data()
+    leDecisions = instr.ACQ.get_frame_data()
+
+    import matplotlib.pyplot as plt
+    for r in range(acq_module.NumRepetitions) :
+        for s in range(acq_module.NumSegments) :
+            data = leData['data']['ch1'][r][s][1::2]    #I
+            plt.plot(data)
+            data = leData['data']['ch1'][r][s][0::2]    #Q
+            plt.plot(data)
+            data = leData['data']['ch2'][r][s][1::2]
+            plt.plot(data)
+            data = leData['data']['ch2'][r][s][0::2]
+            plt.plot(data)
+    plt.show()
+    awg_wfm1.get_output_channel(0).Output = False
+    input('Press ENTER to finish test.')
+
+
+def test_awg_driver_2() :
+    """
+    Test Single Channel (CH2) programming
+    """
+    # Waveform transformation
+    WFMT_ModulationIQ("OscMod", lab, 100e6)
+
+    # Setup waveforms
+    awg_wfm1 = WaveformAWG("Waveform CH2", lab,  [(['TaborAWG', 'AWG'], 'CH2')], 1e9)
+
+    # Add Segments
+    awg_wfm1.add_waveform_segment(WFS_Constant(f"init", lab.WFMT('OscMod').apply(), 512e-9-384e-9, 0.25))
+    awg_wfm1.add_waveform_segment(WFS_Constant(f"zero1", None, 512e-9+384e-9, 0.0))
+    awg_wfm1.add_waveform_segment(WFS_Constant(f"zero2", None, 576e-9, 0.0))
+    
+    # Setup trigger 
+    awg_wfm1.get_output_channel(0).marker(0).set_markers_to_segments(["init"])
+
+    # Prepare waveforms and output them
+    awg_wfm1.prepare_initial()
+    awg_wfm1.prepare_final()
+
+    # Set output channel to true
+    awg_wfm1.get_output_channel(0).Output = True
+
+    instr = lab._get_instrument('TaborAWG')
+
+    acq_module = ACQ("TabourACQ", lab, ['TaborAWG', 'ACQ'])
+    acq_module.NumSamples = 4800
+    acq_module.NumSegments = 1
+    acq_module.NumRepetitions = 1
+
+
+    leData = acq_module.get_data()
+    leDecisions = instr.ACQ.get_frame_data()
+
+    import matplotlib.pyplot as plt
+    for r in range(acq_module.NumRepetitions) :
+        for s in range(acq_module.NumSegments) :
+            data = leData['data']['ch1'][r][s][1::2]    #I
+            plt.plot(data)
+            data = leData['data']['ch1'][r][s][0::2]    #Q
+            plt.plot(data)
+            data = leData['data']['ch2'][r][s][1::2]
+            plt.plot(data)
+            data = leData['data']['ch2'][r][s][0::2]
+            plt.plot(data)
+    plt.show()
+    awg_wfm1.get_output_channel(0).Output = False
+    input('Press ENTER to finish test.')
+
+
+def test_awg_driver_3() :
+    """
+    Test Double Channel (CH1 and CH2) programming where
+    channels share a memory bank
+    """
+    # Waveform transformation
+    WFMT_ModulationIQ("OscMod", lab, 100e6)
+
+    # Setup waveforms
+    awg_wfmIQ = WaveformAWG("Waveform IQ", lab,  [(['TaborAWG', 'AWG'], 'CH1') ,(['TaborAWG', 'AWG'], 'CH2')], 1e9)
+
+    # Add Segments
+    awg_wfmIQ.add_waveform_segment(WFS_Constant(f"init", lab.WFMT('OscMod').apply(), 512e-9-384e-9, 0.25))
+    awg_wfmIQ.add_waveform_segment(WFS_Constant(f"zero1", None, 512e-9+384e-9, 0.0))
+    awg_wfmIQ.add_waveform_segment(WFS_Constant(f"zero2", None, 576e-9, 0.0))
+    
+    # Setup trigger 
+    awg_wfmIQ.get_output_channel(0).marker(0).set_markers_to_segments(["init"])
+
+    # Prepare waveforms and output them
+    awg_wfmIQ.prepare_initial()
+    awg_wfmIQ.prepare_final()
+
+    # Set output channel to true
+    awg_wfmIQ.get_output_channel(0).Output = True
+    awg_wfmIQ.get_output_channel(1).Output = True
+
+    instr = lab._get_instrument('TaborAWG')
+
+    acq_module = ACQ("TabourACQ", lab, ['TaborAWG', 'ACQ'])
+    acq_module.NumSamples = 4800
+    acq_module.NumSegments = 1
+    acq_module.NumRepetitions = 1
+
+
+    leData = acq_module.get_data()
+    leDecisions = instr.ACQ.get_frame_data()
+
+    import matplotlib.pyplot as plt
+    for r in range(acq_module.NumRepetitions) :
+        for s in range(acq_module.NumSegments) :
+            data = leData['data']['ch1'][r][s][1::2]    #I
+            plt.plot(data)
+            data = leData['data']['ch1'][r][s][0::2]    #Q
+            plt.plot(data)
+            data = leData['data']['ch2'][r][s][1::2]
+            plt.plot(data)
+            data = leData['data']['ch2'][r][s][0::2]
+            plt.plot(data)
+    plt.show()
+    awg_wfmIQ.get_output_channel(0).Output = False
+    awg_wfmIQ.get_output_channel(1).Output = False
+    input('Press ENTER to finish test.')
+
+def test_awg_driver_4() :
+    """
+    Test Double Channel (CH1 and CH2) programming where
+    channels share a memory bank. This test varies length of pulses
+    """
+    # Waveform transformation
+    WFMT_ModulationIQ("OscMod", lab, 100e6)
+
+    # Setup waveforms
+    awg_wfmIQ = WaveformAWG("Waveform IQ", lab,  [(['TaborAWG', 'AWG'], 'CH1') ,(['TaborAWG', 'AWG'], 'CH2')], 1e9)
+
+    # Add Segments
+    awg_wfmIQ.add_waveform_segment(WFS_Constant(f"init0", lab.WFMT('OscMod').apply(), 512e-9-384e-9, 0.3))
+    awg_wfmIQ.add_waveform_segment(WFS_Constant(f"zero1", None, 512e-9+384e-9, 0.0))
+    awg_wfmIQ.add_waveform_segment(WFS_Constant(f"zero2", None, 576e-9, 0.0))
+    awg_wfmIQ.add_waveform_segment(WFS_Constant(f"init1", lab.WFMT('OscMod').apply(), 512e-9, 0.2))
+    awg_wfmIQ.add_waveform_segment(WFS_Constant(f"zero3", None, 512e-9+384e-9, 0.0))
+    awg_wfmIQ.add_waveform_segment(WFS_Constant(f"zero4", None, 576e-9, 0.0))
+    awg_wfmIQ.add_waveform_segment(WFS_Constant(f"init2", lab.WFMT('OscMod').apply(), 50e-9*32, 0.1))
+    awg_wfmIQ.add_waveform_segment(WFS_Constant(f"zero5", None, 512e-9+384e-9, 0.0))
+    awg_wfmIQ.add_waveform_segment(WFS_Constant(f"zero6", None, 576e-9, 0.0))
+    
+    # Setup trigger 
+    awg_wfmIQ.get_output_channel(0).marker(0).set_markers_to_segments(["init0"])
+
+    # Prepare waveforms and output them
+    awg_wfmIQ.prepare_initial()
+    awg_wfmIQ.prepare_final()
+
+    # Set output channel to true
+    awg_wfmIQ.get_output_channel(0).Output = True
+    awg_wfmIQ.get_output_channel(1).Output = True
+
+    instr = lab._get_instrument('TaborAWG')
+
+    acq_module = ACQ("TabourACQ", lab, ['TaborAWG', 'ACQ'])
+    acq_module.NumSamples = 4800 * 4
+    acq_module.NumSegments = 1
+    acq_module.NumRepetitions = 1
+
+
+    leData = acq_module.get_data()
+    leDecisions = instr.ACQ.get_frame_data()
+
+    import matplotlib.pyplot as plt
+    for r in range(acq_module.NumRepetitions) :
+        for s in range(acq_module.NumSegments) :
+            data = leData['data']['ch1'][r][s][1::2]    #I
+            plt.plot(data)
+            data = leData['data']['ch1'][r][s][0::2]    #Q
+            plt.plot(data)
+            data = leData['data']['ch2'][r][s][1::2]
+            plt.plot(data)
+            data = leData['data']['ch2'][r][s][0::2]
+            plt.plot(data)
+    plt.show()
+    awg_wfmIQ.get_output_channel(0).Output = False
+    awg_wfmIQ.get_output_channel(1).Output = False
+    input('Press ENTER to finish test.')
+
+def test_awg_driver_5() :
+    """
+    test of waveform with large number of segments
+    across both channels (CH1 and CH2) which share a memory bank
+    """
+        # Waveform transformation
+    WFMT_ModulationIQ("OscMod", lab, 100e6)
+
+    # Setup waveforms
+    awg_wfmIQ = WaveformAWG("Waveform IQ", lab,  [(['TaborAWG', 'AWG'], 'CH1') ,(['TaborAWG', 'AWG'], 'CH2')], 1e9)
+
+    # Add Segments
+    for m in range(4):
+        awg_wfmIQ.add_waveform_segment(WFS_Gaussian(f"init{m}", lab.WFMT('OscMod').apply(), 512e-9, 0.5-0.1*(m)))
+        #awg_wfmIQ.add_waveform_segment(WFS_Constant(f"zero1{m}", None, 512e-9, 0.01*m))
+        #awg_wfmIQ.add_waveform_segment(WFS_Gaussian(f"init2{m}", lab.WFMT('OscMod').apply(), 512e-9, 0.3))# 0.5-0.1*m))
+        awg_wfmIQ.add_waveform_segment(WFS_Constant(f"zero2{m}", None, 512e-9, 0.0))
+
+    
+    # Setup trigger 
+    awg_wfmIQ.get_output_channel(0).marker(0).set_markers_to_segments(["init0"])
+
+    # Prepare waveforms and output them
+    awg_wfmIQ.prepare_initial()
+    awg_wfmIQ.prepare_final()
+
+    # Set output channel to true
+    awg_wfmIQ.get_output_channel(0).Output = True
+    awg_wfmIQ.get_output_channel(1).Output = True
+
+    instr = lab._get_instrument('TaborAWG')
+
+    acq_module = ACQ("TabourACQ", lab, ['TaborAWG', 'ACQ'])
+    acq_module.NumSamples = 4800 * 12
+    acq_module.NumSegments = 1
+    acq_module.NumRepetitions = 1
+
+
+    leData = acq_module.get_data()
+    leDecisions = instr.ACQ.get_frame_data()
+
+    import matplotlib.pyplot as plt
+    for r in range(acq_module.NumRepetitions) :
+        for s in range(acq_module.NumSegments) :
+            data = leData['data']['ch1'][r][s][1::2]    #I
+            plt.plot(data)
+            data = leData['data']['ch1'][r][s][0::2]    #Q
+            plt.plot(data)
+            data = leData['data']['ch2'][r][s][1::2]
+            plt.plot(data)
+            data = leData['data']['ch2'][r][s][0::2]
+            plt.plot(data)
+    plt.show()
+    awg_wfmIQ.get_output_channel(0).Output = False
+    awg_wfmIQ.get_output_channel(1).Output = False
+    input('Press ENTER to finish test.')
+    
+
+### ACQ TESTS ###
+#test_acq_driver_1(waveform_setup = setup_acq_const_tests)
+#test_acq_driver_1(waveform_setup = setup_acq_osc_tests)
+
+#est_acq_driver_2(lab, waveform_setup = setup_acq_const_tests)
+
+# Vary Reps
+# test_acq_driver_3(numSamples = 4800, numFrames = 4, numReps = 1, waveform_setup = setup_acq_full_osc_tests)
+# test_acq_driver_3(numSamples = 4800, numFrames = 4, numReps = 3, waveform_setup = setup_acq_const_tests)
+# test_acq_driver_3(numSamples = 4800, numFrames = 4, numReps = 5, waveform_setup = setup_acq_const_tests)
+
+# Vary Frames
+# test_acq_driver_3(numSamples = 4800, numFrames = 4, numReps = 1, waveform_setup = setup_acq_const_tests)
+# test_acq_driver_3(numSamples = 4800, numFrames = 6, numReps = 1, waveform_setup = setup_acq_const_tests)
+# test_acq_driver_3(numSamples = 4800, numFrames = 8, numReps = 1, waveform_setup = setup_acq_const_tests)
+
+# Vary number of samples
+# test_acq_driver_3(numSamples = 50*48, numFrames = 4, numReps = 1, waveform_setup = setup_acq_const_tests)
+# test_acq_driver_3(numSamples = 150*48, numFrames = 4, numReps = 1, waveform_setup = setup_acq_const_tests)
+# test_acq_driver_3(numSamples = 400*48, numFrames = 4, numReps = 1, waveform_setup = setup_acq_const_tests)
+
+### AWG TESTS ###
+# test_awg_driver_1()
+# test_awg_driver_2()
+# test_awg_driver_3()
+# test_awg_driver_4()
+test_awg_driver_5()
 input('Press ENTER to exit.')
 
 ### ========================== MANUAL TEST SCRIPT =============================== ###

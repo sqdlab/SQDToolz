@@ -401,6 +401,9 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
         return self._assemble_waveform_raw()[0]
 
     def prepare_initial(self):
+        """
+        Method to prepare waveforms and load them into memory of AWG intsrument
+        """
         #Prepare the waveform
         final_wfms, elastic_ind = self._assemble_waveform_raw()
 
@@ -471,6 +474,9 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
                 self.cur_wfms_to_commit.append(dict_wfm_data)
 
     def prepare_final(self):
+        """
+        Method that programs waveform onto channel
+        """
         if not self._dont_reprogram:
             for ind, cur_awg_chan in enumerate(self._awg_chan_list):
                 cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.short_name, self.cur_wfms_to_commit[ind])

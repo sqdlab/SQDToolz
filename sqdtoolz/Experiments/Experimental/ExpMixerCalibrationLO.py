@@ -22,12 +22,12 @@ class ExpMixerCalibrationLO(Experiment):
         self._accuracy = kwargs.get('accuracy', 0.0005)
 
     def _cost_func(self, iq_vals):
-        self._var_DC_off_I.Value = iq_vals[0]
-        self._var_DC_off_Q.Value = iq_vals[1]
+        self._var_DC_off_I.Value = np.clip(iq_vals[0], self._range_DC_off_I[0], self._range_DC_off_I[1])
+        self._var_DC_off_Q.Value = np.clip(iq_vals[1], self._range_DC_off_Q[0], self._range_DC_off_Q[1])
         self._expt_config.prepare_instruments()
         smpl_data = self._expt_config.get_data()
 
-        i_val, q_val = smpl_data['data']['ch0_I'], smpl_data['data']['ch0_Q']
+        i_val, q_val = smpl_data['data']['ch1_I'], smpl_data['data']['ch1_Q']
 
         ampl = np.sqrt(i_val**2 + q_val**2)
         self._opt_data += [[iq_vals[0], iq_vals[1], ampl]]

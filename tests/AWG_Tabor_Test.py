@@ -36,66 +36,72 @@ new_lab = Laboratory(instr_config_file = "tests\\TaborTest.yaml", save_dir = "my
 
 new_lab.load_instrument('TaborAWG')
 
-WFMT_ModulationIQ("QubitFreqMod", new_lab, 100e6)
+# WFMT_ModulationIQ("QubitFreqMod", new_lab, 100e6)
 
-# awg_wfm_q = WaveformAWG("Waveform 2 CH", new_lab, [(['TaborAWG', 'AWG'], 'CH1'),(['TaborAWG', 'AWG'], 'CH2')], 2e9)
+# # awg_wfm_q = WaveformAWG("Waveform 2 CH", new_lab, [(['TaborAWG', 'AWG'], 'CH1'),(['TaborAWG', 'AWG'], 'CH2')], 2e9)
+# # read_segs = []
+# # for m in range(4):
+# #     awg_wfm_q.add_waveform_segment(WFS_Constant(f"init{m}", new_lab.WFMT('QubitFreqMod').apply(), 512e-9-384e-9, 0.5-0.1*m))#WFS_Gaussian
+# #     awg_wfm_q.add_waveform_segment(WFS_Cosine(f"zero1{m}", None, 512e-9+384e-9, 0.05, 200e6))
+# #     awg_wfm_q.add_waveform_segment(WFS_Constant(f"init2{m}", new_lab.WFMT('QubitFreqMod').apply(), 512e-9, 0.0*(0.5-0.1*m)))
+# #     awg_wfm_q.add_waveform_segment(WFS_Constant(f"zero2{m}", None, 576e-9, 0.0))
+# #     read_segs += [f"init{m}"]
+
+# awg_wfm_q = WaveformAWG("CosSrc", new_lab, [(['TaborAWG', 'AWG'], 'CH1'),(['TaborAWG', 'AWG'], 'CH2')], 1e9, total_time=1024e-9)
 # read_segs = []
-# for m in range(4):
-#     awg_wfm_q.add_waveform_segment(WFS_Constant(f"init{m}", new_lab.WFMT('QubitFreqMod').apply(), 512e-9-384e-9, 0.5-0.1*m))#WFS_Gaussian
-#     awg_wfm_q.add_waveform_segment(WFS_Cosine(f"zero1{m}", None, 512e-9+384e-9, 0.05, 200e6))
-#     awg_wfm_q.add_waveform_segment(WFS_Constant(f"init2{m}", new_lab.WFMT('QubitFreqMod').apply(), 512e-9, 0.0*(0.5-0.1*m)))
-#     awg_wfm_q.add_waveform_segment(WFS_Constant(f"zero2{m}", None, 576e-9, 0.0))
-#     read_segs += [f"init{m}"]
+# new_lab.HAL('CosSrc').add_waveform_segment(WFS_Cosine("LO1", None, 100e-9, 0.5, 100e6))
+# new_lab.HAL('CosSrc').add_waveform_segment(WFS_Cosine("LO2", None, 100e-9, 0.05, 200e6))
+# new_lab.HAL('CosSrc').add_waveform_segment(WFS_Cosine("LO3", None, 100e-9, 0.05, 300e6))
+# new_lab.HAL('CosSrc').add_waveform_segment(WFS_Constant("True Pad", None, -1, 0.00))
 
-awg_wfm_q = WaveformAWG("CosSrc", new_lab, [(['TaborAWG', 'AWG'], 'CH3'),(['TaborAWG', 'AWG'], 'CH4')], 1e9, total_time=1024e-9)
-read_segs = []
-new_lab.HAL('CosSrc').add_waveform_segment(WFS_Cosine("LO1", None, 100e-9, 0.05, 100e6))
-new_lab.HAL('CosSrc').add_waveform_segment(WFS_Cosine("LO2", None, 100e-9, 0.05, 200e6))
-new_lab.HAL('CosSrc').add_waveform_segment(WFS_Cosine("LO3", None, 100e-9, 0.05, 300e6))
-new_lab.HAL('CosSrc').add_waveform_segment(WFS_Constant("True Pad", None, -1, 0.00))
+# new_lab.HAL('CosSrc').get_output_channel(0).marker(0).set_markers_to_segments(['LO1'])
+# new_lab.HAL('CosSrc').get_output_channel(0).marker(1).set_markers_to_segments(['LO1'])
+# new_lab.HAL('CosSrc').get_output_channel(1).marker(0).set_markers_to_segments(['LO2'])
+# new_lab.HAL('CosSrc').get_output_channel(1).marker(1).set_markers_to_segments(['LO3'])
 
-new_lab.HAL('CosSrc').get_output_channel(0).marker(0).set_markers_to_segments(['LO1'])
-new_lab.HAL('CosSrc').get_output_channel(0).marker(1).set_markers_to_segments(['LO1'])
-new_lab.HAL('CosSrc').get_output_channel(1).marker(0).set_markers_to_segments(['LO2'])
-new_lab.HAL('CosSrc').get_output_channel(1).marker(1).set_markers_to_segments(['LO3'])
+# # awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments(["init0","init2"])
+# # awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments(read_segs)
+# awg_wfm_q.prepare_initial()
+# awg_wfm_q.prepare_final()
 
-# awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments(["init0","init2"])
-# awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments(read_segs)
-awg_wfm_q.prepare_initial()
-awg_wfm_q.prepare_final()
+# awg_wfm_q.get_output_channel(0).Output = True
+# awg_wfm_q.get_output_channel(1).Output = True
+# # inst_tabor.AWG._get_channel_output('CH1').marker1_output(True)
+# # inst_tabor.AWG._get_channel_output('CH1').marker2_output(True)
 
-awg_wfm_q.get_output_channel(0).Output = True
-awg_wfm_q.get_output_channel(1).Output = True
-# inst_tabor.AWG._get_channel_output('CH1').marker1_output(True)
-# inst_tabor.AWG._get_channel_output('CH1').marker2_output(True)
+# # my_param1 = VariableInstrument("len1", awg_wfm2, 'IQFrequency')
+# # my_param2 = VariableInstrument("len2", awg_wfm2, 'IQPhase')
 
-# my_param1 = VariableInstrument("len1", awg_wfm2, 'IQFrequency')
-# my_param2 = VariableInstrument("len2", awg_wfm2, 'IQPhase')
-
-# tc = TimingConfiguration(1.2e-6, [ddg_module], [awg_wfm2], None)
-# lePlot = tc.plot().show()
-# leData = new_exp.run(tc, [(my_param1, np.linspace(20e6,35e6,10)),(my_param2, np.linspace(0,3,3))])
+# # tc = TimingConfiguration(1.2e-6, [ddg_module], [awg_wfm2], None)
+# # lePlot = tc.plot().show()
+# # leData = new_exp.run(tc, [(my_param1, np.linspace(20e6,35e6,10)),(my_param2, np.linspace(0,3,3))])
 
 
-#Connected M1 to TRIG1 and AWG-CH1 to ADC-CH1
+# #Connected M1 to TRIG1 and AWG-CH1 to ADC-CH1
 
-instr = new_lab._get_instrument('TaborAWG')
+# GENvoltSource('CH1offset', new_lab, ['TaborAWG', 'AWG', 'CH1'])
+
+# instr = new_lab._get_instrument('TaborAWG')
 
 
-instr._set_cmd(':DIG:MODE', 'DUAL')
-instr._set_cmd(':DIG:FREQ', 2500e6)
-instr._set_cmd(':DIG:CHAN', 'CH1')
-instr._set_cmd(':DIG:DDC:MODE', 'COMPlex')
-instr._set_cmd(':DIG:CHAN', 'CH2')
-instr._set_cmd(':DIG:DDC:MODE', 'COMPlex')
-instr._set_cmd(':DIG:DDC:CFR1', 100e6)
-instr._set_cmd(':DIG:DDC:CFR2', 100e6)
-instr._chk_err("")
+# instr._set_cmd(':DIG:MODE', 'DUAL')
+# instr._set_cmd(':DIG:FREQ', 2500e6)
+# instr._set_cmd(':DIG:CHAN', 'CH1')
+# instr._set_cmd(':DIG:DDC:MODE', 'COMPlex')
+# instr._set_cmd(':DIG:CHAN', 'CH2')
+# instr._set_cmd(':DIG:DDC:MODE', 'COMPlex')
+# instr._set_cmd(':DIG:DDC:CFR1', 100e6)
+# instr._set_cmd(':DIG:DDC:CFR2', 100e6)
+# instr._chk_err("")
 
-instr._set_cmd(':DSP:STOR1', 'DIRECT1')
-instr._set_cmd(':DSP:STOR2', 'DIRECT2')
+# instr._set_cmd(':DSP:STOR1', 'DIRECT1')
+# instr._set_cmd(':DSP:STOR2', 'DIRECT2')
 
-instr._set_cmd(':DSP:STOR1', 'DSP1')
+# instr._set_cmd(':DSP:STOR1', 'DSP1')
+
+
+
+
 
 # #Set DSP Path 1 to IQ
 # instr._set_cmd(':DSP:DEC:IQP:SEL', 1)

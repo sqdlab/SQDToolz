@@ -27,7 +27,7 @@ class ExpMixerCalibrationSB(Experiment):
         self._expt_config.prepare_instruments()
         smpl_data = self._expt_config.get_data()
 
-        i_val, q_val = smpl_data['data']['ch0_I'], smpl_data['data']['ch0_Q']
+        i_val, q_val = smpl_data['data']['ch1_I'], smpl_data['data']['ch1_Q']
 
         ampl = np.sqrt(i_val**2 + q_val**2)
         self._opt_data += [[amp_phs_vals[0], amp_phs_vals[1], ampl]]

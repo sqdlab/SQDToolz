@@ -1,3 +1,4 @@
+from optparse import AmbiguousOptionError
 import numpy as np
 from sqdtoolz.HAL.WaveformTransformations import*
 from sqdtoolz.HAL.HALbase import LockableProperties
@@ -387,4 +388,63 @@ class WFS_Cosine(WaveformSegmentBase):
         cur_dict['Amplitude'] = self._amplitude
         cur_dict['Frequency'] = self._frequency
         cur_dict['Phase'] = self._phase
+        return cur_dict
+
+
+class WFS_Arbitrary(WaveformSegmentBase):
+    """
+    Waveform segment class for constructing arbitrary waveforms
+    """
+    def __init__(self, name, transform_func, time_len, amplitudes):
+        """
+        Class Initialialiser
+        """
+        super().__init__(name, transform_func, time_len)
+        #TODO: Add in a classmethod to use sigma and truncate...
+        self._amplitudes = amplitudes
+
+
+    @classmethod
+    def fromConfigDict(cls, config_dict):
+        assert 'Type' in config_dict, "Configuration dictionary does not have the key: type"
+        assert config_dict['Type'] == cls.__name__, "Configuration dictionary has the wrong type."
+        for cur_key in ["Name", "Duration", "Amplitudes"]:
+            assert cur_key in config_dict, "Configuration dictionary does not have the key: " + cur_key
+        #TODO: Fix the functionality here.
+        if config_dict['Mod Func']['Name'] == '':
+            wfmt_obj = None
+        else:
+            wfmt_obj = WaveformTransformationArgs(config_dict['Mod Func']['Name'], config_dict['Mod Func']['Args'])
+        return cls(config_dict["Name"], wfmt_obj, config_dict["Duration"], config_dict["Amplitude"], config_dict["Num SD"])
+
+    @property
+    def Amplitudes(self):
+        return self._amplitudes
+    @Amplitudes.setter
+    def Amplitudes(self, ampl_vals):
+        self._amplitudes = ampl_vals
+
+    def _get_waveform(self, lab, fs, t0_ind, ch_index):
+        """
+        Create Arbitrary waveform from provided amplitude envelope
+        Upsamples/downsamples waveform to align with sampling frequency 
+        """
+        n = self.NumPts(fs)
+
+        if (n > len(self._amplitudes)) :
+            # Need to upsample amplitudes to match n
+            pass
+        elif (n < len(self._amplitudes)) :
+            # Need to downsample amplitudes to match n
+            pass
+        else :
+            # n match len of amplitudes
+            sample_points = self._amplitudes
+
+        return sample_points
+
+    def _get_current_config(self):
+        cur_dict = WaveformSegmentBase._get_current_config(self)
+        cur_dict['Duration'] = self.Duration
+        cur_dict['Amplitudes'] = self._amplitudes
         return cur_dict

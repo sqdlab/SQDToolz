@@ -67,6 +67,9 @@ class AWG_TaborP2584M_channel(InstrumentChannel):
                 val_mapping={True: 'ON', False: 'OFF'})
             getattr(self, f'marker{cur_mkr}_output')(True)  #Default state is ON
             self._set_mkr_cmd(':MARK:VOLT:PTOP', cur_mkr, 1.2)
+            #TODO: Maybe parametrise this? But it will be set to maximum range for now...  
+            self._set_mkr_cmd(':MARKer:VOLTage:OFFSet', cur_mkr, 0.0)
+            self._set_mkr_cmd(':MARK:VOLT:PTOP', cur_mkr, 1.2)
 
         #NOTE: Although the ramp-rate is technically software-based, there could be a source that provides actual precision rates - so it's left as a parameter in general instead of being a HAL-level feature...
         self.add_parameter('voltage_ramp_rate', unit='V/s',
@@ -76,6 +79,7 @@ class AWG_TaborP2584M_channel(InstrumentChannel):
                         get_cmd=lambda : self.offset.step/self.offset.inter_delay,
                         set_cmd=self._set_ramp_rate)
         self.voltage_ramp_rate(1)
+
 
 
     def _get_cmd(self, cmd):
@@ -190,7 +194,8 @@ class TaborP2584M_AWG(InstrumentChannel):
         for m in range(4):
             self.activeChannel(m + 1)
             #self._parent._set_cmd(':INST:CHAN', m+1)
-            self._parent._send_cmd(':TRAC:DEL:ALL')        
+            self._parent._send_cmd(':TRAC:DEL:ALL')      
+            self._parent._send_cmd(':TASK:ZERO:ALL')       #Does this need to be run per channel?!
 
         #Get the DAC mode (8 bits or 16 bits)
         dac_mode = self._parent._get_cmd(':SYST:INF:DAC?')
@@ -356,6 +361,8 @@ class TaborP2584M_AWG(InstrumentChannel):
         self._program_task_table(chan_ind+1, task_list)
         
         self._parent._set_cmd('FUNC:MODE', 'TASK')
+        while not self._parent._get_cmd('*OPC?'):
+            pass
 
     def _program_task_table(self, channel_index, tasks):
         #Select current channel

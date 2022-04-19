@@ -16,7 +16,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
             for ch_index, cur_ch_tupl in enumerate(awg_channel_tuples):
                 assert len(cur_ch_tupl) == 2, "The list awg_channel_tuples must contain tuples of form (instr_AWG_name, channel_name)."
                 cur_awg_name, cur_ch_name = cur_ch_tupl            
-                self._awg_chan_list.append(AWGOutputChannel(lab, cur_awg_name, cur_ch_name, ch_index, self))
+                self._awg_chan_list.append(AWGOutputChannel(lab, cur_awg_name, cur_ch_name, ch_index, self, sample_rate))
                 
             self._sample_rate = sample_rate
             self._global_factor = global_factor

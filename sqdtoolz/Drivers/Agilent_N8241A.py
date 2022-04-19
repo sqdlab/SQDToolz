@@ -1539,8 +1539,9 @@ class Agilent_N8241A(Instrument):
         return self.clock_frequency()
     @SampleRate.setter
     def SampleRate(self, frequency_hertz):
-        #TODO: this doesn't work - fix it...
-        self.configure_sample_clock(source=0, freq=frequency_hertz)
+        #Only set sample-rate if not in Master/Slave mode - otherwise it locks the AWG!
+        if self._sync_state == 'Independent':
+            self.configure_sample_clock(source=0, freq=frequency_hertz)
 
     @property
     def AutoCompressionSupport(self):

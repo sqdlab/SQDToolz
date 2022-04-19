@@ -4,7 +4,7 @@ from scipy import signal
 from sqdtoolz.HAL.HALbase import LockableProperties
 
 class AWGOutputChannel(TriggerInput, LockableProperties):
-    def __init__(self, lab, instr_awg_name, channel_name, ch_index, parent_awg_waveform):
+    def __init__(self, lab, instr_awg_name, channel_name, ch_index, parent_awg_waveform, sample_rate):
         self._instr_awg_name = instr_awg_name
         self._channel_name = channel_name
         self._ch_index = ch_index
@@ -13,6 +13,10 @@ class AWGOutputChannel(TriggerInput, LockableProperties):
         self._instr_awg = instr_awg
         self._instr_awg_chan = instr_awg._get_channel_output(channel_name)
         assert self._instr_awg_chan != None, "The channel name " + channel_name + " does not exist in the AWG instrument " + self._instr_awg.name
+
+        #TODO: Think about whether sample-rate is a AWG-channel-level or AWG-level property - e.g. most AWGs probably enforce all output channels
+        #must synchronise sample rates... Here it's treated as an AWG-level property.
+        instr_awg.SampleRate = sample_rate
 
         self._trig_src_obj = None
         self._trig_src_pol = 1

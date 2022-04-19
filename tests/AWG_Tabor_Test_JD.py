@@ -261,9 +261,11 @@ def test_awg_driver_1() :
     awg_wfm1 = WaveformAWG("Waveform CH1", lab,  [(['TaborAWG', 'AWG'], 'CH1')], 1e9)
 
     # Add Segments
-    awg_wfm1.add_waveform_segment(WFS_Constant(f"init", lab.WFMT('OscMod').apply(), 512e-9-384e-9, 0.25))
-    awg_wfm1.add_waveform_segment(WFS_Constant(f"zero1", None, 512e-9+384e-9, 0.0))
-    awg_wfm1.add_waveform_segment(WFS_Constant(f"zero2", None, 576e-9, 0.0))
+    awg_wfm1.add_waveform_segment(WFS_Constant(f"init", lab.WFMT('OscMod').apply(), 1024e-9, 0.25))
+    awg_wfm1.add_waveform_segment(WFS_Constant(f"init1", lab.WFMT('OscMod').apply(), 1024e-9, 0.25))
+    #awg_wfm1.add_waveform_segment(WFS_Constant(f"init", lab.WFMT('OscMod').apply(), 512e-9-384e-9, 0.25))
+    #awg_wfm1.add_waveform_segment(WFS_Constant(f"zero1", None, 512e-9+384e-9, 0.0))
+    #awg_wfm1.add_waveform_segment(WFS_Constant(f"zero2", None, 576e-9, 0.0))
     
     # Setup trigger 
     awg_wfm1.get_output_channel(0).marker(0).set_markers_to_segments(["init"])
@@ -278,6 +280,7 @@ def test_awg_driver_1() :
     instr = lab._get_instrument('TaborAWG')
 
     acq_module = ACQ("TabourACQ", lab, ['TaborAWG', 'ACQ'])
+    acq_module.set_data_processor(None)
     acq_module.NumSamples = 4800
     acq_module.NumSegments = 1
     acq_module.NumRepetitions = 1
@@ -298,9 +301,8 @@ def test_awg_driver_1() :
             data = leData['data']['ch2'][r][s][0::2]
             plt.plot(data)
     plt.show()
-    awg_wfm1.get_output_channel(0).Output = False
+    # awg_wfm1.get_output_channel(0).Output = False
     input('Press ENTER to finish test.')
-
 
 def test_awg_driver_2() :
     """
@@ -352,7 +354,6 @@ def test_awg_driver_2() :
     plt.show()
     awg_wfm1.get_output_channel(0).Output = False
     input('Press ENTER to finish test.')
-
 
 def test_awg_driver_3() :
     """
@@ -525,12 +526,61 @@ def test_awg_driver_5() :
     awg_wfmIQ.get_output_channel(1).Output = False
     input('Press ENTER to finish test.')
     
+def test_awg_driver_6(lab) :
+    """
+    Test using external trigger
+    Note this test is not robust to different external triggers
+    """
+    # Waveform transformation
+    WFMT_ModulationIQ("OscMod", lab, 100e6)
+
+    # Load External Triggering Device
+    lab.load_instrument('pulser')
+    DDG("DDG", lab, 'pulser')
+    lab.HAL('DDG').get_trigger_output('AB').TrigPulseLength = 50e-9
+    lab.HAL('DDG').get_trigger_output('AB').TrigPolarity = 1
+    lab.HAL('DDG').get_trigger_output('AB').TrigPulseDelay = 0.0e-9
+
+    ACQ("TabACQ", lab, ['TaborAWG', 'ACQ'])
+    WaveformAWG("WfmCon2", lab, [(['TaborAWG', 'AWG'], 'CH1'),(['TaborAWG', 'AWG'], 'CH2')], 1e9, total_time=10*1024000e-9)
+    #lab.HAL("WfmCon2").add_waveform_segment(WFS_Constant("pulse", None, 100e-9, 0.0))
+    #lab.HAL("WfmCon2").add_waveform_segment(WFS_Constant("zeros", None, -1, 0.0))
+
+    # Construct Waveform to test
+    for m in range(4):
+        lab.HAL("WfmCon2").add_waveform_segment(WFS_Gaussian(f"init{m}", lab.WFMT('OscMod').apply(), 512000e-9, 0.5-0.1*(m)))
+        lab.HAL("WfmCon2").add_waveform_segment(WFS_Gaussian(f"init1{m}", lab.WFMT('OscMod').apply(), 512000e-9, 0.5-0.1*(m)))
+        #lab.HAL("WfmCon2").add_waveform_segment(WFS_Constant(f"zero2{m}", None, 512e-9, 0.0))
+
+    # Pad Final Waveform
+    lab.HAL("WfmCon2").add_waveform_segment(WFS_Constant(f"zero1{m}", None, -1, 0.0))
+
+    lab.HAL("WfmCon2").get_output_channel(0).marker(0).set_markers_to_segments(['init0'])
+    lab.HAL("WfmCon2").AutoCompression = 'None'
+
+    lab.HAL("WfmCon2").set_trigger_source_all(lab.HAL("DDG").get_trigger_output('AB'))
+    lab.HAL("TabACQ").set_trigger_source(lab.HAL("WfmCon2").get_output_channel(0).marker(0))
+
+    lab.HAL("DDG").RepetitionTime = 10*10240000e-9 #4e-3
+
+    lab.HAL("TabACQ").SampleRate = 1.4e9
+    lab.HAL("TabACQ").set_acq_params(reps=1, segs=1, samples=2**20 * 3)
+    lab.HAL("TabACQ").ChannelStates = (True, True)
+
+    # lab.HAL("WfmCon2").prepare_initial()
+    # lab.HAL("WfmCon2").prepare_final()
+    # lab.HAL("WfmCon2").get_output_channel(0).Output = True
+
+    ExperimentConfiguration('test_6', lab, 4e-3, ['DDG', 'WfmCon2'], 'TabACQ')
+    exp = Experiment("AWG_test_6", lab.CONFIG('test_6'))
+    lab.run_single(exp)
+    lab.CONFIG('test_6').plot()
+    plt.show()
 
 ### ACQ TESTS ###
-#test_acq_driver_1(waveform_setup = setup_acq_const_tests)
-#test_acq_driver_1(waveform_setup = setup_acq_osc_tests)
-
-#est_acq_driver_2(lab, waveform_setup = setup_acq_const_tests)
+test_acq_driver_1(waveform_setup = setup_acq_const_tests)
+test_acq_driver_1(waveform_setup = setup_acq_osc_tests)
+test_acq_driver_2(lab, waveform_setup = setup_acq_const_tests)
 
 # Vary Reps
 # test_acq_driver_3(numSamples = 4800, numFrames = 4, numReps = 1, waveform_setup = setup_acq_full_osc_tests)
@@ -548,11 +598,12 @@ def test_awg_driver_5() :
 # test_acq_driver_3(numSamples = 400*48, numFrames = 4, numReps = 1, waveform_setup = setup_acq_const_tests)
 
 ### AWG TESTS ###
-# test_awg_driver_1()
-# test_awg_driver_2()
-# test_awg_driver_3()
-# test_awg_driver_4()
+test_awg_driver_1()
+test_awg_driver_2()
+test_awg_driver_3()
+test_awg_driver_4()
 test_awg_driver_5()
+test_awg_driver_6(lab)
 input('Press ENTER to exit.')
 
 ### ========================== MANUAL TEST SCRIPT =============================== ###

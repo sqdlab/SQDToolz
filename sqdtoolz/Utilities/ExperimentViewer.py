@@ -204,13 +204,15 @@ class ExperimentViewer:
 
 
         ###############################
-        # VAR AND SPEC DISPLAY ON LHS #
+        # VAR AND SPEC DISPLAY ON LHS # <- And Kill Button...
         #
         self.pw_dash_VARSPEC = PanedWindow(orient =tk.VERTICAL, master=self.frame_dash_left, sashwidth=3, bg = "#000077", bd = 0)
         frame_var_spec_up = Frame(master=self.pw_dash_VARSPEC)
         frame_var_spec_down = Frame(master=self.pw_dash_VARSPEC)
+        frame_var_spec_foot = Frame(master=self.pw_dash_VARSPEC)
         self.pw_dash_VARSPEC.add(frame_var_spec_up,stretch='always')
         self.pw_dash_VARSPEC.add(frame_var_spec_down,stretch='always')
+        self.pw_dash_VARSPEC.add(frame_var_spec_foot,stretch='always')
         self.pw_dash_VARSPEC.pack(expand = 1, fill ="both")
         # frame_var_spec_up.pack(expand=1, fill="both")
         # frame_var_spec_down.pack(expand=1, fill="both")
@@ -234,6 +236,11 @@ class ExperimentViewer:
         lblFrm_specs.rowconfigure(0, weight=1)
         lblFrm_specs.columnconfigure(0, weight=1)
         lblFrm_specs.columnconfigure(1, weight=0)
+        #
+        #
+        #Kill Button
+        self.btn_kill = tk.Button(master=frame_var_spec_foot, text="Kill Experiment", command = self._event_btn_kill)
+        self.btn_kill.pack(expand=1,fill='both')
         #################
 
 
@@ -318,6 +325,12 @@ class ExperimentViewer:
                 self.trvw_expts.insert(tree_folder_date, "end", text=cur_data_folder, tags=[cur_path_data])
 
         while True:
+            #Reset Kill-Switch if applicable
+            if os.path.exists(self._path + 'HALT.txt'):
+                self.btn_kill['text'] = 'Kill Experiment (Signal Sent)'
+            else:
+                self.btn_kill['text'] = 'Kill Experiment'
+
             #Read JSON file for latest configuration...
             file_state = self._path + "_last_state.txt"
             if not os.path.isfile(file_state):
@@ -504,7 +517,11 @@ class ExperimentViewer:
         self.comp_right = self.cur_sel_trvw
         self.lbl_comp_right['text'] = f"Right: {self.comp_right[len(self._path):].replace('/',', ')}"
         self._compare_configs()
-    
+  
+    def _event_btn_kill(self):
+        if not os.path.exists(self._path + 'HALT.txt'):
+            open(self._path + 'HALT.txt', 'a').close()
+
     def _compare_configs(self):
         if self.comp_left == '' or not os.path.isdir(self.comp_left):
             return
@@ -564,5 +581,4 @@ if __name__ == '__main__':
     if len(sys.argv) >= 2:
         print(sys.argv[1])
         ExperimentViewer(sys.argv[1]).main_loop()
-    # ExperimentViewer(r'Z:\Data\EH_QuantumClock_V2\\').main_loop()
 

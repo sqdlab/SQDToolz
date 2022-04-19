@@ -36,6 +36,7 @@ class Experiment:
     def _run(self, file_path, sweep_vars=[], **kwargs):
         delay = kwargs.get('delay', 0.0)
         ping_iteration = kwargs.get('ping_iteration')
+        kill_signal = kwargs.get('kill_signal')
         ping_iteration(reset=True)
         disable_progress_bar = kwargs.get('disable_progress_bar', False)
         
@@ -57,39 +58,51 @@ class Experiment:
 
         assert isinstance(sweep_vars, list), "Sweeping variables must be given as a LIST of TUPLEs: [(VAR1, range1), (VAR2, range2), ...]"
         if len(sweep_vars) == 0:
-            self._expt_config.prepare_instruments()
-            data = self._expt_config.get_data()
-            data_file.push_datapkt(data, sweep_vars)
-            time.sleep(delay)
+            if not kill_signal():
+                self._expt_config.prepare_instruments()
+                if not kill_signal():
+                    data = self._expt_config.get_data()
+                    data_file.push_datapkt(data, sweep_vars)
+                    time.sleep(delay)
+            #################################
         else:
             for ind_var, cur_var in enumerate(sweep_vars):
                 assert isinstance(cur_var[1], np.ndarray), "The second argument in each sweeping-variable tuple must be a Numpy Array."
                 assert cur_var[1].size > 0, f"The sweeping array for sweeping-variable {ind_var} is empty. If using arange, check the bounds!"
 
-            sweep_arrays = [x[1] for x in sweep_vars]
-            sweep_grids = np.meshgrid(*sweep_arrays)
-            sweep_grids = np.array(sweep_grids)
-            axes = np.arange(len(sweep_grids.shape))
-            try:
-                axes[2] = 1
-                axes[1] = 2
-            except IndexError:
-                pass
-            sweep_grids = np.transpose(sweep_grids, axes=axes).reshape(len(sweep_arrays),-1).T
-            
-            #sweep_vars is given as a list of tuples formatted as (parameter, sweep-values in an numpy-array)
-            for ind_coord, cur_coord in enumerate(sweep_grids):
-                #Set the values
-                for ind, cur_val in enumerate(cur_coord):
-                    sweep_vars[ind][0].set_raw(cur_val)
-                #Now prepare the instrument
-                # self._expt_config.check_conformance() #TODO: Write this
-                self._expt_config.prepare_instruments()
-                time.sleep(delay)
-                data = self._expt_config.get_data()
-                data_file.push_datapkt(data, sweep_vars)
-                if not disable_progress_bar:
-                    ping_iteration((ind_coord+1)/sweep_grids.shape[0])
+            if not kill_signal():
+                sweep_arrays = [x[1] for x in sweep_vars]
+                sweep_grids = np.meshgrid(*sweep_arrays)
+                sweep_grids = np.array(sweep_grids)
+                axes = np.arange(len(sweep_grids.shape))
+                try:
+                    axes[2] = 1
+                    axes[1] = 2
+                except IndexError:
+                    pass
+                sweep_grids = np.transpose(sweep_grids, axes=axes).reshape(len(sweep_arrays),-1).T
+                
+                #sweep_vars is given as a list of tuples formatted as (parameter, sweep-values in an numpy-array)
+                for ind_coord, cur_coord in enumerate(sweep_grids):
+                    #Set the values
+                    for ind, cur_val in enumerate(cur_coord):
+                        sweep_vars[ind][0].set_raw(cur_val)
+
+                    if kill_signal():
+                        break
+                    
+                    #Now prepare the instrument
+                    # self._expt_config.check_conformance() #TODO: Write this
+                    self._expt_config.prepare_instruments()
+                    time.sleep(delay)
+
+                    if kill_signal():
+                        break
+
+                    data = self._expt_config.get_data()
+                    data_file.push_datapkt(data, sweep_vars)
+                    if not disable_progress_bar:
+                        ping_iteration((ind_coord+1)/sweep_grids.shape[0])
 
         data_file.close()
         self._expt_config.makesafe_instruments()

@@ -391,7 +391,10 @@ class Laboratory:
         cur_exp_path = self._save_dir + folder_time_stamp
         Path(cur_exp_path).mkdir(parents=True, exist_ok=True)
 
-        ret_vals = expt_obj._run(cur_exp_path, sweep_vars, ping_iteration=self._update_progress_bar, **kwargs)
+        #Reset kill-switch state
+        self._kill_switch_reset(cur_exp_path)
+
+        ret_vals = expt_obj._run(cur_exp_path, sweep_vars, ping_iteration=self._update_progress_bar, kill_signal=self._kill_switch_check, **kwargs)
         self._group_dir['ExptIndex'] += 1
 
         #Save the experiment configuration
@@ -399,8 +402,9 @@ class Laboratory:
         #Save experiment-specific experiment-configuration data (i.e. timing diagram)
         expt_obj.save_config(cur_exp_path, 'timing_diagram', 'experiment_parameters.txt', self._group_dir['SweepQueue'], self._group_dir['ExptIndex'])
 
-        #Run postprocessing
-        expt_obj._post_process(ret_vals)
+        #Run postprocessing if the experiment completed
+        if not self._killed_expt:
+            expt_obj._post_process(ret_vals)
         
         #Save instrument configurations (QCoDeS)
         self._save_instrument_config(cur_exp_path)
@@ -520,7 +524,24 @@ class Laboratory:
     def open_browser(self):
         cur_dir = os.path.dirname(os.path.realpath(__file__)).replace('\\','/')
         drive = cur_dir[0:2]
-        os.system(f'start \"temp\" cmd /k \"{drive} && cd \"{cur_dir}/Utilities\" && python ExperimentViewer.py \"{self._save_dir}\"\"')
+        full_abs_path = os.path.abspath(self._save_dir) + '/'    #Extra / as abspath doesn't include it...
+        os.system(f'start \"temp\" cmd /k \"{drive} && cd \"{cur_dir}/Utilities\" && python ExperimentViewer.py \"{full_abs_path}\"\"')
+
+    def _kill_switch_reset(self, cur_exp_path):
+        halt_loc = self._save_dir + 'HALT.txt'
+        if os.path.exists(halt_loc):
+            os.remove(halt_loc)
+        self._kill_switch_dir = cur_exp_path
+        self._killed_expt = False
+    def _kill_switch_check(self):
+        halt_loc = self._save_dir + 'HALT.txt'
+        if os.path.exists(halt_loc):
+            os.remove(halt_loc)
+            #Notify the experiment directory of the halting...
+            open(self._kill_switch_dir + 'EXPERIMENT MANUALLY HALTED.txt', 'a').close()
+            self._killed_expt = True
+            return True
+        return False
 
     def _update_progress_bar(self, val_pct=0, reset=False):
         if reset:

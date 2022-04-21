@@ -7,11 +7,14 @@ class ExpPeakScouterIQ(Experiment):
 
         self._iq_indices = iq_indices
         self._is_trough = kwargs.get('is_trough', False)
+        self._fit_res_fano = kwargs.get('fit_fano_res', False)
+        assert self._is_trough or (not self._is_trough and not self._fit_res_fano), "Fano resonance fitting only supports troughs at the moment."
         self._post_processor = kwargs.get('post_processor', None)
         self._param_centre = kwargs.get('param_centre', None)
         self._param_width = kwargs.get('param_width', None)
         self._param_amplitude = kwargs.get('param_amplitude', None)
         self._param_offset = kwargs.get('param_offset', None)
+        self._param_fano = kwargs.get('param_fano', None)
     
     def _run(self, file_path, sweep_vars=[], **kwargs):
         assert len(sweep_vars) == 1, "Can only sweep one variable in this experiment."
@@ -30,18 +33,32 @@ class ExpPeakScouterIQ(Experiment):
         data_x = data.param_vals[cur_sweep_ind]
         data_y = np.sqrt(arr[:,self._iq_indices[0]]**2 + arr[:,self._iq_indices[1]]**2)
 
-        dfit = DFitPeakLorentzian()
-        dpkt = dfit.get_fitted_plot(data_x, data_y, xLabel=self._cur_param_name, dip=self._is_trough)
-
-        #Commit to parameters...
-        if self._param_centre:
-            self._param_centre.Value = dpkt['centre']
-        if self._param_width:
-            self._param_width.Value = dpkt['width']
-        if self._param_amplitude:
-            self._param_amplitude.Value = dpkt['amplitude']
-        if self._param_offset:
-            self._param_offset.Value = dpkt['offset']
+        if not self._fit_res_fano:
+            dfit = DFitPeakLorentzian()
+            dpkt = dfit.get_fitted_plot(data_x, data_y, xLabel=self._cur_param_name, dip=self._is_trough)
+            #Commit to parameters...
+            if self._param_centre:
+                self._param_centre.Value = dpkt['centre']
+            if self._param_width:
+                self._param_width.Value = dpkt['width']
+            if self._param_amplitude:
+                self._param_amplitude.Value = dpkt['amplitude']
+            if self._param_offset:
+                self._param_offset.Value = dpkt['offset']
+        else:
+            dfit = DFitFanoResonance()
+            dpkt = dfit.get_fitted_plot(data_x, data_y**2, xLabel=self._cur_param_name, yLabel="Squared IQ Amplitude") #, dip=self._is_trough)
+            #Commit to parameters...
+            if self._param_centre:
+                self._param_centre.Value = dpkt['xMinimum']
+            if self._param_width:
+                self._param_width.Value = dpkt['width']
+            if self._param_amplitude:
+                self._param_amplitude.Value = dpkt['amplitude']
+            if self._param_offset:
+                self._param_offset.Value = dpkt['offset']
+            if self._param_fano:
+                self._param_offset.Value = dpkt['FanoFac']
 
         dpkt['fig'].show()
-        
+

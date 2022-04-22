@@ -771,8 +771,8 @@ class TaborP2584M_ACQ(InstrumentChannel):
         ret_val = {
                     'parameters' : ['repetition', 'segment', 'sample'],
                     'data' : {
-                                'ch1' : self.wav1.astype(np.int32),
-                                'ch2' : self.wav2.astype(np.int32),
+                                'CH1' : self.wav1.astype(np.int32),
+                                'CH2' : self.wav2.astype(np.int32),
                                 },
                     'misc' : {'SampleRates' : [self.SampleRate]*2}  #NOTE!!! DIVIDE SAMPLERATE BY /16 IF USING DECIMATION STAGES!
                 }

@@ -134,6 +134,10 @@ class MWS_SGS100A(VisaInstrument):
                            get_cmd='SOUR:ROSC:EXT:FREQ?',
                            set_cmd='SOUR:ROSC:EXT:FREQ {}',
                            vals=vals.Enum('10MHz', '100MHz', '1000MHz'))
+        self.add_parameter('trigger_impedance',
+                            get_cmd='SOUR:PULM:TRIG:EXT:IMP?',
+                            set_cmd='SOUR:PULM:TRIG:EXT:IMP {}',
+                            vals=vals.Enum('G50', 'G10K'))
                            
         self.add_parameter('alc',
                            get_cmd='POW:ALC?',

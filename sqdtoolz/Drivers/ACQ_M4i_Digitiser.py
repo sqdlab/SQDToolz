@@ -269,7 +269,7 @@ class ACQ_M4i_Digitiser(M4i):
                 
                 cur_processor.push_data({
                     'parameters' : ['repetition', 'segment', 'sample'],
-                    'data' : { f'ch{m}' : arr_blk[m].astype(dtype=np.float64) for m in range(self.num_channels) },
+                    'data' : { f'CH{m}' : arr_blk[m].astype(dtype=np.float64) for m in range(self.num_channels) },
                     'misc' : {'SampleRates' : [self.sample_rate.get()]*self.num_channels}
                 })
                 if done:

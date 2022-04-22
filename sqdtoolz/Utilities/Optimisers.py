@@ -11,19 +11,20 @@ class OptimiseParaboloid:
         self.rec_pts += [[x,y,z_val]]
         return z_val
 
-    def find_minimum(self, x_bounds, y_bounds, fig=None, ax=None, **kwargs):
+    def find_minimum(self, x_bounds, y_bounds, xLabel="x", yLabel="y", fig=None, ax=None, **kwargs):
         self.rec_pts = []
 
         num_sample_points = kwargs.get('num_win_sample_pts', 3)
         step_bound_fraction = kwargs.get('step_shrink_factor', 0.33)
         dont_plot = kwargs.get('dont_plot', False)
+        num_iters = kwargs.get('num_iters', 10)
 
         cur_x_bounds = x_bounds
         cur_y_bounds = y_bounds
         is_x = True
         frac_move = 1-step_bound_fraction
         bnd_history = []
-        for m in range(10):
+        for m in range(num_iters):
             cur_xMid = 0.5*(cur_x_bounds[0] + cur_x_bounds[1])
             cur_yMid = 0.5*(cur_y_bounds[0] + cur_y_bounds[1])
             if is_x:
@@ -45,7 +46,9 @@ class OptimiseParaboloid:
             # print(bnd_history[-1])
 
         arr_pts = np.array(self.rec_pts)
+        self.opt_data = arr_pts*1.0
 
+        min_coord = arr_pts[np.argmin(arr_pts[:,2]),:]
         if not dont_plot:
             if fig == None:
                 fig, ax = plt.subplots(1)
@@ -53,6 +56,9 @@ class OptimiseParaboloid:
             for cur_bnd in bnd_history:
                 rect = patches.Rectangle((cur_bnd[0][0], cur_bnd[1][0]), cur_bnd[0][1] - cur_bnd[0][0], cur_bnd[1][1] - cur_bnd[1][0], linewidth=1, edgecolor='r', facecolor='none')
                 ax.add_patch(rect)
+            ax.set_xlabel(xLabel)
+            ax.set_ylabel(yLabel)
+            ax.plot(min_coord[0], min_coord[1], 'rx')
 
-        return arr_pts[np.argmin(arr_pts[:,2]),:], fig   #Basically: (x, y, minimum z), fig
+        return min_coord, fig   #Basically: (x, y, minimum z), fig
 

@@ -1,36 +1,34 @@
 from sqdtoolz.Experiment import Experiment
 from sqdtoolz.HAL.WaveformSegments import*
-import time
-
+from sqdtoolz.Utilities.Optimisers import OptimiseParaboloid
 from sqdtoolz.Utilities.DataFitting import*
-import scipy.optimize
 from sqdtoolz.Utilities.FileIO import*
-
 class ExpMixerCalibrationLO(Experiment):
     def __init__(self, name, expt_config, var_down_conv_freq, freqs_sidebands_LCR, var_DC_off_I, range_DC_off_I, var_DC_off_Q, range_DC_off_Q, optimise=False, **kwargs):
         super().__init__(name, expt_config)
         self._var_down_conv_freq = var_down_conv_freq
         self._freqs_sidebands_LCR = freqs_sidebands_LCR
         self._var_DC_off_I = var_DC_off_I
-        self._range_DC_off_I = range_DC_off_I
+        self._range_DC_off_I = (min(range_DC_off_I), max(range_DC_off_I))
         self._var_DC_off_Q = var_DC_off_Q
-        self._range_DC_off_Q = range_DC_off_Q
+        self._range_DC_off_Q = (min(range_DC_off_Q), max(range_DC_off_Q))
+        self._ch_id = kwargs.get('acq_ch', 'CH1')
         self._iters = kwargs.get('iterations', 1)
 
         self._optimise = optimise
-        self._opt_data = []
-        self._accuracy = kwargs.get('accuracy', 0.0005)
+        self._sample_points = kwargs.get('sample_points', 3)
+        self._win_shrink_factor = kwargs.get('win_shrink_factor', 0.33)
 
-    def _cost_func(self, iq_vals):
-        self._var_DC_off_I.Value = np.clip(iq_vals[0], self._range_DC_off_I[0], self._range_DC_off_I[1])
-        self._var_DC_off_Q.Value = np.clip(iq_vals[1], self._range_DC_off_Q[0], self._range_DC_off_Q[1])
+
+    def _cost_func(self, x, y):
+        self._var_DC_off_I.Value = x
+        self._var_DC_off_Q.Value = y
         self._expt_config.prepare_instruments()
         smpl_data = self._expt_config.get_data()
 
-        i_val, q_val = smpl_data['data']['ch1_I'], smpl_data['data']['ch1_Q']
+        i_val, q_val = smpl_data['data'][self._ch_id + '_I'], smpl_data['data'][self._ch_id + '_Q']
 
         ampl = np.sqrt(i_val**2 + q_val**2)
-        self._opt_data += [[iq_vals[0], iq_vals[1], ampl]]
         return ampl
 
     def _run(self, file_path, sweep_vars=[], **kwargs):
@@ -41,26 +39,20 @@ class ExpMixerCalibrationLO(Experiment):
         
         if self._optimise:
             self._file_path = file_path
-            #
-            self._opt_ind = 0
-            self._opt_data = []
-            #
-            #Due to a bug in Scipy...
-            fprime = lambda x: scipy.optimize.approx_fprime(x, self._cost_func, self._accuracy)
-            sol = scipy.optimize.minimize(self._cost_func, [self._var_DC_off_I.Value, self._var_DC_off_Q.Value], jac=fprime, method='Newton-CG',
-                                                    options={'xtol': self._accuracy, 'maxiter' : self._iters, 'eps' : self._accuracy})
-                                                    # bounds=( (self._range_DC_off_I[0], self._range_DC_off_I[1]),
-                                                    #          (self._range_DC_off_Q[0], self._range_DC_off_Q[1]) ),
-                                                    #  options={'fatol': self._accuracy})
 
-            self._var_DC_off_I.Value, self._var_DC_off_Q.Value = sol.x
+            opt = OptimiseParaboloid(self._cost_func)
+            min_coord, self.fig = opt.find_minimum( self._range_DC_off_I, self._range_DC_off_Q, 'I-Channel', 'Q-Channel', num_iters=self._iters, num_win_sample_pts=self._sample_points, step_shrink_factor=self._win_shrink_factor )
+
+            print(f'Minimum Coordinate: I={min_coord[0]}, Q={min_coord[1]}, Ampl={min_coord[2]}')
+            
+            self._var_DC_off_I.Value, self._var_DC_off_Q.Value = min_coord[0], min_coord[1]
             #
-            data_opt = np.array(self._opt_data)
+            data_opt = np.array(opt.opt_data)
             final_data = {
                 'data' : {
-                    'ch_I' : data_opt[:,0],
-                    'ch_Q' : data_opt[:,1],
-                    'ch_ampl' : data_opt[:,2]
+                    'CH_I' : data_opt[:,0],
+                    'CH_Q' : data_opt[:,1],
+                    'CH_ampl' : data_opt[:,2]
                 },
                 'parameters' : ['step']
             }
@@ -113,12 +105,12 @@ class ExpMixerCalibrationLO(Experiment):
 
     def _post_process(self, data):
         if self._optimise:
-            data_opt = data.get_numpy_array()
-            #
-            fig, ax = plt.subplots(1)
-            ax.scatter(data_opt[:,0], data_opt[:,1], c=data_opt[:,2])
-            ax.set_xlabel('I (V)'); ax.set_ylabel('Q (V)')
-            ax.grid(b=True, which='minor'); ax.grid(b=True, which='major', color='k')
-            #
-            fig.show()
-            fig.savefig(self._file_path + 'fitted_plot.png')
+            # data_opt = data.get_numpy_array()
+            # #
+            # fig, ax = plt.subplots(1)
+            # ax.scatter(data_opt[:,0], data_opt[:,1], c=data_opt[:,2])
+            # ax.set_xlabel('I (V)'); ax.set_ylabel('Q (V)')
+            # ax.grid(b=True, which='minor'); ax.grid(b=True, which='major', color='k')
+            # #
+            self.fig.show()
+            self.fig.savefig(self._file_path + 'fitted_plot.png')

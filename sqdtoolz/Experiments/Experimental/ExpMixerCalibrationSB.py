@@ -1,7 +1,7 @@
 from sqdtoolz.Experiment import Experiment
 from sqdtoolz.HAL.WaveformSegments import*
 import time
-
+from sqdtoolz.Utilities.Optimisers import OptimiseParaboloid
 from sqdtoolz.Utilities.DataFitting import*
 import scipy.optimize
 from sqdtoolz.Utilities.FileIO import*
@@ -12,25 +12,25 @@ class ExpMixerCalibrationSB(Experiment):
         self._var_down_conv_freq = var_down_conv_freq
         self._freq_SB_minimise = freq_SB_minimise
         self._var_amp = var_amp
-        self._range_amps = range_amps
+        self._range_amps = (min(range_amps), max(range_amps))
         self._var_phs = var_phs
-        self._range_phs = range_phs
+        self._range_phs = (min(range_phs), max(range_phs))
+        self._ch_id = kwargs.get('acq_ch', 'CH1')
         self._iters = kwargs.get('iterations', 1)
 
         self._optimise = optimise
-        self._opt_data = []
-        self._accuracy = kwargs.get('accuracy', 0.0005)
+        self._sample_points = kwargs.get('sample_points', 3)
+        self._win_shrink_factor = kwargs.get('win_shrink_factor', 0.33)
 
-    def _cost_func(self, amp_phs_vals):
-        self._var_amp.Value = amp_phs_vals[0]
-        self._var_phs.Value = amp_phs_vals[1]
+    def _cost_func(self, x, y):
+        self._var_amp.Value = x
+        self._var_phs.Value = y
         self._expt_config.prepare_instruments()
         smpl_data = self._expt_config.get_data()
 
-        i_val, q_val = smpl_data['data']['ch1_I'], smpl_data['data']['ch1_Q']
+        i_val, q_val = smpl_data['data'][self._ch_id + '_I'], smpl_data['data'][self._ch_id + '_Q']
 
         ampl = np.sqrt(i_val**2 + q_val**2)
-        self._opt_data += [[amp_phs_vals[0], amp_phs_vals[1], ampl]]
         return ampl
 
     def _run(self, file_path, sweep_vars=[], **kwargs):
@@ -41,22 +41,20 @@ class ExpMixerCalibrationSB(Experiment):
 
         if self._optimise:
             self._file_path = file_path
+            
+            opt = OptimiseParaboloid(self._cost_func)
+            min_coord, self.fig = opt.find_minimum( self._range_amps, self._range_phs, 'Amplitude Factor', 'Phase Offset', num_iters=self._iters, num_win_sample_pts=self._sample_points, step_shrink_factor=self._win_shrink_factor )
+
+            print(f'Minimum Coordinate: Amp={min_coord[0]}, Phs={min_coord[1]}, Value={min_coord[2]}')
+            
+            self._var_amp.Value, self._var_phs.Value = min_coord[0], min_coord[1]
             #
-            self._opt_ind = 0
-            self._opt_data = []
-            #
-            #Due to a bug in Scipy...
-            fprime = lambda x: scipy.optimize.approx_fprime(x, self._cost_func, self._accuracy)
-            sol = scipy.optimize.minimize(self._cost_func, [self._var_amp.Value, self._var_phs.Value], jac=fprime, method='Newton-CG',
-                                                    options={'xtol': self._accuracy, 'maxiter' : self._iters, 'eps' : self._accuracy})
-            self._var_amp.Value, self._var_phs.Value = sol.x
-            #
-            data_opt = np.array(self._opt_data)
+            data_opt = np.array(opt.opt_data)
             final_data = {
                 'data' : {
-                    'ch_I' : data_opt[:,0],
-                    'ch_Q' : data_opt[:,1],
-                    'ch_ampl' : data_opt[:,2]
+                    'CH_I' : data_opt[:,0],
+                    'CH_Q' : data_opt[:,1],
+                    'CH_ampl' : data_opt[:,2]
                 },
                 'parameters' : ['step']
             }
@@ -70,15 +68,15 @@ class ExpMixerCalibrationSB(Experiment):
 
     def _post_process(self, data):
         if self._optimise:
-            data_opt = data.get_numpy_array()
-            #
-            fig, ax = plt.subplots(1)
-            ax.scatter(data_opt[:,0], data_opt[:,1], c=data_opt[:,2])
-            ax.set_xlabel('Amplitude-Factor Q/I'); ax.set_ylabel('Phase-Difference')
-            ax.grid(b=True, which='minor'); ax.grid(b=True, which='major', color='k')
-            #
-            fig.show()
-            fig.savefig(self._file_path + 'fitted_plot.png')
+            # data_opt = data.get_numpy_array()
+            # #
+            # fig, ax = plt.subplots(1)
+            # ax.scatter(data_opt[:,0], data_opt[:,1], c=data_opt[:,2])
+            # ax.set_xlabel('Amplitude-Factor Q/I'); ax.set_ylabel('Phase-Difference')
+            # ax.grid(b=True, which='minor'); ax.grid(b=True, which='major', color='k')
+            # #
+            self.fig.show()
+            self.fig.savefig(self._file_path + 'fitted_plot.png')
         else:
             arr = data.get_numpy_array()
             data_amp = np.sqrt(arr[:,:,0]**2+arr[:,:,1]**2)

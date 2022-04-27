@@ -29,7 +29,7 @@ class ExpACstarkRamseyGE(Experiment):
         self.load_time = kwargs.get('load_time', 40e-6)
 
         #Calculate tipping amplitude
-        def_tip_ampl = self._SPEC_qubit['GE X-Gate Amplitude'].Value * 0.5
+        def_tip_ampl = self._SPEC_qubit['GE X/2-Gate Amplitude'].Value
         #Override the tip-amplitude if one is specified explicitly
         self.tip_ampl = kwargs.get('tip_amplitude', def_tip_ampl)
         assert self.tip_ampl != 0, "Tip-amplitude is zero. Either supply a tip_amplitude or have \'GE X-Gate Amplitude\' inside the qubit SPEC to be non-zero (e.g. run Rabi first?)."

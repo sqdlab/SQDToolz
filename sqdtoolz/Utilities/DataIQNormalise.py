@@ -41,7 +41,7 @@ class DataIQNormalise:
         return (calib_0, calib_1)
     
     
-    def normalise_data(self, iq_data_array, ax=None):
+    def normalise_data(self, iq_data_array, normalise_to_unity=True, ax=None):
         #iq_data_array is a Nx2 array
 
         calibG = np.mean(self._calib_pts_IQ_state_0, axis=0)
@@ -57,8 +57,11 @@ class DataIQNormalise:
         rotMat = np.array([[np.cos(angleRot), -np.sin(angleRot)],[np.sin(angleRot), np.cos(angleRot)]])
         normData = rotMat @ normData.T
 
-        #Just take I component of the dataset
-        finalData = normData[0]/np.linalg.norm(vecSig)
+        if normalise_to_unity:
+            #Just take I component of the dataset
+            finalData = normData[0]/np.linalg.norm(vecSig)
+        else:
+            finalData = normData
 
         if ax != None:
             ax.plot(self._calib_pts_IQ_state_0[:,0],self._calib_pts_IQ_state_0[:,1], 'o')

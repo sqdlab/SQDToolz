@@ -32,9 +32,6 @@ class GPU_MeanBlock(ProcNodeGPU):
 
             data_pkt['data'][cur_ch] = cp.mean(data_pkt['data'][cur_ch][tuple(slice_inds)].reshape(tuple(temp)), axis_num+1)
 
-        #Remove the parameter as it no longer exists after the averaging...
-        data_pkt['parameters'].pop(axis_num)
-
         return data_pkt
 
     def _get_current_config(self):

@@ -61,7 +61,7 @@ class ExpCalibGE(Experiment):
 
         data_norm = DataIQNormalise.calibrateFromFileIOReader(self.cur_data, self._iq_indices, True)
 
-        return data_norm.normalise_data(iq_data_array, ax)
+        return data_norm.normalise_data(iq_data_array, ax=ax)
 
 
 

@@ -35,11 +35,11 @@ class ExpSingleShotGE(Experiment):
 
         wfm = WaveformGeneric(['qubit'], ['readout'])
         wfm.set_waveform('qubit', [
-            WFS_Constant("SEQPAD", None, -1, 0.0),
-            WFS_Constant("init", None, self.load_time, 0.0),
             WFS_Gaussian("drive", self._wfmt_qubit_drive.apply(phase=0), self.drive_time, 0.001),
             WFS_Constant("pad", None, 5e-9, 0.0),
-            WFS_Constant("read", None, self.readout_time, 0.0)
+            WFS_Constant("read", None, self.readout_time, 0.0),
+            WFS_Constant("SEQPAD", None, -1, 0.0),
+            WFS_Constant("init", None, self.load_time, 0.0)
         ])
         wfm.set_digital_segments('readout', 'qubit', ['read'])
         self._temp_vars = self._expt_config.update_waveforms(wfm, [('Drive Amplitude', 'qubit', 'drive', 'Amplitude')] )

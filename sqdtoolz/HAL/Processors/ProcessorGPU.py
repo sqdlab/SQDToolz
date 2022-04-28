@@ -37,6 +37,7 @@ from sqdtoolz.HAL.Processors.GPU.GPU_Slice import*
 from sqdtoolz.HAL.Processors.GPU.GPU_Rename import*
 from sqdtoolz.HAL.Processors.GPU.GPU_ChannelArithmetic import*
 from sqdtoolz.HAL.Processors.GPU.GPU_ConstantArithmetic import*
+from sqdtoolz.HAL.Processors.GPU.GPU_MeanBlock import*
 
 class ProcessorGPU(DataProcessor):
     def __init__(self, proc_name, lab, pipeline_main = [], pipeline_end = []):

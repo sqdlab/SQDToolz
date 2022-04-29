@@ -96,8 +96,8 @@ class TestCPU(unittest.TestCase):
             plt.show()
         mus = np.array(mus)
         sds = np.array(sds)
-        assert np.max(np.abs(mus)) < noise_level / np.sqrt(num_reps) * 2.56, "CPU Signal downconversion yields unsuitable results."
-        assert np.max(np.abs(sds)) < noise_level / np.sqrt(num_reps) * 2.56, "CPU Signal downconversion yields unsuitable results."
+        assert np.max(np.abs(mus)) < noise_level / np.sqrt(num_reps) * 2.56 * 2, "CPU Signal downconversion yields unsuitable results."
+        assert np.max(np.abs(sds)) < noise_level / np.sqrt(num_reps) * 2.56 * 2, "CPU Signal downconversion yields unsuitable results."
         if INCLUDE_PLOTS:
             input('Press ENTER')
         self.cleanup()
@@ -187,6 +187,146 @@ class TestCPU(unittest.TestCase):
         fin_data = new_proc.get_all_data()
         expected_ans = 0.5*(data_size**2+data_size) * ( 0.5*(num_segs**2+num_segs)*num_reps + 2*0.5*(num_reps**2+num_reps)*num_segs ) / (data_size * num_segs * num_reps)
         assert np.abs(expected_ans - fin_data['data']['ch1']) < 1e-16, "CPU Mean does not yield expected result."
+        self.cleanup()
+
+    def test_MeanBlock(self):
+        self.initialise()
+
+        sample_array = [[[x+y+z for x in range(6)] for y in range(10)] for z in range(4)]
+        sample_array = np.array(sample_array)
+
+        num_reps, num_segs, num_smpls = sample_array.shape
+        #
+        #Test with simple case over samples:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : sample_array*1.0, 'ch2' : sample_array*2.0 },
+            'misc' : {'SampleRates' : [1,1]}
+        }
+        new_proc = ProcessorCPU('CPU_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_MeanBlock('sample', 2))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = [[[(2*x+0.5)+y+z for x in range(3)] for y in range(10)] for z in range(4)]
+        assert self.arr_equality(fin_data['data']['ch1'], np.array(expected_ans)), "GPU MeanBlock does not yield expected result."
+        expected_ans = np.array(expected_ans)*2.0
+        assert self.arr_equality(fin_data['data']['ch2'], expected_ans), "GPU MeanBlock does not yield expected result."
+        #
+        #Test with simple case over segments:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : sample_array*1.0, 'ch2' : sample_array*2.0 },
+            'misc' : {'SampleRates' : [1,1]}
+        }
+        new_proc = ProcessorCPU('CPU_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_MeanBlock('segment', 5))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = [[[0.2*((x+5*y) + (x+5*y)+1 + (x+5*y)+2 + (x+5*y)+3 + (x+5*y)+4)+z for x in range(6)] for y in range(2)] for z in range(4)]
+        assert self.arr_equality(fin_data['data']['ch1'], np.array(expected_ans)), "GPU MeanBlock does not yield expected result."
+        expected_ans = np.array(expected_ans)*2.0
+        assert self.arr_equality(fin_data['data']['ch2'], expected_ans), "GPU MeanBlock does not yield expected result."
+        #
+        #Test with simple case over repetitions:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : sample_array*1.0, 'ch2' : sample_array*2.0 },
+            'misc' : {'SampleRates' : [1,1]}
+        }
+        new_proc = ProcessorCPU('CPU_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_MeanBlock('repetition', 2))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = [0.5*(sample_array[2*x]+sample_array[2*x+1]) for x in range(2)]
+        assert self.arr_equality(fin_data['data']['ch1'], np.array(expected_ans)), "GPU MeanBlock does not yield expected result."
+        expected_ans = np.array(expected_ans)*2.0
+        assert self.arr_equality(fin_data['data']['ch2'], expected_ans), "GPU MeanBlock does not yield expected result."
+
+        #
+        #Test with case where block-size is not divisible over array size over samples:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : sample_array*1.0, 'ch2' : sample_array*2.0 },
+            'misc' : {'SampleRates' : [1,1]}
+        }
+        new_proc = ProcessorCPU('CPU_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_MeanBlock('sample', 4))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = [[[(0+1+2+3)*0.25+y+z for x in range(1)] for y in range(10)] for z in range(4)]
+        assert self.arr_equality(fin_data['data']['ch1'], np.array(expected_ans)), "GPU MeanBlock does not yield expected result."
+        expected_ans = np.array(expected_ans)*2.0
+        assert self.arr_equality(fin_data['data']['ch2'], expected_ans), "GPU MeanBlock does not yield expected result."
+        #
+        #Test with case where block-size is not divisible over array size over segments:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : sample_array*1.0, 'ch2' : sample_array*2.0 },
+            'misc' : {'SampleRates' : [1,1]}
+        }
+        new_proc = ProcessorCPU('CPU_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_MeanBlock('segment', 3))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = [[[1/3*((x+3*y) + (x+3*y)+1 + (x+3*y)+2)+z for x in range(6)] for y in range(3)] for z in range(4)]
+        assert self.arr_equality(fin_data['data']['ch1'], np.array(expected_ans)), "GPU MeanBlock does not yield expected result."
+        expected_ans = np.array(expected_ans)*2.0
+        assert self.arr_equality(fin_data['data']['ch2'], expected_ans), "GPU MeanBlock does not yield expected result."
+        #
+        #Test with case where block-size is not divisible over array size over repetitions:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : sample_array*1.0, 'ch2' : sample_array*2.0 },
+            'misc' : {'SampleRates' : [1,1]}
+        }
+        new_proc = ProcessorCPU('CPU_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_MeanBlock('repetition', 3))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = [1/3*(sample_array[3*x]+sample_array[3*x+1]+sample_array[3*x+2]) for x in range(1)]
+        assert self.arr_equality(fin_data['data']['ch1'], np.array(expected_ans)), "GPU MeanBlock does not yield expected result."
+        expected_ans = np.array(expected_ans)*2.0
+        assert self.arr_equality(fin_data['data']['ch2'], expected_ans), "GPU MeanBlock does not yield expected result."
+
+        #
+        #Test case where block-size is greater than array size over repetitions:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : sample_array*1.0, 'ch2' : sample_array*2.0 },
+            'misc' : {'SampleRates' : [1,1]}
+        }
+        new_proc = ProcessorCPU('CPU_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_MeanBlock('repetition', 5))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = [1/4*(sample_array[4*x]+sample_array[4*x+1]+sample_array[4*x+2]+sample_array[4*x+3]) for x in range(1)]
+        assert self.arr_equality(fin_data['data']['ch1'], np.array(expected_ans)), "GPU MeanBlock does not yield expected result."
+        expected_ans = np.array(expected_ans)*2.0
+        assert self.arr_equality(fin_data['data']['ch2'], expected_ans), "GPU MeanBlock does not yield expected result."
+        #
+        #Test case where block-size is equal to the array size over repetitions:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : sample_array*1.0, 'ch2' : sample_array*2.0 },
+            'misc' : {'SampleRates' : [1,1]}
+        }
+        new_proc = ProcessorCPU('CPU_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_MeanBlock('repetition', 4))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = [1/4*(sample_array[4*x]+sample_array[4*x+1]+sample_array[4*x+2]+sample_array[4*x+3]) for x in range(1)]
+        assert self.arr_equality(fin_data['data']['ch1'], np.array(expected_ans)), "GPU MeanBlock does not yield expected result."
+        expected_ans = np.array(expected_ans)*2.0
+        assert self.arr_equality(fin_data['data']['ch2'], expected_ans), "GPU MeanBlock does not yield expected result."
+
         self.cleanup()
 
     def test_Integrate(self):
@@ -626,11 +766,11 @@ class TestGPU(unittest.TestCase):
         return np.max(np.abs(arr1 - arr2)) < self.ERR_TOL
     
     def test_IQdemod(self):
+        self.initialise()
         try:
             test_proc = ProcessorGPU('test',self.lab)
         except:
-            return
-        self.initialise()
+            assert False, "GPU Processor could not be initialised - has CuPy been installed?"
         data_size = 1024#*1024*4
         omega = 2*np.pi*0.14
         def ampl_envelope(ampl, noise_level=1.0):
@@ -675,18 +815,18 @@ class TestGPU(unittest.TestCase):
             plt.show()
         mus = np.array(mus)
         sds = np.array(sds)
-        assert np.max(np.abs(mus)) < noise_level / np.sqrt(num_reps) * 2.56, "GPU Signal downconversion yields unsuitable results."
-        assert np.max(np.abs(sds)) < noise_level / np.sqrt(num_reps) * 2.56, "GPU Signal downconversion yields unsuitable results."
+        assert np.max(np.abs(mus)) < noise_level / np.sqrt(num_reps) * 2.56 * 2, "GPU Signal downconversion yields unsuitable results."
+        assert np.max(np.abs(sds)) < noise_level / np.sqrt(num_reps) * 2.56 * 2, "GPU Signal downconversion yields unsuitable results."
         if INCLUDE_PLOTS:
             input('Press ENTER')
         self.cleanup()
 
     def test_Mean(self):
+        self.initialise()
         try:
             test_proc = ProcessorGPU('test',self.lab)
         except:
-            return
-        self.initialise()
+            assert False, "GPU Processor could not be initialised - has CuPy been installed?"
         data_size = 1024#*1024*4
         num_reps = 10   #keep greater than 2
         num_segs = 6
@@ -772,12 +912,156 @@ class TestGPU(unittest.TestCase):
         assert np.abs(expected_ans - fin_data['data']['ch1']) < 1e-16, "GPU Mean does not yield expected result."
         self.cleanup()
 
-    def test_Integrate(self):
+    def test_MeanBlock(self):
+        self.initialise()
         try:
             test_proc = ProcessorGPU('test',self.lab)
         except:
-            return
+            assert False, "GPU Processor could not be initialised - has CuPy been installed?"
+
+        sample_array = [[[x+y+z for x in range(6)] for y in range(10)] for z in range(4)]
+        sample_array = np.array(sample_array)
+
+        num_reps, num_segs, num_smpls = sample_array.shape
+        #
+        #Test with simple case over samples:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : sample_array*1.0, 'ch2' : sample_array*2.0 },
+            'misc' : {'SampleRates' : [1,1]}
+        }
+        new_proc = ProcessorGPU('GPU_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(GPU_MeanBlock('sample', 2))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = [[[(2*x+0.5)+y+z for x in range(3)] for y in range(10)] for z in range(4)]
+        assert self.arr_equality(fin_data['data']['ch1'], np.array(expected_ans)), "GPU MeanBlock does not yield expected result."
+        expected_ans = np.array(expected_ans)*2.0
+        assert self.arr_equality(fin_data['data']['ch2'], expected_ans), "GPU MeanBlock does not yield expected result."
+        #
+        #Test with simple case over segments:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : sample_array*1.0, 'ch2' : sample_array*2.0 },
+            'misc' : {'SampleRates' : [1,1]}
+        }
+        new_proc = ProcessorGPU('GPU_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(GPU_MeanBlock('segment', 5))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = [[[0.2*((x+5*y) + (x+5*y)+1 + (x+5*y)+2 + (x+5*y)+3 + (x+5*y)+4)+z for x in range(6)] for y in range(2)] for z in range(4)]
+        assert self.arr_equality(fin_data['data']['ch1'], np.array(expected_ans)), "GPU MeanBlock does not yield expected result."
+        expected_ans = np.array(expected_ans)*2.0
+        assert self.arr_equality(fin_data['data']['ch2'], expected_ans), "GPU MeanBlock does not yield expected result."
+        #
+        #Test with simple case over repetitions:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : sample_array*1.0, 'ch2' : sample_array*2.0 },
+            'misc' : {'SampleRates' : [1,1]}
+        }
+        new_proc = ProcessorGPU('GPU_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(GPU_MeanBlock('repetition', 2))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = [0.5*(sample_array[2*x]+sample_array[2*x+1]) for x in range(2)]
+        assert self.arr_equality(fin_data['data']['ch1'], np.array(expected_ans)), "GPU MeanBlock does not yield expected result."
+        expected_ans = np.array(expected_ans)*2.0
+        assert self.arr_equality(fin_data['data']['ch2'], expected_ans), "GPU MeanBlock does not yield expected result."
+
+        #
+        #Test with case where block-size is not divisible over array size over samples:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : sample_array*1.0, 'ch2' : sample_array*2.0 },
+            'misc' : {'SampleRates' : [1,1]}
+        }
+        new_proc = ProcessorGPU('GPU_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(GPU_MeanBlock('sample', 4))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = [[[(0+1+2+3)*0.25+y+z for x in range(1)] for y in range(10)] for z in range(4)]
+        assert self.arr_equality(fin_data['data']['ch1'], np.array(expected_ans)), "GPU MeanBlock does not yield expected result."
+        expected_ans = np.array(expected_ans)*2.0
+        assert self.arr_equality(fin_data['data']['ch2'], expected_ans), "GPU MeanBlock does not yield expected result."
+        #
+        #Test with case where block-size is not divisible over array size over segments:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : sample_array*1.0, 'ch2' : sample_array*2.0 },
+            'misc' : {'SampleRates' : [1,1]}
+        }
+        new_proc = ProcessorGPU('GPU_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(GPU_MeanBlock('segment', 3))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = [[[1/3*((x+3*y) + (x+3*y)+1 + (x+3*y)+2)+z for x in range(6)] for y in range(3)] for z in range(4)]
+        assert self.arr_equality(fin_data['data']['ch1'], np.array(expected_ans)), "GPU MeanBlock does not yield expected result."
+        expected_ans = np.array(expected_ans)*2.0
+        assert self.arr_equality(fin_data['data']['ch2'], expected_ans), "GPU MeanBlock does not yield expected result."
+        #
+        #Test with case where block-size is not divisible over array size over repetitions:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : sample_array*1.0, 'ch2' : sample_array*2.0 },
+            'misc' : {'SampleRates' : [1,1]}
+        }
+        new_proc = ProcessorGPU('GPU_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(GPU_MeanBlock('repetition', 3))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = [1/3*(sample_array[3*x]+sample_array[3*x+1]+sample_array[3*x+2]) for x in range(1)]
+        assert self.arr_equality(fin_data['data']['ch1'], np.array(expected_ans)), "GPU MeanBlock does not yield expected result."
+        expected_ans = np.array(expected_ans)*2.0
+        assert self.arr_equality(fin_data['data']['ch2'], expected_ans), "GPU MeanBlock does not yield expected result."
+
+        #
+        #Test case where block-size is greater than array size over repetitions:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : sample_array*1.0, 'ch2' : sample_array*2.0 },
+            'misc' : {'SampleRates' : [1,1]}
+        }
+        new_proc = ProcessorGPU('GPU_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(GPU_MeanBlock('repetition', 5))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = [1/4*(sample_array[4*x]+sample_array[4*x+1]+sample_array[4*x+2]+sample_array[4*x+3]) for x in range(1)]
+        assert self.arr_equality(fin_data['data']['ch1'], np.array(expected_ans)), "GPU MeanBlock does not yield expected result."
+        expected_ans = np.array(expected_ans)*2.0
+        assert self.arr_equality(fin_data['data']['ch2'], expected_ans), "GPU MeanBlock does not yield expected result."
+        #
+        #Test case where block-size is equal to the array size over repetitions:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : sample_array*1.0, 'ch2' : sample_array*2.0 },
+            'misc' : {'SampleRates' : [1,1]}
+        }
+        new_proc = ProcessorGPU('GPU_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(GPU_MeanBlock('repetition', 4))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = [1/4*(sample_array[4*x]+sample_array[4*x+1]+sample_array[4*x+2]+sample_array[4*x+3]) for x in range(1)]
+        assert self.arr_equality(fin_data['data']['ch1'], np.array(expected_ans)), "GPU MeanBlock does not yield expected result."
+        expected_ans = np.array(expected_ans)*2.0
+        assert self.arr_equality(fin_data['data']['ch2'], expected_ans), "GPU MeanBlock does not yield expected result."
+
+        self.cleanup()
+
+    def test_Integrate(self):
         self.initialise()
+        try:
+            test_proc = ProcessorGPU('test',self.lab)
+        except:
+            assert False, "GPU Processor could not be initialised - has CuPy been installed?"
         data_size = 1024#*1024*4
         num_reps = 17
         num_segs = 4
@@ -847,11 +1131,11 @@ class TestGPU(unittest.TestCase):
         self.cleanup()
 
     def test_Max(self):
+        self.initialise()
         try:
             test_proc = ProcessorGPU('test',self.lab)
         except:
-            return
-        self.initialise()
+            assert False, "GPU Processor could not be initialised - has CuPy been installed?"
         data_size = 1024#*1024*4
         num_reps = 10
         num_segs = 47
@@ -902,11 +1186,11 @@ class TestGPU(unittest.TestCase):
         self.cleanup()
 
     def test_ConstantArithmetic(self):
+        self.initialise()
         try:
             test_proc = ProcessorGPU('test',self.lab)
         except:
-            return
-        self.initialise()
+            assert False, "GPU Processor could not be initialised - has CuPy been installed?"
         data_size = 1024#*1024*4
         num_reps = 10
         num_segs = 47
@@ -999,11 +1283,11 @@ class TestGPU(unittest.TestCase):
         self.cleanup()
 
     def test_ChannelArithmetic(self):
+        self.initialise()
         try:
             test_proc = ProcessorGPU('test',self.lab)
         except:
-            return
-        self.initialise()
+            assert False, "GPU Processor could not be initialised - has CuPy been installed?"
         data_size = 512#*1024*4
         num_reps = 10
         num_segs = 47

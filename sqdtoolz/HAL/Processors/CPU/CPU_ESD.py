@@ -38,9 +38,9 @@ class CPU_ESD(ProcNodeCPU):
         #Remove the parameter as it no longer exists after the averaging...
         data_pkt['parameters'][-1] = 'fft_freqency'
         if 'parameter_values' in data_pkt:
-            data_pkt['parameter_values']['fft_freqency'] = freqs
+            data_pkt['parameter_values']['fft_frequency'] = freqs
         else:
-            data_pkt['parameter_values'] = {'fft_freqency' : freqs}
+            data_pkt['parameter_values'] = {'fft_frequency' : freqs}
 
         return data_pkt
 

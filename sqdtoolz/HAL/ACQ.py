@@ -31,21 +31,21 @@ class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
         return self._instr_acq.NumSamples
     @NumSamples.setter
     def NumSamples(self, num_samples):
-        self._instr_acq.NumSamples = num_samples
+        self._instr_acq.NumSamples = int(num_samples)
 
     @property
     def NumSegments(self):
         return self._instr_acq.NumSegments
     @NumSegments.setter
     def NumSegments(self, num_segs):
-        self._instr_acq.NumSegments = num_segs
+        self._instr_acq.NumSegments = int(num_segs)
 
     @property
     def NumRepetitions(self):
         return self._instr_acq.NumRepetitions
     @NumRepetitions.setter
     def NumRepetitions(self, num_reps):
-        self._instr_acq.NumRepetitions = num_reps
+        self._instr_acq.NumRepetitions = int(num_reps)
 
     @property
     def SampleRate(self):

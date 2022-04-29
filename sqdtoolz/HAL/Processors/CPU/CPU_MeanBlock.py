@@ -1,8 +1,7 @@
-from sqdtoolz.HAL.Processors.ProcessorGPU import*
-import cupy as cp
+from sqdtoolz.HAL.Processors.ProcessorCPU import*
 import numpy as np
 
-class GPU_MeanBlock(ProcNodeGPU):
+class CPU_MeanBlock(ProcNodeCPU):
     def __init__(self, index_parameter_name, block_fac):
         '''
         General function that averages each channel across some parameter (e.g. over repetition or over all the samples) over blocks. 
@@ -35,7 +34,7 @@ class GPU_MeanBlock(ProcNodeGPU):
             slice_inds = [np.s_[:] for x in data_pkt['data'][cur_ch].shape]
             slice_inds[axis_num] = np.s_[:temp[axis_num]*self._block_fac]
 
-            data_pkt['data'][cur_ch] = cp.mean(data_pkt['data'][cur_ch][tuple(slice_inds)].reshape(tuple(temp)), axis_num+1)
+            data_pkt['data'][cur_ch] = np.mean(data_pkt['data'][cur_ch][tuple(slice_inds)].reshape(tuple(temp)), axis_num+1)
 
         return data_pkt
 

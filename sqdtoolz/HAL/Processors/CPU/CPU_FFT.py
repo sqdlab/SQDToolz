@@ -37,11 +37,11 @@ class CPU_FFT(ProcNodeCPU):
         data_pkt['data']['fft_imag'] = np.imag(arr_fft)
 
         #Remove the parameter as it no longer exists after the averaging...
-        data_pkt['parameters'][-1] = 'fft_freqency'
+        data_pkt['parameters'][-1] = 'fft_frequency'
         if 'parameter_values' in data_pkt:
-            data_pkt['parameter_values']['fft_freqency'] = freqs
+            data_pkt['parameter_values']['fft_frequency'] = freqs
         else:
-            data_pkt['parameter_values'] = {'fft_freqency' : freqs}
+            data_pkt['parameter_values'] = {'fft_frequency' : freqs}
 
         return data_pkt
 

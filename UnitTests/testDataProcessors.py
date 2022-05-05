@@ -76,6 +76,7 @@ class TestCPU(unittest.TestCase):
         # input('Press ENTER')
         #
         new_proc = ProcessorCPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
         new_proc.add_stage(CPU_DDC([0.14]))
         new_proc.add_stage(CPU_FIR([{'Type' : 'low', 'Taps' : 40, 'fc' : 0.01, 'Win' : 'hamming'}]*2))
         new_proc.add_stage_end(CPU_Mean('repetition'))
@@ -96,10 +97,141 @@ class TestCPU(unittest.TestCase):
             plt.show()
         mus = np.array(mus)
         sds = np.array(sds)
-        assert np.max(np.abs(mus)) < noise_level / np.sqrt(num_reps) * 2.56 * 2, "CPU Signal downconversion yields unsuitable results."
-        assert np.max(np.abs(sds)) < noise_level / np.sqrt(num_reps) * 2.56 * 2, "CPU Signal downconversion yields unsuitable results."
+        assert np.max(np.abs(mus)) < noise_level / np.sqrt(num_reps) * 2.56 * 4, "CPU Signal downconversion yields unsuitable results."
+        assert np.max(np.abs(sds)) < noise_level / np.sqrt(num_reps) * 2.56 * 4, "CPU Signal downconversion yields unsuitable results."
         if INCLUDE_PLOTS:
             input('Press ENTER')
+        self.cleanup()
+
+    def test_IQddc(self):
+        self.initialise()
+
+        #Try simple test-case
+        data_size = 1024#*1024*4
+        f0 = 0.14
+        omega = 2*np.pi*f0
+        def ampl_envelope(ampl, noise_level=1.0):
+            return ampl * np.exp(-(np.arange(data_size)-200.0)**2/10000)
+        num_reps = 10
+        num_segs = 4
+        phase = 3.0
+        raw_data = np.array([[ampl_envelope(num_segs-s)*np.sin(omega*np.arange(data_size)+phase) for s in range(num_segs)] for r in range(num_reps)])
+        #
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : raw_data },
+            'misc' : {'SampleRates' : [1]}
+        }
+        #
+        new_proc = ProcessorCPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_DDC([f0]))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        #
+        expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega*np.arange(data_size)+phase)*2.0*np.cos(omega*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
+        assert self.arr_equality(fin_data['data']['ch1_I'], expected_ans), "CPU DDC does not yield expected result for I-channel."
+        expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega*np.arange(data_size)+phase)*2.0*np.sin(omega*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
+        assert self.arr_equality(fin_data['data']['ch1_Q'], expected_ans), "CPU DDC does not yield expected result for Q-channel."
+
+        #Try with 2 channels
+        data_size = 1024#*1024*4
+        f0 = 0.29
+        f1 = 0.11
+        omega0 = 2*np.pi*f0
+        omega1 = 2*np.pi*f1
+        def ampl_envelope(ampl, noise_level=1.0):
+            return ampl * np.exp(-(np.arange(data_size)-200.0)**2/10000)
+        num_reps = 13
+        num_segs = 8
+        phase = 3.0
+        raw_data = np.array([[ampl_envelope(num_segs-s)*np.sin(omega0*np.arange(data_size)+phase) for s in range(num_segs)] for r in range(num_reps)])
+        raw_data2 = np.array([[ampl_envelope(num_segs+s)*np.sin(omega1*np.arange(data_size)-phase) for s in range(num_segs)] for r in range(num_reps)])
+        #
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : raw_data, 'ch2' : raw_data2 },
+            'misc' : {'SampleRates' : [1, 1]}
+        }
+        #
+        new_proc = ProcessorCPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_DDC([f0, f1]))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        #
+        expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega0*np.arange(data_size)+phase)*2.0*np.cos(omega0*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
+        assert self.arr_equality(fin_data['data']['ch1_I'], expected_ans), "CPU DDC does not yield expected result in the 2-channel case for I-channel."
+        expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega0*np.arange(data_size)+phase)*2.0*np.sin(omega0*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
+        assert self.arr_equality(fin_data['data']['ch1_Q'], expected_ans), "CPU DDC does not yield expected result in the 2-channel case for Q-channel."
+        expected_ans = np.array([[ampl_envelope(num_segs+s)*np.sin(omega1*np.arange(data_size)-phase)*2.0*np.cos(omega1*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
+        assert self.arr_equality(fin_data['data']['ch2_I'], expected_ans), "CPU DDC does not yield expected result in the 2-channel case for I-channel."
+        expected_ans = np.array([[ampl_envelope(num_segs+s)*np.sin(omega1*np.arange(data_size)-phase)*2.0*np.sin(omega1*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
+        assert self.arr_equality(fin_data['data']['ch2_Q'], expected_ans), "CPU DDC does not yield expected result in the 2-channel case for Q-channel."
+
+        #Try with 2 channels and different sample rates
+        data_size = 4536#*1024*4
+        f0 = 0.29
+        f1 = 0.11
+        omega0 = 2*np.pi*f0
+        omega1 = 2*np.pi*f1
+        def ampl_envelope(ampl, noise_level=1.0):
+            return ampl * np.exp(-(np.arange(data_size)-200.0)**2/10000)
+        num_reps = 11
+        num_segs = 7
+        phase = 3.0
+        raw_data = np.array([[ampl_envelope(num_segs-s)*np.sin(omega0*np.arange(data_size)+phase) for s in range(num_segs)] for r in range(num_reps)])
+        raw_data2 = np.array([[ampl_envelope(num_segs+s)*np.sin(omega1*np.arange(data_size)-phase) for s in range(num_segs)] for r in range(num_reps)])
+        #
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : raw_data, 'ch2' : raw_data2 },
+            'misc' : {'SampleRates' : [1, 2]}
+        }
+        #
+        new_proc = ProcessorCPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_DDC([f0, f1]))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        #
+        expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega0*np.arange(data_size)+phase)*2.0*np.cos(omega0*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
+        assert self.arr_equality(fin_data['data']['ch1_I'], expected_ans), "CPU DDC does not yield expected result in the 2-channel case for I-channel."
+        expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega0*np.arange(data_size)+phase)*2.0*np.sin(omega0*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
+        assert self.arr_equality(fin_data['data']['ch1_Q'], expected_ans), "CPU DDC does not yield expected result in the 2-channel case for Q-channel."
+        expected_ans = np.array([[ampl_envelope(num_segs+s)*np.sin(omega1*np.arange(data_size)-phase)*2.0*np.cos(omega1*np.arange(data_size)/2) for s in range(num_segs)] for r in range(num_reps)])
+        assert self.arr_equality(fin_data['data']['ch2_I'], expected_ans), "CPU DDC does not yield expected result in the 2-channel case for I-channel."
+        expected_ans = np.array([[ampl_envelope(num_segs+s)*np.sin(omega1*np.arange(data_size)-phase)*2.0*np.sin(omega1*np.arange(data_size)/2) for s in range(num_segs)] for r in range(num_reps)])
+        assert self.arr_equality(fin_data['data']['ch2_Q'], expected_ans), "CPU DDC does not yield expected result in the 2-channel case for Q-channel."
+
+        #Try only 1 dimension
+        data_size = 5424#*1024*4
+        f0 = 0.14
+        omega = 2*np.pi*f0
+        def ampl_envelope(ampl, noise_level=1.0):
+            return ampl * np.exp(-(np.arange(data_size)-200.0)**2/10000)
+        num_reps = 10
+        num_segs = 4
+        phase = 3.0
+        raw_data = ampl_envelope(num_segs)*np.sin(omega*np.arange(data_size)+phase)
+        #
+        cur_data = {
+            'parameters' : ['sample'],
+            'data' : { 'ch1' : raw_data },
+            'misc' : {'SampleRates' : [1]}
+        }
+        #
+        new_proc = ProcessorCPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_DDC([f0]))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        #
+        expected_ans = ampl_envelope(num_segs)*np.sin(omega*np.arange(data_size)+phase)*2.0*np.cos(omega*np.arange(data_size))
+        assert self.arr_equality(fin_data['data']['ch1_I'], expected_ans), "CPU DDC does not yield expected result for I-channel."
+        expected_ans = ampl_envelope(num_segs)*np.sin(omega*np.arange(data_size)+phase)*2.0*np.sin(omega*np.arange(data_size))
+        assert self.arr_equality(fin_data['data']['ch1_Q'], expected_ans), "CPU DDC does not yield expected result for Q-channel."
+
         self.cleanup()
 
     def test_Mean(self):
@@ -121,7 +253,7 @@ class TestCPU(unittest.TestCase):
         new_proc.push_data(cur_data)
         fin_data = new_proc.get_all_data()
         expected_ans = np.array([0.5*(data_size**2+data_size) * ( 0.5*(num_segs**2+num_segs) + 2*x*num_segs ) / (data_size * num_segs) for x in range(1,num_reps+1)])
-        assert np.array_equal(fin_data['data']['ch1'], expected_ans), "CPU Mean does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1'], expected_ans), "CPU Mean does not yield expected result."
         #Test with multiple-push
         new_proc.reset_pipeline()
         new_proc.add_stage(CPU_Mean('sample'))
@@ -140,7 +272,7 @@ class TestCPU(unittest.TestCase):
         new_proc.push_data(cur_data)
         fin_data = new_proc.get_all_data()
         expected_ans = np.array([0.5*(data_size**2+data_size) * ( 0.5*(num_segs**2+num_segs) + 2*x*num_segs ) / (data_size * num_segs) for x in range(1,num_reps+1)])
-        assert np.array_equal(fin_data['data']['ch1'], expected_ans), "CPU Mean does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1'], expected_ans), "CPU Mean does not yield expected result."
         #
         #Test with another simple case:
         cur_data = {
@@ -153,7 +285,7 @@ class TestCPU(unittest.TestCase):
         new_proc.push_data(cur_data)
         fin_data = new_proc.get_all_data()
         expected_ans = np.array([[( (num_segs**2+num_segs)*0.5 +2*r*num_segs)*x for x in range(1,data_size+1)] for r in range(1,num_reps+1)]) / num_segs
-        assert np.array_equal(fin_data['data']['ch1'], expected_ans), "CPU Mean does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1'], expected_ans), "CPU Mean does not yield expected result."
         #Test with multiple-push
         new_proc.reset_pipeline()
         new_proc.add_stage(CPU_Mean('segment'))
@@ -171,7 +303,7 @@ class TestCPU(unittest.TestCase):
         new_proc.push_data(cur_data)
         fin_data = new_proc.get_all_data()
         expected_ans = np.array([[( (num_segs**2+num_segs)*0.5 +2*r*num_segs)*x for x in range(1,data_size+1)] for r in range(1,num_reps+1)]) / num_segs
-        assert np.array_equal(fin_data['data']['ch1'], expected_ans), "CPU Mean does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1'], expected_ans), "CPU Mean does not yield expected result."
         #
         #Test with full contraction:
         cur_data = {
@@ -348,7 +480,7 @@ class TestCPU(unittest.TestCase):
         new_proc.push_data(cur_data)
         fin_data = new_proc.get_all_data()
         expected_ans = np.array([0.5*(data_size**2+data_size) * ( 0.5*(num_segs**2+num_segs) + 2*x*num_segs ) for x in range(1,num_reps+1)])
-        assert np.array_equal(fin_data['data']['ch1'], expected_ans), "CPU Integrate does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1'], expected_ans), "CPU Integrate does not yield expected result."
         #
         #Test with another simple case:
         cur_data = {
@@ -361,7 +493,7 @@ class TestCPU(unittest.TestCase):
         new_proc.push_data(cur_data)
         fin_data = new_proc.get_all_data()
         expected_ans = np.array([[( (num_segs**2+num_segs)*0.5 +2*r*num_segs)*x for x in range(1,data_size+1)] for r in range(1,num_reps+1)])
-        assert np.array_equal(fin_data['data']['ch1'], expected_ans), "CPU Integrate does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1'], expected_ans), "CPU Integrate does not yield expected result."
         #
         #Test with full contraction:
         cur_data = {
@@ -418,7 +550,7 @@ class TestCPU(unittest.TestCase):
         new_proc.push_data(cur_data)
         fin_data = new_proc.get_all_data()
         expected_ans = np.array([[(s+2*r)*data_size for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
-        assert np.array_equal(fin_data['data']['ch1'], expected_ans), "CPU Max does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1'], expected_ans), "CPU Max does not yield expected result."
         #
         #Test with another simple case:
         cur_data = {
@@ -431,7 +563,7 @@ class TestCPU(unittest.TestCase):
         new_proc.push_data(cur_data)
         fin_data = new_proc.get_all_data()
         expected_ans = np.array([[(num_segs+2*r)*x for x in range(1,data_size+1)] for r in range(1,num_reps+1)])
-        assert np.array_equal(fin_data['data']['ch1'], expected_ans), "CPU Max does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1'], expected_ans), "CPU Max does not yield expected result."
         #
         #Test with full contraction
         cur_data = {
@@ -479,7 +611,7 @@ class TestCPU(unittest.TestCase):
             new_proc.push_data(cur_data)
             fin_data = new_proc.get_all_data()
             expected_ans = opsMap[ops[m]](leOrigArray, 12)
-            assert np.array_equal(fin_data['data']['ch1'], expected_ans), f"CPU Constant-Arithmetic does not yield expected result for operator: {ops[m]}."
+            assert self.arr_equality(fin_data['data']['ch1'], expected_ans), f"CPU Constant-Arithmetic does not yield expected result for operator: {ops[m]}."
         
         for m in range(len(ops)):
             leOrigArray = np.array([[sorted([(s+2*r)*x for x in range(1,data_size+1)], key=lambda k: random.random()) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
@@ -496,9 +628,9 @@ class TestCPU(unittest.TestCase):
             new_proc.push_data(cur_data)
             fin_data = new_proc.get_all_data()
             expected_ans = opsMap[ops[m]](leOrigArray, 13)
-            assert np.array_equal(fin_data['data']['ch1'], expected_ans), f"CPU Constant-Arithmetic does not yield expected result for global multi-channel application for operator: {ops[m]}."
+            assert self.arr_equality(fin_data['data']['ch1'], expected_ans), f"CPU Constant-Arithmetic does not yield expected result for global multi-channel application for operator: {ops[m]}."
             expected_ans = opsMap[ops[m]](leOrigArray2, 13)
-            assert np.array_equal(fin_data['data']['ch2'], expected_ans), f"CPU Constant-Arithmetic does not yield expected result for global multi-channel application for operator: {ops[m]}."
+            assert self.arr_equality(fin_data['data']['ch2'], expected_ans), f"CPU Constant-Arithmetic does not yield expected result for global multi-channel application for operator: {ops[m]}."
          
         for m in range(len(ops)):
             leOrigArray = np.array([[sorted([(s+2*r)*x for x in range(1,data_size+1)], key=lambda k: random.random()) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
@@ -515,9 +647,9 @@ class TestCPU(unittest.TestCase):
             new_proc.push_data(cur_data)
             fin_data = new_proc.get_all_data()
             expected_ans = leOrigArray
-            assert np.array_equal(fin_data['data']['ch1'], expected_ans), f"CPU Constant-Arithmetic does not yield expected result for multi-channel application for operator: {ops[m]}."
+            assert self.arr_equality(fin_data['data']['ch1'], expected_ans), f"CPU Constant-Arithmetic does not yield expected result for multi-channel application for operator: {ops[m]}."
             expected_ans = opsMap[ops[m]](leOrigArray2, 14)
-            assert np.array_equal(fin_data['data']['ch2'], expected_ans), f"CPU Constant-Arithmetic does not yield expected result for multi-channel application for operator: {ops[m]}."
+            assert self.arr_equality(fin_data['data']['ch2'], expected_ans), f"CPU Constant-Arithmetic does not yield expected result for multi-channel application for operator: {ops[m]}."
          
         for m in range(len(ops)):
             leOrigArray = np.array([[sorted([(s+2*r)*x for x in range(1,data_size+1)], key=lambda k: random.random()) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
@@ -535,11 +667,11 @@ class TestCPU(unittest.TestCase):
             new_proc.push_data(cur_data)
             fin_data = new_proc.get_all_data()
             expected_ans = opsMap[ops[m]](leOrigArray, 15)
-            assert np.array_equal(fin_data['data']['ch1'], expected_ans), f"CPU Constant-Arithmetic does not yield expected result for multi-channel application for operator: {ops[m]}."
+            assert self.arr_equality(fin_data['data']['ch1'], expected_ans), f"CPU Constant-Arithmetic does not yield expected result for multi-channel application for operator: {ops[m]}."
             expected_ans = leOrigArray2
-            assert np.array_equal(fin_data['data']['ch2'], expected_ans), f"CPU Constant-Arithmetic does not yield expected result for multi-channel application for operator: {ops[m]}."
+            assert self.arr_equality(fin_data['data']['ch2'], expected_ans), f"CPU Constant-Arithmetic does not yield expected result for multi-channel application for operator: {ops[m]}."
             expected_ans = opsMap[ops[m]](leOrigArray3, 15)
-            assert np.array_equal(fin_data['data']['ch3'], expected_ans), f"CPU Constant-Arithmetic does not yield expected result for multi-channel application for operator: {ops[m]}."
+            assert self.arr_equality(fin_data['data']['ch3'], expected_ans), f"CPU Constant-Arithmetic does not yield expected result for multi-channel application for operator: {ops[m]}."
         
         self.cleanup()
 
@@ -795,6 +927,7 @@ class TestGPU(unittest.TestCase):
         # input('Press ENTER')
         #
         new_proc = ProcessorGPU('GPU_test', self.lab)
+        new_proc.reset_pipeline()
         new_proc.add_stage(GPU_DDC([0.14]))
         new_proc.add_stage(GPU_FIR([{'Type' : 'low', 'Taps' : 40, 'fc' : 0.01, 'Win' : 'hamming'}]*2))
         new_proc.add_stage_end(GPU_Mean('repetition'))
@@ -804,7 +937,7 @@ class TestGPU(unittest.TestCase):
         mus = []
         sds = []
         for s in range(num_segs):
-            data_envelope = np.sqrt(cur_data['data']['ch1_I'][s]**2 + cur_data['data']['ch1_Q'][s]**2)
+            data_envelope = np.sqrt(fin_data['data']['ch1_I'][s]**2 + fin_data['data']['ch1_Q'][s]**2)
             resids = data_envelope-ampl_envelope(num_segs-s,0.0)#[40:]
             mu, sd = np.mean(resids), np.std(resids)
             mus += [mu]
@@ -815,10 +948,146 @@ class TestGPU(unittest.TestCase):
             plt.show()
         mus = np.array(mus)
         sds = np.array(sds)
-        assert np.max(np.abs(mus)) < noise_level / np.sqrt(num_reps) * 2.56 * 2, "GPU Signal downconversion yields unsuitable results."
-        assert np.max(np.abs(sds)) < noise_level / np.sqrt(num_reps) * 2.56 * 2, "GPU Signal downconversion yields unsuitable results."
+        assert np.max(np.abs(mus)) < noise_level / np.sqrt(num_reps) * 2.56 * 4, "GPU Signal downconversion yields unsuitable results."
+        assert np.max(np.abs(sds)) < noise_level / np.sqrt(num_reps) * 2.56 * 4, "GPU Signal downconversion yields unsuitable results."
         if INCLUDE_PLOTS:
             input('Press ENTER')
+        self.cleanup()
+
+
+    def test_IQddc(self):
+        self.initialise()
+        try:
+            test_proc = ProcessorGPU('test',self.lab)
+        except:
+            assert False, "GPU Processor could not be initialised - has CuPy been installed?"
+
+        #Try simple test-case
+        data_size = 1024#*1024*4
+        f0 = 0.14
+        omega = 2*np.pi*f0
+        def ampl_envelope(ampl, noise_level=1.0):
+            return ampl * np.exp(-(np.arange(data_size)-200.0)**2/10000)
+        num_reps = 10
+        num_segs = 4
+        phase = 3.0
+        raw_data = np.array([[ampl_envelope(num_segs-s)*np.sin(omega*np.arange(data_size)+phase) for s in range(num_segs)] for r in range(num_reps)])
+        #
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : raw_data },
+            'misc' : {'SampleRates' : [1]}
+        }
+        #
+        new_proc = ProcessorGPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(GPU_DDC([f0]))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        #
+        expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega*np.arange(data_size)+phase)*2.0*np.cos(omega*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
+        assert self.arr_equality(fin_data['data']['ch1_I'], expected_ans), "GPU DDC does not yield expected result for I-channel."
+        expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega*np.arange(data_size)+phase)*2.0*np.sin(omega*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
+        assert self.arr_equality(fin_data['data']['ch1_Q'], expected_ans), "GPU DDC does not yield expected result for Q-channel."
+
+        #Try with 2 channels
+        data_size = 1024#*1024*4
+        f0 = 0.29
+        f1 = 0.11
+        omega0 = 2*np.pi*f0
+        omega1 = 2*np.pi*f1
+        def ampl_envelope(ampl, noise_level=1.0):
+            return ampl * np.exp(-(np.arange(data_size)-200.0)**2/10000)
+        num_reps = 13
+        num_segs = 8
+        phase = 3.0
+        raw_data = np.array([[ampl_envelope(num_segs-s)*np.sin(omega0*np.arange(data_size)+phase) for s in range(num_segs)] for r in range(num_reps)])
+        raw_data2 = np.array([[ampl_envelope(num_segs+s)*np.sin(omega1*np.arange(data_size)-phase) for s in range(num_segs)] for r in range(num_reps)])
+        #
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : raw_data, 'ch2' : raw_data2 },
+            'misc' : {'SampleRates' : [1, 1]}
+        }
+        #
+        new_proc = ProcessorGPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(GPU_DDC([f0, f1]))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        #
+        expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega0*np.arange(data_size)+phase)*2.0*np.cos(omega0*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
+        assert self.arr_equality(fin_data['data']['ch1_I'], expected_ans), "GPU DDC does not yield expected result in the 2-channel case for I-channel."
+        expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega0*np.arange(data_size)+phase)*2.0*np.sin(omega0*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
+        assert self.arr_equality(fin_data['data']['ch1_Q'], expected_ans), "GPU DDC does not yield expected result in the 2-channel case for Q-channel."
+        expected_ans = np.array([[ampl_envelope(num_segs+s)*np.sin(omega1*np.arange(data_size)-phase)*2.0*np.cos(omega1*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
+        assert self.arr_equality(fin_data['data']['ch2_I'], expected_ans), "GPU DDC does not yield expected result in the 2-channel case for I-channel."
+        expected_ans = np.array([[ampl_envelope(num_segs+s)*np.sin(omega1*np.arange(data_size)-phase)*2.0*np.sin(omega1*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
+        assert self.arr_equality(fin_data['data']['ch2_Q'], expected_ans), "GPU DDC does not yield expected result in the 2-channel case for Q-channel."
+
+        #Try with 2 channels and different sample rates
+        data_size = 4536#*1024*4
+        f0 = 0.29
+        f1 = 0.11
+        omega0 = 2*np.pi*f0
+        omega1 = 2*np.pi*f1
+        def ampl_envelope(ampl, noise_level=1.0):
+            return ampl * np.exp(-(np.arange(data_size)-200.0)**2/10000)
+        num_reps = 11
+        num_segs = 7
+        phase = 3.0
+        raw_data = np.array([[ampl_envelope(num_segs-s)*np.sin(omega0*np.arange(data_size)+phase) for s in range(num_segs)] for r in range(num_reps)])
+        raw_data2 = np.array([[ampl_envelope(num_segs+s)*np.sin(omega1*np.arange(data_size)-phase) for s in range(num_segs)] for r in range(num_reps)])
+        #
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : raw_data, 'ch2' : raw_data2 },
+            'misc' : {'SampleRates' : [1, 2]}
+        }
+        #
+        new_proc = ProcessorGPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(GPU_DDC([f0, f1]))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        #
+        expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega0*np.arange(data_size)+phase)*2.0*np.cos(omega0*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
+        assert self.arr_equality(fin_data['data']['ch1_I'], expected_ans), "GPU DDC does not yield expected result in the 2-channel case for I-channel."
+        expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega0*np.arange(data_size)+phase)*2.0*np.sin(omega0*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
+        assert self.arr_equality(fin_data['data']['ch1_Q'], expected_ans), "GPU DDC does not yield expected result in the 2-channel case for Q-channel."
+        expected_ans = np.array([[ampl_envelope(num_segs+s)*np.sin(omega1*np.arange(data_size)-phase)*2.0*np.cos(omega1*np.arange(data_size)/2) for s in range(num_segs)] for r in range(num_reps)])
+        assert self.arr_equality(fin_data['data']['ch2_I'], expected_ans), "GPU DDC does not yield expected result in the 2-channel case for I-channel."
+        expected_ans = np.array([[ampl_envelope(num_segs+s)*np.sin(omega1*np.arange(data_size)-phase)*2.0*np.sin(omega1*np.arange(data_size)/2) for s in range(num_segs)] for r in range(num_reps)])
+        assert self.arr_equality(fin_data['data']['ch2_Q'], expected_ans), "GPU DDC does not yield expected result in the 2-channel case for Q-channel."
+
+        #Try only 1 dimension
+        data_size = 5424#*1024*4
+        f0 = 0.14
+        omega = 2*np.pi*f0
+        def ampl_envelope(ampl, noise_level=1.0):
+            return ampl * np.exp(-(np.arange(data_size)-200.0)**2/10000)
+        num_reps = 10
+        num_segs = 4
+        phase = 3.0
+        raw_data = ampl_envelope(num_segs)*np.sin(omega*np.arange(data_size)+phase)
+        #
+        cur_data = {
+            'parameters' : ['sample'],
+            'data' : { 'ch1' : raw_data },
+            'misc' : {'SampleRates' : [1]}
+        }
+        #
+        new_proc = ProcessorGPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(GPU_DDC([f0]))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        #
+        expected_ans = ampl_envelope(num_segs)*np.sin(omega*np.arange(data_size)+phase)*2.0*np.cos(omega*np.arange(data_size))
+        assert self.arr_equality(fin_data['data']['ch1_I'], expected_ans), "GPU DDC does not yield expected result for I-channel."
+        expected_ans = ampl_envelope(num_segs)*np.sin(omega*np.arange(data_size)+phase)*2.0*np.sin(omega*np.arange(data_size))
+        assert self.arr_equality(fin_data['data']['ch1_Q'], expected_ans), "GPU DDC does not yield expected result for Q-channel."
+
         self.cleanup()
 
     def test_Mean(self):
@@ -844,7 +1113,7 @@ class TestGPU(unittest.TestCase):
         new_proc.push_data(cur_data)
         fin_data = new_proc.get_all_data()
         expected_ans = np.array([0.5*(data_size**2+data_size) * ( 0.5*(num_segs**2+num_segs) + 2*x*num_segs ) / (data_size * num_segs) for x in range(1,num_reps+1)])
-        assert np.array_equal(fin_data['data']['ch1'], expected_ans), "GPU Mean does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1'], expected_ans), "GPU Mean does not yield expected result."
         #Test with multiple-push
         new_proc.reset_pipeline()
         new_proc.add_stage(GPU_Mean('sample'))
@@ -863,7 +1132,7 @@ class TestGPU(unittest.TestCase):
         new_proc.push_data(cur_data)
         fin_data = new_proc.get_all_data()
         expected_ans = np.array([0.5*(data_size**2+data_size) * ( 0.5*(num_segs**2+num_segs) + 2*x*num_segs ) / (data_size * num_segs) for x in range(1,num_reps+1)])
-        assert np.array_equal(fin_data['data']['ch1'], expected_ans), "GPU Mean does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1'], expected_ans), "GPU Mean does not yield expected result."
         #
         #Test with another simple case:
         cur_data = {
@@ -876,7 +1145,7 @@ class TestGPU(unittest.TestCase):
         new_proc.push_data(cur_data)
         fin_data = new_proc.get_all_data()
         expected_ans = np.array([[( (num_segs**2+num_segs)*0.5 +2*r*num_segs)*x for x in range(1,data_size+1)] for r in range(1,num_reps+1)]) / num_segs
-        assert np.array_equal(fin_data['data']['ch1'], expected_ans), "GPU Mean does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1'], expected_ans), "GPU Mean does not yield expected result."
         #Test with multiple-push
         new_proc.reset_pipeline()
         new_proc.add_stage(GPU_Mean('segment'))
@@ -894,7 +1163,7 @@ class TestGPU(unittest.TestCase):
         new_proc.push_data(cur_data)
         fin_data = new_proc.get_all_data()
         expected_ans = np.array([[( (num_segs**2+num_segs)*0.5 +2*r*num_segs)*x for x in range(1,data_size+1)] for r in range(1,num_reps+1)]) / num_segs
-        assert np.array_equal(fin_data['data']['ch1'], expected_ans), "GPU Mean does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1'], expected_ans), "GPU Mean does not yield expected result."
         #
         #Test with full contraction:
         cur_data = {
@@ -1079,7 +1348,7 @@ class TestGPU(unittest.TestCase):
         new_proc.push_data(cur_data)
         fin_data = new_proc.get_all_data()
         expected_ans = np.array([0.5*(data_size**2+data_size) * ( 0.5*(num_segs**2+num_segs) + 2*x*num_segs ) for x in range(1,num_reps+1)])
-        assert np.array_equal(fin_data['data']['ch1'], expected_ans), "GPU Integrate does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1'], expected_ans), "GPU Integrate does not yield expected result."
         #
         #Test with another simple case:
         cur_data = {
@@ -1092,7 +1361,7 @@ class TestGPU(unittest.TestCase):
         new_proc.push_data(cur_data)
         fin_data = new_proc.get_all_data()
         expected_ans = np.array([[( (num_segs**2+num_segs)*0.5 +2*r*num_segs)*x for x in range(1,data_size+1)] for r in range(1,num_reps+1)])
-        assert np.array_equal(fin_data['data']['ch1'], expected_ans), "GPU Integrate does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1'], expected_ans), "GPU Integrate does not yield expected result."
         #
         #Test with full contraction:
         cur_data = {
@@ -1153,7 +1422,7 @@ class TestGPU(unittest.TestCase):
         new_proc.push_data(cur_data)
         fin_data = new_proc.get_all_data()
         expected_ans = np.array([[(s+2*r)*data_size for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
-        assert np.array_equal(fin_data['data']['ch1'], expected_ans), "GPU Max does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1'], expected_ans), "GPU Max does not yield expected result."
         #
         #Test with another simple case:
         cur_data = {
@@ -1166,7 +1435,7 @@ class TestGPU(unittest.TestCase):
         new_proc.push_data(cur_data)
         fin_data = new_proc.get_all_data()
         expected_ans = np.array([[(num_segs+2*r)*x for x in range(1,data_size+1)] for r in range(1,num_reps+1)])
-        assert np.array_equal(fin_data['data']['ch1'], expected_ans), "GPU Max does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1'], expected_ans), "GPU Max does not yield expected result."
         #
         #Test with full contraction
         cur_data = {
@@ -1218,7 +1487,7 @@ class TestGPU(unittest.TestCase):
             new_proc.push_data(cur_data)
             fin_data = new_proc.get_all_data()
             expected_ans = opsMap[ops[m]](leOrigArray, 12)
-            assert np.array_equal(fin_data['data']['ch1'], expected_ans), f"GPU Constant-Arithmetic does not yield expected result for operator: {ops[m]}."
+            assert self.arr_equality(fin_data['data']['ch1'], expected_ans), f"GPU Constant-Arithmetic does not yield expected result for operator: {ops[m]}."
         
         for m in range(len(ops)):
             leOrigArray = np.array([[sorted([(s+2*r)*x for x in range(1,data_size+1)], key=lambda k: random.random()) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
@@ -1235,9 +1504,9 @@ class TestGPU(unittest.TestCase):
             new_proc.push_data(cur_data)
             fin_data = new_proc.get_all_data()
             expected_ans = opsMap[ops[m]](leOrigArray, 13)
-            assert np.array_equal(fin_data['data']['ch1'], expected_ans), f"GPU Constant-Arithmetic does not yield expected result for global multi-channel application for operator: {ops[m]}."
+            assert self.arr_equality(fin_data['data']['ch1'], expected_ans), f"GPU Constant-Arithmetic does not yield expected result for global multi-channel application for operator: {ops[m]}."
             expected_ans = opsMap[ops[m]](leOrigArray2, 13)
-            assert np.array_equal(fin_data['data']['ch2'], expected_ans), f"GPU Constant-Arithmetic does not yield expected result for global multi-channel application for operator: {ops[m]}."
+            assert self.arr_equality(fin_data['data']['ch2'], expected_ans), f"GPU Constant-Arithmetic does not yield expected result for global multi-channel application for operator: {ops[m]}."
          
         for m in range(len(ops)):
             leOrigArray = np.array([[sorted([(s+2*r)*x for x in range(1,data_size+1)], key=lambda k: random.random()) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
@@ -1254,9 +1523,9 @@ class TestGPU(unittest.TestCase):
             new_proc.push_data(cur_data)
             fin_data = new_proc.get_all_data()
             expected_ans = leOrigArray
-            assert np.array_equal(fin_data['data']['ch1'], expected_ans), f"GPU Constant-Arithmetic does not yield expected result for multi-channel application for operator: {ops[m]}."
+            assert self.arr_equality(fin_data['data']['ch1'], expected_ans), f"GPU Constant-Arithmetic does not yield expected result for multi-channel application for operator: {ops[m]}."
             expected_ans = opsMap[ops[m]](leOrigArray2, 14)
-            assert np.array_equal(fin_data['data']['ch2'], expected_ans), f"GPU Constant-Arithmetic does not yield expected result for multi-channel application for operator: {ops[m]}."
+            assert self.arr_equality(fin_data['data']['ch2'], expected_ans), f"GPU Constant-Arithmetic does not yield expected result for multi-channel application for operator: {ops[m]}."
          
         for m in range(len(ops)):
             leOrigArray = np.array([[sorted([(s+2*r)*x for x in range(1,data_size+1)], key=lambda k: random.random()) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
@@ -1274,11 +1543,11 @@ class TestGPU(unittest.TestCase):
             new_proc.push_data(cur_data)
             fin_data = new_proc.get_all_data()
             expected_ans = opsMap[ops[m]](leOrigArray, 15)
-            assert np.array_equal(fin_data['data']['ch1'], expected_ans), f"GPU Constant-Arithmetic does not yield expected result for multi-channel application for operator: {ops[m]}."
+            assert self.arr_equality(fin_data['data']['ch1'], expected_ans), f"GPU Constant-Arithmetic does not yield expected result for multi-channel application for operator: {ops[m]}."
             expected_ans = leOrigArray2
-            assert np.array_equal(fin_data['data']['ch2'], expected_ans), f"GPU Constant-Arithmetic does not yield expected result for multi-channel application for operator: {ops[m]}."
+            assert self.arr_equality(fin_data['data']['ch2'], expected_ans), f"GPU Constant-Arithmetic does not yield expected result for multi-channel application for operator: {ops[m]}."
             expected_ans = opsMap[ops[m]](leOrigArray3, 15)
-            assert np.array_equal(fin_data['data']['ch3'], expected_ans), f"GPU Constant-Arithmetic does not yield expected result for multi-channel application for operator: {ops[m]}."
+            assert self.arr_equality(fin_data['data']['ch3'], expected_ans), f"GPU Constant-Arithmetic does not yield expected result for multi-channel application for operator: {ops[m]}."
         
         self.cleanup()
 
@@ -1493,4 +1762,5 @@ class TestGPU(unittest.TestCase):
 
 
 if __name__ == '__main__':
+    TestGPU().test_IQddc()
     unittest.main()

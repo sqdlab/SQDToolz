@@ -11,9 +11,11 @@ Main structure:
     - Data acquisition:
         - [Basic ACQ HAL](ACQ.md)
         - VNA
-    - Setting up real-time processing
-        - CPU Processors
-        - GPU Processors
+    - [Real-time Data Processing](Proc_Overview.md)
+        - [CPU Processor - Overview](Proc_CPU_Overview.md)
+        - [Available CPU processors](Proc_CPU_list.md)
+        - [GPU Processor - Overview](Proc_GPU_Overview.md)
+        - [Available GPU processors](Proc_GPU_list.md)
 - Combine HAL settings to form `ExperimentConfiguration` objects:
     - [Creating ExperimentConfiguration objects](Exp_Config_Basic.md)
     - [Defining Variables](Var_Defns.md)

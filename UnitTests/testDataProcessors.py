@@ -131,7 +131,7 @@ class TestCPU(unittest.TestCase):
         #
         expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega*np.arange(data_size)+phase)*2.0*np.cos(omega*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
         assert self.arr_equality(fin_data['data']['ch1_I'], expected_ans), "CPU DDC does not yield expected result for I-channel."
-        expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega*np.arange(data_size)+phase)*2.0*np.sin(omega*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
+        expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega*np.arange(data_size)+phase)*-2.0*np.sin(omega*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
         assert self.arr_equality(fin_data['data']['ch1_Q'], expected_ans), "CPU DDC does not yield expected result for Q-channel."
 
         #Try with 2 channels
@@ -162,11 +162,11 @@ class TestCPU(unittest.TestCase):
         #
         expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega0*np.arange(data_size)+phase)*2.0*np.cos(omega0*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
         assert self.arr_equality(fin_data['data']['ch1_I'], expected_ans), "CPU DDC does not yield expected result in the 2-channel case for I-channel."
-        expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega0*np.arange(data_size)+phase)*2.0*np.sin(omega0*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
+        expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega0*np.arange(data_size)+phase)*-2.0*np.sin(omega0*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
         assert self.arr_equality(fin_data['data']['ch1_Q'], expected_ans), "CPU DDC does not yield expected result in the 2-channel case for Q-channel."
         expected_ans = np.array([[ampl_envelope(num_segs+s)*np.sin(omega1*np.arange(data_size)-phase)*2.0*np.cos(omega1*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
         assert self.arr_equality(fin_data['data']['ch2_I'], expected_ans), "CPU DDC does not yield expected result in the 2-channel case for I-channel."
-        expected_ans = np.array([[ampl_envelope(num_segs+s)*np.sin(omega1*np.arange(data_size)-phase)*2.0*np.sin(omega1*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
+        expected_ans = np.array([[ampl_envelope(num_segs+s)*np.sin(omega1*np.arange(data_size)-phase)*-2.0*np.sin(omega1*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
         assert self.arr_equality(fin_data['data']['ch2_Q'], expected_ans), "CPU DDC does not yield expected result in the 2-channel case for Q-channel."
 
         #Try with 2 channels and different sample rates
@@ -197,11 +197,11 @@ class TestCPU(unittest.TestCase):
         #
         expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega0*np.arange(data_size)+phase)*2.0*np.cos(omega0*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
         assert self.arr_equality(fin_data['data']['ch1_I'], expected_ans), "CPU DDC does not yield expected result in the 2-channel case for I-channel."
-        expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega0*np.arange(data_size)+phase)*2.0*np.sin(omega0*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
+        expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega0*np.arange(data_size)+phase)*-2.0*np.sin(omega0*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
         assert self.arr_equality(fin_data['data']['ch1_Q'], expected_ans), "CPU DDC does not yield expected result in the 2-channel case for Q-channel."
         expected_ans = np.array([[ampl_envelope(num_segs+s)*np.sin(omega1*np.arange(data_size)-phase)*2.0*np.cos(omega1*np.arange(data_size)/2) for s in range(num_segs)] for r in range(num_reps)])
         assert self.arr_equality(fin_data['data']['ch2_I'], expected_ans), "CPU DDC does not yield expected result in the 2-channel case for I-channel."
-        expected_ans = np.array([[ampl_envelope(num_segs+s)*np.sin(omega1*np.arange(data_size)-phase)*2.0*np.sin(omega1*np.arange(data_size)/2) for s in range(num_segs)] for r in range(num_reps)])
+        expected_ans = np.array([[ampl_envelope(num_segs+s)*np.sin(omega1*np.arange(data_size)-phase)*-2.0*np.sin(omega1*np.arange(data_size)/2) for s in range(num_segs)] for r in range(num_reps)])
         assert self.arr_equality(fin_data['data']['ch2_Q'], expected_ans), "CPU DDC does not yield expected result in the 2-channel case for Q-channel."
 
         #Try only 1 dimension
@@ -229,7 +229,7 @@ class TestCPU(unittest.TestCase):
         #
         expected_ans = ampl_envelope(num_segs)*np.sin(omega*np.arange(data_size)+phase)*2.0*np.cos(omega*np.arange(data_size))
         assert self.arr_equality(fin_data['data']['ch1_I'], expected_ans), "CPU DDC does not yield expected result for I-channel."
-        expected_ans = ampl_envelope(num_segs)*np.sin(omega*np.arange(data_size)+phase)*2.0*np.sin(omega*np.arange(data_size))
+        expected_ans = ampl_envelope(num_segs)*np.sin(omega*np.arange(data_size)+phase)*-2.0*np.sin(omega*np.arange(data_size))
         assert self.arr_equality(fin_data['data']['ch1_Q'], expected_ans), "CPU DDC does not yield expected result for Q-channel."
 
         self.cleanup()
@@ -878,6 +878,145 @@ class TestCPU(unittest.TestCase):
 
         self.cleanup()
 
+    def test_Duplicate(self):
+        self.initialise()
+
+        data_size = 2048#*1024*4
+        num_reps = 10   #keep greater than 2
+        num_segs = 6
+        #
+        #Test with simple case:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+            'misc' : {'SampleRates' : [1]}
+        }
+        new_proc = ProcessorCPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_Duplicate([3]))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality(fin_data['data']['ch1_0'], expected_ans), "CPU Duplicate does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1_1'], expected_ans), "CPU Duplicate does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1_2'], expected_ans), "CPU Duplicate does not yield expected result."
+        assert self.arr_equality(np.array(fin_data['misc']['SampleRates']), np.array([1,1,1])), "CPU Duplicate does not yield expected result on sample rates."
+        fin_data['data'].pop('ch1_0')
+        fin_data['data'].pop('ch1_1')
+        fin_data['data'].pop('ch1_2')
+        assert len(fin_data['data'].keys()) == 0, "CPU Duplicate has left superfluous data keys."
+
+        data_size = 1024#*1024*4
+        num_reps = 10   #keep greater than 2
+        num_segs = 5
+        #
+        #Test with simple case:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : {  'ch1' : np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]),
+                        'ch2' : np.array([[[(s+4*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+            'misc' : {'SampleRates' : [1,3]}
+        }
+        new_proc = ProcessorCPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_Duplicate([3,1]))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality(fin_data['data']['ch1_0'], expected_ans), "CPU Duplicate does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1_1'], expected_ans), "CPU Duplicate does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1_2'], expected_ans), "CPU Duplicate does not yield expected result."
+        expected_ans = np.array([[[(s+4*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality(fin_data['data']['ch2'], expected_ans), "CPU Duplicate does not yield expected result."
+        assert self.arr_equality(np.array(fin_data['misc']['SampleRates']), np.array([1,1,1,3])), "CPU Duplicate does not yield expected result on sample rates."
+        fin_data['data'].pop('ch1_0')
+        fin_data['data'].pop('ch1_1')
+        fin_data['data'].pop('ch1_2')
+        fin_data['data'].pop('ch2')
+        assert len(fin_data['data'].keys()) == 0, "CPU Duplicate has left superfluous data keys."
+
+        data_size = 1024#*1024*4
+        num_reps = 13   #keep greater than 2
+        num_segs = 6
+        #
+        #Test with simple case:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : {  'ch1' : np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]),
+                        'ch2' : np.array([[[(s+4*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+            'misc' : {'SampleRates' : [1,4]}
+        }
+        new_proc = ProcessorCPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_Duplicate([3,2]))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality(fin_data['data']['ch1_0'], expected_ans), "CPU Duplicate does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1_1'], expected_ans), "CPU Duplicate does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1_2'], expected_ans), "CPU Duplicate does not yield expected result."
+        expected_ans = np.array([[[(s+4*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality(fin_data['data']['ch2_0'], expected_ans), "CPU Duplicate does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch2_1'], expected_ans), "CPU Duplicate does not yield expected result."
+        assert self.arr_equality(np.array(fin_data['misc']['SampleRates']), np.array([1,1,1,4,4])), "CPU Duplicate does not yield expected result on sample rates."
+        fin_data['data'].pop('ch1_0')
+        fin_data['data'].pop('ch1_1')
+        fin_data['data'].pop('ch1_2')
+        fin_data['data'].pop('ch2_0')
+        fin_data['data'].pop('ch2_1')
+        assert len(fin_data['data'].keys()) == 0, "CPU Duplicate has left superfluous data keys."
+
+        self.cleanup()
+
+    def test_Rename(self):
+        self.initialise()
+
+        data_size = 2048#*1024*4
+        num_reps = 10   #keep greater than 2
+        num_segs = 6
+        #
+        #Test with simple case:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+            'misc' : {'SampleRates' : [1]}
+        }
+        new_proc = ProcessorCPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_Rename(['mark']))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality(fin_data['data']['mark'], expected_ans), "CPU Duplicate does not yield expected result."
+        fin_data['data'].pop('mark')
+        assert len(fin_data['data'].keys()) == 0, "CPU Duplicate has left superfluous data keys."
+
+        data_size = 1024#*1024*4
+        num_reps = 10   #keep greater than 2
+        num_segs = 5
+        #
+        #Test with simple case:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : {  'ch1' : np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]),
+                        'ch2' : np.array([[[(s+4*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+            'misc' : {'SampleRates' : [1,3]}
+        }
+        new_proc = ProcessorCPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_Rename(['mark', 'space']))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality(fin_data['data']['mark'], expected_ans), "CPU Duplicate does not yield expected result."
+        expected_ans = np.array([[[(s+4*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality(fin_data['data']['space'], expected_ans), "CPU Duplicate does not yield expected result."
+        fin_data['data'].pop('mark')
+        fin_data['data'].pop('space')
+        assert len(fin_data['data'].keys()) == 0, "CPU Duplicate has left superfluous data keys."
+
+        self.cleanup()
+
 
 
 
@@ -987,7 +1126,7 @@ class TestGPU(unittest.TestCase):
         #
         expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega*np.arange(data_size)+phase)*2.0*np.cos(omega*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
         assert self.arr_equality(fin_data['data']['ch1_I'], expected_ans), "GPU DDC does not yield expected result for I-channel."
-        expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega*np.arange(data_size)+phase)*2.0*np.sin(omega*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
+        expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega*np.arange(data_size)+phase)*-2.0*np.sin(omega*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
         assert self.arr_equality(fin_data['data']['ch1_Q'], expected_ans), "GPU DDC does not yield expected result for Q-channel."
 
         #Try with 2 channels
@@ -1018,11 +1157,11 @@ class TestGPU(unittest.TestCase):
         #
         expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega0*np.arange(data_size)+phase)*2.0*np.cos(omega0*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
         assert self.arr_equality(fin_data['data']['ch1_I'], expected_ans), "GPU DDC does not yield expected result in the 2-channel case for I-channel."
-        expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega0*np.arange(data_size)+phase)*2.0*np.sin(omega0*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
+        expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega0*np.arange(data_size)+phase)*-2.0*np.sin(omega0*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
         assert self.arr_equality(fin_data['data']['ch1_Q'], expected_ans), "GPU DDC does not yield expected result in the 2-channel case for Q-channel."
         expected_ans = np.array([[ampl_envelope(num_segs+s)*np.sin(omega1*np.arange(data_size)-phase)*2.0*np.cos(omega1*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
         assert self.arr_equality(fin_data['data']['ch2_I'], expected_ans), "GPU DDC does not yield expected result in the 2-channel case for I-channel."
-        expected_ans = np.array([[ampl_envelope(num_segs+s)*np.sin(omega1*np.arange(data_size)-phase)*2.0*np.sin(omega1*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
+        expected_ans = np.array([[ampl_envelope(num_segs+s)*np.sin(omega1*np.arange(data_size)-phase)*-2.0*np.sin(omega1*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
         assert self.arr_equality(fin_data['data']['ch2_Q'], expected_ans), "GPU DDC does not yield expected result in the 2-channel case for Q-channel."
 
         #Try with 2 channels and different sample rates
@@ -1053,11 +1192,11 @@ class TestGPU(unittest.TestCase):
         #
         expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega0*np.arange(data_size)+phase)*2.0*np.cos(omega0*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
         assert self.arr_equality(fin_data['data']['ch1_I'], expected_ans), "GPU DDC does not yield expected result in the 2-channel case for I-channel."
-        expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega0*np.arange(data_size)+phase)*2.0*np.sin(omega0*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
+        expected_ans = np.array([[ampl_envelope(num_segs-s)*np.sin(omega0*np.arange(data_size)+phase)*-2.0*np.sin(omega0*np.arange(data_size)) for s in range(num_segs)] for r in range(num_reps)])
         assert self.arr_equality(fin_data['data']['ch1_Q'], expected_ans), "GPU DDC does not yield expected result in the 2-channel case for Q-channel."
         expected_ans = np.array([[ampl_envelope(num_segs+s)*np.sin(omega1*np.arange(data_size)-phase)*2.0*np.cos(omega1*np.arange(data_size)/2) for s in range(num_segs)] for r in range(num_reps)])
         assert self.arr_equality(fin_data['data']['ch2_I'], expected_ans), "GPU DDC does not yield expected result in the 2-channel case for I-channel."
-        expected_ans = np.array([[ampl_envelope(num_segs+s)*np.sin(omega1*np.arange(data_size)-phase)*2.0*np.sin(omega1*np.arange(data_size)/2) for s in range(num_segs)] for r in range(num_reps)])
+        expected_ans = np.array([[ampl_envelope(num_segs+s)*np.sin(omega1*np.arange(data_size)-phase)*-2.0*np.sin(omega1*np.arange(data_size)/2) for s in range(num_segs)] for r in range(num_reps)])
         assert self.arr_equality(fin_data['data']['ch2_Q'], expected_ans), "GPU DDC does not yield expected result in the 2-channel case for Q-channel."
 
         #Try only 1 dimension
@@ -1085,7 +1224,7 @@ class TestGPU(unittest.TestCase):
         #
         expected_ans = ampl_envelope(num_segs)*np.sin(omega*np.arange(data_size)+phase)*2.0*np.cos(omega*np.arange(data_size))
         assert self.arr_equality(fin_data['data']['ch1_I'], expected_ans), "GPU DDC does not yield expected result for I-channel."
-        expected_ans = ampl_envelope(num_segs)*np.sin(omega*np.arange(data_size)+phase)*2.0*np.sin(omega*np.arange(data_size))
+        expected_ans = ampl_envelope(num_segs)*np.sin(omega*np.arange(data_size)+phase)*-2.0*np.sin(omega*np.arange(data_size))
         assert self.arr_equality(fin_data['data']['ch1_Q'], expected_ans), "GPU DDC does not yield expected result for Q-channel."
 
         self.cleanup()
@@ -1758,9 +1897,147 @@ class TestGPU(unittest.TestCase):
 
         self.cleanup()
 
+    def test_Duplicate(self):
+        self.initialise()
+
+        data_size = 2048#*1024*4
+        num_reps = 10   #keep greater than 2
+        num_segs = 6
+        #
+        #Test with simple case:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+            'misc' : {'SampleRates' : [1]}
+        }
+        new_proc = ProcessorGPU('GPU_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(GPU_Duplicate([3]))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality(fin_data['data']['ch1_0'], expected_ans), "GPU Duplicate does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1_1'], expected_ans), "GPU Duplicate does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1_2'], expected_ans), "GPU Duplicate does not yield expected result."
+        assert self.arr_equality(np.array(fin_data['misc']['SampleRates']), np.array([1,1,1])), "GPU Duplicate does not yield expected result on sample rates."
+        fin_data['data'].pop('ch1_0')
+        fin_data['data'].pop('ch1_1')
+        fin_data['data'].pop('ch1_2')
+        assert len(fin_data['data'].keys()) == 0, "GPU Duplicate has left superfluous data keys."
+
+        data_size = 1024#*1024*4
+        num_reps = 10   #keep greater than 2
+        num_segs = 5
+        #
+        #Test with simple case:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : {  'ch1' : np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]),
+                        'ch2' : np.array([[[(s+4*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+            'misc' : {'SampleRates' : [1,3]}
+        }
+        new_proc = ProcessorGPU('GPU_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(GPU_Duplicate([3,1]))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality(fin_data['data']['ch1_0'], expected_ans), "GPU Duplicate does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1_1'], expected_ans), "GPU Duplicate does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1_2'], expected_ans), "GPU Duplicate does not yield expected result."
+        expected_ans = np.array([[[(s+4*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality(fin_data['data']['ch2'], expected_ans), "GPU Duplicate does not yield expected result."
+        assert self.arr_equality(np.array(fin_data['misc']['SampleRates']), np.array([1,1,1,3])), "GPU Duplicate does not yield expected result on sample rates."
+        fin_data['data'].pop('ch1_0')
+        fin_data['data'].pop('ch1_1')
+        fin_data['data'].pop('ch1_2')
+        fin_data['data'].pop('ch2')
+        assert len(fin_data['data'].keys()) == 0, "GPU Duplicate has left superfluous data keys."
+
+        data_size = 1024#*1024*4
+        num_reps = 13   #keep greater than 2
+        num_segs = 6
+        #
+        #Test with simple case:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : {  'ch1' : np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]),
+                        'ch2' : np.array([[[(s+4*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+            'misc' : {'SampleRates' : [1,4]}
+        }
+        new_proc = ProcessorGPU('GPU_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(GPU_Duplicate([3,2]))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality(fin_data['data']['ch1_0'], expected_ans), "GPU Duplicate does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1_1'], expected_ans), "GPU Duplicate does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch1_2'], expected_ans), "GPU Duplicate does not yield expected result."
+        expected_ans = np.array([[[(s+4*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality(fin_data['data']['ch2_0'], expected_ans), "GPU Duplicate does not yield expected result."
+        assert self.arr_equality(fin_data['data']['ch2_1'], expected_ans), "GPU Duplicate does not yield expected result."
+        assert self.arr_equality(np.array(fin_data['misc']['SampleRates']), np.array([1,1,1,4,4])), "GPU Duplicate does not yield expected result on sample rates."
+        fin_data['data'].pop('ch1_0')
+        fin_data['data'].pop('ch1_1')
+        fin_data['data'].pop('ch1_2')
+        fin_data['data'].pop('ch2_0')
+        fin_data['data'].pop('ch2_1')
+        assert len(fin_data['data'].keys()) == 0, "GPU Duplicate has left superfluous data keys."
+
+        self.cleanup()
+
+    def test_Rename(self):
+        self.initialise()
+
+        data_size = 2048#*1024*4
+        num_reps = 10   #keep greater than 2
+        num_segs = 6
+        #
+        #Test with simple case:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : { 'ch1' : np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+            'misc' : {'SampleRates' : [1]}
+        }
+        new_proc = ProcessorGPU('GPU_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(GPU_Rename(['mark']))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality(fin_data['data']['mark'], expected_ans), "GPU Duplicate does not yield expected result."
+        fin_data['data'].pop('mark')
+        assert len(fin_data['data'].keys()) == 0, "GPU Duplicate has left superfluous data keys."
+
+        data_size = 1024#*1024*4
+        num_reps = 10   #keep greater than 2
+        num_segs = 5
+        #
+        #Test with simple case:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : {  'ch1' : np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]),
+                        'ch2' : np.array([[[(s+4*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+            'misc' : {'SampleRates' : [1,3]}
+        }
+        new_proc = ProcessorGPU('GPU_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(GPU_Rename(['mark', 'space']))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality(fin_data['data']['mark'], expected_ans), "GPU Duplicate does not yield expected result."
+        expected_ans = np.array([[[(s+4*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality(fin_data['data']['space'], expected_ans), "GPU Duplicate does not yield expected result."
+        fin_data['data'].pop('mark')
+        fin_data['data'].pop('space')
+        assert len(fin_data['data'].keys()) == 0, "GPU Duplicate has left superfluous data keys."
+
+        self.cleanup()
 
 
 
 if __name__ == '__main__':
-    TestGPU().test_IQddc()
+    # TestCPU().test_Duplicate()
     unittest.main()

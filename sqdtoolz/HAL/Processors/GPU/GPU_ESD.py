@@ -1,10 +1,11 @@
-from sqdtoolz.HAL.Processors.ProcessorCPU import*
+from sqdtoolz.HAL.Processors.ProcessorGPU import*
+import cupy as cp
 import numpy as np
 
-class CPU_FFT(ProcNodeCPU):
+class GPU_ESD(ProcNodeGPU):
     def __init__(self, ind_IQ = (0,1)):
         '''
-        Takes the FFT of a given trace of time values.
+        Takes the Energy-Spectral-Density of a given trace of time values. See: https://en.wikipedia.org/wiki/Spectral_density.
 
         Inputs:
             - ind_IQ - Tuple of the IQ indices. Default is 0 and 1 (i.e. assuming first and second channels are I and Q).
@@ -27,17 +28,17 @@ class CPU_FFT(ProcNodeCPU):
             cur_iq_data_complex = cur_iq_arrays[0]
         else:
             cur_iq_data_complex = cur_iq_arrays[0] + 1j*cur_iq_arrays[1]
+        cur_iq_data_complex = ProcNodeGPU.check_conv_to_cupy_array(cur_iq_data_complex)
         
         #Calculate FFT over the last inner-most axis/index:
         num_samples = cur_iq_data_complex.shape[-1]
         #Assuming that the sample rates are the same across both channels!
         sample_rate = data_pkt['misc']['SampleRates'][0]
 
-        freqs = np.fft.fftfreq(num_samples, 1.0/sample_rate)
-        arr_fft = np.fft.fft(cur_iq_data_complex)
+        freqs = np.fft.fftfreq(num_samples, 1.0/sample_rate)    #No need to place this in the GPU...
+        arr_fft = cp.fft.fft(cur_iq_data_complex)
 
-        data_pkt['data']['fft_real'] = np.real(arr_fft)
-        data_pkt['data']['fft_imag'] = np.imag(arr_fft)
+        data_pkt['data']['esd'] = np.abs(arr_fft)**2
 
         #Remove the parameter as it no longer exists after the averaging...
         data_pkt['parameters'][-1] = 'fft_frequency'

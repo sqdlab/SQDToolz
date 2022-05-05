@@ -33,7 +33,7 @@ import shutil
 import unittest
 
 import operator #for ConstantArithmetic
-
+import scipy.fft
 class TestCPU(unittest.TestCase):
     ERR_TOL = 5e-7
 
@@ -49,6 +49,11 @@ class TestCPU(unittest.TestCase):
         if arr1.size != arr2.size:
             return False
         return np.max(np.abs(arr1 - arr2)) < self.ERR_TOL
+
+    def arr_equality_pct(self, arr1, arr2):
+        if arr1.size != arr2.size:
+            return False
+        return np.max(np.abs(arr1 - arr2)/np.abs(arr1 + self.ERR_TOL)) < self.ERR_TOL
     
     def test_IQdemod(self):
         self.initialise()
@@ -878,6 +883,141 @@ class TestCPU(unittest.TestCase):
 
         self.cleanup()
 
+    def test_FFT(self):
+        self.initialise()
+
+        #Test with 1 channel
+        data_size = 1504#*1024*4
+        num_reps = 10   #keep greater than 2
+        num_segs = 6
+        #
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : {  'ch1' : np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+            'misc' : {'SampleRates' : [15]}
+        }
+        new_proc = ProcessorCPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_FFT())
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = np.array([[np.fft.fft([(s+2*r)*x for x in range(1,data_size+1)]) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality_pct(fin_data['data']['fft_real'], np.real(expected_ans)), "CPU FFT does not yield expected result."
+        assert self.arr_equality_pct(fin_data['data']['fft_imag'], np.imag(expected_ans)), "CPU FFT does not yield expected result."
+        expected_ans = np.fft.fftfreq(data_size, 1.0/15)
+        assert self.arr_equality(fin_data['parameter_values']['fft_frequency'], expected_ans), "CPU FFT does not give right frequencies."
+        
+        #Test with 1 channel
+        data_size = 1700#*1024*4
+        num_reps = 1   #keep greater than 2
+        num_segs = 1
+        #
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : {  'ch1' : np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+            'misc' : {'SampleRates' : [15]}
+        }
+        new_proc = ProcessorCPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_FFT())
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = np.array([[np.fft.fft([(s+2*r)*x for x in range(1,data_size+1)]) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality_pct(fin_data['data']['fft_real'], np.real(expected_ans)), "CPU FFT does not yield expected result."
+        assert self.arr_equality_pct(fin_data['data']['fft_imag'], np.imag(expected_ans)), "CPU FFT does not yield expected result."
+        expected_ans = np.fft.fftfreq(data_size, 1.0/15)
+        assert self.arr_equality(fin_data['parameter_values']['fft_frequency'], expected_ans), "CPU FFT does not give right frequencies."
+        
+        #Test with 2 channels
+        data_size = 2048#*1024*4
+        num_reps = 10   #keep greater than 2
+        num_segs = 6
+        #
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : {  'ch1' : np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]),
+                        'ch2' : np.array([[[(s+5*r)*x**2 for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+            'misc' : {'SampleRates' : [10,10]}
+        }
+        new_proc = ProcessorCPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_FFT())
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = np.array([[np.fft.fft([(s+2*r)*x + 1j*(s+5*r)*x**2 for x in range(1,data_size+1)]) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality_pct(fin_data['data']['fft_real'], np.real(expected_ans)), "CPU FFT does not yield expected result."
+        assert self.arr_equality_pct(fin_data['data']['fft_imag'], np.imag(expected_ans)), "CPU FFT does not yield expected result."
+        expected_ans = np.fft.fftfreq(data_size, 1.0/10)
+        assert self.arr_equality(fin_data['parameter_values']['fft_frequency'], expected_ans), "CPU FFT does not give right frequencies."
+        
+        self.cleanup()
+
+    def test_ESD(self):
+        self.initialise()
+
+        #Test with 1 channel
+        data_size = 1504#*1024*4
+        num_reps = 10   #keep greater than 2
+        num_segs = 6
+        #
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : {  'ch1' : np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+            'misc' : {'SampleRates' : [15]}
+        }
+        new_proc = ProcessorCPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_ESD())
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = np.array([[np.fft.fft([(s+2*r)*x for x in range(1,data_size+1)]) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality_pct(fin_data['data']['esd'], np.abs(expected_ans)**2), "CPU ESD does not yield expected result."
+        expected_ans = np.fft.fftfreq(data_size, 1.0/15)
+        assert self.arr_equality(fin_data['parameter_values']['fft_frequency'], expected_ans), "CPU FFT does not give right frequencies."
+        
+        #Test with 1 channel
+        data_size = 1700#*1024*4
+        num_reps = 1   #keep greater than 2
+        num_segs = 1
+        #
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : {  'ch1' : np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+            'misc' : {'SampleRates' : [15]}
+        }
+        new_proc = ProcessorCPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_ESD())
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = np.array([[np.fft.fft([(s+2*r)*x for x in range(1,data_size+1)]) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality_pct(fin_data['data']['esd'], np.abs(expected_ans)**2), "CPU ESD does not yield expected result."
+        expected_ans = np.fft.fftfreq(data_size, 1.0/15)
+        assert self.arr_equality(fin_data['parameter_values']['fft_frequency'], expected_ans), "CPU FFT does not give right frequencies."
+        
+        #Test with 2 channels
+        data_size = 2048#*1024*4
+        num_reps = 10   #keep greater than 2
+        num_segs = 6
+        #
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : {  'ch1' : np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]),
+                        'ch2' : np.array([[[(s+5*r)*x**2 for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+            'misc' : {'SampleRates' : [10,10]}
+        }
+        new_proc = ProcessorCPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_ESD())
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = np.array([[np.fft.fft([(s+2*r)*x + 1j*(s+5*r)*x**2 for x in range(1,data_size+1)]) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality_pct(fin_data['data']['esd'], np.abs(expected_ans)**2), "CPU ESD does not yield expected result."
+        expected_ans = np.fft.fftfreq(data_size, 1.0/10)
+        assert self.arr_equality(fin_data['parameter_values']['fft_frequency'], expected_ans), "CPU FFT does not give right frequencies."
+
+        self.cleanup()
+
     def test_Duplicate(self):
         self.initialise()
 
@@ -987,7 +1127,7 @@ class TestCPU(unittest.TestCase):
         new_proc.push_data(cur_data)
         fin_data = new_proc.get_all_data()
         expected_ans = np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
-        assert self.arr_equality(fin_data['data']['mark'], expected_ans), "CPU Duplicate does not yield expected result."
+        assert self.arr_equality(fin_data['data']['mark'], expected_ans), "CPU Rename does not yield expected result."
         fin_data['data'].pop('mark')
         assert len(fin_data['data'].keys()) == 0, "CPU Duplicate has left superfluous data keys."
 
@@ -1008,12 +1148,12 @@ class TestCPU(unittest.TestCase):
         new_proc.push_data(cur_data)
         fin_data = new_proc.get_all_data()
         expected_ans = np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
-        assert self.arr_equality(fin_data['data']['mark'], expected_ans), "CPU Duplicate does not yield expected result."
+        assert self.arr_equality(fin_data['data']['mark'], expected_ans), "CPU Rename does not yield expected result."
         expected_ans = np.array([[[(s+4*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
-        assert self.arr_equality(fin_data['data']['space'], expected_ans), "CPU Duplicate does not yield expected result."
+        assert self.arr_equality(fin_data['data']['space'], expected_ans), "CPU Rename does not yield expected result."
         fin_data['data'].pop('mark')
         fin_data['data'].pop('space')
-        assert len(fin_data['data'].keys()) == 0, "CPU Duplicate has left superfluous data keys."
+        assert len(fin_data['data'].keys()) == 0, "CPU Rename has left superfluous data keys."
 
         self.cleanup()
 
@@ -1021,7 +1161,7 @@ class TestCPU(unittest.TestCase):
 
 
 class TestGPU(unittest.TestCase):
-    ERR_TOL = 5e-7
+    ERR_TOL = 5e-5
 
     def initialise(self):
         self.lab = Laboratory('', 'test_save_dir/')
@@ -1035,6 +1175,11 @@ class TestGPU(unittest.TestCase):
         if arr1.size != arr2.size:
             return False
         return np.max(np.abs(arr1 - arr2)) < self.ERR_TOL
+
+    def arr_equality_pct(self, arr1, arr2):
+        if arr1.size != arr2.size:
+            return False
+        return np.max(np.abs(arr1 - arr2)/np.abs(arr2 + 2*self.ERR_TOL)) < self.ERR_TOL
     
     def test_IQdemod(self):
         self.initialise()
@@ -1897,8 +2042,155 @@ class TestGPU(unittest.TestCase):
 
         self.cleanup()
 
+    def test_FFT(self):
+        self.initialise()
+        try:
+            test_proc = ProcessorGPU('test',self.lab)
+        except:
+            assert False, "GPU Processor could not be initialised - has CuPy been installed?"
+
+        #Test with 1 channel
+        data_size = 1504#*1024*4
+        num_reps = 10   #keep greater than 2
+        num_segs = 6
+        #
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : {  'ch1' : np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+            'misc' : {'SampleRates' : [15]}
+        }
+        new_proc = ProcessorGPU('gpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(GPU_FFT())
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = np.array([[np.fft.fft([(s+2*r)*x for x in range(1,data_size+1)]) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality_pct(fin_data['data']['fft_real'], np.real(expected_ans)), "GPU FFT does not yield expected result."
+        assert self.arr_equality_pct(fin_data['data']['fft_imag'], np.imag(expected_ans)), "GPU FFT does not yield expected result."
+        expected_ans = np.fft.fftfreq(data_size, 1.0/15)
+        assert self.arr_equality(fin_data['parameter_values']['fft_frequency'], expected_ans), "GPU FFT does not give right frequencies."
+
+        #Test with 1 channel
+        data_size = 1700#*1024*4
+        num_reps = 1   #keep greater than 2
+        num_segs = 1
+        #
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : {  'ch1' : np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+            'misc' : {'SampleRates' : [15]}
+        }
+        new_proc = ProcessorGPU('gpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(GPU_FFT())
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = np.array([[np.fft.fft([(s+2*r)*x for x in range(1,data_size+1)]) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality_pct(fin_data['data']['fft_real'], np.real(expected_ans)), "GPU FFT does not yield expected result."
+        assert self.arr_equality_pct(fin_data['data']['fft_imag'], np.imag(expected_ans)), "GPU FFT does not yield expected result."
+        expected_ans = np.fft.fftfreq(data_size, 1.0/15)
+        assert self.arr_equality(fin_data['parameter_values']['fft_frequency'], expected_ans), "GPU FFT does not give right frequencies."
+
+        #Test with 2 channels
+        data_size = 2048#*1024*4
+        num_reps = 10   #keep greater than 2
+        num_segs = 6
+        #
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : {  'ch1' : np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]),
+                        'ch2' : np.array([[[(s+5*r)*x**2 for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+            'misc' : {'SampleRates' : [10,10]}
+        }
+        new_proc = ProcessorGPU('gpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(GPU_FFT())
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = np.array([[np.fft.fft([(s+2*r)*x + 1j*(s+5*r)*x**2 for x in range(1,data_size+1)]) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality_pct(fin_data['data']['fft_real'], np.real(expected_ans)), "GPU FFT does not yield expected result."
+        assert self.arr_equality_pct(fin_data['data']['fft_imag'], np.imag(expected_ans)), "GPU FFT does not yield expected result."
+        expected_ans = np.fft.fftfreq(data_size, 1.0/10)
+        assert self.arr_equality(fin_data['parameter_values']['fft_frequency'], expected_ans), "GPU FFT does not give right frequencies."
+        
+        self.cleanup()
+
+    def test_ESD(self):
+        self.initialise()
+        try:
+            test_proc = ProcessorGPU('test',self.lab)
+        except:
+            assert False, "GPU Processor could not be initialised - has CuPy been installed?"
+
+        #Test with 1 channel
+        data_size = 1501#*1024*4
+        num_reps = 10   #keep greater than 2
+        num_segs = 6
+        #
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : {  'ch1' : np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+            'misc' : {'SampleRates' : [15]}
+        }
+        new_proc = ProcessorGPU('GPU_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(GPU_ESD())
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = np.array([[np.fft.fft([(s+2*r)*x for x in range(1,data_size+1)]) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality_pct(fin_data['data']['esd'], np.abs(expected_ans)**2), "GPU ESD does not yield expected result."
+        expected_ans = np.fft.fftfreq(data_size, 1.0/15)
+        assert self.arr_equality(fin_data['parameter_values']['fft_frequency'], expected_ans), "GPU FFT does not give right frequencies."
+        
+        #Test with 1 channel
+        data_size = 2048#*1024*4
+        num_reps = 1   #keep greater than 2
+        num_segs = 1
+        #
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : {  'ch1' : np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+            'misc' : {'SampleRates' : [15]}
+        }
+        new_proc = ProcessorGPU('GPU_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(GPU_ESD())
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = np.array([[np.fft.fft([(s+2*r)*x for x in range(1,data_size+1)]) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality_pct(fin_data['data']['esd'], np.abs(expected_ans)**2), "GPU ESD does not yield expected result."
+        expected_ans = np.fft.fftfreq(data_size, 1.0/15)
+        assert self.arr_equality(fin_data['parameter_values']['fft_frequency'], expected_ans), "GPU FFT does not give right frequencies."
+        
+        #Test with 2 channels
+        data_size = 705#*1024*4
+        num_reps = 10   #keep greater than 2
+        num_segs = 6
+        #
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : {  'ch1' : np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]),
+                        'ch2' : np.array([[[(s+5*r)*x**2 for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+            'misc' : {'SampleRates' : [10,10]}
+        }
+        new_proc = ProcessorGPU('GPU_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(GPU_ESD())
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = np.array([[np.fft.fft([(s+2*r)*x + 1j*(s+5*r)*x**2 for x in range(1,data_size+1)]) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality_pct(fin_data['data']['esd'], np.abs(expected_ans)**2), "GPU ESD does not yield expected result."
+        expected_ans = np.fft.fftfreq(data_size, 1.0/10)
+        assert self.arr_equality(fin_data['parameter_values']['fft_frequency'], expected_ans), "GPU FFT does not give right frequencies."
+
+        self.cleanup()
+
     def test_Duplicate(self):
         self.initialise()
+        try:
+            test_proc = ProcessorGPU('test',self.lab)
+        except:
+            assert False, "GPU Processor could not be initialised - has CuPy been installed?"
 
         data_size = 2048#*1024*4
         num_reps = 10   #keep greater than 2
@@ -1989,6 +2281,10 @@ class TestGPU(unittest.TestCase):
 
     def test_Rename(self):
         self.initialise()
+        try:
+            test_proc = ProcessorGPU('test',self.lab)
+        except:
+            assert False, "GPU Processor could not be initialised - has CuPy been installed?"
 
         data_size = 2048#*1024*4
         num_reps = 10   #keep greater than 2
@@ -2006,9 +2302,9 @@ class TestGPU(unittest.TestCase):
         new_proc.push_data(cur_data)
         fin_data = new_proc.get_all_data()
         expected_ans = np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
-        assert self.arr_equality(fin_data['data']['mark'], expected_ans), "GPU Duplicate does not yield expected result."
+        assert self.arr_equality(fin_data['data']['mark'], expected_ans), "GPU Rename does not yield expected result."
         fin_data['data'].pop('mark')
-        assert len(fin_data['data'].keys()) == 0, "GPU Duplicate has left superfluous data keys."
+        assert len(fin_data['data'].keys()) == 0, "GPU Rename has left superfluous data keys."
 
         data_size = 1024#*1024*4
         num_reps = 10   #keep greater than 2
@@ -2027,17 +2323,17 @@ class TestGPU(unittest.TestCase):
         new_proc.push_data(cur_data)
         fin_data = new_proc.get_all_data()
         expected_ans = np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
-        assert self.arr_equality(fin_data['data']['mark'], expected_ans), "GPU Duplicate does not yield expected result."
+        assert self.arr_equality(fin_data['data']['mark'], expected_ans), "GPU Rename does not yield expected result."
         expected_ans = np.array([[[(s+4*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
-        assert self.arr_equality(fin_data['data']['space'], expected_ans), "GPU Duplicate does not yield expected result."
+        assert self.arr_equality(fin_data['data']['space'], expected_ans), "GPU Rename does not yield expected result."
         fin_data['data'].pop('mark')
         fin_data['data'].pop('space')
-        assert len(fin_data['data'].keys()) == 0, "GPU Duplicate has left superfluous data keys."
+        assert len(fin_data['data'].keys()) == 0, "GPU Rename has left superfluous data keys."
 
         self.cleanup()
 
 
 
 if __name__ == '__main__':
-    # TestCPU().test_Duplicate()
+    TestGPU().test_ESD()
     unittest.main()

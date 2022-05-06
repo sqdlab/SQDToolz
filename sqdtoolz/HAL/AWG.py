@@ -30,6 +30,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
             for ch_index, cur_ch_tupl in enumerate(awg_channel_tuples):
                 assert lab._get_instrument(cur_ch_tupl[0]) == self._awg_chan_list[ch_index]._instr_awg, "Cannot reinstantiate a waveform by the same name, but different channel configurations."
                 assert cur_ch_tupl[1] == self._awg_chan_list[ch_index]._channel_name, "Cannot reinstantiate a waveform by the same name, but different channel configurations."
+                self._awg_chan_list[ch_index].update_sample_rate(sample_rate)
             self._sample_rate = sample_rate
             self._global_factor = global_factor
             self._wfm_segment_list = []

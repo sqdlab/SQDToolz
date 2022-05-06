@@ -111,6 +111,9 @@ class AWGOutputChannel(TriggerInput, LockableProperties):
             return {'Type' : 'None'}    #Inactive waveform without any non-zero segments...
         return {'Type' : 'AnalogueSampled', 'Period' : self._parent_waveform_obj.Duration, 'Data' : seg_dicts}
 
+    def update_sample_rate(self, sample_rate):
+        self._instr_awg.SampleRate = sample_rate
+
     def set_trigger_source(self, trig_src_obj, trig_pol = -1):
         assert isinstance(trig_src_obj, TriggerOutput) or trig_src_obj == None, "Must supply a valid Trigger Output object (i.e. digital trigger output like a marker)."
         self._trig_src_obj = trig_src_obj

@@ -8,7 +8,7 @@ class TimingPlot:
 
         self.fig = plt.figure()
         self.num_channels = -1
-        self.yticklabels = []
+        self.yticklabels = []   #Holds the list of pairs containing: [string for label, maximum x-value]
 
         self._cur_pulses = []
         self._cur_rects = []
@@ -32,7 +32,7 @@ class TimingPlot:
 
     def add_rectangle(self, xStart, xEnd):
         '''
-        Draws a rectangular patch for the timing diagram based on the delay and length values from a trigger object.
+        Draws a rectangular patch on the timing diagram.
 
         Inputs:
             - xStart - Starting value on the x-axis
@@ -43,12 +43,21 @@ class TimingPlot:
         self._cur_rects += [rect]
         #Calculate smallest feature size...
         self.min_feature_size = min(self.min_feature_size, xEnd-xStart)
+        self.yticklabels[-1][1] = max(xEnd, self.yticklabels[-1][1])
 
     def goto_new_row(self, new_ylabel):
         self.num_channels += 1
-        self.yticklabels.append(new_ylabel)
+        self.yticklabels.append([new_ylabel,0])
 
     def add_rectangle_with_plot(self, xStart, xEnd, yVals):
+        '''
+        Draws a rectangular patch on the timing diagram with a plot embedded within it. Note that the plot is scaled to fit within the rectangle.
+
+        Inputs:
+            - xStart - Starting value on the x-axis
+            - xEnd   - Ending value on the x-axis
+            - yVals  - A list of y-values to use in generating the plot within the rectangle.
+        '''
         yOff = self.num_channels
         rect = TimingPlot.obj_rectangle(xStart, xEnd, yOff - 0.5*self.bar_width, yOff + 0.5*self.bar_width)
 
@@ -65,8 +74,17 @@ class TimingPlot:
 
         #Calculate smallest feature size...
         self.min_feature_size = min(self.min_feature_size, xEnd-xStart)
+        self.yticklabels[-1][1] = max(xEnd, self.yticklabels[-1][1])
 
-    def add_digital_pulse_sampled(self, vals01, xStart, pts2xVals):       
+    def add_digital_pulse_sampled(self, vals01, xStart, pts2xVals):
+        '''
+        Draws a digital waveform (over a uniformly sampled set of points) on the timing diagram.
+
+        Inputs:
+            - vals01 - List of digital 0s and 1s
+            - xStart - Starting value on the x-axis
+            - pts2xVals - The sampling interval (i.e. reciprocal of sample rate) of each point in the digital waveform.
+        '''
         vals01 = np.append(np.array(vals01), vals01[-1])
 
         yOff = self.num_channels
@@ -74,7 +92,7 @@ class TimingPlot:
         yVals = [vals01[0]]
         last_val = vals01[0]
         for ind, cur_yval in enumerate(vals01):
-            if cur_yval != last_val:
+            if cur_yval != last_val:    #<--- Doing it this way to compress the waveform and only store points of signal-change...
                 xVals.append(pts2xVals * ind + xStart)
                 xVals.append(pts2xVals * ind + xStart)
                 yVals.append(last_val)
@@ -90,8 +108,22 @@ class TimingPlot:
         #Calculate smallest feature size...
         feat_sizes = xVals[1:]-xVals[:-1]
         self.min_feature_size = min(self.min_feature_size, np.min(feat_sizes[feat_sizes>0]))
+        #
+        self.yticklabels[-1][1] = max(xVals[-1], self.yticklabels[-1][1])
 
-    def add_digital_pulse(self, list_time_vals, xStart, scale_fac_x):
+    def add_digital_pulse(self, list_time_vals, xStart, scale_fac_x=1.0):
+        '''
+        Draws a digital waveform on the timing diagram. The waveform is given as a list of changes in the signal. For example,
+        [[0,0], [10,1], [15,0]] implies that the signal is 0 from time 0 to 10, 1 from time 10 to 15 and then zero from 15
+        onwards.
+
+        Inputs:
+            - list_time_vals - List of time and binary value pairs as outlined in the description above.
+            - xStart - Starting value on the x-axis
+            - scale_fac_x - (default: 1) The sampling interval (i.e. reciprocal of sample rate) of each point in the digital
+                            waveform. This is used if list_time_vals is given as sample number in the first argument of the
+                            pairs as opposed to the actual time.
+        '''
         yOff = self.num_channels
         xVals = np.array( [xStart + x[0]*scale_fac_x for x in list_time_vals] )
         yVals = np.array( [x[1] for x in list_time_vals] )
@@ -104,6 +136,8 @@ class TimingPlot:
         #Calculate smallest feature size...
         feat_sizes = xVals[1:]-xVals[:-1]
         self.min_feature_size = min(self.min_feature_size, np.min(feat_sizes[feat_sizes>0]))
+        #
+        self.yticklabels[-1][1] = max(xVals[-1], self.yticklabels[-1][1])
 
     def _plot_stretched(self, total_time, x_units, title):
         ax = self.fig.subplots()
@@ -114,7 +148,7 @@ class TimingPlot:
         ax.set_xlabel(f'time ({x_units})')
      
         ax.set_yticks(range(len(self.yticklabels)))
-        ax.set_yticklabels(self.yticklabels, size=12)
+        ax.set_yticklabels([x[0] for x in self.yticklabels], size=12)
 
         #Rescale plot to better observe the smaller features...
         #
@@ -152,7 +186,8 @@ class TimingPlot:
         x_vals = [x[0] for x in self._cur_pulses] + [np.array([x.x1, x.x2]) for x in self._cur_rects] + [np.array([x[0].x1, x[0].x2]) for x in self._cur_rectplots]
         x_vals = np.concatenate(x_vals)
 
-        assert np.max(x_vals) <= total_time, "The time values within the plot exceed the total_time parameter."
+        for cur_y_label in self.yticklabels:
+            assert cur_y_label[1] <= total_time, f"Error in timing-diagram. The entity {cur_y_label[0]} has a time-point at {cur_y_label[1]} which exceeds the allocated total-time (designated repetition window size) of {total_time}."
 
         #np.unique does not work due to floating-point issues.
         a = x_vals
@@ -225,7 +260,7 @@ class TimingPlot:
                 ax.ticklabel_format(useOffset=False)
                 ax.set_ylim((-self.bar_width, self.num_channels + self.bar_width))  #Otherwise, one must use sharey=True on subplots
             axs[0].set_yticks(range(len(self.yticklabels)))
-            axs[0].set_yticklabels(self.yticklabels, size=12)
+            axs[0].set_yticklabels([x[0] for x in self.yticklabels], size=12)
             self.fig.set_figwidth(15)
 
         
@@ -260,6 +295,9 @@ class TimingPlot:
                     ax.plot((-d*ecc,+d*ecc), (1-d,1+d), **temp_kwargs)
                     ax.plot((-d*ecc,+d*ecc), (-d,+d), **temp_kwargs)
 
+            self.fig.suptitle(title)
+            self.fig.text(0.5, 0.0, f'time ({x_units})', verticalalignment='bottom') 
+
         return self.fig
 
 # tp = TimingPlot()
@@ -284,6 +322,6 @@ class TimingPlot:
 # tp.goto_new_row('test4')
 # tp.add_rectangle_with_plot(45e-6, 45e-6+20e-9, np.sin(np.linspace(0,10,100))*0.5+0.5)
 # tp.add_rectangle_with_plot(45e-6+20e-9, 50e-6, 0*np.sin(np.linspace(0,10,100))*0.5+0.5)
-# tp.finalise_plot(50e-6, 'ns', 'test', tol=1e-9).show()
+# tp.finalise_plot(50e-6, 's', 'test', tol=1e-9).show()
 # input('Press ENTER')
 

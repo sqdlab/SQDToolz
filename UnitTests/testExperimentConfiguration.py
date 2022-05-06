@@ -997,5 +997,5 @@ class TestSaveLoad(unittest.TestCase):
 
 if __name__ == '__main__':
     temp = TestHALInstantiation()
-    temp.test_AWG_Mapping()
+    temp.test_MWsource()
     unittest.main()

@@ -4,10 +4,10 @@ import cupy as cp
 class GPU_Max(ProcNodeGPU):
     def __init__(self, index_parameter_name):
         '''
-        General function that averages each channel across some parameter - e.g. over repetition or over all the samples. 
+        General function that takes the maximum value on each channel across some parameter - e.g. over repetition or over all the samples.
 
         Inputs:
-            - index_parameter_name - Name of the parameter in which to average across.
+            - index_parameter_name - Name of the parameter in which to maximum across.
         '''
         self._param_name = index_parameter_name
 

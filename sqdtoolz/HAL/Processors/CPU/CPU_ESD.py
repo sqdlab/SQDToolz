@@ -17,13 +17,16 @@ class CPU_ESD(ProcNodeCPU):
 
     def process_data(self, data_pkt, **kwargs):
         cur_chs = [x for x in data_pkt['data'].keys()]
-        assert len(cur_chs) == 2, "The incoming data-packet does not have 2 channels for I and Q."
+        assert len(cur_chs) == 2 or len(cur_chs) == 1, "The incoming data-packet must either have 1 channel or 2 channels (for I and Q)."
 
         cur_iq_arrays = []
-        for m in range(2):
+        for m in range(len(cur_chs)):
             cur_iq_arrays.append( data_pkt['data'].pop(cur_chs[self._ind_IQ[m]]) )
 
-        cur_iq_data_complex = cur_iq_arrays[0] + 1j*cur_iq_arrays[1]
+        if len(cur_chs) == 1:
+            cur_iq_data_complex = cur_iq_arrays[0]
+        else:
+            cur_iq_data_complex = cur_iq_arrays[0] + 1j*cur_iq_arrays[1]
         
         #Calculate FFT over the last inner-most axis/index:
         num_samples = cur_iq_data_complex.shape[-1]
@@ -36,7 +39,7 @@ class CPU_ESD(ProcNodeCPU):
         data_pkt['data']['esd'] = np.abs(arr_fft)**2
 
         #Remove the parameter as it no longer exists after the averaging...
-        data_pkt['parameters'][-1] = 'fft_freqency'
+        data_pkt['parameters'][-1] = 'fft_frequency'
         if 'parameter_values' in data_pkt:
             data_pkt['parameter_values']['fft_frequency'] = freqs
         else:

@@ -33,12 +33,11 @@ class CPU_DDC(ProcNodeCPU):
                 if self._ddc_cossin_arrays[ch_ind][0] != num_samples or self._ddc_cossin_arrays[ch_ind][1] != sample_rate or self._ddc_cossin_arrays[ch_ind][2] != ddc_frequency:
                     omega = 2*np.pi*ddc_frequency/sample_rate
                     self._ddc_cossin_arrays[ch_ind] = (
-                num_samples, sample_rate, ddc_frequency, np.cos(omega*np.arange(num_samples)), np.sin(omega*np.arange(num_samples))
-                )
+                        num_samples, sample_rate, ddc_frequency, 2.0*np.cos(omega*np.arange(num_samples)), -2.0*np.sin(omega*np.arange(num_samples)) )
                 #Perform the actual DDC...
                 cur_data_cpu = data_pkt['data'].pop(cur_ch)
-                data_pkt['data'][f'{cur_ch}_I'] = 2.0*np.multiply(cur_data_cpu, self._ddc_cossin_arrays[ch_ind][3])
-                data_pkt['data'][f'{cur_ch}_Q'] = 2.0*np.multiply(cur_data_cpu, self._ddc_cossin_arrays[ch_ind][4])
+                data_pkt['data'][f'{cur_ch}_I'] = np.multiply(cur_data_cpu, self._ddc_cossin_arrays[ch_ind][3])
+                data_pkt['data'][f'{cur_ch}_Q'] = np.multiply(cur_data_cpu, self._ddc_cossin_arrays[ch_ind][4])
                 final_sample_rates += [sample_rate]*2
                 del cur_data_cpu    #Perhaps necessary - well it's no time for caution...
             else:

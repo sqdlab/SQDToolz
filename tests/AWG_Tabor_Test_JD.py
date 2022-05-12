@@ -169,18 +169,18 @@ def test_acq_driver_1(waveform_setup = setup_acq_const_tests) :
 
 
     leData = acq_module.get_data()
-    leDecisions = instr.ACQ.get_frame_data()
+    #leDecisions = instr.ACQ.get_frame_data()
 
     import matplotlib.pyplot as plt
     for r in range(acq_module.NumRepetitions) :
         for s in range(acq_module.NumSegments) :
-            data = leData['data']['ch1'][r][s][1::2]    #I
+            data = leData['data']['CH1'][r][s][1::2]    #I
             plt.plot(data)
-            data = leData['data']['ch1'][r][s][0::2]    #Q
+            data = leData['data']['CH1'][r][s][0::2]    #Q
             plt.plot(data)
-            data = leData['data']['ch2'][r][s][1::2]
+            data = leData['data']['CH2'][r][s][1::2]
             plt.plot(data)
-            data = leData['data']['ch2'][r][s][0::2]
+            data = leData['data']['CH2'][r][s][0::2]
             plt.plot(data)
     plt.show()  #!!!REMEMBER TO CLOSE THE PLOT WINDOW BEFORE CLOSING PYTHON KERNEL OR TABOR LOCKS UP (PC restart won't cut it - needs to be a chassis restart)!!!
 
@@ -203,18 +203,18 @@ def test_acq_driver_2(lab, waveform_setup = setup_acq_const_tests) :
 
 
     leData = acq_module.get_data()
-    leDecisions = instr.ACQ.get_frame_data()
+    #leDecisions = instr.ACQ.get_frame_data()
 
     import matplotlib.pyplot as plt
     for r in range(acq_module.NumRepetitions) :
         for s in range(acq_module.NumSegments) :
-            data = leData['data']['ch1_I'][r][s][1::2]    #I
+            data = leData['data']['CH1_I'][r][s][1::2]    #I
             plt.plot(data)
-            data = leData['data']['ch1_Q'][r][s][0::2]    #Q
+            data = leData['data']['CH1_Q'][r][s][0::2]    #Q
             plt.plot(data)
-            data = leData['data']['ch2_I'][r][s][1::2]
+            data = leData['data']['CH2_I'][r][s][1::2]
             plt.plot(data)
-            data = leData['data']['ch2_Q'][r][s][0::2]
+            data = leData['data']['CH2_Q'][r][s][0::2]
             plt.plot(data)
     plt.show()  #!!!REMEMBER TO CLOSE THE PLOT WINDOW BEFORE CLOSING PYTHON KERNEL OR TABOR LOCKS UP (PC restart won't cut it - needs to be a chassis restart)!!!
     input('Press ENTER to finish test.')
@@ -233,19 +233,19 @@ def test_acq_driver_3(numSamples = 4800, numFrames = 4, numReps = 1, waveform_se
 
 
     leData = acq_module.get_data()
-    leDecisions = instr.ACQ.get_frame_data()
+    #leDecisions = instr.ACQ.get_frame_data()
 
     import matplotlib.pyplot as plt
     for r in range(acq_module.NumRepetitions) :
         for s in range(acq_module.NumSegments) :
-            data = leData['data']['ch1'][r][s][1::2]    #I
-            plt.plot(data, label = f'ch1-I-S:{s}-R:{r}')
-            data = leData['data']['ch1'][r][s][0::2]    #Q
-            plt.plot(data, label = f'ch1-Q-S:{s}-R:{r}')
-            data = leData['data']['ch2'][r][s][1::2]
-            plt.plot(data, label = f'ch2-I-S:{s}-R:{r}')
-            data = leData['data']['ch2'][r][s][0::2]
-            plt.plot(data, label = f'ch2-Q-S:{s}-R:{r}')
+            data = leData['data']['CH1'][r][s][1::2]    #I
+            plt.plot(data, label = f'CH1-I-S:{s}-R:{r}')
+            data = leData['data']['CH1'][r][s][0::2]    #Q
+            plt.plot(data, label = f'CH1-Q-S:{s}-R:{r}')
+            data = leData['data']['CH2'][r][s][1::2]
+            plt.plot(data, label = f'CH2-I-S:{s}-R:{r}')
+            data = leData['data']['CH2'][r][s][0::2]
+            plt.plot(data, label = f'CH2-Q-S:{s}-R:{r}')
     plt.legend(loc="upper right")
     plt.show()
     input('Press ENTER to finish test.')
@@ -287,18 +287,18 @@ def test_awg_driver_1() :
 
 
     leData = acq_module.get_data()
-    leDecisions = instr.ACQ.get_frame_data()
+    #leDecisions = instr.ACQ.get_frame_data()
 
     import matplotlib.pyplot as plt
     for r in range(acq_module.NumRepetitions) :
         for s in range(acq_module.NumSegments) :
-            data = leData['data']['ch1'][r][s][1::2]    #I
+            data = leData['data']['CH1'][r][s][1::2]    #I
             plt.plot(data)
-            data = leData['data']['ch1'][r][s][0::2]    #Q
+            data = leData['data']['CH1'][r][s][0::2]    #Q
             plt.plot(data)
-            data = leData['data']['ch2'][r][s][1::2]
+            data = leData['data']['CH2'][r][s][1::2]
             plt.plot(data)
-            data = leData['data']['ch2'][r][s][0::2]
+            data = leData['data']['CH2'][r][s][0::2]
             plt.plot(data)
     plt.show()
     # awg_wfm1.get_output_channel(0).Output = False
@@ -338,18 +338,18 @@ def test_awg_driver_2() :
 
 
     leData = acq_module.get_data()
-    leDecisions = instr.ACQ.get_frame_data()
+    #leDecisions = instr.ACQ.get_frame_data()
 
     import matplotlib.pyplot as plt
     for r in range(acq_module.NumRepetitions) :
         for s in range(acq_module.NumSegments) :
-            data = leData['data']['ch1'][r][s][1::2]    #I
+            data = leData['data']['CH1'][r][s][1::2]    #I
             plt.plot(data)
-            data = leData['data']['ch1'][r][s][0::2]    #Q
+            data = leData['data']['CH1'][r][s][0::2]    #Q
             plt.plot(data)
-            data = leData['data']['ch2'][r][s][1::2]
+            data = leData['data']['CH2'][r][s][1::2]
             plt.plot(data)
-            data = leData['data']['ch2'][r][s][0::2]
+            data = leData['data']['CH2'][r][s][0::2]
             plt.plot(data)
     plt.show()
     awg_wfm1.get_output_channel(0).Output = False
@@ -391,18 +391,18 @@ def test_awg_driver_3() :
 
 
     leData = acq_module.get_data()
-    leDecisions = instr.ACQ.get_frame_data()
+    #leDecisions = instr.ACQ.get_frame_data()
 
     import matplotlib.pyplot as plt
     for r in range(acq_module.NumRepetitions) :
         for s in range(acq_module.NumSegments) :
-            data = leData['data']['ch1'][r][s][1::2]    #I
+            data = leData['data']['CH1'][r][s][1::2]    #I
             plt.plot(data)
-            data = leData['data']['ch1'][r][s][0::2]    #Q
+            data = leData['data']['CH1'][r][s][0::2]    #Q
             plt.plot(data)
-            data = leData['data']['ch2'][r][s][1::2]
+            data = leData['data']['CH2'][r][s][1::2]
             plt.plot(data)
-            data = leData['data']['ch2'][r][s][0::2]
+            data = leData['data']['CH2'][r][s][0::2]
             plt.plot(data)
     plt.show()
     awg_wfmIQ.get_output_channel(0).Output = False
@@ -451,18 +451,18 @@ def test_awg_driver_4() :
 
 
     leData = acq_module.get_data()
-    leDecisions = instr.ACQ.get_frame_data()
+    #leDecisions = instr.ACQ.get_frame_data()
 
     import matplotlib.pyplot as plt
     for r in range(acq_module.NumRepetitions) :
         for s in range(acq_module.NumSegments) :
-            data = leData['data']['ch1'][r][s][1::2]    #I
+            data = leData['data']['CH1'][r][s][1::2]    #I
             plt.plot(data)
-            data = leData['data']['ch1'][r][s][0::2]    #Q
+            data = leData['data']['CH1'][r][s][0::2]    #Q
             plt.plot(data)
-            data = leData['data']['ch2'][r][s][1::2]
+            data = leData['data']['CH2'][r][s][1::2]
             plt.plot(data)
-            data = leData['data']['ch2'][r][s][0::2]
+            data = leData['data']['CH2'][r][s][0::2]
             plt.plot(data)
     plt.show()
     awg_wfmIQ.get_output_channel(0).Output = False
@@ -508,18 +508,18 @@ def test_awg_driver_5() :
 
 
     leData = acq_module.get_data()
-    leDecisions = instr.ACQ.get_frame_data()
+    #leDecisions = instr.ACQ.get_frame_data()
 
     import matplotlib.pyplot as plt
     for r in range(acq_module.NumRepetitions) :
         for s in range(acq_module.NumSegments) :
-            data = leData['data']['ch1'][r][s][1::2]    #I
+            data = leData['data']['CH1'][r][s][1::2]    #I
             plt.plot(data)
-            data = leData['data']['ch1'][r][s][0::2]    #Q
+            data = leData['data']['CH1'][r][s][0::2]    #Q
             plt.plot(data)
-            data = leData['data']['ch2'][r][s][1::2]
+            data = leData['data']['CH2'][r][s][1::2]
             plt.plot(data)
-            data = leData['data']['ch2'][r][s][0::2]
+            data = leData['data']['CH2'][r][s][0::2]
             plt.plot(data)
     plt.show()
     awg_wfmIQ.get_output_channel(0).Output = False
@@ -578,9 +578,9 @@ def test_awg_driver_6(lab) :
     plt.show()
 
 ### ACQ TESTS ###
-test_acq_driver_1(waveform_setup = setup_acq_const_tests)
-test_acq_driver_1(waveform_setup = setup_acq_osc_tests)
-test_acq_driver_2(lab, waveform_setup = setup_acq_const_tests)
+# test_acq_driver_1(waveform_setup = setup_acq_const_tests)
+# test_acq_driver_1(waveform_setup = setup_acq_osc_tests)
+# test_acq_driver_2(lab, waveform_setup = setup_acq_const_tests)
 
 # Vary Reps
 # test_acq_driver_3(numSamples = 4800, numFrames = 4, numReps = 1, waveform_setup = setup_acq_full_osc_tests)
@@ -603,7 +603,7 @@ test_awg_driver_2()
 test_awg_driver_3()
 test_awg_driver_4()
 test_awg_driver_5()
-test_awg_driver_6(lab)
+# test_awg_driver_6(lab)
 input('Press ENTER to exit.')
 
 ### ========================== MANUAL TEST SCRIPT =============================== ###
@@ -637,13 +637,13 @@ leDecisions = instr.ACQ.get_frame_data()
 import matplotlib.pyplot as plt
 for r in range(2):
     for s in range(2):
-        data = leData['data']['ch1'][r][s][1::2]    #I
+        data = leData['data']['CH1'][r][s][1::2]    #I
         plt.plot(data)
-        data = leData['data']['ch1'][r][s][0::2]    #Q
+        data = leData['data']['CH1'][r][s][0::2]    #Q
         plt.plot(data)
-        data = leData['data']['ch2'][r][s][1::2]
+        data = leData['data']['CH2'][r][s][1::2]
         plt.plot(data)
-        data = leData['data']['ch2'][r][s][0::2]
+        data = leData['data']['CH2'][r][s][0::2]
         plt.plot(data)
 plt.show()  #!!!REMEMBER TO CLOSE THE PLOT WINDOW BEFORE CLOSING PYTHON KERNEL OR TABOR LOCKS UP (PC restart won't cut it - needs to be a chassis restart)!!!
 """

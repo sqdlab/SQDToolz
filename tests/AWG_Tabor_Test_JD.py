@@ -249,6 +249,44 @@ def test_acq_driver_3(numSamples = 4800, numFrames = 4, numReps = 1, waveform_se
     plt.legend(loc="upper right")
     plt.show()
     input('Press ENTER to finish test.')
+
+def test_acq_driver_4(numSamples = 4800, numFrames = 4, numReps = 1, waveform_setup = setup_acq_const_tests) :
+    """
+    Test DSP FIR blocks on proteus, filter coefficients taken from file provided by Tabor
+    """
+    filt_coeffs = [-0.00084713, 0.000673766, 0.001850315, -0.000517804, -0.003273407,-0.000363655,0.004920981,0.002325397,-0.006386267,\
+        -0.005644754,0.007043156,0.010434112,-0.006062997,-0.016572719,0.002425474,0.023678146,0.005161621,-0.031130307,-0.018682209,\
+        0.038149254,0.042538523,-0.043914904,-0.092565044,0.047705801,0.313645744,0.450972039,0.313645744,0.047705801,-0.092565044,\
+        -0.043914904,0.042538523,0.038149254,-0.018682209,-0.031130307,0.005161621,0.023678146,0.002425474,-0.016572719,-0.006062997,\
+        0.010434112,0.007043156,-0.005644754,-0.006386267,0.002325397,0.004920981,-0.000363655,-0.003273407,-0.000517804,0.001850315,\
+        0.000673766,-0.00084713]
+
+    waveform_setup()
+    instr = lab._get_instrument('TaborAWG')
+
+    acq_module = ACQ("TabourACQ", lab, ['TaborAWG', 'ACQ'])
+    acq_module.NumSamples = numSamples
+    acq_module.NumSegments = numFrames
+    acq_module.NumRepetitions = numReps
+    acq_module._instr_acq.setup_data_path(ddc_mode = "REAL", acq_mode = "DUAL")
+    acq_module._instr_acq.setup_filter("I1", filt_coeffs)
+    acq_module._instr_acq.setup_filter("Q1", filt_coeffs)
+    
+    leData = acq_module.get_data()
+    #leDecisions = instr.ACQ.get_frame_data()
+
+    import matplotlib.pyplot as plt
+    for r in range(acq_module.NumRepetitions) :
+        for s in range(acq_module.NumSegments) :
+            data = leData['data']['CH1'][r][s][1::2]    #I
+            plt.plot(data)
+            data = leData['data']['CH1'][r][s][0::2]    #Q
+            plt.plot(data)
+            data = leData['data']['CH2'][r][s][1::2]
+            #plt.plot(data)
+            data = leData['data']['CH2'][r][s][0::2]
+            #plt.plot(data)
+    plt.show()  #!!!REMEMBER TO CLOSE THE PLOT WINDOW BEFORE CLOSING PYTHON KERNEL OR TABOR LOCKS UP (PC restart won't cut it - needs to be a chassis restart)!!!
     
 def test_awg_driver_1() :
     """
@@ -597,12 +635,15 @@ def test_awg_driver_6(lab) :
 # test_acq_driver_3(numSamples = 150*48, numFrames = 4, numReps = 1, waveform_setup = setup_acq_const_tests)
 # test_acq_driver_3(numSamples = 400*48, numFrames = 4, numReps = 1, waveform_setup = setup_acq_const_tests)
 
+# Test DSP processes
+test_acq_driver_4()
+
 ### AWG TESTS ###
-test_awg_driver_1()
-test_awg_driver_2()
-test_awg_driver_3()
-test_awg_driver_4()
-test_awg_driver_5()
+# test_awg_driver_1()
+# test_awg_driver_2()
+# test_awg_driver_3()
+# test_awg_driver_4()
+# test_awg_driver_5()
 # test_awg_driver_6(lab)
 input('Press ENTER to exit.')
 

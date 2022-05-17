@@ -544,7 +544,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
             'ddc_mode', label='DDC Mode of the Digitizer',
             get_cmd=partial(self._parent._get_cmd, ':DIG:DDC:MODE?'),
             set_cmd=partial(self._parent._set_cmd, ':DIG:DDC:MODE'),
-            val_mapping = {"REAL" : "REAL", "COMP" : "COMP"})
+            val_mapping = {"REAL" : "REAL", "COMP" : "COMP", "COMPlex" : "COMP", "N/A" : "N/A"})
 
         self.add_parameter(
             'ddr1_store', label='Data path to be stored in DDR1',
@@ -568,12 +568,20 @@ class TaborP2584M_ACQ(InstrumentChannel):
             set_cmd=partial(self._parent._set_cmd, ':DSP:IQD:SEL'),
             val_mapping = {"DBUG":"DBUG", "IQ4":"IQ4", "IQ5":"IQ5", "IQ6":"IQ6",\
                 "IQ7":"IQ7"})
-
+        
         self.add_parameter(
             'iq_path', label='Select IQ input path to configure',
             get_cmd=partial(self._parent._get_cmd, ':DSP:IQP:SEL?'),
             set_cmd=partial(self._parent._set_cmd, ':DSP:IQP:SEL'),
-            val_mapping = {"DSP1":"DSP1", "DSP2":"DSP2", "DSP3":"DSP3", "DSP4":"DSP4"})
+            val_mapping = {"DSP1":"DSP1", "DSP2":"DSP2", "DSP3":"DSP3", "DSP4":"DSP4"},
+            initial_value = "DSP1")
+
+        self.add_parameter(
+            'fir_block', label='Select FIR block to configure',
+            get_cmd=partial(self._parent._get_cmd, ':DSP:FIR:SEL?'),
+            set_cmd=partial(self._parent._set_cmd, ':DSP:FIR:SEL'),
+            val_mapping = {"I1":"I1", "Q1":"Q1", "I2":"I2", "Q2":"Q2", \
+                "DBUGI":"DBUGI", "DBUGQ":"DBUGQ"})
 
         self.add_parameter(
             'extTriggerType', label='type of trigger that will be derived from the external trigger of the digitizer',
@@ -609,7 +617,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
         self.trigger1Source("EXT")
         self.trigger2Source("EXT")
         self.extTriggerType("EDGE")
-
+        self.setup_data_path(default = True)
         self._dsp_channels = {"DDC1" : "OFF", "DDC2" : "OFF"}
 
 
@@ -819,6 +827,112 @@ class TaborP2584M_ACQ(InstrumentChannel):
                 }
         cur_processor.push_data(ret_val)
 
+    def convert_IQ_to_sample(self, inp_i,inp_q,size):
+        """
+        Convert the signed number into 12bit FIX1_11 presentation
+        """
+        out_i = np.zeros(inp_i.size)
+        out_i = out_i.astype(np.uint32)
+        
+        out_q = np.zeros(inp_q.size)
+        out_q = out_q.astype(np.uint32)
+
+        max_i = np.amax(abs(inp_i))
+        max_q = np.amax(abs(inp_q))
+        
+        max = np.maximum(max_i,max_q)
+        
+        if max < 1:
+            max = 1
+        
+        inp_i = inp_i / max
+        inp_q = inp_q / max
+        
+        M = 2**(size-1)
+        A = 2**(size)
+        
+        for i in range(inp_i.size):
+            if(inp_i[i] < 0):
+                out_i[i] = int(inp_i[i]*M) + A
+            else:
+                out_i[i] = int(inp_i[i]*(M-1))
+                
+        for i in range(inp_q.size):
+            if(inp_q[i] < 0):
+                out_q[i] = int(inp_q[i]*M) + A
+            else:
+                out_q[i] = int(inp_q[i]*(M-1))
+
+        return out_i , out_q
+
+    def pack_kernel_data(self, ki,kq,EXPORT=False,PATH='') :
+        """
+        Method to pack kernel data 
+        """
+        out_i = []
+        out_q = []
+        L = int(ki.size/5)
+        
+        b_ki = np.zeros(ki.size)
+        b_kq = np.zeros(ki.size)
+        kernel_data = np.zeros(L*4)
+        
+        b_ki = b_ki.astype(np.uint16)
+        b_kq = b_kq.astype(np.uint16)
+        kernel_data = kernel_data.astype(np.uint32)
+        
+        # convert the signed number into 12bit FIX1_11 presentation
+        b_ki,b_kq = self.convert_IQ_to_sample(ki,kq,12)
+        
+        # convert 12bit to 15bit because of FPGA memory structure
+        for i in range(L):
+            s1 = (b_ki[i*5+1]&0x7) * 4096 + ( b_ki[i*5]               )
+            s2 = (b_ki[i*5+2]&0x3F) * 512 + ((b_ki[i*5+1]&0xFF8) >> 3 )
+            s3 = (b_ki[i*5+3]&0x1FF) * 64 + ((b_ki[i*5+2]&0xFC0) >> 6 )
+            s4 = (b_ki[i*5+4]&0xFFF) *  8 + ((b_ki[i*5+3]&0xE00) >> 9 )
+            out_i.append(s1)
+            out_i.append(s2)
+            out_i.append(s3)
+            out_i.append(s4)
+        
+        out_i = np.array(out_i)
+        
+        for i in range(L):
+            s1 = (b_kq[i*5+1]&0x7) * 4096 + ( b_kq[i*5]               )
+            s2 = (b_kq[i*5+2]&0x3F) * 512 + ((b_kq[i*5+1]&0xFF8) >> 3 )
+            s3 = (b_kq[i*5+3]&0x1FF) * 64 + ((b_kq[i*5+2]&0xFC0) >> 6 )
+            s4 = (b_kq[i*5+4]&0xFFF) *  8 + ((b_kq[i*5+3]&0xE00) >> 9 )
+            out_q.append(s1)
+            out_q.append(s2)
+            out_q.append(s3)
+            out_q.append(s4)
+
+        out_q = np.array(out_q)
+
+        fout_i = np.zeros(out_i.size)
+        fout_q = np.zeros(out_q.size)
+
+        for i in range(out_i.size):
+            if(out_i[i] >16383):
+                fout_i[i] = out_i[i] - 32768
+            else:
+                fout_i[i] = out_i[i]
+
+        for i in range(out_q.size):
+            if(out_q[i] >16383):
+                fout_q[i] = out_q[i] - 32768
+            else:
+                fout_q[i] = out_q[i]
+        
+        for i in range(L*4):
+            kernel_data[i] = out_q[i]*(1 << 16) + out_i[i]
+        sim_kernel_data = []
+
+        for i in range(kernel_data.size):
+            sim_kernel_data.append(hex(kernel_data[i])[2:])
+
+        return kernel_data
+
     def setup_data_path(self, **kwargs) :
         """
         Method to setup datapath of the acquisition
@@ -836,53 +950,70 @@ class TaborP2584M_ACQ(InstrumentChannel):
             
             if kwargs["default"] == True :
                 # Set Default Values
-                self.acq_mode("SING")
-                self.ddc_mode("REAL")
+                self.acq_mode("DUAL")
+                self.ddc_mode("COMP")
                 self.ddr1_store("DIR1")
-                self.ddr2_store("DIR1")
+                self.ddr2_store("DIR2")
                 return
 
         # Assign variables
         self.acq_mode(kwargs.get("acq_mode", self.acq_mode()))
         self.ddc_mode(kwargs.get("ddc_mode", self.ddc_mode()))
+        # self.ddc_mode("COMP")
+        # self.ddc_mode("REAL")
         # If in Complex mode, storage options are limited 
         # TODO: confirm if it will set to something allowed automatically
-        if (self.ddc_mode() == "COMP") :
-            self.ddr1_store(kwargs.get("dd1_store", self.dd1_store()))
-            self.ddr2_store(kwargs.get("dd2_store", self.dd2_store()))
-        else :
-            self.ddr1_store(kwargs.get("dd1_store", self.dd1_store()))
-            self.ddr2_store(kwargs.get("dd2_store", self.dd2_store()))
+        # if (self.ddc_mode() == "COMP") :
+        #     self.ddr1_store(kwargs.get("ddr1_store", self.dd1_store()))
+        #     self.ddr2_store(kwargs.get("ddr2_store", self.dd2_store()))
+        # else :
+        #     self.ddr1_store(kwargs.get("ddr1_store", self.dd1_store()))
+        #     self.ddr2_store(kwargs.get("ddr2_store", self.dd2_store()))
 
-    def setup_filter(self, filter_array, **kwargs) :
+    def setup_filter(self, filter_channel, filter_array, **kwargs) :
         """
-        Method to initialise filter on Tabor
+        Method to set coefficients for specific FIR filter on Tabor
+        @param filter_channel:
         """
-        # Select to store the DSP1 data
-        self._parent._inst.send_scpi_cmd(':DSP:STOR1 DSP1')
-        resp = self._parent._inst.send_scpi_cmd.send_scpi_query(':SYST:ERR?')
-        print(resp)
+
+        valid_real_channels = ["DBUQI", "DBUGQ"]
+        valid_complex_channels = ["I1", "Q1", "I2", "Q2"]
+        # Check that the requested block is valid for the current ddc mode
+        # NOTE: could remove this check and rely on user to know what blocks are being used when
+        print("DDC mode is: ", self.ddc_mode())
+        if (self.ddc_mode() == "REAL" and filter_channel in valid_real_channels) :
+            self.fir_block(filter_channel)
+        elif (self.ddc_mode() == "COMP" and filter_channel in valid_complex_channels) :
+            self.fir_block(filter_channel)
+        else :
+            print("Not a vaild filter channel for current DDC mode")
+
+        # Check array size is valid
+        if (len(filter_array) > int(self._parent._inst.send_scpi_query(':DSP:FIR:LENG?'))) :
+            print("filter array contains too many coefficients, limit is {0}".format(self._parent._inst.send_scpi_query(':DSP:FIR:LENG?')))
+            return
 
         # dsp decision frame
-        self._parent._inst.send_scpi_cmd(':DSP:DEC:FRAM {0}'.format(DSP_DEC_LEN))
-        resp = self._parent._inst.send_scpi_cmd.send_scpi_query(':SYST:ERR?')
+        # TODO: what is the frame size of the calculation
+        self._parent._inst.send_scpi_cmd(':DSP:DEC:FRAM {0}'.format(1024))
+        resp = self._parent._inst.send_scpi_query(':SYST:ERR?')
         print(resp)
 
         # Load in filter coefficients
-        for i in (filter_array) :
+        for i in range(0, len(filter_array)) :
             self._parent._inst.send_scpi_cmd(':DSP:FIR:COEF {},{}'.format(i, filter_array[i]))
             
-        self._parent._inst.send_scpi_cmd(':DSP:IQD:SEL IQ4')           # DBUG | IQ4 | IQ5 | IQ6 | IQ7
+        # self._parent._inst.send_scpi_cmd(':DSP:IQD:SEL IQ4')           # DBUG | IQ4 | IQ5 | IQ6 | IQ7
         # self._parent._inst.send_scpi_cmd(':DSP:IQD:KER:DATA', mem)
-        resp =  self._parent._inst.send_scpi_query(':SYST:ERR?')
-        print(resp)
+        # resp =  self._parent._inst.send_scpi_query(':SYST:ERR?')
+        # print(resp)
 
-        #define decision DSP1 path SVM
-        self._parent._inst.send_scpi_cmd(':DSP:DEC:IQP:SEL DSP1')
-        self._parent._inst.send_scpi_cmd(':DSP:DEC:IQP:OUTP SVM')
-        self._parent._inst.send_scpi_cmd(':DSP:DEC:IQP:LINE 1,-0.625,-5')
-        self._parent._inst.send_scpi_cmd(':DSP:DEC:IQP:LINE 2,1.0125,0.5')
-        self._parent._inst.send_scpi_cmd(':DSP:DEC:IQP:LINE 3,0,0')
+        # define decision DSP1 path SVM
+        # self._parent._inst.send_scpi_cmd(':DSP:DEC:IQP:SEL DSP1')
+        # self._parent._inst.send_scpi_cmd(':DSP:DEC:IQP:OUTP SVM')
+        # self._parent._inst.send_scpi_cmd(':DSP:DEC:IQP:LINE 1,-0.625,-5')
+        # self._parent._inst.send_scpi_cmd(':DSP:DEC:IQP:LINE 2,1.0125,0.5')
+        # self._parent._inst.send_scpi_cmd(':DSP:DEC:IQP:LINE 3,0,0')
 
     def get_data(self, **kwargs):
         self.blocksize(self.NumRepetitions)
@@ -914,7 +1045,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
             self._allocate_frame_memory()
 
         # Clean memory 
-        self._parent._send_cmd(':DIG:ACQ:ZERO:ALL')
+        self._parent._send_cmd(':DIG:ACQ:ZERO:ALL 0') # NOTE: This didnt have the '0' argument originally
 
         self._parent._chk_err('after clearing memory.')
 

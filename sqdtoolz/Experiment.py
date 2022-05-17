@@ -1,3 +1,4 @@
+from typing import List
 import numpy as np
 import time
 import json
@@ -12,6 +13,7 @@ class Experiment:
         '''
         self._name = name
         self._expt_config = expt_config
+        self.last_rec_params = None
 
     @property
     def Name(self):
@@ -34,20 +36,28 @@ class Experiment:
         data_file.close()
 
     def _run(self, file_path, sweep_vars=[], **kwargs):
+        self.last_rec_params = None
         delay = kwargs.get('delay', 0.0)
         ping_iteration = kwargs.get('ping_iteration')
         kill_signal = kwargs.get('kill_signal')
         ping_iteration(reset=True)
         disable_progress_bar = kwargs.get('disable_progress_bar', False)
-        
+
         data_file_index = kwargs.get('data_file_index', -1)
         if data_file_index >= 0:
             data_file_name = f'data{data_file_index}.h5'
         else:
             data_file_name = 'data.h5'
-
         store_timestamps = kwargs.get('store_timestamps', True)
         data_file = FileIOWriter(file_path + data_file_name, store_timestamps=store_timestamps)
+        
+        rec_params = kwargs.get('rec_params')
+        if len(rec_params) > 0:
+            if data_file_index >= 0:
+                rec_param_file_name = f'rec_params{data_file_index}.h5'
+            else:
+                rec_param_file_name = 'rec_params.h5'
+            rec_data_file = FileIOWriter(file_path + rec_param_file_name, store_timestamps=store_timestamps)
 
         if not kwargs.get('skip_init_instruments', False):
             self._expt_config.init_instruments()
@@ -63,6 +73,8 @@ class Experiment:
                 if not kill_signal():
                     data = self._expt_config.get_data()
                     data_file.push_datapkt(data, sweep_vars)
+                    if len(rec_params) > 0:
+                        rec_data_file.push_datapkt(self._prepare_rec_params(rec_params), sweep_vars)
                     time.sleep(delay)
             #################################
         else:
@@ -101,13 +113,25 @@ class Experiment:
 
                     data = self._expt_config.get_data()
                     data_file.push_datapkt(data, sweep_vars)
+                    if len(rec_params) > 0:
+                        rec_data_file.push_datapkt(self._prepare_rec_params(rec_params), sweep_vars)
                     if not disable_progress_bar:
                         ping_iteration((ind_coord+1)/sweep_grids.shape[0])
 
         data_file.close()
+        if len(rec_params) > 0:
+            rec_data_file.close()
+            self.last_rec_params = FileIOReader(file_path + rec_param_file_name)
         self._expt_config.makesafe_instruments()
 
         return FileIOReader(file_path + data_file_name)
+
+    def _prepare_rec_params(self, rec_params):
+        return {
+                'parameters' : [],
+                'data' : { f'{cur_rec_param[2]}' : np.array([getattr(cur_rec_param[0], cur_rec_param[1])]) for cur_rec_param in rec_params }
+            }
+
 
     def save_config(self, save_dir, name_time_diag, name_expt_params, sweep_queue = [], file_index = 0):
         #Save a PNG of the Timing Plot

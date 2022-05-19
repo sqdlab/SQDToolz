@@ -719,6 +719,52 @@ class TestSegments(unittest.TestCase):
         shutil.rmtree('test_save_dir')
         self.cleanup()
 
+    def test_WFMTcopy(self):
+        self.initialise()
+
+        WFMT_ModulationIQ('IQmod', self.lab, 47e7)
+        WFMT_ModulationIQ('IQmod2', self.lab, 13e7)
+        self.lab.WFMT('IQmod').IQAmplitude = 2.0
+        self.lab.WFMT('IQmod').IQAmplitudeFactor = 5.0
+        self.lab.WFMT('IQmod').IQPhaseOffset = 7.1
+        self.lab.WFMT('IQmod').IQdcOffset = (8.1,7.4)
+        self.lab.WFMT('IQmod2').IQAmplitude = 45.0
+        self.lab.WFMT('IQmod2').IQAmplitudeFactor = 54.0
+        self.lab.WFMT('IQmod2').IQPhaseOffset = 7.145
+        self.lab.WFMT('IQmod2').IQdcOffset = (188.1, 748.3)
+        #Check that everything was set properly...
+        assert self.lab.WFMT('IQmod').IQAmplitude == 2.0, "Somehow the WMFT property was not set..."
+        assert self.lab.WFMT('IQmod').IQAmplitudeFactor == 5.0, "Somehow the WMFT property was not set..."
+        assert self.lab.WFMT('IQmod').IQPhaseOffset == 7.1, "Somehow the WMFT property was not set..."
+        assert self.lab.WFMT('IQmod').IQdcOffset == (8.1,7.4), "Somehow the WMFT property was not set..."
+        assert self.lab.WFMT('IQmod2').IQAmplitude == 45.0, "Somehow the WMFT property was not set..."
+        assert self.lab.WFMT('IQmod2').IQAmplitudeFactor == 54.0, "Somehow the WMFT property was not set..."
+        assert self.lab.WFMT('IQmod2').IQPhaseOffset == 7.145, "Somehow the WMFT property was not set..."
+        assert self.lab.WFMT('IQmod2').IQdcOffset == (188.1, 748.3), "Somehow the WMFT property was not set..."
+        #Run the copy of settings on itself...
+        self.lab.WFMT('IQmod').copy_settings(self.lab.WFMT('IQmod'))
+        assert self.lab.WFMT('IQmod').IQAmplitude == 2.0, "WMFT property corrupted during copy of settings onto itself..."
+        assert self.lab.WFMT('IQmod').IQAmplitudeFactor == 5.0, "WMFT property corrupted during copy of settings onto itself..."
+        assert self.lab.WFMT('IQmod').IQPhaseOffset == 7.1, "WMFT property corrupted during copy of settings onto itself..."
+        assert self.lab.WFMT('IQmod').IQdcOffset == (8.1,7.4), "WMFT property corrupted during copy of settings onto itself..."
+        assert self.lab.WFMT('IQmod2').IQAmplitude == 45.0, "WMFT property corrupted during copy of settings onto itself..."
+        assert self.lab.WFMT('IQmod2').IQAmplitudeFactor == 54.0, "WMFT property corrupted during copy of settings onto itself..."
+        assert self.lab.WFMT('IQmod2').IQPhaseOffset == 7.145, "WMFT property corrupted during copy of settings onto itself..."
+        assert self.lab.WFMT('IQmod2').IQdcOffset == (188.1, 748.3), "WMFT property corrupted during copy of settings onto itself..."
+        #Run the copy of settings amongst one another...
+        self.lab.WFMT('IQmod').copy_settings(self.lab.WFMT('IQmod2'))
+        assert self.lab.WFMT('IQmod').IQAmplitude == 45.0, "WMFT property corrupted during copy of settings..."
+        assert self.lab.WFMT('IQmod').IQAmplitudeFactor == 54.0, "WMFT property corrupted during copy of settings..."
+        assert self.lab.WFMT('IQmod').IQPhaseOffset == 7.145, "WMFT property corrupted during copy of settings..."
+        assert self.lab.WFMT('IQmod').IQdcOffset == (188.1, 748.3), "WMFT property corrupted during copy of settings..."
+        assert self.lab.WFMT('IQmod2').IQAmplitude == 45.0, "WMFT property corrupted during copy of settings..."
+        assert self.lab.WFMT('IQmod2').IQAmplitudeFactor == 54.0, "WMFT property corrupted during copy of settings..."
+        assert self.lab.WFMT('IQmod2').IQPhaseOffset == 7.145, "WMFT property corrupted during copy of settings..."
+        assert self.lab.WFMT('IQmod2').IQdcOffset == (188.1, 748.3), "WMFT property corrupted during copy of settings..."
+       
+        shutil.rmtree('test_save_dir')
+        self.cleanup()
+
 class TestAWGChecks(unittest.TestCase):
     def initialise(self):
         self.lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir/')
@@ -814,5 +860,5 @@ class TestAWGChecks(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    TestSegments().test_SegmentsAndIQ()
+    TestSegments().test_WFMTcopy()
     unittest.main()

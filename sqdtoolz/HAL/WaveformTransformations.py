@@ -169,14 +169,14 @@ class WFMT_ModulationIQ(WaveformTransformation):
 
         if 'phase' in kwargs:
             if self.IQUpperSideband:
-                self._cur_t0 = t0 - kwargs.get('phase') / (2*np.pi*self.IQFrequency)
-            else:
                 self._cur_t0 = t0 + kwargs.get('phase') / (2*np.pi*self.IQFrequency)
+            else:
+                self._cur_t0 = t0 - kwargs.get('phase') / (2*np.pi*self.IQFrequency)
         elif 'phase_offset' in kwargs:
             if self.IQUpperSideband:
-                self._cur_t0 -= kwargs.get('phase_offset') / (2*np.pi*self.IQFrequency)
-            else:
                 self._cur_t0 += kwargs.get('phase_offset') / (2*np.pi*self.IQFrequency)
+            else:
+                self._cur_t0 -= kwargs.get('phase_offset') / (2*np.pi*self.IQFrequency)
 
         t_vals = np.arange(wfm_pts.size) / fs + t0 - self._cur_t0
         if ch_index == 0:   #I-Channel

@@ -1,0 +1,6 @@
+instruments:
+  smu:
+    driver: sqdtoolz.Drivers.SMU_B2901A
+    type: SMU_B2901A
+    address: 'TCPIP::192.168.1.201::INSTR'
+    enable_forced_reconnect: true

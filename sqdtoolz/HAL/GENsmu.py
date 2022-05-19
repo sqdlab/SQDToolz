@@ -43,6 +43,28 @@ class GENsmu(HALbase):
         self._instr_smu.Current = val
         
     @property
+    def SenseVoltage(self):
+        return self._instr_smu.SenseVoltage
+        
+    @property
+    def SenseCurrent(self):
+        return self._instr_smu.SenseCurrent
+    
+    @property
+    def ComplianceCurrent(self):
+        return self._instr_smu.ComplianceCurrent
+    @ComplianceCurrent.setter
+    def ComplianceCurrent(self, val):
+        self._instr_smu.ComplianceCurrent = val
+    
+    @property
+    def ComplianceVoltage(self):
+        return self._instr_smu.ComplianceVoltage
+    @ComplianceVoltage.setter
+    def ComplianceVoltage(self, val):
+        self._instr_smu.ComplianceVoltage = val
+        
+    @property
     def Mode(self):
         return self._instr_smu.Mode
     @Mode.setter
@@ -71,12 +93,13 @@ class GENsmu(HALbase):
             'Type' : self.__class__.__name__,
             #Ignoring ManualActivation
             }
-        self.pack_properties_to_dict(['Mode', 'Voltage', 'Current', 'RampRateVoltage', 'RampRateCurrent', 'Output'], ret_dict)
+        self.pack_properties_to_dict(['Mode', 'Voltage', 'Current', 'RampRateVoltage', 'RampRateCurrent', 'Output', 'SenseVoltage', 'SenseCurrent', 'ComplianceVoltage', 'ComplianceCurrent'], ret_dict)
         return ret_dict
 
     def _set_current_config(self, dict_config, lab):
         assert dict_config['Type'] == self.__class__.__name__, 'Cannot set configuration to a Voltage-Source with a configuration that is of type ' + dict_config['Type']
         self.Mode = dict_config['Mode']
+        #Don't store SenseVoltage and SenseCurrent as they are only readonly properties!s
         #Only set the Source Property - shouldn't be allowed to set the measure-property!
         if self.Mode == 'SrcI_MeasV':
             self.Current = dict_config['Current']
@@ -84,5 +107,7 @@ class GENsmu(HALbase):
             self.Voltage = dict_config['Voltage']
         self.RampRateVoltage = dict_config['RampRateVoltage']
         self.RampRateCurrent = dict_config['RampRateCurrent']
+        self.ComplianceVoltage = dict_config['ComplianceVoltage']
+        self.ComplianceCurrent = dict_config['ComplianceCurrent']
         self.Output = dict_config['Output']
         self.ManualActivation = dict_config.get('ManualActivation', False)

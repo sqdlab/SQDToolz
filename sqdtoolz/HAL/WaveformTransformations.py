@@ -3,7 +3,21 @@ from sqdtoolz.HAL.LockableProperties import LockableProperties
 class WaveformTransformationArgs:
     def __init__(self, wfmt_name, kwargs):
         self.wfmt_name = wfmt_name
-        self.kwargs = kwargs
+        self._kwargs = []
+        for cur_kwarg in kwargs:
+            self._kwargs += [cur_kwarg]
+            setattr(self, cur_kwarg, kwargs[cur_kwarg])
+
+    @property
+    def Name(self):
+        return self.wfmt_name
+    
+    @property
+    def kwargs(self):
+        ret_dict = {}
+        for cur_kwarg in self._kwargs:
+            ret_dict[cur_kwarg] = getattr(self, cur_kwarg)
+        return ret_dict
 
 class WaveformTransformation(LockableProperties):
     def __init__(self, name):
@@ -33,6 +47,7 @@ class WaveformTransformation(LockableProperties):
             return super(cls.__class__, cls).__new__(cls)
     
     def apply(self, **kwargs):
+        self._process_kwargs(kwargs)
         return WaveformTransformationArgs(self.Name, kwargs)
 
     @property
@@ -60,6 +75,9 @@ class WaveformTransformation(LockableProperties):
         raise NotImplementedError()
 
     def _set_current_config(self, dict_config, instr_obj = None):
+        raise NotImplementedError()
+    
+    def _process_kwargs(self, kwargs):
         raise NotImplementedError()
 
 class WFMT_ModulationIQ(WaveformTransformation):
@@ -185,3 +203,7 @@ class WFMT_ModulationIQ(WaveformTransformation):
         self._iq_phase_offset = dict_config["IQ Phase Offset"]
         self._iq_dc_offsets = dict_config["IQ DC Offset"]
         self._iq_upper_sb  = dict_config["IQ using Upper Sideband"]
+    
+    def _process_kwargs(self, kwargs):
+        kwargs['phase'] = kwargs.get('phase', None)
+        kwargs['phase_offset'] = kwargs.get('phase_offset', None)

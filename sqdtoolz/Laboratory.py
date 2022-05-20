@@ -394,6 +394,32 @@ class Laboratory:
         #Reset kill-switch state
         self._kill_switch_reset(cur_exp_path)
 
+        #Verify and condition rec_params to be purely object-property pairs along with their unique resolution name...
+        rec_params = kwargs.get('rec_params', [])
+        assert isinstance(rec_params, list), "rec_params must be given as a list of parameters to track over the experiment."
+        new_rec_params = []
+        for m, cur_rec_param in enumerate(rec_params):
+            if isinstance(cur_rec_param, tuple):
+                assert len(cur_rec_param), "rec_param can only have doublets in the tuples - i.e. (sqdtoolz object, property name)."
+                #Check that asserts in the object resolution don't trigger and that it resolves to a valid registered object
+                obj_tree = self._resolve_sqdobj_tree(cur_rec_param[0])
+                assert len(obj_tree) > 0, f"Object resolution failed for argument {m} in rec_param."
+                #Check that the property exists in said object
+                assert hasattr(cur_rec_param[0], cur_rec_param[1]), f"Property \'{cur_rec_param[1]}\' doesn't exist for object {m} in rec_param."
+                #
+                new_rec_param = [cur_rec_param[0], cur_rec_param[1]]
+            else:
+                #Check that asserts in the object resolution don't trigger and that it resolves to a valid registered object
+                obj_tree = self._resolve_sqdobj_tree(cur_rec_param)
+                assert len(obj_tree) > 0, f"Object resolution failed in the \'{cur_rec_param}\' for rec_param."
+                #Check that Value exists in said object
+                assert hasattr(cur_rec_param, 'Value'), f"Property \'Value\' doesn't exist for object {m} in rec_param. Perhaps specify a tuple to be sure?"
+                #
+                new_rec_param = [cur_rec_param, 'Value']
+            cur_param_name = ".".join([f'{x[1]}_{x[0]}' for x in obj_tree])+f'.{new_rec_param[1]}'
+            new_rec_params += [(new_rec_param[0], new_rec_param[1], cur_param_name)]
+        kwargs['rec_params'] = new_rec_params
+
         ret_vals = expt_obj._run(cur_exp_path, sweep_vars, ping_iteration=self._update_progress_bar, kill_signal=self._kill_switch_check, **kwargs)
         self._group_dir['ExptIndex'] += 1
 

@@ -8,6 +8,7 @@ class WaveformSegmentBase(LockableProperties):
         self._name = name
         if transform_func:
             assert isinstance(transform_func, WaveformTransformationArgs), "Transformation function specified incorrectly - remember to call apply() on the WFMT object..."
+            transform_func.Parent = (self, 'wt')
         self._transform_func = transform_func
         self._duration = duration
 
@@ -24,6 +25,17 @@ class WaveformSegmentBase(LockableProperties):
     @Duration.setter
     def Duration(self, len_seconds):
         self._duration = len_seconds
+
+    def _get_child(self, tuple_name_group):
+        cur_name, cur_type = tuple_name_group
+        if cur_type == 'wt':
+            for cur_wfmt in [self._transform_func]:
+                if cur_wfmt.Name == cur_name:
+                    return cur_wfmt
+        return None
+
+    def get_WFMT(self):
+        return self._transform_func
 
     def reset_waveform_transforms(self, lab):
         if self._transform_func:
@@ -46,12 +58,19 @@ class WaveformSegmentBase(LockableProperties):
         cur_wfm = self._get_waveform(lab, fs, t0_ind, ch_index)
         #Transform if necessary:      
         if self._transform_func:
-            return lab.WFMT(self._transform_func.wfmt_name).modify_waveform(cur_wfm, fs, t0_ind, ch_index, **self._transform_func.kwargs)
+            kwargs = self._transform_func.kwargs
+            none_keys = []
+            for cur_key in kwargs:
+                if kwargs[cur_key] == None:
+                    none_keys += [cur_key]
+            for cur_none_key in none_keys:
+                kwargs.pop(cur_none_key)
+            return lab.WFMT(self._transform_func.wfmt_name).modify_waveform(cur_wfm, fs, t0_ind, ch_index, **kwargs)
         else:
             return cur_wfm
 
     def _get_waveform(self, lab, fs, t0_ind, ch_index):
-        assert False, "Waveform Segment classes must implement a get_waveform function."
+        raise NotImplementedError()
 
     def _get_current_config(self):
         '''

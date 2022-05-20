@@ -701,7 +701,54 @@ class TestSweeps(unittest.TestCase):
     def test_Exp(self):
         self.initialise()
         
+        #Check out recorded parameter storage
+        #
+        #Check basic parameter storage with VARs
+        exp = Experiment("test", self.lab.CONFIG('testConf'))
+        self.lab.VAR('myFreq').Value = 5
+        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1))], delay=1, rec_params=[self.lab.VAR('myFreq'), self.lab.VAR('testAmpl')])
+        assert hasattr(exp, 'last_rec_params'), "Running an experiment with rec_params did not create an attribute \'last_rec_params\'."
+        assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array().shape), np.array([3,2]))
+        assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array()), np.array([[5,0],[5,1],[5,2]]))
+        assert self.arr_equality(np.array(exp.last_rec_params.param_vals[0]), np.arange(0,3,1))
+        #
+        #Check basic parameter storage with a WFMT
+        exp = Experiment("test", self.lab.CONFIG('testConf'))
+        self.lab.VAR('myFreq').Value = 5
+        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1))], delay=1, rec_params=[(self.lab.WFMT("IQmod"), 'IQFrequency'), self.lab.VAR('testAmpl')])
+        assert hasattr(exp, 'last_rec_params'), "Running an experiment with rec_params did not create an attribute \'last_rec_params\'."
+        assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array().shape), np.array([3,2]))
+        val = self.lab.WFMT("IQmod").IQFrequency
+        assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array()), np.array([[val,0],[val,1],[val,2]]))
+        assert self.arr_equality(np.array(exp.last_rec_params.param_vals[0]), np.arange(0,3,1))
+        #
+        #Check basic parameter storage with a HAL and 2D sweep
+        exp = Experiment("test", self.lab.CONFIG('testConf'))
+        self.lab.VAR('myFreq').Value = 5
+        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1)), (self.lab.VAR('test RepTime'), np.linspace(9,12,4))], rec_params=[(self.lab.WFMT("IQmod"), 'IQFrequency'), (self.lab.HAL("MW-Src"), 'Power')])
+        assert hasattr(exp, 'last_rec_params'), "Running an experiment with rec_params did not create an attribute \'last_rec_params\'."
+        assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array().shape), np.array([3,4,2]))
+        val = self.lab.WFMT("IQmod").IQFrequency
+        val2 = self.lab.HAL("MW-Src").Power
+        assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array()), np.array([[[val,val2]]*4]*3))
+        assert self.arr_equality(np.array(exp.last_rec_params.param_vals[0]), np.arange(0,3,1))
+        assert self.arr_equality(np.array(exp.last_rec_params.param_vals[1]), np.linspace(9,12,4))
+        #
+        #Check case when there are no sweeping points
+        time.sleep(1)   #Otherwise it writes to the same file as the previous test...
+        exp = Experiment("test", self.lab.CONFIG('testConf'))
+        self.lab.VAR('myFreq').Value = 5
+        res = self.lab.run_single(exp, rec_params=[(self.lab.WFMT("IQmod"), 'IQFrequency'), (self.lab.HAL("MW-Src"), 'Power'), (self.lab.HAL("Wfm1").get_waveform_segment('init0'), 'Duration')])
+        assert hasattr(exp, 'last_rec_params'), "Running an experiment with rec_params did not create an attribute \'last_rec_params\'."
+        assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array().shape), np.array([3]))
+        val = self.lab.WFMT("IQmod").IQFrequency
+        val2 = self.lab.HAL("MW-Src").Power
+        val3 = self.lab.HAL("Wfm1").get_waveform_segment('init0').Duration
+        assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array()), np.array([val,val2,val3]))
+        assert self.arr_equality(np.array(exp.last_rec_params.param_vals), np.array([]))
+
         #Check Experiment sweep_vars don't accept empty arrays...
+        time.sleep(1)   #Otherwise it writes to the same file as the previous test...
         self.lab.VAR('myDura2').Value = 1e-9
         exp = Experiment("test", self.lab.CONFIG('testConf'))
         res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,10,1))], delay=1)
@@ -823,8 +870,8 @@ class TestSweeps(unittest.TestCase):
         self.cleanup()
 
 if __name__ == '__main__':
-    temp = TestColdReload()
-    temp.test_LabAndExpConfigs() #test_SPECs()
+    # temp = TestColdReload()
+    # temp.test_LabAndExpConfigs() #test_SPECs()
     temp = TestSweeps()
-    temp.test_ExpSweepAndFullColdReload()
+    temp.test_Exp()
     unittest.main()

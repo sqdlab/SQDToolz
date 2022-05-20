@@ -3,7 +3,21 @@ from sqdtoolz.HAL.LockableProperties import LockableProperties
 class WaveformTransformationArgs:
     def __init__(self, wfmt_name, kwargs):
         self.wfmt_name = wfmt_name
-        self.kwargs = kwargs
+        self._kwargs = []
+        for cur_kwarg in kwargs:
+            self._kwargs += [cur_kwarg]
+            setattr(self, cur_kwarg, kwargs[cur_kwarg])
+
+    @property
+    def Name(self):
+        return self.wfmt_name
+    
+    @property
+    def kwargs(self):
+        ret_dict = {}
+        for cur_kwarg in self._kwargs:
+            ret_dict[cur_kwarg] = getattr(self, cur_kwarg)
+        return ret_dict
 
 class WaveformTransformation(LockableProperties):
     def __init__(self, name):
@@ -33,6 +47,7 @@ class WaveformTransformation(LockableProperties):
             return super(cls.__class__, cls).__new__(cls)
     
     def apply(self, **kwargs):
+        self._process_kwargs(kwargs)
         return WaveformTransformationArgs(self.Name, kwargs)
 
     @property
@@ -42,6 +57,12 @@ class WaveformTransformation(LockableProperties):
     @property
     def Parent(self):
         return None
+    
+    def copy_settings(self, otherObj):
+        assert otherObj.__class__.__name__ == self.__class__.__name__, f"Other WFMT must be of the same type as the current one (i.e. {self.__class__.__name__}) to copy over the settings."
+        other_settings = otherObj._get_current_config()
+        other_settings['Name'] = self.Name
+        self._set_current_config(other_settings)
 
     def initialise_for_new_waveform(self):
         raise NotImplementedError()
@@ -61,6 +82,9 @@ class WaveformTransformation(LockableProperties):
 
     def _set_current_config(self, dict_config, instr_obj = None):
         raise NotImplementedError()
+    
+    def _process_kwargs(self, kwargs):
+        raise NotImplementedError()
 
 class WFMT_ModulationIQ(WaveformTransformation):
     def __init__(self, name, lab, iq_frequency, **kwargs):
@@ -71,7 +95,7 @@ class WFMT_ModulationIQ(WaveformTransformation):
             self._iq_amplitude_factor = kwargs.get('iq_amplitude_factor', 1.0)    #Defined as a = Q/I amplitudes and the factor 'a' is multiplied onto the Q-channel waveform 
             self._iq_phase_offset = kwargs.get('iq_phase_offset', 0.0)            #Defined as the phase to add to the Q (sine) term
             self._iq_dc_offsets = kwargs.get('iq_dc_offsets', (0.0, 0.0))       
-            self._iq_upper_sb = kwargs.get('iq_upper_sb', True)             #If True, the phases of the cosine and sine waves are reset to zero after every waveform segment.
+            self._iq_upper_sb = kwargs.get('iq_upper_sb', True)
             self._cur_t0 = 0.0
         else:
             self._iq_frequency = iq_frequency
@@ -79,7 +103,7 @@ class WFMT_ModulationIQ(WaveformTransformation):
             self._iq_amplitude_factor = kwargs.get('iq_amplitude_factor', self._iq_amplitude_factor)    #Defined as a = Q/I amplitudes and the factor 'a' is multiplied onto the Q-channel waveform 
             self._iq_phase_offset = kwargs.get('iq_phase_offset', self._iq_phase_offset)            #Defined as the phase to add to the Q (sine) term
             self._iq_dc_offsets = kwargs.get('iq_dc_offsets', self._iq_dc_offsets)       
-            self._iq_upper_sb = kwargs.get('iq_upper_sb', self._iq_upper_sb)             #If True, the phases of the cosine and sine waves are reset to zero after every waveform segment.
+            self._iq_upper_sb = kwargs.get('iq_upper_sb', self._iq_upper_sb)
             self._cur_t0 = 0.0
 
     @classmethod
@@ -145,14 +169,14 @@ class WFMT_ModulationIQ(WaveformTransformation):
 
         if 'phase' in kwargs:
             if self.IQUpperSideband:
-                self._cur_t0 = t0 - kwargs.get('phase') / (2*np.pi*self.IQFrequency)
-            else:
                 self._cur_t0 = t0 + kwargs.get('phase') / (2*np.pi*self.IQFrequency)
+            else:
+                self._cur_t0 = t0 - kwargs.get('phase') / (2*np.pi*self.IQFrequency)
         elif 'phase_offset' in kwargs:
             if self.IQUpperSideband:
-                self._cur_t0 -= kwargs.get('phase_offset') / (2*np.pi*self.IQFrequency)
-            else:
                 self._cur_t0 += kwargs.get('phase_offset') / (2*np.pi*self.IQFrequency)
+            else:
+                self._cur_t0 -= kwargs.get('phase_offset') / (2*np.pi*self.IQFrequency)
 
         t_vals = np.arange(wfm_pts.size) / fs + t0 - self._cur_t0
         if ch_index == 0:   #I-Channel
@@ -176,7 +200,7 @@ class WFMT_ModulationIQ(WaveformTransformation):
 
     def _set_current_config(self, dict_config, instr_obj = None):
         assert dict_config['Type'] == self.__class__.__name__
-        for cur_key in ["IQ Frequency", "IQ Amplitude", "IQ Phase", "IQ Amplitude Factor", "IQ Phase Offset", "IQ DC Offset", "IQ Reset Phase"]:
+        for cur_key in ["IQ Frequency", "IQ Amplitude", "IQ Amplitude Factor", "IQ Phase Offset", "IQ DC Offset", "IQ using Upper Sideband"]:
             assert cur_key in dict_config, "Configuration dictionary does not have the key: " + cur_key
         
         self._iq_frequency = dict_config["IQ Frequency"]
@@ -185,3 +209,7 @@ class WFMT_ModulationIQ(WaveformTransformation):
         self._iq_phase_offset = dict_config["IQ Phase Offset"]
         self._iq_dc_offsets = dict_config["IQ DC Offset"]
         self._iq_upper_sb  = dict_config["IQ using Upper Sideband"]
+    
+    def _process_kwargs(self, kwargs):
+        kwargs['phase'] = kwargs.get('phase', None)
+        kwargs['phase_offset'] = kwargs.get('phase_offset', None)

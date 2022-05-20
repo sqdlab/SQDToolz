@@ -68,6 +68,8 @@ class TestSegments(unittest.TestCase):
         #Okay now modulate...
         WFMT_ModulationIQ('IQmod', self.lab, 47e7)
         WFMT_ModulationIQ('IQmod2', self.lab, 13e7)
+        self.lab.WFMT('IQmod').IQUpperSideband = False
+        self.lab.WFMT('IQmod2').IQUpperSideband = False
         #
         #Changing phases Test
         awg_wfm.clear_segments()
@@ -860,5 +862,5 @@ class TestAWGChecks(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    TestSegments().test_WFMTcopy()
+    TestSegments().test_SegmentsAndIQ()
     unittest.main()

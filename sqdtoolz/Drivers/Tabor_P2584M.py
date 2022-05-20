@@ -865,7 +865,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
         return out_i , out_q
 
-    def pack_kernel_data(self, ki,kq,EXPORT=False,PATH='') :
+    def pack_kernel_data(self, ki,kq) :
         """
         Method to pack kernel data 
         """

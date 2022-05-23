@@ -4,6 +4,7 @@ from sqdtoolz.Drivers.Dependencies.teproteus import TEProteusAdmin as TepAdmin
 from sqdtoolz.Drivers.Dependencies.teproteus import TEProteusInst as TepInst
 
 import numpy as np
+import math
 import time
 
 from qcodes import Instrument, InstrumentChannel, validators as vals
@@ -969,6 +970,41 @@ class TaborP2584M_ACQ(InstrumentChannel):
         # else :
         #     self.ddr1_store(kwargs.get("ddr1_store", self.dd1_store()))
         #     self.ddr2_store(kwargs.get("ddr2_store", self.dd2_store()))
+
+    def iq_kernel(coefficients, fs=1350e6,flo=400e6,kl=10240):
+        TAP = coefficients.size
+        print('loaded {0} TAP filter from {1}'.format(TAP,coe_file_path))
+        res = 10
+        L = res * math.ceil(kl / res)
+        k = np.ones(L+TAP)
+        
+        pi = math.pi
+        ts = 1 / fs
+        t = np.linspace(0, L*ts, L, endpoint=False)
+        
+        loi = np.cos(2 * pi * flo * t)
+        loq = -(np.sin(2 * pi * flo * t))
+        
+        k_i = np.zeros(L)
+        k_q = np.zeros(L)
+        
+        for l in range(L):
+            b = 0
+            for n in range(TAP):
+                b += k[l+n]*coefficients[n]
+            k_q[l] = loq[l] * b
+            k_i[l] = loi[l] * b
+        
+        print('sigma bn = {0}'.format(b))
+        return(k_i,k_q)
+    def setup_kernel(self, coefficients, fs=1350e6,flo=400e6,kl=10240) :
+        """
+
+        """
+        ki,kq = self.iq_kernel(coefficients, fs = fs,flo = flo, kl = kl)
+        mem = self.pack_kernel_data(ki,kq)
+        self._parent._inst.write_binary_data(':DSP:IQD:KER:DATA', mem)
+        pass
 
     def setup_filter(self, filter_channel, filter_array, **kwargs) :
         """

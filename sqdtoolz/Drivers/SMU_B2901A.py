@@ -22,7 +22,7 @@ class SMU_B2901A(VisaInstrument):
         self.write(':RANG:AUTO:VOLT ON')
         self.write(':RANG:AUTO:CURR ON')
         #Setup compliance checks
-        self.write(':OUTP:PROT ON')
+        self.write(':OUTP:PROT OFF')
         self.write(':CALC:LIM:FUNC COMP')
         self.write(':CALC:LIM:COMP:FAIL OUT')
         self.write(":CALC:LIM:STAT 0")
@@ -124,22 +124,23 @@ class SMU_B2901A(VisaInstrument):
         return self.volt_force()
     @Voltage.setter
     def Voltage(self, val):
-        temp = self._last_user_output_state
-        self.Output = False
+        # temp = self._last_user_output_state
+        # self.Output = False
         self.volt_force(val)
-        self._last_user_output_state = temp
-        self.Output = self._last_user_output_state
+        # self._last_user_output_state = temp
+        # self.Output = self._last_user_output_state
 
     @property
     def Current(self):
         return self.current_force()
     @Current.setter
     def Current(self, val):
-        temp = self._last_user_output_state
-        self.Output = False
+        #TODO: This is bad as it literally sets the output to zero - can the device be unlocked without turning output explicitly off?!
+        # temp = self._last_user_output_state
+        # self.Output = False
         self.current_force(val)
-        self._last_user_output_state = temp
-        self.Output = self._last_user_output_state
+        # self._last_user_output_state = temp
+        # self.Output = self._last_user_output_state
 
     @property
     def SenseVoltage(self):

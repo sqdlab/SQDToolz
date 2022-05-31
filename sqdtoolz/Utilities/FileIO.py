@@ -4,6 +4,7 @@ import json
 from h5py._hl.files import File
 import numpy as np
 import itertools
+import xarray as xr
 
 from datetime import datetime
 
@@ -122,6 +123,16 @@ class FileIOReader:
         else:
             assert False, "The reader has released the file - create a new FileIOReader instance to extract data."
             return np.array([])
+    
+    def get_xarray(self):
+        data_arrays = []
+        arr = self.get_numpy_array()
+        for v, dep_var in enumerate(self.dep_params):
+            my_slice = [ np.s_[0:] for x in self.param_vals] + [v]
+            my_slice = np.s_[tuple(my_slice)]
+            data_arrays += [ xr.DataArray(arr[my_slice], dims=tuple(self.param_names), coords={ x:self.param_vals[m] for m,x in enumerate(self.param_names) } ) ]
+        ret_data = xr.Dataset({ x:data_arrays[m] for m,x in enumerate(self.dep_params) })
+        return ret_data
     
     def get_time_stamps(self):
         if not self.hdf5_file is None:
@@ -419,3 +430,4 @@ class FileIODirectory:
 
 # a = FileIODirectory(r'test_save_dir\2022-02-15\193832-test_group\193834-test\data.h5')
 # b=0
+

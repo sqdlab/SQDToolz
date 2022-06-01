@@ -57,8 +57,6 @@ lab.load_instrument('TaborAWG')
 awg_wfm_q = WaveformAWG("Waveform 2 CH", lab,  [(['TaborAWG', 'AWG'], 'CH1'), (['TaborAWG', 'AWG'], 'CH2')], 1e9)
 #awg_wfm_q = WaveformAWG("Waveform 2 CH", lab,  [(['TaborAWG', 'AWG'], 'CH1')], 1e9)
 
-FIR_FILE = r"Z:\Manuals\Proteus\UPDATE on 2022-01-18 (v2 DSP)\Scripts\sfir_51_tap.csv"
-
 ### =============================ACQ TESTS ====================================== ###
 """
 Parameters to Vary:
@@ -160,6 +158,7 @@ def test_acq_driver_1(waveform_setup = setup_acq_const_tests) :
     """
     acquisition driver test 1 acquire a constant pulse from both channels
     """
+    print("Running Acquisition Driver Test 1")
     waveform_setup()
     instr = lab._get_instrument('TaborAWG')
 
@@ -250,16 +249,19 @@ def test_acq_driver_3(numSamples = 4800, numFrames = 4, numReps = 1, waveform_se
     plt.show()
     input('Press ENTER to finish test.')
 
-def test_acq_driver_4(numSamples = 4800, numFrames = 4, numReps = 1, waveform_setup = setup_acq_const_tests) :
+def test_acq_driver_4(numSamples = 4800, numFrames = 4, numReps = 1, waveform_setup = setup_acq_full_osc_tests) :
     """
-    Test DSP FIR blocks on proteus, filter coefficients taken from file provided by Tabor
+    Test DSP Kernel blocks on proteus, filter coefficients taken from file provided by Tabor
     """
-    filt_coeffs = [-0.00084713, 0.000673766, 0.001850315, -0.000517804, -0.003273407,-0.000363655,0.004920981,0.002325397,-0.006386267,\
+    filt_coeffs = np.array([-0.00084713, 0.000673766, 0.001850315, -0.000517804, -0.003273407,-0.000363655,0.004920981,0.002325397,-0.006386267,\
         -0.005644754,0.007043156,0.010434112,-0.006062997,-0.016572719,0.002425474,0.023678146,0.005161621,-0.031130307,-0.018682209,\
         0.038149254,0.042538523,-0.043914904,-0.092565044,0.047705801,0.313645744,0.450972039,0.313645744,0.047705801,-0.092565044,\
         -0.043914904,0.042538523,0.038149254,-0.018682209,-0.031130307,0.005161621,0.023678146,0.002425474,-0.016572719,-0.006062997,\
         0.010434112,0.007043156,-0.005644754,-0.006386267,0.002325397,0.004920981,-0.000363655,-0.003273407,-0.000517804,0.001850315,\
-        0.000673766,-0.00084713]
+        0.000673766,-0.00084713])
+
+    #filt_coeffs = np.zeros(51)
+    #filt_coeffs = np.ones(51)
 
     waveform_setup()
     instr = lab._get_instrument('TaborAWG')
@@ -268,12 +270,14 @@ def test_acq_driver_4(numSamples = 4800, numFrames = 4, numReps = 1, waveform_se
     acq_module.NumSamples = numSamples
     acq_module.NumSegments = numFrames
     acq_module.NumRepetitions = numReps
-    acq_module._instr_acq.setup_data_path(ddc_mode = "REAL", acq_mode = "DUAL")
-    acq_module._instr_acq.setup_filter("I1", filt_coeffs)
-    acq_module._instr_acq.setup_filter("Q1", filt_coeffs)
+    acq_module._instr_acq.setup_data_path(ddc_mode = "REAL", acq_mode = "DUAL", ddr1_store = "DSP1", ddr2_store = "DIR2")
+    acq_module._instr_acq.setup_kernel("IQ4", filt_coeffs)
+
+    #acq_module._instr_acq.setup_filter("I1", filt_coeffs)
+    #acq_module._instr_acq.setup_filter("Q1", filt_coeffs)
     
     leData = acq_module.get_data()
-    #leDecisions = instr.ACQ.get_frame_data()
+    leDecisions = instr.ACQ.get_frame_data()
 
     import matplotlib.pyplot as plt
     for r in range(acq_module.NumRepetitions) :
@@ -628,14 +632,15 @@ def test_awg_driver_6(lab) :
 # Vary Frames
 # test_acq_driver_3(numSamples = 4800, numFrames = 4, numReps = 1, waveform_setup = setup_acq_const_tests)
 # test_acq_driver_3(numSamples = 4800, numFrames = 6, numReps = 1, waveform_setup = setup_acq_const_tests)
-# test_acq_driver_3(numSamples = 4800, numFrames = 8, numReps = 1, waveform_setup = setup_acq_const_tests)
+# test_acq_driver_3(numSamples = 4800, numFrames = 8, numReps = 1, waveform_setup = set
+# up_acq_const_tests)
 
 # Vary number of samples
 # test_acq_driver_3(numSamples = 50*48, numFrames = 4, numReps = 1, waveform_setup = setup_acq_const_tests)
 # test_acq_driver_3(numSamples = 150*48, numFrames = 4, numReps = 1, waveform_setup = setup_acq_const_tests)
 # test_acq_driver_3(numSamples = 400*48, numFrames = 4, numReps = 1, waveform_setup = setup_acq_const_tests)
 
-# Test DSP processes
+# Test DSP processe
 test_acq_driver_4()
 
 ### AWG TESTS ###

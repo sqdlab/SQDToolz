@@ -410,6 +410,81 @@ class WFS_Cosine(WaveformSegmentBase):
         return cur_dict
 
 
+class WFS_Multiplex(WaveformSegmentBase):
+    """
+    Class that creates a frequency multiplexed waveform
+    """
+    def __init__(self, name, transform_func, time_len, amplitudes = None, frequencies = [0.0], phases = None):
+        """
+        Class Constructor
+
+        """
+        super().__init__(name, transform_func, time_len)
+        # Setup Attributes
+        self._frequencies = frequencies
+
+        if (phases is None or len(phases) != len(frequencies)) :
+            # Phase parameter passed in is not to spec
+            print("Input phases do not match waveform specification, setting all to 0")
+            phases = np.zeros(len(frequencies))
+            self._phases = phases
+
+        if (amplitudes is None or len(amplitudes) != len(frequencies)) :
+            # Phase parameter passed in is not to spec
+            print("Input amplitudes do not match waveform specification, setting all to 0")
+            amplitudes = np.zeros(len(frequencies))
+            self._amplitude = amplitudes
+
+    @classmethod
+    def fromConfigDict(cls, config_dict):
+        assert 'Type' in config_dict, "Configuration dictionary does not have the key: type"
+        assert config_dict['Type'] == cls.__name__, "Configuration dictionary has the wrong type."
+        for cur_key in ["Name", "Duration", "Amplitude", "Frequency", "Phase"]:
+            assert cur_key in config_dict, "Configuration dictionary does not have the key: " + cur_key
+        if config_dict['Mod Func']['Name'] == '':
+            wfmt_obj = None
+        else:
+            wfmt_obj = WaveformTransformationArgs(config_dict['Mod Func']['Name'], config_dict['Mod Func']['Args'])
+        return cls(config_dict["Name"], wfmt_obj, config_dict["Duration"], config_dict["Amplitude"], config_dict["Frequency"], config_dict["Phase"])
+
+    @property
+    def Amplitudes(self) :
+        return self._amplitudes
+    @Amplitudes.setter
+    def Amplitudes(self, ampl_vals):
+        self._amplitudes = ampl_vals
+
+    @property
+    def Frequencies(self) :
+        return self._frequencies
+    @Frequencies.setter
+    def Frequencies(self, freq_vals):
+        self._frequencies = freq_vals
+
+    @property
+    def Phases(self):
+        return self._phases
+    @Phases.setter
+    def Phases(self, phase_val):
+        self._phases = phase_val
+
+    def _get_waveform(self, lab, fs, t0_ind, ch_index):
+        t_vals = np.arange(self.NumPts(fs)) / fs
+        # Iterate through frequencies and generate a series of sine waves, then sum them for the final waveform
+        finalWaveform = np.zeros(len(t_vals))
+        for i in range(0, len(self.Frequencies())) :
+            finalWaveform += self.Amplitudes[i] * np.cos(2*np.pi*self.Frequencies[i] * t_vals + self.Phases[i])
+
+        return finalWaveform
+
+    def _get_current_config(self):
+        cur_dict = WaveformSegmentBase._get_current_config(self)
+        cur_dict['Duration'] = self.Duration
+        cur_dict['Amplitude'] = self._amplitude
+        cur_dict['Frequency'] = self._frequency
+        cur_dict['Phase'] = self._phase
+        return cur_dict
+
 class WFS_Arbitrary(WaveformSegmentBase):
     """
     Waveform segment class for constructing arbitrary waveforms

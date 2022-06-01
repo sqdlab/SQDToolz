@@ -500,8 +500,8 @@ class TaborP2584M_ACQ(InstrumentChannel):
                 f'trigger{i + 1}Source', label='Source of trigger for selected channel',
                 get_cmd=partial(self._chan_get_cmd, i + 1, ':DIG:TRIG:SOUR?'),
                 set_cmd=partial(self._chan_set_cmd, i + 1, ':DIG:TRIG:SOUR'),
-                val_mapping = {"CPU" : "CPU", "EXT" : "EXT"})
-
+                val_mapping = {"CPU" : "CPU", "EXT" : "EXT", "CH1" : "CH1", "CH2" : "CH2"},
+                initial_value = "EXT")
             self.add_parameter(
                 f'channel{i + 1}Offset', label='Input Offset of Acquisition Channels', unit = "V",
                 get_cmd=partial(self._chan_get_cmd, i + 1, ':DIG:CHAN:OFFS?'),
@@ -545,7 +545,8 @@ class TaborP2584M_ACQ(InstrumentChannel):
             'ddc_mode', label='DDC Mode of the Digitizer',
             get_cmd=partial(self._parent._get_cmd, ':DIG:DDC:MODE?'),
             set_cmd=partial(self._parent._set_cmd, ':DIG:DDC:MODE'),
-            val_mapping = {"REAL" : "REAL", "COMP" : "COMP", "COMPlex" : "COMP", "N/A" : "N/A"})
+            val_mapping = {"REAL" : "REAL", "COMP" : "COMP", "COMPlex" : "COMP", "N/A" : "N/A"},
+            initial_value = "REAL")
 
         self.add_parameter(
             'ddr1_store', label='Data path to be stored in DDR1',
@@ -553,7 +554,8 @@ class TaborP2584M_ACQ(InstrumentChannel):
             set_cmd=partial(self._parent._set_cmd, ':DSP:STOR1'),
             val_mapping = {"DIR1" : "DIR1", "DIR2" : "DIR2", "DSP1":"DSP1",\
                 "DSP2":"DSP2", "DSP3":"DSP3", "DSP4":"DSP4", "FFTI":"FFTI",\
-                "FFTO":"FFTO"})
+                "FFTO":"FFTO"},
+            initial_value = "DIR1")
 
         self.add_parameter(
             'ddr2_store', label='Data path to be stored in DDR2',
@@ -561,7 +563,8 @@ class TaborP2584M_ACQ(InstrumentChannel):
             set_cmd=partial(self._parent._set_cmd, ':DSP:STOR2'),
             val_mapping = {"DIR1" : "DIR1", "DIR2" : "DIR2", "DSP1":"DSP1",\
                 "DSP2":"DSP2", "DSP3":"DSP3", "DSP4":"DSP4", "FFTI":"FFTI",\
-                "FFTO":"FFTO"})
+                "FFTO":"FFTO"},
+            initial_value = "DIR2")
 
         self.add_parameter(
             'iq_demod', label='Select IQ demodulation block to configure (REAL mode)',
@@ -569,13 +572,15 @@ class TaborP2584M_ACQ(InstrumentChannel):
             set_cmd=partial(self._parent._set_cmd, ':DSP:IQD:SEL'),
             val_mapping = {"DBUG":"DBUG", "IQ4":"IQ4", "IQ5":"IQ5", "IQ6":"IQ6",\
                 "IQ7":"IQ7"})
-        
+
+        """
         self.add_parameter(
             'iq_path', label='Select IQ input path to configure',
             get_cmd=partial(self._parent._get_cmd, ':DSP:IQP:SEL?'),
             set_cmd=partial(self._parent._set_cmd, ':DSP:IQP:SEL'),
             val_mapping = {"DSP1":"DSP1", "DSP2":"DSP2", "DSP3":"DSP3", "DSP4":"DSP4"},
             initial_value = "DSP1")
+        """
 
         self.add_parameter(
             'fir_block', label='Select FIR block to configure',
@@ -948,11 +953,10 @@ class TaborP2584M_ACQ(InstrumentChannel):
         # Check if default is set
         # TODO: Better way to handle kwargs so there is no need to use nested ifs
         if "default" in kwargs :
-            
             if kwargs["default"] == True :
                 # Set Default Values
                 self.acq_mode("DUAL")
-                self.ddc_mode("COMP")
+                self.ddc_mode("REAL")
                 self.ddr1_store("DIR1")
                 self.ddr2_store("DIR2")
                 return
@@ -960,20 +964,22 @@ class TaborP2584M_ACQ(InstrumentChannel):
         # Assign variables
         self.acq_mode(kwargs.get("acq_mode", self.acq_mode()))
         self.ddc_mode(kwargs.get("ddc_mode", self.ddc_mode()))
+        self.ddr1_store(kwargs.get("ddr1_store", self.ddr1_store()))
+        self.ddr2_store(kwargs.get("ddr2_store", self.ddr2_store()))
         # self.ddc_mode("COMP")
         # self.ddc_mode("REAL")
         # If in Complex mode, storage options are limited 
         # TODO: confirm if it will set to something allowed automatically
         # if (self.ddc_mode() == "COMP") :
-        #     self.ddr1_store(kwargs.get("ddr1_store", self.dd1_store()))
-        #     self.ddr2_store(kwargs.get("ddr2_store", self.dd2_store()))
+        #     self.ddr1_store(kwargs.get("ddr1_store", self.ddr1_store()))
+        #     self.ddr2_store(kwargs.get("ddr2_store", self.ddr2_store()))
         # else :
-        #     self.ddr1_store(kwargs.get("ddr1_store", self.dd1_store()))
-        #     self.ddr2_store(kwargs.get("ddr2_store", self.dd2_store()))
+        #     self.ddr1_store(kwargs.get("ddr1_store", self.ddr1_store()))
+        #     self.ddr2_store(kwargs.get("ddr2_store", self.ddr2_store()))
 
-    def iq_kernel(coefficients, fs=1350e6,flo=400e6,kl=10240):
+    def iq_kernel(self, coefficients, fs, flo=400e6,kl=10240):
         TAP = coefficients.size
-        print('loaded {0} TAP filter from {1}'.format(TAP,coe_file_path))
+        # print('loaded {0} TAP filter from {1}'.format(TAP,coe_file_path))
         res = 10
         L = res * math.ceil(kl / res)
         k = np.ones(L+TAP)
@@ -997,21 +1003,31 @@ class TaborP2584M_ACQ(InstrumentChannel):
         
         print('sigma bn = {0}'.format(b))
         return(k_i,k_q)
-    def setup_kernel(self, coefficients, fs=1350e6,flo=400e6,kl=10240) :
-        """
 
+
+    def setup_kernel(self, path, coefficients, fs=1350e6,flo=400e6,kl=10240) :
         """
-        ki,kq = self.iq_kernel(coefficients, fs = fs,flo = flo, kl = kl)
+        Method to setup kernel on real path
+        @param path:
+        @param coefficients
+        """
+        valid_paths = ["DBUG", "IQ4", "IQ5", "IQ6", "IQ7"]
+        if path not in valid_paths :
+            print("Not a valid iq demodulation kernel to program, must be one of: 'DBUG' 'IQ4' 'IQ5' 'IQ6' 'IQ7'")
+            return
+        self.iq_demod(path)
+        ki,kq = self.iq_kernel(coefficients, fs = self.SampleRate,flo=400e6,kl=10240)
         mem = self.pack_kernel_data(ki,kq)
         self._parent._inst.write_binary_data(':DSP:IQD:KER:DATA', mem)
-        pass
+        resp = self._parent._inst.send_scpi_query(':SYST:ERR?')
+        print(resp)
+
 
     def setup_filter(self, filter_channel, filter_array, **kwargs) :
         """
         Method to set coefficients for specific FIR filter on Tabor
         @param filter_channel:
         """
-
         valid_real_channels = ["DBUQI", "DBUGQ"]
         valid_complex_channels = ["I1", "Q1", "I2", "Q2"]
         # Check that the requested block is valid for the current ddc mode
@@ -1132,10 +1148,12 @@ class TaborP2584M_ACQ(InstrumentChannel):
             #print(num_bytes, 'hi', self._parent._get_cmd(':DIG:DATA:FRAM?'))
 
             wavlen = int(num_bytes // 2)
+            fakeNumSamples = num_bytes / (self.NumSegments*2)
             wav1 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
-            wav1 = wav1.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)
+            wav1 = wav1.reshape(self.NumRepetitions, self.NumSegments, int(fakeNumSamples))
+
             wav2 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
-            wav2 = wav2.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)
+            wav2 = wav2.reshape(self.NumRepetitions, self.NumSegments, int(fakeNumSamples)) # self.NumSamples
             # Ensure all previous commands have been executed
             while (not self._parent._get_cmd('*OPC?')):
                 pass

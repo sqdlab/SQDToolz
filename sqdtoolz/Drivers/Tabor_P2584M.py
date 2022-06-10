@@ -349,9 +349,9 @@ class TaborP2584M_AWG(InstrumentChannel):
         for m in range(len(dict_wfm_data['waveforms'])):
             cur_data = dict_wfm_data['waveforms'][m]
             cur_amp = cur_chnl.Amplitude/2
-            cur_off = cur_chnl.Offset * 0   #Don't compensate for offset...
+            cur_off = cur_chnl.Offset   #Don't compensate for offset... # NOTE: this used to be multiplied by 0
             cur_data = (cur_data - cur_off)/cur_amp
-            #TODO: Write an assert to ensure max(cur_data) < |cur_chnl.Amplitude + cur_chnl.Offset|
+            assert (max(cur_data) < np.abs(cur_chnl.Amplitude + cur_chnl.Offset)), "The Amplitude and Offset are too large, output will be saturated"
             self._send_data_to_memory(m+1 + seg_offset, cur_data, dict_wfm_data['markers'][m])
         #Program the task table...
         task_list = []
@@ -502,6 +502,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
                 set_cmd=partial(self._chan_set_cmd, i + 1, ':DIG:TRIG:SOUR'),
                 val_mapping = {"CPU" : "CPU", "EXT" : "EXT", "CH1" : "CH1", "CH2" : "CH2"},
                 initial_value = "EXT")
+
             self.add_parameter(
                 f'channel{i + 1}Offset', label='Input Offset of Acquisition Channels', unit = "V",
                 get_cmd=partial(self._chan_get_cmd, i + 1, ':DIG:CHAN:OFFS?'),
@@ -735,8 +736,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
         #Choose what to read (only the frame-data without the header in this example)
         self._parent._set_cmd(':DIG:DATA:TYPE', 'HEAD')
         if (self.acq_mode() == "DUAL") :
-            # TODO : WHY IS THIS 72 and not 48 as mentioned in the manual
-            header_size = 72 # Header size taken from PG118 of manual #72
+            header_size = 72 # Header size taken from PG118 of manual 
         else : 
             header_size = 96 # Header size taken from PG118 of manual
         number_of_frames = self.NumSegments*self.NumRepetitions
@@ -800,11 +800,21 @@ class TaborP2584M_ACQ(InstrumentChannel):
             # wavlen = int(self.num_bytes // 2)
             wavlen = int(blocksize*self.NumSegments*self.NumSamples)
             # print(self.num_bytes)
-            #TODO : Run a check on DSP before setting up the waves
-            wav1 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
-            wav1 = wav1.reshape(blocksize, self.NumSegments, self.NumSamples)
-            wav2 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
-            wav2 = wav2.reshape(blocksize, self.NumSegments, self.NumSamples)
+            #TODO : Run a check on DSP before setting up the waves, NEED TO KNOW WHAT CHANNEL AS WELL
+            if (self.ddr1_store() == "DIR1") :
+                wav1 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
+                wav1 = wav1.reshape(blocksize, self.NumSegments, self.NumSamples)
+            else :
+                wav1 = np.zeros(wavlen, dtype=np.uint32)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
+                wav1 = wav1.reshape(blocksize, self.NumSegments, self.NumSamples)
+
+            if (self.ddr2_store() == "DIR2") :
+                wav2 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
+                wav2 = wav2.reshape(blocksize, self.NumSegments, self.NumSamples)
+            else :
+                wav2 = np.zeros(wavlen, dtype=np.uint32)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
+                wav2 = wav2.reshape(blocksize, self.NumSegments, self.NumSamples)
+
             self.wav1 = wav1
             self.wav2 = wav2
 
@@ -821,15 +831,32 @@ class TaborP2584M_ACQ(InstrumentChannel):
         rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', self.wav2, num_bytes)
         # Check errors
         self._parent._chk_err('after downloading the ACQ data from the FGPA DRAM.')
+        sampleRates = []
+        # Adjust Sample Rates for DDC stages if in DSP Mode
+        if (self.ddr1_store() == "DIR1") :
+            sampleRates.append(self.SampleRate)
+        elif (self.ddc_mode() == "REAL") :
+            # We are in non-direct REAL mode = DSP is enabled
+            sampleRates.append(self.SampleRate/16)
+        else :
+            sampleRates.append(self.SampleRate)
 
-        #TODO: Write some blocked caching code here (like with the M4i)...
+        if (self.ddr2_store() == "DIR2") :
+            sampleRates = sampleRates.append(self.SampleRate)
+        elif (self.ddc_mode() == "REAL") :
+            # We are in non-direct REAL mode = DSP is enabled
+            sampleRates.append(self.SampleRate/16)
+        else :
+            sampleRates.append(self.SampleRate)
+
+        #TODO: Write some blocked caching code here (like with the M4i)...  
         ret_val = {
                     'parameters' : ['repetition', 'segment', 'sample'],
                     'data' : {
                                 'CH1' : self.wav1.astype(np.int32),
                                 'CH2' : self.wav2.astype(np.int32),
                                 },
-                    'misc' : {'SampleRates' : [self.SampleRate]*2}  #NOTE!!! DIVIDE SAMPLERATE BY /16 IF USING DECIMATION STAGES!
+                    'misc' : {'SampleRates' : [self.SampleRate] * 2}  #NOTE!!! DIVIDE SAMPLERATE BY /16 IF USING DECIMATION STAGES! # sampleRates
                 }
         cur_processor.push_data(ret_val)
 
@@ -977,7 +1004,10 @@ class TaborP2584M_ACQ(InstrumentChannel):
         #     self.ddr1_store(kwargs.get("ddr1_store", self.ddr1_store()))
         #     self.ddr2_store(kwargs.get("ddr2_store", self.ddr2_store()))
 
-    def iq_kernel(self, coefficients, fs, flo=400e6,kl=10240):
+    def iq_kernel(self, coefficients, fs, flo=400e6, kl=10240):
+        """
+        Method to sythesise an IQ kernel for frequency extraction
+        """
         TAP = coefficients.size
         # print('loaded {0} TAP filter from {1}'.format(TAP,coe_file_path))
         res = 10
@@ -1005,18 +1035,22 @@ class TaborP2584M_ACQ(InstrumentChannel):
         return(k_i,k_q)
 
 
-    def setup_kernel(self, path, coefficients, fs=1350e6,flo=400e6,kl=10240) :
+    def setup_kernel(self, path, coefficients, flo, kl=10240) :
         """
         Method to setup kernel on real path
         @param path:
-        @param coefficients
+        @param coefficients:
+        @param flo
+        @param kl
         """
         valid_paths = ["DBUG", "IQ4", "IQ5", "IQ6", "IQ7"]
         if path not in valid_paths :
             print("Not a valid iq demodulation kernel to program, must be one of: 'DBUG' 'IQ4' 'IQ5' 'IQ6' 'IQ7'")
             return
         self.iq_demod(path)
-        ki,kq = self.iq_kernel(coefficients, fs = self.SampleRate,flo=400e6,kl=10240)
+        ki,kq = self.iq_kernel(coefficients, flo=flo, fs = self.SampleRate, kl=kl)
+        #ki = np.linspace(0,1,ki.size)
+        #kq = np.linspace(0,-1,ki.size)
         mem = self.pack_kernel_data(ki,kq)
         self._parent._inst.write_binary_data(':DSP:IQD:KER:DATA', mem)
         resp = self._parent._inst.send_scpi_query(':SYST:ERR?')
@@ -1149,11 +1183,24 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
             wavlen = int(num_bytes // 2)
             fakeNumSamples = num_bytes / (self.NumSegments*2)
-            wav1 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
-            wav1 = wav1.reshape(self.NumRepetitions, self.NumSegments, int(fakeNumSamples))
-
-            wav2 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
-            wav2 = wav2.reshape(self.NumRepetitions, self.NumSegments, int(fakeNumSamples)) # self.NumSamples
+            # TODO: NEED TO CHANGE DATATYPE BASED ON DSP MODE
+            if (self.ChannelStates[0]) :
+                if (self.ddr1_store() == "DIR1") :
+                    wav1 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
+                    wav1 = wav1.reshape(self.NumRepetitions, self.NumSegments, int(fakeNumSamples))
+                else :
+                    wav1 = np.zeros(wavlen, dtype=np.uint32)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
+                    fakeNumSamples = num_bytes / (self.NumSegments*2)
+                    wav1 = wav1.reshape(self.NumRepetitions, self.NumSegments, int(fakeNumSamples))
+            if (self.ChannelStates[1]) :
+                if (self.ddr2_store() == "DIR2") :
+                    wav2 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
+                    wav2 = wav2.reshape(self.NumRepetitions, self.NumSegments, int(fakeNumSamples)) # self.NumSamples
+                else :
+                    wav2 = np.zeros(wavlen, dtype=np.uint32)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
+                    fakeNumSamples = num_bytes / (self.NumSegments*2)
+                    wav2 = wav2.reshape(self.NumRepetitions, self.NumSegments, int(fakeNumSamples)) # self.NumSamples
+        
             # Ensure all previous commands have been executed
             while (not self._parent._get_cmd('*OPC?')):
                 pass
@@ -1170,6 +1217,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
             self._parent._chk_err('after downloading the ACQ data from the FGPA DRAM.')
 
             #TODO: Write some blocked caching code here (like with the M4i)...
+            """
             ret_val = {
                         'parameters' : ['repetition', 'segment', 'sample'],
                         'data' : {
@@ -1178,6 +1226,17 @@ class TaborP2584M_ACQ(InstrumentChannel):
                                     },
                         'misc' : {'SampleRates' : [self.SampleRate]*2}
                     }
+            """
+            ret_val = {
+                        'parameters' : ['repetition', 'segment', 'sample'],
+                        'data' : {},
+                        'misc' : {'SampleRates' : [self.SampleRate]*2}
+                    }
+            # Only return data which matches channels that are active
+            if (self.ChannelStates[0]) :
+                ret_val['data']['CH1'] = wav1.astype(np.int32)
+            if (self.ChannelStates[1]) :
+                ret_val['data']['CH2'] = wav2.astype(np.int32)
             return ret_val
 
 class Tabor_P2584M(Instrument):

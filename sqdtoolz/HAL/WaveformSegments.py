@@ -428,12 +428,17 @@ class WFS_Multiplex(WaveformSegmentBase):
             print("Input phases do not match waveform specification, setting all to 0")
             phases = np.zeros(len(frequencies))
             self._phases = phases
+        else :
+            self._phases = phases
 
         if (amplitudes is None or len(amplitudes) != len(frequencies)) :
             # Phase parameter passed in is not to spec
             print("Input amplitudes do not match waveform specification, setting all to 0")
             amplitudes = np.zeros(len(frequencies))
-            self._amplitude = amplitudes
+            self._amplitudes = amplitudes
+        else :
+            self._amplitudes = amplitudes
+
 
     @classmethod
     def fromConfigDict(cls, config_dict):
@@ -472,7 +477,7 @@ class WFS_Multiplex(WaveformSegmentBase):
         t_vals = np.arange(self.NumPts(fs)) / fs
         # Iterate through frequencies and generate a series of sine waves, then sum them for the final waveform
         finalWaveform = np.zeros(len(t_vals))
-        for i in range(0, len(self.Frequencies())) :
+        for i in range(0, len(self.Frequencies)) :
             finalWaveform += self.Amplitudes[i] * np.cos(2*np.pi*self.Frequencies[i] * t_vals + self.Phases[i])
 
         return finalWaveform

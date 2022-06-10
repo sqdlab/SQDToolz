@@ -75,14 +75,14 @@ class SMU_B2901A(VisaInstrument):
         self.add_parameter('voltage_ramp_rate', unit='V/s',
                         label="Output voltage ramp-rate",
                         initial_value=2.5e-3/0.05,
-                        vals=vals.Numbers(0.001, 1),
+                        vals=vals.Numbers(0.001, 100),
                         get_cmd=lambda : self.volt_force.step/self.volt_force.inter_delay,
                         set_cmd=self._set_ramp_rate_volt)
 
         self.add_parameter('current_ramp_rate', unit='A/s',
                         label="Output current ramp-rate",
                         initial_value=0.001,
-                        vals=vals.Numbers(0.001, 1),
+                        vals=vals.Numbers(0.001, 100),
                         get_cmd=lambda : self.current_force.step/self.current_force.inter_delay,
                         set_cmd=self._set_ramp_rate_current)
 
@@ -95,7 +95,12 @@ class SMU_B2901A(VisaInstrument):
                         label="Voltage Measure",
                         get_parser=float,
                         get_cmd=":MEAS:VOLT?")
-        
+
+        self.add_parameter('meas_probe_type',
+                            get_cmd=lambda: self.ask(':SENS:REM?').strip(),
+                            set_cmd=':SENS:REM {}',
+                            val_mapping = {'TwoWire' : '0', 'FourWire' : '1'})
+
         self._last_user_output_state = self.Output
 
     @property
@@ -184,6 +189,14 @@ class SMU_B2901A(VisaInstrument):
     @RampRateCurrent.setter
     def RampRateCurrent(self, val):
         self.current_ramp_rate(val)
+
+    @property
+    def ProbeType(self):
+        return self.meas_probe_type()
+    @ProbeType.setter
+    def ProbeType(self, connection):
+        assert connection == 'TwoWire' or connection == 'FourWire', "ProbeType must be FourWire or TwoWire"
+        self.meas_probe_type(connection)
 
     def _set_ramp_rate_volt(self, ramp_rate):
         if ramp_rate < 0.01:

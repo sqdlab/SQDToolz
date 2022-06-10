@@ -86,6 +86,13 @@ class GENsmu(HALbase):
     def RampRateCurrent(self, val):
         self._instr_smu.RampRateCurrent = val
 
+    @property
+    def ProbeType(self):
+        return self._instr_smu.ProbeType
+    @ProbeType.setter
+    def ProbeType(self, val):
+        self._instr_smu.ProbeType = val
+
     def _get_current_config(self):
         ret_dict = {
             'Name' : self.Name,
@@ -93,7 +100,7 @@ class GENsmu(HALbase):
             'Type' : self.__class__.__name__,
             #Ignoring ManualActivation
             }
-        self.pack_properties_to_dict(['Mode', 'Voltage', 'Current', 'RampRateVoltage', 'RampRateCurrent', 'Output', 'SenseVoltage', 'SenseCurrent', 'ComplianceVoltage', 'ComplianceCurrent'], ret_dict)
+        self.pack_properties_to_dict(['Mode', 'Voltage', 'Current', 'RampRateVoltage', 'RampRateCurrent', 'ProbeType', 'Output', 'SenseVoltage', 'SenseCurrent', 'ComplianceVoltage', 'ComplianceCurrent'], ret_dict)
         return ret_dict
 
     def _set_current_config(self, dict_config, lab):
@@ -107,6 +114,7 @@ class GENsmu(HALbase):
             self.Voltage = dict_config['Voltage']
         self.RampRateVoltage = dict_config['RampRateVoltage']
         self.RampRateCurrent = dict_config['RampRateCurrent']
+        self.ProbeType = dict_config['ProbeType']
         self.ComplianceVoltage = dict_config['ComplianceVoltage']
         self.ComplianceCurrent = dict_config['ComplianceCurrent']
         self.Output = dict_config['Output']

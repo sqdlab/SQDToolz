@@ -9,7 +9,7 @@ Example syntax of a sweeping experiment is shown below (assuming `lab` is the `L
 
 
 ``` python
-#Create experiment object (it's temporary and not stored in lab)
+#Create experiment object (it's temporary and not stored in lab) using configuration 'AutoExp'
 exp = Experiment("Rabi", lab.CONFIG('AutoExp'))
 #Run experiment with one sweeping parameter:
 result = lab.run_single(exp, [(lab.VAR("wait_time"), np.arange(0,100e-9,10e-9))])

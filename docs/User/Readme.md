@@ -24,6 +24,7 @@ Main structure:
 - Take experiment configurations and run an `Experiment` object:
     - [Overview of general workflow](Exp_Overview.md)
     - [Sweeping parameters in experiments](Exp_Sweep.md)
+    - [Recording extra parameters](Exp_RecParams.md) - i.e. `rec_params`
     - [Cascading and grouping multiple experiments](Exp_CascadeGroup.md)
     - [Automated experiments](Exp_Automated.md)
 - Retrieve and analyse the data returned from an experiment:

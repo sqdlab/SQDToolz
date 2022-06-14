@@ -17,6 +17,13 @@ class ACQvna(HALbase):
         return True
 
     @property
+    def Output(self):
+        return self._instr_vna.Output
+    @Output.setter
+    def Output(self, boolVal):
+        self._instr_vna.Output = boolVal
+
+    @property
     def SweepMode(self):
         return self._instr_vna.SweepMode
     @SweepMode.setter
@@ -117,6 +124,12 @@ class ACQvna(HALbase):
         assert 'Segmented' in self._instr_vna.SupportedSweepModes
         self._instr_vna.setup_segmented(segment_freqs)
 
+    def activate(self):
+        self.Output = True
+
+    def deactivate(self):
+        self.Output = False
+
     def get_data(self):
         return self._instr_vna.get_data()
 
@@ -128,14 +141,14 @@ class ACQvna(HALbase):
             }
         #Not adding in FrequencyCentre and FrequencySpan to avoid strange contradictions...
         self.pack_properties_to_dict(['SweepMode', 'FrequencyStart', 'FrequencyEnd', 'Power', 'SweepPoints', 'AveragesNum', 'AveragesEnable',
-                                      'Bandwidth', 'NumRepetitions', 'FrequencySingle', 'PowerStart', 'PowerEnd'], ret_dict)
+                                      'Bandwidth', 'NumRepetitions', 'FrequencySingle', 'PowerStart', 'PowerEnd', 'Output'], ret_dict)
         ret_dict['FrequencySegments'] = self._instr_vna.get_frequency_segments()
         return ret_dict
 
     def _set_current_config(self, dict_config, lab):
         assert dict_config['Type'] == self.__class__.__name__, 'Cannot set configuration to a VNA with a configuration that is of type ' + dict_config['Type']
         for cur_prop in ['SweepMode', 'FrequencyStart', 'FrequencyEnd', 'Power', 'SweepPoints', 'AveragesNum', 'AveragesEnable',
-                         'Bandwidth', 'NumRepetitions', 'FrequencySingle', 'PowerStart', 'PowerEnd']:
+                         'Bandwidth', 'NumRepetitions', 'FrequencySingle', 'PowerStart', 'PowerEnd', 'Output']:
             setattr(self, cur_prop, dict_config[cur_prop])
         cur_mode = dict_config['SweepMode']     #Current mode may not have necessarily have set as 'Segmented' mode requires the calling of setup_segmented_sweep to set the segments first...
         if cur_mode == 'Segmented':

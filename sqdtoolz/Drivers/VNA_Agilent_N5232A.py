@@ -183,6 +183,13 @@ class VNA_Agilent_N5232A(VisaInstrument):
         self.freq_start(val)
 
     @property
+    def Output(self):
+        return self.output()
+    @Output.setter
+    def Output(self, boolVal):
+        self.output(boolVal)
+
+    @property
     def FrequencyEnd(self):
         return self.freq_stop()
     @FrequencyEnd.setter

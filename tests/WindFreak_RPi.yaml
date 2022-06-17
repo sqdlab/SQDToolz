@@ -1,0 +1,10 @@
+instruments:
+  MWS_Windfreak:
+    driver: sqdtoolz.Drivers.MWS_WFSynthHDProV2_RPi
+    type: MWS_WFSynthHDProV2_RPi
+    init:
+      address: '192.168.1.36'
+      username: 'pi'
+      password: 'Experiment'
+      com_port: '/dev/ttyACM1'
+    enable_forced_reconnect: true

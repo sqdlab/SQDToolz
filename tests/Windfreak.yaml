@@ -1,0 +1,6 @@
+instruments:
+  MWS_Windfreak:
+    driver: sqdtoolz.Drivers.MWS_WFSynthHDProV2
+    type: MWS_WFSynthHDProV2
+    address: 'COM3'
+    enable_forced_reconnect: true

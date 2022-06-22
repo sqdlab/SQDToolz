@@ -57,6 +57,13 @@ class MWS_WFSynthHDProV2_Channel(InstrumentChannel):
                                'ON':1,
                                'OFF':0
                            })
+        
+        
+        self.add_parameter('REF_Source',
+                            get_cmd=partial(self._get_cmd, 'x?'),
+                            set_cmd=partial(self._set_cmd, 'x'),
+                            set_parser=int,
+                            val_mapping={'INT':  1, 'EXT': 0})
 
     def _get_cmd(self, cmd):
         #Perform channel-select
@@ -157,12 +164,6 @@ class MWS_WFSynthHDProV2(VisaInstrument):
             cur_channel = MWS_WFSynthHDProV2_Channel(self, ch_name, ch_ind)
             self.add_submodule(ch_name, cur_channel)
             self._source_outputs[ch_name] = cur_channel
-
-        self.add_parameter('REF_Source',
-                            get_cmd=partial(self._get_cmd, 'x?'),
-                            set_cmd=partial(self._set_cmd, 'x'),
-                            set_parser=int,
-                            val_mapping={'INT':  1, 'EXT': 0})
 
         self.add_parameter('EXT_REF_frequency', label='External REF Frequency', unit='Hz',
                             get_cmd=partial(self._get_cmd, '*?'),

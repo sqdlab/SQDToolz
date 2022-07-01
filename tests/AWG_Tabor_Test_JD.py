@@ -160,7 +160,7 @@ def setup_acq_full_osc_tests(amp = 0.2, trigger = "EXT") :
     awg_wfm1.get_output_channel(0).Output = True
     awg_wfm2.get_output_channel(0).Output = True
 
-def setup_acq_multi_osc_tests(amps = [0.1,0.1,0.1,0.1], freqs = [100e6,120e6,140e6,160e6], trigger = "EXT") :
+def setup_acq_multi_osc_tests(amps = [0.2,0.15,0.1,0.05], freqs = [100e6,120e6,140e6,160e6], trigger = "EXT") :
 
     print("Setting up Multiplexed Waveforms for Acquisition")
     phases = np.zeros(len(freqs))
@@ -170,8 +170,10 @@ def setup_acq_multi_osc_tests(amps = [0.1,0.1,0.1,0.1], freqs = [100e6,120e6,140
     awg_wfm2 = WaveformAWG("Waveform CH2", lab,  [(['TaborAWG', 'AWG'], 'CH2')], 1e9)
 
     # Add Segments
-    awg_wfm1.add_waveform_segment(WFS_Multiplex(f"init", None, 1024e-9, amplitudes = amps, frequencies = freqs, phases = phases))
-    awg_wfm1.add_waveform_segment(WFS_Multiplex(f"init0", None, 1024e-9, amplitudes = amps, frequencies = freqs, phases = phases))
+    awg_wfm1.add_waveform_segment(WFS_Constant(f"init", None, 2*1024e-9))
+    awg_wfm1.add_waveform_segment(WFS_Multiplex(f"init1", None, 2*1024e-9, amplitudes = amps, frequencies = freqs, phases = phases))
+    #awg_wfm1.add_waveform_segment(WFS_Multiplex(f"init2", None, 1024e-9, amplitudes = amps, frequencies = freqs, phases = phases))
+    awg_wfm1.add_waveform_segment(WFS_Constant(f"init3", None, 4*1024e-9))
     if (trigger == "EXT") :
         awg_wfm1.get_output_channel(0).marker(0).set_markers_to_segments(["init"])
 
@@ -350,15 +352,17 @@ def test_acq_driver_4(numSamples = 4800, numFrames = 4, numReps = 1, waveform_se
     
     leData = acq_module.get_data()
     leDecisions = instr.ACQ.get_frame_data()
-
+    print("Decisions: {0} + j {1}".format(leDecisions["I"], leDecisions["Q"]))
+    print("State1: {0}".format(leDecisions["state1"]))
+    print("State2: {0}".format(leDecisions["state2"]))
     import matplotlib.pyplot as plt
-    for r in range(acq_module.NumRepetitions) :
-        for s in range(acq_module.NumSegments) :
-            data = leData['data']['CH1'][r][s]    
-            freqs = np.fft.fftfreq(len(data), 1.0/lab.HAL("TaborACQ").SampleRate)
-            arr_fft = np.abs(np.fft.fft(data))
-            plt.plot(freqs, arr_fft)
-    plt.show()  #!!!REMEMBER TO CLOSE THE PLOT WINDOW BEFORE CLOSING PYTHON KERNEL OR TABOR LOCKS UP (PC restart won't cut it - needs to be a chassis restart)!!!
+    # for r in range(acq_module.NumRepetitions) :
+    #     for s in range(acq_module.NumSegments) :
+    #         data = leData['data']['CH1'][r][s]    
+    #         freqs = np.fft.fftfreq(len(data), 1.0/lab.HAL("TaborACQ").SampleRate)
+    #         arr_fft = np.abs(np.fft.fft(data))
+    #         plt.plot(freqs, arr_fft)
+    # plt.show()  #!!!REMEMBER TO CLOSE THE PLOT WINDOW BEFORE CLOSING PYTHON KERNEL OR TABOR LOCKS UP (PC restart won't cut it - needs to be a chassis restart)!!!
     for r in range(acq_module.NumRepetitions) :
         for s in range(acq_module.NumSegments) :
             data = leData['data']['CH1'][r][s][1::2]   
@@ -377,10 +381,17 @@ def test_acq_driver_5(waveform_setup = setup_acq_multi_osc_tests) :
     instr = lab._get_instrument('TaborAWG')
 
     acq_module = ACQ("TaborACQ", lab, ['TaborAWG', 'ACQ'])
+    acq_module.NumSamples = 48 * 250 
     acq_module.NumSegments = 1
     acq_module.NumRepetitions = 1
     lab.HAL("TaborACQ").SampleRate = 1e9
 
+    # stz.ProcessorCPU('demodulator', lab)
+    # lab.PROC('demodulator').reset_pipeline()
+    # lab.PROC('demodulator').add_stage(stz.CPU_Duplicate([4,4]))
+    # lab.PROC('demodulator').add_stage(stz.CPU_DDC([100e6, 120e6, 140e6, 160e6, 100e6, 120e6, 140e6, 160e6]))
+    # lab.PROC('demodulator').add_stage(stz.CPU_FIR([{'Type' : 'low', 'Taps' : 128, 'fc' : 10e6, 'Win' : 'hamming'}]*16))
+    # lab.HAL("TaborACQ").set_data_processor(lab.PROC('demodulator'))
 
     leData = acq_module.get_data()
     #leDecisions = instr.ACQ.get_frame_data()
@@ -388,10 +399,25 @@ def test_acq_driver_5(waveform_setup = setup_acq_multi_osc_tests) :
     import matplotlib.pyplot as plt
     for r in range(acq_module.NumRepetitions) :
         for s in range(acq_module.NumSegments) :
-            data = leData['data']['CH1'][r][s]    
-            freqs = np.fft.fftfreq(len(data), 1.0/lab.HAL("TaborACQ").SampleRate)
-            arr_fft = np.abs(np.fft.fft(data))
-            plt.plot(freqs, arr_fft)
+            data = leData['data']['CH1'][r][s]
+            plt.plot(data)
+            # plt.show() 
+            # data1 = np.sqrt(leData['data']['CH1_3_I'][r][s]**2 + leData['data']['CH1_3_Q'][r][s]**2)
+            # data2 = np.sqrt(leData['data']['CH1_0_I'][r][s]**2 + leData['data']['CH1_0_Q'][r][s]**2)
+            # data3 = np.sqrt(leData['data']['CH1_1_I'][r][s]**2 + leData['data']['CH1_1_Q'][r][s]**2)
+            # data4 = np.sqrt(leData['data']['CH1_2_I'][r][s]**2 + leData['data']['CH1_2_Q'][r][s]**2)
+            # plt.plot(data1)
+            # plt.plot(data2)
+            # plt.plot(data3)
+            # plt.plot(data4)
+            # plt.legend(["160e6","100e6","120e6","140e6"])
+            plt.xlabel("Sample Number")
+            plt.ylabel("Digitization Amplitude")
+            plt.show()
+            #data = leData['data']['CH1'][r][s]    
+            #freqs = np.fft.fftfreq(len(data), 1.0/lab.HAL("TaborACQ").SampleRate)
+            #arr_fft = np.abs(np.fft.fft(data))
+            #plt.plot(freqs, arr_fft)
     plt.show()  #!!!REMEMBER TO CLOSE THE PLOT WINDOW BEFORE CLOSING PYTHON KERNEL OR TABOR LOCKS UP (PC restart won't cut it - needs to be a chassis restart)!!!
     input('Press ENTER to finish test.')
 
@@ -412,7 +438,7 @@ def test_acq_driver_6(waveform_setup = setup_acq_multi_time_osc_tests) :
     instr = lab._get_instrument('TaborAWG')
 
     acq_module = ACQ("TaborACQ", lab, ['TaborAWG', 'ACQ'])
-    #acq_module.ChannelStates = (True, False)
+    acq_module.ChannelStates = (True, True)
     acq_module.NumSamples = 48 * 250 
     acq_module.NumSegments = 1
     acq_module.NumRepetitions = 1
@@ -422,8 +448,8 @@ def test_acq_driver_6(waveform_setup = setup_acq_multi_time_osc_tests) :
     lab.HAL("TaborACQ").SampleRate = 1e9
     stz.ProcessorCPU('demodulator', lab)
     lab.PROC('demodulator').reset_pipeline()
-    lab.PROC('demodulator').add_stage(stz.CPU_Duplicate([4, 1]))
-    lab.PROC('demodulator').add_stage(stz.CPU_DDC([100e6, 120e6, 140e6, 160e6, 95e6]))
+    lab.PROC('demodulator').add_stage(stz.CPU_Duplicate([4]))
+    lab.PROC('demodulator').add_stage(stz.CPU_DDC([100e6, 120e6, 140e6, 160e6]))
     lab.PROC('demodulator').add_stage(stz.CPU_FIR([{'Type' : 'low', 'Taps' : 128, 'fc' : 10e6, 'Win' : 'hamming'}]*10))
     lab.HAL("TaborACQ").set_data_processor(lab.PROC('demodulator'))
 
@@ -448,18 +474,21 @@ def test_acq_driver_6(waveform_setup = setup_acq_multi_time_osc_tests) :
     
     for r in range(acq_module.NumRepetitions) :
         for s in range(acq_module.NumSegments) :
-            data1 = np.sqrt(leData['data']['CH1_3_I'][r][s]**2 + leData['data']['CH1_3_Q'][r][s]**2)
-            data2 = np.sqrt(leData['data']['CH1_0_I'][r][s]**2 + leData['data']['CH1_0_Q'][r][s]**2)
-            data3 = np.sqrt(leData['data']['CH1_1_I'][r][s]**2 + leData['data']['CH1_1_Q'][r][s]**2)
-            data4 = np.sqrt(leData['data']['CH1_2_I'][r][s]**2 + leData['data']['CH1_2_Q'][r][s]**2)
+            data1 = leData['data']['CH1'][r][s]
             plt.plot(data1)
             plt.show()
-            plt.plot(data2)
-            plt.show()
-            plt.plot(data3)
-            plt.show()
-            plt.plot(data4)
-            plt.show()
+            # data1 = np.sqrt(leData['data']['CH1_3_I'][r][s]**2 + leData['data']['CH1_3_Q'][r][s]**2)
+            # data2 = np.sqrt(leData['data']['CH1_0_I'][r][s]**2 + leData['data']['CH1_0_Q'][r][s]**2)
+            # data3 = np.sqrt(leData['data']['CH1_1_I'][r][s]**2 + leData['data']['CH1_1_Q'][r][s]**2)
+            # data4 = np.sqrt(leData['data']['CH1_2_I'][r][s]**2 + leData['data']['CH1_2_Q'][r][s]**2)
+            # plt.plot(data1)
+            # plt.show()
+            # plt.plot(data2)
+            # plt.show()
+            # plt.plot(data3)
+            # plt.show()
+            # plt.plot(data4)
+            # plt.show()
 
             # freqs = np.fft.fftfreq(len(data), 1.0/lab.HAL("TaborACQ").SampleRate)
             # arr_fft = np.abs(np.fft.fft(data))
@@ -498,11 +527,11 @@ def test_awg_driver_1() :
     awg_wfm1 = WaveformAWG("Waveform CH1", lab,  [(['TaborAWG', 'AWG'], 'CH1')], 1e9)
 
     # Add Segments
-    awg_wfm1.add_waveform_segment(WFS_Constant(f"init", lab.WFMT('OscMod').apply(), 1024e-9, 0.25))
-    awg_wfm1.add_waveform_segment(WFS_Constant(f"init1", lab.WFMT('OscMod').apply(), 1024e-9, 0.25))
+    awg_wfm1.add_waveform_segment(WFS_Constant(f"init", None, 1024e-9, 0.25)) # lab.WFMT('OscMod').apply()
+    awg_wfm1.add_waveform_segment(WFS_Constant(f"zero1", None, 512e-9+384e-9, 0.0))
+    awg_wfm1.add_waveform_segment(WFS_Constant(f"init1", None, 1024e-9, 0.25)) # lab.WFMT('OscMod').apply()
     #awg_wfm1.add_waveform_segment(WFS_Constant(f"init", lab.WFMT('OscMod').apply(), 512e-9-384e-9, 0.25))
-    #awg_wfm1.add_waveform_segment(WFS_Constant(f"zero1", None, 512e-9+384e-9, 0.0))
-    #awg_wfm1.add_waveform_segment(WFS_Constant(f"zero2", None, 576e-9, 0.0))
+    awg_wfm1.add_waveform_segment(WFS_Constant(f"zero2", None, 576e-9, 0.0))
     
     # Setup trigger 
     awg_wfm1.get_output_channel(0).marker(0).set_markers_to_segments(["init"])
@@ -524,19 +553,21 @@ def test_awg_driver_1() :
 
 
     leData = acq_module.get_data()
-    #leDecisions = instr.ACQ.get_frame_data()
+    leDecisions = instr.ACQ.get_frame_data()
 
     import matplotlib.pyplot as plt
     for r in range(acq_module.NumRepetitions) :
         for s in range(acq_module.NumSegments) :
-            data = leData['data']['CH1'][r][s][1::2]    #I
+            data = np.sqrt(leData['data']['CH1'][r][s][1::2] ** 2 + leData['data']['CH1'][r][s][0::2] ** 2)     #I
             plt.plot(data)
-            data = leData['data']['CH1'][r][s][0::2]    #Q
-            plt.plot(data)
-            data = leData['data']['CH2'][r][s][1::2]
-            plt.plot(data)
-            data = leData['data']['CH2'][r][s][0::2]
-            plt.plot(data)
+            # data = leData['data']['CH1'][r][s][1::2]    #I
+            # plt.plot(data)
+            # data = leData['data']['CH1'][r][s][0::2]    #Q
+            # plt.plot(data)
+            # data = leData['data']['CH2'][r][s][1::2]
+            # plt.plot(data)
+            # data = leData['data']['CH2'][r][s][0::2]
+            # plt.plot(data)
     plt.show()
     # awg_wfm1.get_output_channel(0).Output = False
     input('Press ENTER to finish test.')
@@ -581,14 +612,16 @@ def test_awg_driver_2() :
     import matplotlib.pyplot as plt
     for r in range(acq_module.NumRepetitions) :
         for s in range(acq_module.NumSegments) :
-            data = leData['data']['CH1'][r][s][1::2]    #I
+            data = np.sqrt(leData['data']['CH1'][r][s][1::2] ** 2 + leData['data']['CH1'][r][s][0::2] ** 2)     #I
             plt.plot(data)
-            data = leData['data']['CH1'][r][s][0::2]    #Q
-            plt.plot(data)
-            data = leData['data']['CH2'][r][s][1::2]
-            plt.plot(data)
-            data = leData['data']['CH2'][r][s][0::2]
-            plt.plot(data)
+            # data = leData['data']['CH1'][r][s][1::2]    #I
+            # plt.plot(data)
+            # data = leData['data']['CH1'][r][s][0::2]    #Q
+            # plt.plot(data)
+            # data = leData['data']['CH2'][r][s][1::2]
+            # plt.plot(data)
+            # data = leData['data']['CH2'][r][s][0::2]
+            # plt.plot(data)
     plt.show()
     awg_wfm1.get_output_channel(0).Output = False
     input('Press ENTER to finish test.')
@@ -635,14 +668,16 @@ def test_awg_driver_3() :
     import matplotlib.pyplot as plt
     for r in range(acq_module.NumRepetitions) :
         for s in range(acq_module.NumSegments) :
-            data = leData['data']['CH1'][r][s][1::2]    #I
+            data = np.sqrt(leData['data']['CH1'][r][s][1::2] ** 2 + leData['data']['CH1'][r][s][0::2] ** 2)     #I
             plt.plot(data)
-            data = leData['data']['CH1'][r][s][0::2]    #Q
-            plt.plot(data)
-            data = leData['data']['CH2'][r][s][1::2]
-            plt.plot(data)
-            data = leData['data']['CH2'][r][s][0::2]
-            plt.plot(data)
+            # data = leData['data']['CH1'][r][s][1::2]    #I
+            # plt.plot(data)
+            # data = leData['data']['CH1'][r][s][0::2]    #Q
+            # plt.plot(data)
+            # data = leData['data']['CH2'][r][s][1::2]
+            # plt.plot(data)
+            # data = leData['data']['CH2'][r][s][0::2]
+            # plt.plot(data)
     plt.show()
     awg_wfmIQ.get_output_channel(0).Output = False
     awg_wfmIQ.get_output_channel(1).Output = False
@@ -696,14 +731,16 @@ def test_awg_driver_4() :
     import matplotlib.pyplot as plt
     for r in range(acq_module.NumRepetitions) :
         for s in range(acq_module.NumSegments) :
-            data = leData['data']['CH1'][r][s][1::2]    #I
+            data = np.sqrt(leData['data']['CH1'][r][s][1::2] ** 2 + leData['data']['CH1'][r][s][0::2] ** 2)     #I
             plt.plot(data)
-            data = leData['data']['CH1'][r][s][0::2]    #Q
-            plt.plot(data)
-            data = leData['data']['CH2'][r][s][1::2]
-            plt.plot(data)
-            data = leData['data']['CH2'][r][s][0::2]
-            plt.plot(data)
+            # data = leData['data']['CH1'][r][s][1::2]    #I
+            # plt.plot(data)
+            # data = leData['data']['CH1'][r][s][0::2]    #Q
+            # plt.plot(data)
+            # data = leData['data']['CH2'][r][s][1::2]
+            # plt.plot(data)
+            # data = leData['data']['CH2'][r][s][0::2]
+            # plt.plot(data)
     plt.show()
     awg_wfmIQ.get_output_channel(0).Output = False
     awg_wfmIQ.get_output_channel(1).Output = False
@@ -754,14 +791,16 @@ def test_awg_driver_5() :
     import matplotlib.pyplot as plt
     for r in range(acq_module.NumRepetitions) :
         for s in range(acq_module.NumSegments) :
-            data = leData['data']['CH1'][r][s][1::2]    #I
+            data = np.sqrt(leData['data']['CH1'][r][s][1::2] ** 2 + leData['data']['CH1'][r][s][0::2] ** 2)     #I
             plt.plot(data)
-            data = leData['data']['CH1'][r][s][0::2]    #Q
-            plt.plot(data)
-            data = leData['data']['CH2'][r][s][1::2]
-            plt.plot(data)
-            data = leData['data']['CH2'][r][s][0::2]
-            plt.plot(data)
+            # data = leData['data']['CH1'][r][s][1::2]    #I
+            # plt.plot(data)
+            # data = leData['data']['CH1'][r][s][0::2]    #Q
+            # plt.plot(data)
+            # data = leData['data']['CH2'][r][s][1::2]
+            # plt.plot(data)
+            # data = leData['data']['CH2'][r][s][0::2]
+            # plt.plot(data)
     plt.show()
     awg_wfmIQ.get_output_channel(0).Output = False
     awg_wfmIQ.get_output_channel(1).Output = False
@@ -842,8 +881,8 @@ def test_awg_driver_6(lab) :
 # test_acq_driver_3(numSamples = 400*48, numFrames = 4, numReps = 1, waveform_setup = setup_acq_const_tests)
 
 # Test DSP processes
-test_acq_driver_6()
-# test_acq_driver_5()
+#test_acq_driver_6()
+test_acq_driver_5()
 # test_acq_driver_4()
 
 ### AWG TESTS ###

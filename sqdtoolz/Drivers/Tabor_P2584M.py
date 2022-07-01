@@ -683,7 +683,9 @@ class TaborP2584M_ACQ(InstrumentChannel):
             self._parent._set_cmd(':DIG:CHAN:SEL', i+1)
             self._parent._set_cmd(':DIG:CHAN:STATE', TABOR_DIG_CHANNEL_STATES[state])
             self._ch_states[i] = state
-            #TODO: If using both channels, then ensure it does the DUAL-mode setting here!
+            if (self.ChannelStates[0] and self.ChannelStates[1]) :
+                # If using both channels, then ensure it does the DUAL-mode setting here!
+                self.acq_mode("DUAL")
 
     def _chan_get_cmd(self, ch, cmd):
         """
@@ -744,7 +746,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
         wav2 = np.zeros(num_bytes, dtype=np.uint8)
         rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav2, num_bytes)
-        print(self._parent._get_cmd(":DIG:ACQ:STAT?"))
+        print(self._parent._get_cmd(":DIG:ACQ:STAT?")) # Perhaps check that second bit is set to 1 (all frames done)
 
         # Ensure all previous commands have been executed
         while (not self._parent._get_cmd('*OPC?')):
@@ -752,7 +754,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
         self._parent._chk_err('in reading frame data.')
 
         #print(wav2)
-
+        headerDict = {}
         trig_loc = np.zeros(number_of_frames,np.uint32)
         I_dec= np.zeros(number_of_frames,np.int32)
         Q_dec= np.zeros(number_of_frames,np.int64)
@@ -767,9 +769,22 @@ class TaborP2584M_ACQ(InstrumentChannel):
                             (wav2[idx+22] << 16) + (wav2[idx+23] <<24) + \
                             (wav2[idx+24] << 32) + (wav2[idx+25] <<40) + \
                             (wav2[idx+26] << 48)+ (wav2[idx+27] << 56)
-            Q_dec[i]= decisionReal
             decisionIm = (wav2[idx+28]) + (wav2[idx+29] << 8) + (wav2[idx+30] << 16) + (wav2[idx+31] << 24)
+            state1 = wav2[idx+36]*(1 << 0)
+            state2 = wav2[idx+37]*(1 << 0)
+            # NOTE: they mix up I and Q here ...
+            Q_dec[i]= decisionReal
             I_dec[i]= decisionIm
+            headerDict["header#"] = i
+            headerDict["TriggerPos"] = trigPos
+            headerDict["GateLength"] = gateLen
+            headerDict["MinAmp"] = minVpp
+            headerDict["MaxAmp"] = maxVpp
+            headerDict["MinTimeStamp"] = timeStamp
+            headerDict["I"] = I_dec[i]
+            headerDict["Q"] = Q_dec[i]  
+            headerDict["state1"] = state1
+            headerDict["state2"] = state2
             outprint = 'header# {0}\n'.format(i)
             outprint += 'TriggerPos: {0}\n'.format(trigPos)
             outprint += 'GateLength: {0}\n'.format(gateLen)
@@ -779,8 +794,8 @@ class TaborP2584M_ACQ(InstrumentChannel):
             outprint += 'Decision: {0} + j* {1}\n'.format(decisionReal,decisionIm)
             print(outprint)
             
-        dec_vals = Q_dec + 1j*I_dec #No idea about the inversion...
-        return dec_vals
+        dec_vals = Q_dec + 1j*I_dec # ... and fix it down here 
+        return headerDict #dec_vals
 
     def process_block(self, block_idx, cur_processor, blocksize):
         if block_idx == 0:
@@ -823,33 +838,37 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
         # Select the frames to read
         self._parent._set_cmd(':DIG:DATA:FRAM', f'{1+block_idx*blocksize},{blocksize}')
-        # Read from channel 1
-        self._parent._set_cmd(':DIG:CHAN:SEL', 1)
-        rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', self.wav1, num_bytes)
-        # read from channel 2
-        self._parent._set_cmd(':DIG:CHAN:SEL', 2)
-        rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', self.wav2, num_bytes)
+        if (self.ChannelStates[0]) :
+            # Read from channel 1
+            self._parent._set_cmd(':DIG:CHAN:SEL', 1)
+            rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', self.wav1, num_bytes)
+        if (self.ChannelStates[1]) :
+            # read from channel 2
+            self._parent._set_cmd(':DIG:CHAN:SEL', 2)
+            rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', self.wav2, num_bytes)
         # Check errors
         self._parent._chk_err('after downloading the ACQ data from the FGPA DRAM.')
         sampleRates = []
+        
         # Adjust Sample Rates for DDC stages if in DSP Mode
-        if (self.ddr1_store() == "DIR1") :
-            sampleRates.append(self.SampleRate)
-        elif (self.ddc_mode() == "REAL") :
-            # We are in non-direct REAL mode = DSP is enabled
-            sampleRates.append(self.SampleRate/16)
-        else :
-            sampleRates.append(self.SampleRate)
+        # if (self.ddr1_store() == "DIR1") :
+        #     sampleRates.append(self.SampleRate)
+        # elif (self.ddc_mode() == "REAL") :
+        #     # We are in non-direct REAL mode = DSP is enabled
+        #     sampleRates.append(self.SampleRate/16)
+        # else :
+        #     sampleRates.append(self.SampleRate)
 
-        if (self.ddr2_store() == "DIR2") :
-            sampleRates = sampleRates.append(self.SampleRate)
-        elif (self.ddc_mode() == "REAL") :
-            # We are in non-direct REAL mode = DSP is enabled
-            sampleRates.append(self.SampleRate/16)
-        else :
-            sampleRates.append(self.SampleRate)
+        # if (self.ddr2_store() == "DIR2") :
+        #     sampleRates = sampleRates.append(self.SampleRate)
+        # elif (self.ddc_mode() == "REAL") :
+        #     # We are in non-direct REAL mode = DSP is enabled
+        #     sampleRates.append(self.SampleRate/16)
+        # else :
+        #     sampleRates.append(self.SampleRate)
 
-        #TODO: Write some blocked caching code here (like with the M4i)...  
+        #TODO: Write some blocked caching code here (like with the M4i)... 
+        """ 
         ret_val = {
                     'parameters' : ['repetition', 'segment', 'sample'],
                     'data' : {
@@ -858,6 +877,18 @@ class TaborP2584M_ACQ(InstrumentChannel):
                                 },
                     'misc' : {'SampleRates' : [self.SampleRate] * 2}  #NOTE!!! DIVIDE SAMPLERATE BY /16 IF USING DECIMATION STAGES! # sampleRates
                 }
+        """
+        ret_val = {
+                        'parameters' : ['repetition', 'segment', 'sample'],
+                        'data' : {},
+                        'misc' : {'SampleRates' : [self.SampleRate]*2}
+                    }
+        # Only return data which matches channels that are active
+        if (self.ChannelStates[0]) :
+            ret_val['data']['CH1'] = wav1.astype(np.int32)
+        if (self.ChannelStates[1]) :
+            ret_val['data']['CH2'] = wav2.astype(np.int32)
+
         cur_processor.push_data(ret_val)
 
     def convert_IQ_to_sample(self, inp_i,inp_q,size):
@@ -1183,36 +1214,39 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
             wavlen = int(num_bytes // 2)
             fakeNumSamples = num_bytes / (self.NumSegments*2)
-            # TODO: NEED TO CHANGE DATATYPE BASED ON DSP MODE
+            # TODO: NEED TO CHANGE DATATYPE BASED ON DSP MODE # NOTE: WE NO LONGER HAVE TO?!?!?! WHATS GOING ON HERE
             if (self.ChannelStates[0]) :
                 if (self.ddr1_store() == "DIR1") :
                     wav1 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
                     wav1 = wav1.reshape(self.NumRepetitions, self.NumSegments, int(fakeNumSamples))
                 else :
-                    wav1 = np.zeros(wavlen, dtype=np.uint32)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
-                    fakeNumSamples = num_bytes / (self.NumSegments*2)
+                    wav1 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
                     wav1 = wav1.reshape(self.NumRepetitions, self.NumSegments, int(fakeNumSamples))
-            if (self.ChannelStates[1]) :
-                if (self.ddr2_store() == "DIR2") :
-                    wav2 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
-                    wav2 = wav2.reshape(self.NumRepetitions, self.NumSegments, int(fakeNumSamples)) # self.NumSamples
-                else :
-                    wav2 = np.zeros(wavlen, dtype=np.uint32)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
-                    fakeNumSamples = num_bytes / (self.NumSegments*2)
-                    wav2 = wav2.reshape(self.NumRepetitions, self.NumSegments, int(fakeNumSamples)) # self.NumSamples
+            #if (self.ChannelStates[1]) :
+            if (self.ddr2_store() == "DIR2") :
+                wav2 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
+                wav2 = wav2.reshape(self.NumRepetitions, self.NumSegments, int(fakeNumSamples)) # self.NumSamples
+            else :
+                wav2 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
+                wav2 = wav2.reshape(self.NumRepetitions, self.NumSegments, int(fakeNumSamples)) # self.NumSamples
         
             # Ensure all previous commands have been executed
             while (not self._parent._get_cmd('*OPC?')):
                 pass
-            # Read from channel 1
-            self._parent._set_cmd(':DIG:CHAN:SEL', 1)
-            rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav1, num_bytes)
-            # Ensure all previous commands have been executed
-            while (not self._parent._get_cmd('*OPC?')):
-                pass
-            # read from channel 2
-            self._parent._set_cmd(':DIG:CHAN:SEL', 2)
-            rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav2, num_bytes)
+            if (self.ChannelStates[0]) :
+                # Read from channel 1
+                self._parent._set_cmd(':DIG:CHAN:SEL', 1)
+                rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav1, num_bytes)
+                # Ensure all previous commands have been executed
+                while (not self._parent._get_cmd('*OPC?')):
+                    pass
+            if (self.ChannelStates[1]) :
+                # read from channel 2
+                self._parent._set_cmd(':DIG:CHAN:SEL', 2)
+                rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav2, num_bytes)
+                # Ensure all previous commands have been executed
+                while (not self._parent._get_cmd('*OPC?')):
+                    pass
             # Check errors
             self._parent._chk_err('after downloading the ACQ data from the FGPA DRAM.')
 

@@ -1,4 +1,6 @@
 import serial
+import time
+import os
 
 """
 Classes for Device Management
@@ -39,7 +41,12 @@ class Device() :
 
         """
         self._ser.write(bytes(command, 'utf-8'))
-        return self._ser.readline()
+        retData = self._ser.readline().decode('utf-8').rstrip()
+        #time.sleep(0.2)
+        while (self._ser.in_waiting) :
+            retData = self._ser.readline().decode('utf-8').rstrip()
+            print(retData)
+        return retData
         
 
 
@@ -49,46 +56,27 @@ Helper functions
 def handle_input(devices) :
     """
     """
-    DEVICE_NUM = 0
-    COMMAND_TYPE = 1
-    COMMAND = 2
+    #DEVICE_NUM = 0
+    COMMAND_TYPE = 1 - 1
+    COMMAND = 2 - 1
     #print("INPUT CMD")
     command = input()
     #print("CMD RECV")
     command = command.split(":")
     #print(command)
 
-    cmdResult = devices[command[DEVICE_NUM]].handle_command(command[COMMAND_TYPE],command[COMMAND])
+    cmdResult = devices.handle_command(command[COMMAND_TYPE],command[COMMAND])
     #print("cmdResult: ", cmdResult)
     return cmdResult
-    
-
-def parse_ports(portList) :
-    """
-    """
-    portList = portList.split(":")
-    return setup_devices(portList)
-
-def setup_devices(portList) :
-    """
-    """
-    devices = dict()
-    i = 1
-    for port in portList :
-        devices[f"M{0}".format(i)] = (Device(port))
-        i += 1
-    return devices
-
-
 
 """
 Program
 """
 if __name__ == "__main__" :
-    print("Please enter list of ports")
-    portList = input()
-    devices = parse_ports(portList)
-    print(devices)
+    print(os.listdir("/dev/"))
+    print("Please enter port")
+    port = input()
+    device = Device(port)
+    print(device)
     while (1) :
-        print(handle_input(devices))
-
+        print(handle_input(device))

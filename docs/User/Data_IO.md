@@ -5,6 +5,7 @@ Experiments generate data in the form of HDF5 files. Said data can be retrieved 
 - [FileIOReader](#fileioreader)
     - [Basic usage](#basic-usage)
     - [Time-stamps](#time-stamps)
+    - [One-many Parameters](#one-many-parameters)
 - [FileIODirectory](#fileiodirectory)
 
 When using these classes, the user need not write low-level HDF5 file-retrieval commands. Note that the utilities do not require a running `Laboratory` and thus, one may retrieve data by simply importing the required class as shown in the examples below.

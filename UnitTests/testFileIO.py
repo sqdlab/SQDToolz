@@ -24,7 +24,7 @@ import os.path
 
 import unittest
 
-class TestFileIDirectory(unittest.TestCase):
+class TestExpFileIO(unittest.TestCase):
     def initialise(self):
         self.lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir/')
 
@@ -82,10 +82,88 @@ class TestFileIDirectory(unittest.TestCase):
         assert self.arr_equality(var_dicts['myFreq'], np.array([2]*4)), "FileIODirectory failed to parse in VARs correctly."
         assert 'testAmpl' in var_dicts, "FileIODirectory failed to parse in VARs correctly."
         assert self.arr_equality(var_dicts['testAmpl'], np.arange(0,4,1)), "FileIODirectory failed to parse in VARs correctly."
+        time.sleep(1)
         #
         res.release()
         res = None
         reader = None
+        self.cleanup()
+    
+    def test_ManyOneSampling(self):
+        self.initialise()
+        VariableInternal('test_var', self.lab, 0)
+        #
+        #Test with one simple one-many variable - and check it sets correctly via rec_params 
+        exp = Experiment("test", self.lab.CONFIG('testConf'))
+        res = self.lab.run_single(exp, [('testAmal', [self.lab.VAR("myFreq"), self.lab.VAR("testAmpl")], np.array([[1,2],[3,4],[5,6]]))],
+                                    rec_params=[self.lab.VAR("myFreq"), self.lab.VAR("testAmpl")])
+        assert 'testAmal' in res.param_many_one_maps, "FileIOReader failed to parse a many-one sweeping variable."
+        assert res.param_many_one_maps['testAmal']['param_names'][0] == 'myFreq', "FileIOReader failed to parse a many-one sweeping variable."
+        assert res.param_many_one_maps['testAmal']['param_names'][1] == 'testAmpl', "FileIOReader failed to parse a many-one sweeping variable."
+        assert self.arr_equality(res.param_many_one_maps['testAmal']['param_vals'][0], np.array([1,3,5])), "FileIOReader failed to parse a many-one sweeping variable."
+        assert self.arr_equality(res.param_many_one_maps['testAmal']['param_vals'][1], np.array([2,4,6])), "FileIOReader failed to parse a many-one sweeping variable."
+        assert self.arr_equality(exp.last_rec_params.get_numpy_array(), np.array([[1,2],[3,4],[5,6]]))
+        time.sleep(1)
+        #
+        #Test with one simple one-many variable and a normal variable - and check it sets correctly via rec_params
+        exp = Experiment("test", self.lab.CONFIG('testConf'))
+        res = self.lab.run_single(exp, [('testAmal', [self.lab.VAR("myFreq"), self.lab.VAR("testAmpl")], np.array([[1,2],[3,4],[5,6]])),
+                                        (self.lab.VAR('test_var'), np.arange(4))],
+                                    rec_params=[self.lab.VAR("myFreq"), self.lab.VAR("testAmpl")])
+        assert 'testAmal' in res.param_many_one_maps, "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        assert res.param_many_one_maps['testAmal']['param_names'][0] == 'myFreq', "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        assert res.param_many_one_maps['testAmal']['param_names'][1] == 'testAmpl', "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        assert self.arr_equality(res.param_many_one_maps['testAmal']['param_vals'][0], np.array([1,3,5])), "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        assert self.arr_equality(res.param_many_one_maps['testAmal']['param_vals'][1], np.array([2,4,6])), "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        assert res.param_names[:2] == ['testAmal', 'test_var'], "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        assert self.arr_equality(exp.last_rec_params.get_numpy_array(), np.array([[[1,2]]*4,[[3,4]]*4,[[5,6]]*4])), "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        time.sleep(1)
+        #
+        #Test with one normal variable and one one-many variable - and check it sets correctly via rec_params
+        exp = Experiment("test", self.lab.CONFIG('testConf'))
+        res = self.lab.run_single(exp, [(self.lab.VAR('test_var'), np.arange(4)),
+                                        ('testAmal', [self.lab.VAR("myFreq"), self.lab.VAR("testAmpl")], np.array([[1,2],[3,4],[5,6]]))],
+                                    rec_params=[self.lab.VAR("myFreq"), self.lab.VAR("testAmpl")])
+        assert 'testAmal' in res.param_many_one_maps, "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        assert res.param_many_one_maps['testAmal']['param_names'][0] == 'myFreq', "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        assert res.param_many_one_maps['testAmal']['param_names'][1] == 'testAmpl', "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        assert self.arr_equality(res.param_many_one_maps['testAmal']['param_vals'][0], np.array([1,3,5])), "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        assert self.arr_equality(res.param_many_one_maps['testAmal']['param_vals'][1], np.array([2,4,6])), "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        assert res.param_names[:2] == ['test_var', 'testAmal'], "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        assert self.arr_equality(exp.last_rec_params.get_numpy_array(), np.array([[[1,2],[3,4],[5,6]]]*4)), "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        time.sleep(1)
+        #
+        #Test with one normal variable and two one-many variables - and check it sets correctly via rec_params
+        VariableInternal('test_var2', self.lab, 0)
+        VariableInternal('test_var3', self.lab, 0)
+        VariableInternal('test_var4', self.lab, 0)
+        exp = Experiment("test", self.lab.CONFIG('testConf'))
+        res = self.lab.run_single(exp, [('testAmal', [self.lab.VAR("myFreq"), self.lab.VAR("testAmpl")], np.array([[1,2],[3,4],[5,6]])),
+                                        (self.lab.VAR('test_var'), np.arange(4)),
+                                        ('testAmal2', [self.lab.VAR("test_var2"), self.lab.VAR("test_var3"), self.lab.VAR("test_var4")], np.array([[11,12,13],[14,15,16],[17,18,19],[20,21,22]]))],
+                                    rec_params=[self.lab.VAR("myFreq"), self.lab.VAR("testAmpl"), self.lab.VAR("test_var2"), self.lab.VAR("test_var3"), self.lab.VAR("test_var4")])
+        assert 'testAmal' in res.param_many_one_maps, "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        assert res.param_many_one_maps['testAmal']['param_names'][0] == 'myFreq', "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        assert res.param_many_one_maps['testAmal']['param_names'][1] == 'testAmpl', "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        assert self.arr_equality(res.param_many_one_maps['testAmal']['param_vals'][0], np.array([1,3,5])), "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        assert self.arr_equality(res.param_many_one_maps['testAmal']['param_vals'][1], np.array([2,4,6])), "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        #
+        assert 'testAmal2' in res.param_many_one_maps, "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        assert res.param_many_one_maps['testAmal2']['param_names'][0] == 'test_var2', "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        assert res.param_many_one_maps['testAmal2']['param_names'][1] == 'test_var3', "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        assert res.param_many_one_maps['testAmal2']['param_names'][2] == 'test_var4', "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        assert self.arr_equality(res.param_many_one_maps['testAmal2']['param_vals'][0], np.array([11,14,17,20])), "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        assert self.arr_equality(res.param_many_one_maps['testAmal2']['param_vals'][1], np.array([12,15,18,21])), "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        assert self.arr_equality(res.param_many_one_maps['testAmal2']['param_vals'][2], np.array([13,16,19,22])), "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        #
+        assert res.param_names[:3] == ['testAmal', 'test_var', 'testAmal2'], "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        assert self.arr_equality(exp.last_rec_params.get_numpy_array(), np.array([[[[y, y+1, x, x+1, x+2] for x in np.arange(11,23,3)]]*4 for y in np.arange(1,7,2)])), "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
+        time.sleep(1)
+        #
+        #
+        exp.last_rec_params.release()
+        res.release()
+        res = None
         self.cleanup()
     
     def test_NonUniformSampling(self):
@@ -101,6 +179,7 @@ class TestFileIDirectory(unittest.TestCase):
         reader = FileIODirectory.fromReader(res)
         assert reader.param_names[0] == 'DirFileNo', "FileIODirectory returns wrong outer slicing variable for uniform sampling."
         assert self.arr_equality(reader.param_vals[0], np.arange(3)), "FileIODirectory returns wrong outer slicing values for uniform sampling."
+        time.sleep(1)
         #
         res.release()
         res = None
@@ -109,6 +188,6 @@ class TestFileIDirectory(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    temp = TestFileIDirectory()
-    temp.test_NonUniformSampling()
+    temp = TestExpFileIO()
+    temp.test_ManyOneSampling()
     unittest.main()

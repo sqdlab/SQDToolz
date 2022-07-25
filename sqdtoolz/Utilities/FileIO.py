@@ -17,7 +17,7 @@ class FileIOWriter:
         self._hf = None
         self.store_timestamps = kwargs.get('store_timestamps', True)
 
-    def _init_hdf5(self, sweep_vars, data_pkt):
+    def _init_hdf5(self, sweep_vars, data_pkt, sweepEx = {}):
         if self._hf == None:
             if os.path.isfile(self._filepath):
                 self._hf = h5py.File(self._filepath, 'a', libver='latest')
@@ -31,6 +31,13 @@ class FileIOWriter:
                 for m, cur_param in enumerate(sweep_vars):
                     grp_params.create_dataset(cur_param[0].Name, data=np.hstack([m,cur_param[1]]))
                 offset = len(sweep_vars)
+                #
+                if len(sweepEx) > 0:
+                    grp_paramEx = self._hf.create_group('param_many_one_maps')
+                    for cur_mVar in sweepEx:
+                        grp_cur_var = grp_paramEx.create_group(cur_mVar)
+                        for ind, cur_var in enumerate(sweepEx[cur_mVar]['vars']):
+                            grp_cur_var.create_dataset(cur_var.Name, data=np.hstack([ind,sweepEx[cur_mVar]['var_vals'][:,ind]]))
                 #
                 random_dataset = next(iter(data_pkt['data'].values()))
                 if np.isscalar(random_dataset):
@@ -71,8 +78,8 @@ class FileIOWriter:
                 
                 self._hf.swmr_mode = True
 
-    def push_datapkt(self, data_pkt, sweep_vars):
-        self._init_hdf5(sweep_vars, data_pkt)
+    def push_datapkt(self, data_pkt, sweep_vars, sweepEx):
+        self._init_hdf5(sweep_vars, data_pkt, sweepEx)
 
         cur_data = np.vstack([data_pkt['data'][x].flatten() for x in self._meas_chs]).T
         self._dset[self._dset_ind*self._datapkt_size : (self._dset_ind+1)*self._datapkt_size] = cur_data
@@ -108,6 +115,19 @@ class FileIOReader:
         for cur_key in self.hdf5_file["measurements"].keys():
             cur_ind = self.hdf5_file["measurements"][cur_key][0]
             self.dep_params[cur_ind] = cur_key
+
+        #Extract the param_many_one_maps if any exist:
+        if 'param_many_one_maps' in self.hdf5_file:
+            self.param_many_one_maps = {}
+            vMaps = self.hdf5_file['param_many_one_maps']
+            for cur_mVar in vMaps:
+                var_names = [None]*len(vMaps[cur_mVar])
+                var_vals = [None]*len(vMaps[cur_mVar])
+                for cur_var in vMaps[cur_mVar]:
+                    cur_ind = int(vMaps[cur_mVar][cur_var][0])
+                    var_names[cur_ind] = cur_var
+                    var_vals[cur_ind] = vMaps[cur_mVar][cur_var][1:]
+                self.param_many_one_maps[cur_mVar] = {'param_names' : var_names, 'param_vals' : var_vals}
 
         temp_param_names = self.param_names[:]
         self.param_vals = [None]*len(temp_param_names) 

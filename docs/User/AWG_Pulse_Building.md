@@ -53,7 +53,7 @@ Note that is all that must be done to define a waveform. To activate this partic
 VariableProperty("driveAmpl", lab, lab.HAL("Wfm1").get_waveform_segment("Drive"), 'Amplitude')
 lab.VAR('testAmpl').Value = 0.3
 ```
-Note that the `WFS_Gaussian` object has an `Amplitude` property that is being tied to the variable `"driveAmpl"`. Another useful property common to all waveform segment classes is `Duration`.
+Note that the `WFS_Gaussian` object has an `Amplitude` property that is being tied to the variable `"driveAmpl"`. Another useful property common to all waveform segment classes is `Duration`. More details on sweeping AWG waveform parameters are given in a separate [article](AWG_VARs.md).
 
 
 ## Flexible time-segments in waveforms of fixed time-length

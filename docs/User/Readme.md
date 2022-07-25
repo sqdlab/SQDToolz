@@ -8,6 +8,7 @@ Main structure:
     - [AWG Pulse Building](AWG_Pulse_Building.md)
         - [Waveform Segments](AWG_WFS.md)
         - [Waveform Transformations](AWG_WFMTs.md)
+        - [Sweeping AWG waveform parameters using VARs](AWG_VARs.md)
     - Data acquisition:
         - [Basic ACQ HAL](ACQ.md)
         - VNA

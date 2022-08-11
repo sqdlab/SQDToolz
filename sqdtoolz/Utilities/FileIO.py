@@ -4,6 +4,7 @@ import json
 from h5py._hl.files import File
 import numpy as np
 import itertools
+import xarray as xr
 
 from datetime import datetime
 
@@ -16,7 +17,7 @@ class FileIOWriter:
         self._hf = None
         self.store_timestamps = kwargs.get('store_timestamps', True)
 
-    def _init_hdf5(self, sweep_vars, data_pkt):
+    def _init_hdf5(self, sweep_vars, data_pkt, sweepEx = {}):
         if self._hf == None:
             if os.path.isfile(self._filepath):
                 self._hf = h5py.File(self._filepath, 'a', libver='latest')
@@ -30,6 +31,13 @@ class FileIOWriter:
                 for m, cur_param in enumerate(sweep_vars):
                     grp_params.create_dataset(cur_param[0].Name, data=np.hstack([m,cur_param[1]]))
                 offset = len(sweep_vars)
+                #
+                if len(sweepEx) > 0:
+                    grp_paramEx = self._hf.create_group('param_many_one_maps')
+                    for cur_mVar in sweepEx:
+                        grp_cur_var = grp_paramEx.create_group(cur_mVar)
+                        for ind, cur_var in enumerate(sweepEx[cur_mVar]['vars']):
+                            grp_cur_var.create_dataset(cur_var.Name, data=np.hstack([ind,sweepEx[cur_mVar]['var_vals'][:,ind]]))
                 #
                 random_dataset = next(iter(data_pkt['data'].values()))
                 if np.isscalar(random_dataset):
@@ -70,8 +78,8 @@ class FileIOWriter:
                 
                 self._hf.swmr_mode = True
 
-    def push_datapkt(self, data_pkt, sweep_vars):
-        self._init_hdf5(sweep_vars, data_pkt)
+    def push_datapkt(self, data_pkt, sweep_vars, sweepEx):
+        self._init_hdf5(sweep_vars, data_pkt, sweepEx)
 
         cur_data = np.vstack([data_pkt['data'][x].flatten() for x in self._meas_chs]).T
         self._dset[self._dset_ind*self._datapkt_size : (self._dset_ind+1)*self._datapkt_size] = cur_data
@@ -108,6 +116,19 @@ class FileIOReader:
             cur_ind = self.hdf5_file["measurements"][cur_key][0]
             self.dep_params[cur_ind] = cur_key
 
+        #Extract the param_many_one_maps if any exist:
+        if 'param_many_one_maps' in self.hdf5_file:
+            self.param_many_one_maps = {}
+            vMaps = self.hdf5_file['param_many_one_maps']
+            for cur_mVar in vMaps:
+                var_names = [None]*len(vMaps[cur_mVar])
+                var_vals = [None]*len(vMaps[cur_mVar])
+                for cur_var in vMaps[cur_mVar]:
+                    cur_ind = int(vMaps[cur_mVar][cur_var][0])
+                    var_names[cur_ind] = cur_var
+                    var_vals[cur_ind] = vMaps[cur_mVar][cur_var][1:]
+                self.param_many_one_maps[cur_mVar] = {'param_names' : var_names, 'param_vals' : var_vals}
+
         temp_param_names = self.param_names[:]
         self.param_vals = [None]*len(temp_param_names) 
         for cur_param in temp_param_names:
@@ -122,6 +143,16 @@ class FileIOReader:
         else:
             assert False, "The reader has released the file - create a new FileIOReader instance to extract data."
             return np.array([])
+    
+    def get_xarray(self):
+        data_arrays = []
+        arr = self.get_numpy_array()
+        for v, dep_var in enumerate(self.dep_params):
+            my_slice = [ np.s_[0:] for x in self.param_vals] + [v]
+            my_slice = np.s_[tuple(my_slice)]
+            data_arrays += [ xr.DataArray(arr[my_slice], dims=tuple(self.param_names), coords={ x:self.param_vals[m] for m,x in enumerate(self.param_names) } ) ]
+        ret_data = xr.Dataset({ x:data_arrays[m] for m,x in enumerate(self.dep_params) })
+        return ret_data
     
     def get_time_stamps(self):
         if not self.hdf5_file is None:
@@ -419,3 +450,4 @@ class FileIODirectory:
 
 # a = FileIODirectory(r'test_save_dir\2022-02-15\193832-test_group\193834-test\data.h5')
 # b=0
+

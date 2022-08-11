@@ -2,6 +2,7 @@ from typing import List
 import numpy as np
 import time
 import json
+from sqdtoolz.Variable import VariablePropertyOneManyTransient
 
 import matplotlib.pyplot as plt
 
@@ -78,12 +79,27 @@ class Experiment:
                     time.sleep(delay)
             #################################
         else:
+            sweep_vars2 = []
+            sweepEx = {}
+            cur_names = []
             for ind_var, cur_var in enumerate(sweep_vars):
-                assert isinstance(cur_var[1], np.ndarray), "The second argument in each sweeping-variable tuple must be a Numpy Array."
-                assert cur_var[1].size > 0, f"The sweeping array for sweeping-variable {ind_var} is empty. If using arange, check the bounds!"
+                if len(cur_var) == 2:
+                    assert isinstance(cur_var[1], np.ndarray), "The second argument in each sweeping-variable tuple must be a Numpy Array."
+                    assert cur_var[1].size > 0, f"The sweeping array for sweeping-variable {ind_var} is empty. If using arange, check the bounds!"
+                    sweep_vars2 += [(cur_var[0], cur_var[1])]
+                else:
+                    assert isinstance(cur_var[0], str) and isinstance(cur_var[1], list) and isinstance(cur_var[2], np.ndarray), "One-many sweeping arguments must be given as the tuple: (name, list of VARs, ND-array)"
+                    assert len(cur_var[2].shape) == 2, f"The array for sweeping parameter {cur_var[0]} must be 2D."
+                    assert cur_var[2].shape[1] == len(cur_var[1]), f"The array for one-many sweeping parameter {cur_var[0]} must have {len(cur_var[1])} columns."
+                    var_amalg = VariablePropertyOneManyTransient(cur_var[0], cur_var[1], cur_var[2])
+                    sweep_vars2 += [(var_amalg, np.arange(cur_var[2].shape[0]))]
+                    sweepEx[cur_var[0]] = {'vars' : cur_var[1], 'var_vals' : cur_var[2]}
+            
+            cur_names = [v[0].Name for v in sweep_vars2]
+            assert len(cur_names) == len(set(cur_names)), "All assigned sweeping variable names must be unique."
 
             if not kill_signal():
-                sweep_arrays = [x[1] for x in sweep_vars]
+                sweep_arrays = [x[1] for x in sweep_vars2]
                 sweep_grids = np.meshgrid(*sweep_arrays)
                 sweep_grids = np.array(sweep_grids)
                 axes = np.arange(len(sweep_grids.shape))
@@ -94,11 +110,11 @@ class Experiment:
                     pass
                 sweep_grids = np.transpose(sweep_grids, axes=axes).reshape(len(sweep_arrays),-1).T
                 
-                #sweep_vars is given as a list of tuples formatted as (parameter, sweep-values in an numpy-array)
+                #sweep_vars2 is given as a list of tuples formatted as (parameter, sweep-values in an numpy-array)
                 for ind_coord, cur_coord in enumerate(sweep_grids):
                     #Set the values
                     for ind, cur_val in enumerate(cur_coord):
-                        sweep_vars[ind][0].set_raw(cur_val)
+                        sweep_vars2[ind][0].set_raw(cur_val)
 
                     if kill_signal():
                         break
@@ -112,9 +128,9 @@ class Experiment:
                         break
 
                     data = self._expt_config.get_data()
-                    data_file.push_datapkt(data, sweep_vars)
+                    data_file.push_datapkt(data, sweep_vars2, sweepEx)
                     if len(rec_params) > 0:
-                        rec_data_file.push_datapkt(self._prepare_rec_params(rec_params), sweep_vars)
+                        rec_data_file.push_datapkt(self._prepare_rec_params(rec_params), sweep_vars2, sweepEx)
                     if not disable_progress_bar:
                         ping_iteration((ind_coord+1)/sweep_grids.shape[0])
 

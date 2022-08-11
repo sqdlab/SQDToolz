@@ -5,6 +5,7 @@ Experiments generate data in the form of HDF5 files. Said data can be retrieved 
 - [FileIOReader](#fileioreader)
     - [Basic usage](#basic-usage)
     - [Time-stamps](#time-stamps)
+    - [One-many Parameters](#one-many-parameters)
 - [FileIODirectory](#fileiodirectory)
 
 When using these classes, the user need not write low-level HDF5 file-retrieval commands. Note that the utilities do not require a running `Laboratory` and thus, one may retrieve data by simply importing the required class as shown in the examples below.
@@ -79,6 +80,52 @@ Note that the ND-array of time-stamps is sliced over the independent sweeping pa
 >>> ts_first = arr[0][0]
   numpy.datetime64('2021-11-19T16:05:59.253367')
 ```
+
+### One-many Parameters
+
+This refers to the parsing of datasets swept with parameters that are [one-many mappings](Exp_Sweep.md#one-many-sweeps). THe dataset will have the one-many parameters appear in the `param_names` as shown above with their `param_vals` simply being integers indexed from 0 to the number of tuples that it sweeps. To get the variables this one-many parameter sweeps along with their respective tuple values, the `FileIOReader` object will implement (if one-many parameters exist) the attribute `param_many_one_maps` which is a dictionary:
+
+- Its keys are the names of the one-many parameters
+- Each key contains a separate dictionary with the keys `'param_names'` and `'param_vals'`:
+  - The key `'param_names'` contains an ordered list of the variables that are set by the given one-many parameter
+  - The key `'param_vals'` contains a list, for every corresponding variable in `'param_names'`, of the values set in every swept step
+- This attribute `param_many_one_maps` only exists if there is at least, one one-many parameter in the experiment's sweep
+
+For example, consider the experiment:
+
+``` python
+#Create experiment object (it's temporary and not stored in lab) using configuration 'AutoExp'
+exp = Experiment("Rabi", lab.CONFIG('AutoExp'))
+#Run experiment with two sweeping parameters:
+leData = lab.run_single(exp, [ (lab.VAR("wait_amps"), np.arange(0,0.3,0.1)), 
+                                ('gateSet', [lab.VAR("A1"), lab.VAR("P1"), lab.VAR("A2"), lab.VAR("P2")],
+                                  np.array([[1,0,3,-4], [4,-3,2,-2], [5,7,0,-1]])) ])
+```
+
+The following commands may be used to probe the stored data:
+
+```python
+#Get parameter names (that is, the parameters on each axis when slicing)
+>>> leData.param_names
+  ['wait_amps', 'gateSet']
+
+#Get parameter values corresponding to each slicing axis
+>>> leData.param_vals
+  [array([0.0, 0.1, 0.2]),
+   array([0, 1, 2])]
+
+#Get the variables set by 'gateSet':
+>>> leData.param_many_one_maps['gateSet']['param_names']
+  ['A1', 'P1', 'A2', 'P2']
+
+#Get the variables values by 'gateSet':
+>>> leData.param_many_one_maps['gateSet']['param_names']
+  [array([1,4,5]),
+   array([0,-3,7]),
+   array([3,2,0]),
+   array([-4,-2,-1])]
+```
+
 
 ## FileIODirectory
 

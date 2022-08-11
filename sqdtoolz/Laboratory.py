@@ -11,6 +11,7 @@ from sqdtoolz.HAL.GENvoltSource import*
 from sqdtoolz.HAL.GENswitch import*
 from sqdtoolz.HAL.ACQvna import*
 from sqdtoolz.HAL.GENatten import*
+from sqdtoolz.HAL.GENsmu import*
 from sqdtoolz.HAL.Processors.ProcessorCPU import*
 try:
     from sqdtoolz.HAL.Processors.ProcessorGPU import*
@@ -226,6 +227,8 @@ class Laboratory:
             if ret_obj == None:
                 return None
             for m in range(1,len(res_list)):
+                if ret_obj == None:
+                    return None
                 ret_obj = ret_obj._get_child(res_list[m])
         return ret_obj
 

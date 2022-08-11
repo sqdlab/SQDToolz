@@ -216,6 +216,33 @@ class VariablePropertyTransient:
         print("How did this even get called?")
         return []   #Shouldn't actually get called?
 
+class VariablePropertyOneManyTransient:
+    def __init__(self, name, var_list, var_many_vals):
+        self._name = name
+        self._var_list = var_list[:]
+        self._var_many_vals = var_many_vals
+
+    @property
+    def Name(self):
+        return self._name
+
+    @property
+    def Value(self):
+        print("Why is this getting called?")
+        return tuple([v.Value for v in self._var_list]) #Shouldn't actually get called?
+    @Value.setter
+    def Value(self, index):
+        self.set_raw(index)
+
+    def set_raw(self, index):
+        index = int(index)
+        for ind, v in enumerate(self._var_list):
+            v.Value = self._var_many_vals[index][ind]
+
+    def _get_written_objs(self):
+        print("How did this even get called?")
+        return []   #Shouldn't actually get called?
+
 class VariableSpaced(VariableBase):
     def __init__(self, name, lab, var_1, var_2, space_val):
         super().__init__(name, lab)

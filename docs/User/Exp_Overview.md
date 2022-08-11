@@ -40,7 +40,7 @@ The result on running the experiment is a file created with the time-stamp and t
 
 ![ExpRun](Exp_Overview_Run.drawio.svg)
 
-The mechanics of sweeping, running cascaded experiments (to put grouped experiments into a single folder) and pre-written automatic experiments are highlighted in the next [document](Exp_Sweep.md). Now, in general, note that:
+The mechanics of sweeping, running cascaded experiments (to put grouped experiments into a single folder) and pre-written automatic experiments are highlighted in the next [document](Exp_Sweep.md). In addition, the ability to record the value of arbitrary parameters over the course of the experiment (via the `rec_params` argument) is discussed in another [document](Exp_RecParams.md). Now, in general, note that:
 
 - Instrument preparation is taken to match the HAL parameters that were present when creating the `ExperimentConfiguration` object
 - The AWGs are automatically programmed only if necessary. For example, if the subsequent sweeping iterations do not change the waveform, then the AWG will not be unnecessarily reprogrammed.

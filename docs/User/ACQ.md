@@ -11,7 +11,7 @@ The sequence of pulse-trains and acquisiton over the measurement window is a *Re
 
 The idea is that a given pulse train will trigger the ADC module to capture a bunch of samples (for more information on triggering read-out windows via AWG markers, see the [pulse-building article](AWG_Pulse_Building.md)). These read-outs are taken over a specified number of *Repetitions*. Multiple read-out events within a single repetition window are grouped into *Segments*. Note that the raw driver and experimental wiring will ensure that the captured segments are correctly ordered and grouped within each repetition.
 
-To initialise an ACQ HAL (assuming that lab has is a valid Laboratory object):
+To initialise an ACQ HAL (assuming that `lab` is a valid Laboratory object):
 
 ```python
 #Load instrument from the YAML

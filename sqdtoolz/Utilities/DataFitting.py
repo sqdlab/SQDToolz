@@ -178,7 +178,7 @@ class DFitExponential:
     def __init__(self):
         pass
 
-    def get_fitted_plot(self, data_x, data_y, xLabel="", rise = False, fig=None, axs=None, dontplot=False):
+    def get_fitted_plot(self, data_x, data_y, xLabel="", yLabel="IQ Amplitude", rise = False, fig=None, axs=None, dontplot=False):
         def func(x, a, c, tau):
             return a * np.exp(-x/tau) + c
 
@@ -212,7 +212,7 @@ class DFitExponential:
             axs.plot(data_x, data_y, 'kx')
             axs.plot(data_x, func(data_x, *popt), 'r-')
             axs.set_xlabel(xLabel)
-            axs.set_ylabel('IQ Amplitude')
+            axs.set_ylabel(yLabel)
         else:
             fig = None
 

@@ -34,8 +34,8 @@ class MWS_WFSynthHDProV2_Channel(InstrumentChannel):
 
         self.add_parameter('trigger_input',
                            label='Reference oscillator source',
-                           get_cmd='w?',
-                           set_cmd='w{}',
+                           get_cmd=partial(self._get_cmd, 'w?'),
+                           set_cmd=partial(self._set_cmd, 'w'),
                            val_mapping={
                                'None':0,
                                'FreqSweepFull':1,
@@ -51,33 +51,40 @@ class MWS_WFSynthHDProV2_Channel(InstrumentChannel):
         #and disables the PLL and VCO to save energy and can take 20mS to boot up.
         self.add_parameter('pll_status',
                            label='Reference oscillator source',
-                           get_cmd='E?',
-                           set_cmd='E{}',
+                           get_cmd=partial(self._get_cmd, 'E?'),
+                           set_cmd=partial(self._set_cmd, 'E'),
                            val_mapping={
                                'ON':1,
                                'OFF':0
                            })
+        
+        
+        self.add_parameter('REF_Source',
+                            get_cmd=partial(self._get_cmd, 'x?'),
+                            set_cmd=partial(self._set_cmd, 'x'),
+                            set_parser=int,
+                            val_mapping={'INT':  1, 'EXT': 0})
 
     def _get_cmd(self, cmd):
         #Perform channel-select
-        self._parent.write(f'C{self._chan_ind}')
+        self._parent._set_cmd(f'C{self._chan_ind}','')
         #Query command
-        return self._parent.ask(f'{cmd}')
+        return self._parent._get_cmd(f'{cmd}')
     def _set_cmd(self, cmd, val):
         #Perform channel-select
-        self._parent.write(f'C{self._chan_ind}')
+        self._parent._set_cmd(f'C{self._chan_ind}','')
         #Perform command
-        self._parent.write(f'{cmd}{val}')
+        self._parent._set_cmd(f'{cmd}{val}','')
     def _set_cmd_trunc_freq(self, val):
         #Perform channel-select
-        self._parent.write(f'C{self._chan_ind}')
+        self._parent._set_cmd(f'C{self._chan_ind}', '')
         #Perform command
-        self._parent.write('f' + ('%013.7f'%val))
+        self._parent._set_cmd('f' + ('%013.7f'%val),'')
     def _set_cmd_trunc_power(self, cmd, val):
         #Perform channel-select
-        self._parent.write(f'C{self._chan_ind}')
+        self._parent._set_cmd(f'C{self._chan_ind}','')
         #Perform command
-        self._parent.write(cmd + ('%06.3f'%val))
+        self._parent._set_cmd(cmd + ('%06.3f'%val),'')
 
     @property
     def Output(self):
@@ -144,7 +151,11 @@ class MWS_WFSynthHDProV2(VisaInstrument):
     Driver for the Windfreak SynthHD PRO v2.
     """
     def __init__(self, name, address, **kwargs):
-        super().__init__(name, address, **kwargs)
+        init_instrument_only = kwargs.pop('init_instrument_only', False)
+        if init_instrument_only:
+            Instrument.__init__(self, name, **kwargs)
+        else:
+            super().__init__(name, address, **kwargs)
 
         # Output channels added to both the module for snapshots and internal output sources for use in queries
         self._source_outputs = {}
@@ -153,12 +164,6 @@ class MWS_WFSynthHDProV2(VisaInstrument):
             cur_channel = MWS_WFSynthHDProV2_Channel(self, ch_name, ch_ind)
             self.add_submodule(ch_name, cur_channel)
             self._source_outputs[ch_name] = cur_channel
-
-        self.add_parameter('REF_Source',
-                            get_cmd=partial(self._get_cmd, 'x?'),
-                            set_cmd=partial(self._set_cmd, 'x'),
-                            set_parser=int,
-                            val_mapping={'INT':  1, 'EXT': 0})
 
         self.add_parameter('EXT_REF_frequency', label='External REF Frequency', unit='Hz',
                             get_cmd=partial(self._get_cmd, '*?'),
@@ -178,10 +183,11 @@ class MWS_WFSynthHDProV2(VisaInstrument):
         #Otherwise, it will send *IDN and cahnge the sample clock!
         return {'vendor': 'Windfreak', 'model': 'HDProV2', 'serial': None, 'firmware': None}
 
+    def _set_cmd_ref_freq(self, val):
+        self._set_cmd('*' + ('%07.3f'%val), '')
+
     #NEED THESE BECAUSE QCODES INSERTS \n etc...
     def _get_cmd(self, cmd):
         return self.ask(f'{cmd}')
     def _set_cmd(self, cmd, val):
         self.write(f'{cmd}{val}')
-    def _set_cmd_ref_freq(self, val):
-        self.write('*' + ('%07.3f'%val))

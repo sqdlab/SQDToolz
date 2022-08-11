@@ -108,6 +108,12 @@ class ACQvna(HALbase):
     @PowerEnd.setter
     def PowerEnd(self, val):
         self._instr_vna.PowerEnd = val
+    @property
+    def ElecDelayTime(self):
+        return self._instr_vna.ElecDelayTime
+    @ElecDelayTime.setter
+    def ElecDelayTime(self, val):
+        self._instr_vna.ElecDelayTime = val
 
     def set_measurement_parameters(self, ports_meas_src_tuples):
         self._instr_vna.setup_measurements(ports_meas_src_tuples)
@@ -141,14 +147,14 @@ class ACQvna(HALbase):
             }
         #Not adding in FrequencyCentre and FrequencySpan to avoid strange contradictions...
         self.pack_properties_to_dict(['SweepMode', 'FrequencyStart', 'FrequencyEnd', 'Power', 'SweepPoints', 'AveragesNum', 'AveragesEnable',
-                                      'Bandwidth', 'NumRepetitions', 'FrequencySingle', 'PowerStart', 'PowerEnd', 'Output'], ret_dict)
+                                      'Bandwidth', 'NumRepetitions', 'FrequencySingle', 'PowerStart', 'PowerEnd', 'Output', 'ElecDelayTime'], ret_dict)
         ret_dict['FrequencySegments'] = self._instr_vna.get_frequency_segments()
         return ret_dict
 
     def _set_current_config(self, dict_config, lab):
         assert dict_config['Type'] == self.__class__.__name__, 'Cannot set configuration to a VNA with a configuration that is of type ' + dict_config['Type']
         for cur_prop in ['SweepMode', 'FrequencyStart', 'FrequencyEnd', 'Power', 'SweepPoints', 'AveragesNum', 'AveragesEnable',
-                         'Bandwidth', 'NumRepetitions', 'FrequencySingle', 'PowerStart', 'PowerEnd', 'Output']:
+                         'Bandwidth', 'NumRepetitions', 'FrequencySingle', 'PowerStart', 'PowerEnd', 'Output', 'ElecDelayTime']:
             setattr(self, cur_prop, dict_config[cur_prop])
         cur_mode = dict_config['SweepMode']     #Current mode may not have necessarily have set as 'Segmented' mode requires the calling of setup_segmented_sweep to set the segments first...
         if cur_mode == 'Segmented':

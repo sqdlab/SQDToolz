@@ -79,6 +79,12 @@ class VNA_Agilent_N5232A(VisaInstrument):
             docstring = '''Averaging ON/OFF''',
             get_cmd = 'SENS:AVER?',
             set_cmd = 'SENS:AVER {}', val_mapping = {True: 1, False: 0})
+
+        self.add_parameter(
+            'elec_delay_time', label = 'Electrical Delay Time', unit = 's',
+            get_cmd = ':CALC:CORR:EDEL:TIME?', get_parser = float,
+            set_cmd = ':CALC:CORR:EDEL:TIME {}')    #{:f}', set_parser=float, vals = vals.Numbers(-10.00, 10.00)
+        #TODO: Find out why putting that vals breaks it when using test input 42e-9
             
         self.add_parameter(
             'averaging_mode',
@@ -218,6 +224,13 @@ class VNA_Agilent_N5232A(VisaInstrument):
         self.power(val)
 
     @property
+    def ElecDelayTime(self):
+        return self.elec_delay_time()
+    @ElecDelayTime.setter
+    def ElecDelayTime(self, val):
+        self.elec_delay_time(val)
+
+    @property
     def SweepPoints(self):
         return self.sweep_points()
     @SweepPoints.setter
@@ -296,6 +309,7 @@ class VNA_Agilent_N5232A(VisaInstrument):
         return self._segment_freqs[:]
 
     def setup_measurements(self, ports_meas_src_tuples):
+        prev_elec_delay = self.ElecDelayTime
         self._delete_all_measurements()
         self._display_window()
         for i, cur_s_param in enumerate(ports_meas_src_tuples):
@@ -303,6 +317,7 @@ class VNA_Agilent_N5232A(VisaInstrument):
             cur_name = f'ch1_{cur_s_str}'
             self.write(f'CALC:PAR:EXT {cur_name}, {cur_s_str}')
             self.write(f'DISP:WIND:TRAC{i+1}:FEED {cur_name}')
+        self.ElecDelayTime = prev_elec_delay
 
     def ask(self, *args, **kwargs):
         got_data_without_errors = False

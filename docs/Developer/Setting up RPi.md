@@ -9,3 +9,7 @@ SD card was inserted into RPi and the Pi was booted with an ethernet connection 
 
 Setting up Serial capability
 - pyserial package should already be installed (using basic raspberry Pi OS)
+
+Setting up GPIO capability
+- run `sudo apt-get install rpi.gpio` to install the gpio package if it is not already installed
+

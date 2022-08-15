@@ -42,4 +42,14 @@ lab.HAL("Wfm1").add_waveform_segment(WFS_Gaussian("Drive B", lab.WFMT('IQmod').a
 lab.HAL("Wfm1").add_waveform_segment(WFS_Gaussian("Drive C", lab.WFMT('IQmod').apply(phase_offset=0.1), 20e-9, 0.1))
 ```
 
-Note that by default *ɸ* is set to zero at the beginning of the entire waveform sequence and accumulates with time. If one wishes to start from a zero phase at the beginning of a particular segment, then the `phase=0` argument must be supplied to the `apply()` function.
+Note that by default *ɸ* is set to zero at the beginning of the entire waveform sequence and accumulates with time. Thus, if one uses `apply()`, the phase will be taken relative to time from the beginning. Phase can be dynamically manipulated via arguments given to `apply()` (note that only one of these can be used per segment):
+
+- `phase` - if one wishes to start from a zero phase at the beginning of a particular segment, then the `phase=0` argument must be supplied to the `apply()` function. Similarly, one may reset the phase to any value. For example, `phase=0.1` will take the phase to be `0.1` at the beginning of that segment and all subsequent applications of this `WFMT` will take the phase to be such that it will be `0.1` if tracing back to the beginning of this segment.
+- `phase_offset` - this has a similar behaviour to `phase`, but it **adds** the value to be current phase at the beginning of the segment with the supplied offset. Thus, if the phase were accumulating to `0.5` at the segment, using `apply(phase_offset=0.1)` will set the phase to be `0.6` and all subsequent applications of this `WFMT` will ensure that the phase is `0.6` if tracing back to the beginning of this segment.
+- `phase_segment` - this **adds** a phase value to the current segment only without affecting the global phase accumulation. For example, `apply(phase_segment=np.pi/2)` would be applicable when running Y-Gates.
+
+These function of these arguments are better illustrated in the figure below:
+
+![My Diagram](WFMT_IQ_phases.drawio.svg)
+
+Notice how `apply()` creates the waveform given the phase of zero set from the beginning. Using `phase=np.pi` sets the phase on that segment to pi and all subsequent segments will use this new phase as the starting point (as shown by the dashed lines). Using `phase_offset=np.pi` resets the global phase point, but the phase that is set is added onto the phase that was currently present. Finally, `phase_segment=np.pi` adds pi (onto the current phase) only to the current segment. Subsequent segments will have the phase as continued from the beginning of said segment. That is, `phase` and `phase_offset` changes the phase of the current and subsequent segments, while `phase_segment` only offsets the current segment.

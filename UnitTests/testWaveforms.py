@@ -275,6 +275,30 @@ class TestSegments(unittest.TestCase):
         temp[1, init3_stencil] *= np.sin(omega*1e-9*(np.arange(45)+182-10)+0.1)
         assert self.arr_equality(temp, wfm_mod), "The IQ waveform was incorrectly compiled when changing phase in a previous waveform segment with 2 frequencies in play."
         #
+        #Trying to manipulate the phase_segment and checking relation down the track...
+        awg_wfm.clear_segments()
+        awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, 10e-9, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init", self.lab.WFMT('IQmod').apply(), 20e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero1", None, 30e-9, 0.1))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init2", self.lab.WFMT('IQmod').apply(phase_segment=0.1), 45e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 77e-9, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init3", self.lab.WFMT('IQmod').apply(), 45e-9, 0.5-0.1))
+        wfm_mod = np.vstack(awg_wfm.get_raw_waveforms())
+        init_stencil = np.s_[10:30]
+        init2_stencil = np.s_[60:105]
+        init3_stencil = np.s_[182:227]
+        temp = wfm_unmod*1.0
+        omega = 2*np.pi*self.lab.WFMT('IQmod').IQFrequency
+        omega2 = 2*np.pi*self.lab.WFMT('IQmod2').IQFrequency
+        temp[0, init_stencil] *= np.cos(omega*1e-9*(np.arange(20) + 10))
+        temp[1, init_stencil] *= np.sin(omega*1e-9*(np.arange(20) + 10))
+        temp[0, init2_stencil] *= np.cos(omega*1e-9*(np.arange(45)+60)+0.1)
+        temp[1, init2_stencil] *= np.sin(omega*1e-9*(np.arange(45)+60)+0.1)
+        temp[0, init3_stencil] *= np.cos(omega*1e-9*(np.arange(45)+182))
+        temp[1, init3_stencil] *= np.sin(omega*1e-9*(np.arange(45)+182))
+        assert self.arr_equality(temp, wfm_mod), "The IQ waveform was incorrectly compiled when changing phase_segment in a previous waveform segment."
+        #
+        #
         #Check that VARs can set WFMTs...
         awg_wfm.clear_segments()
         awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, 10e-9, 0.0))

@@ -167,6 +167,7 @@ class WFMT_ModulationIQ(WaveformTransformation):
     def modify_waveform(self, wfm_pts, fs, t0_ind, ch_index, **kwargs):
         t0 = t0_ind / fs
 
+        cur_t_off = 0.0
         if 'phase' in kwargs:
             if self.IQUpperSideband:
                 self._cur_t0 = t0 + kwargs.get('phase') / (2*np.pi*self.IQFrequency)
@@ -177,8 +178,13 @@ class WFMT_ModulationIQ(WaveformTransformation):
                 self._cur_t0 += kwargs.get('phase_offset') / (2*np.pi*self.IQFrequency)
             else:
                 self._cur_t0 -= kwargs.get('phase_offset') / (2*np.pi*self.IQFrequency)
+        elif 'phase_segment' in kwargs:
+            if self.IQUpperSideband:
+                cur_t_off = kwargs.get('phase_segment') / (2*np.pi*self.IQFrequency)
+            else:
+                cur_t_off = -kwargs.get('phase_segment') / (2*np.pi*self.IQFrequency)
 
-        t_vals = np.arange(wfm_pts.size) / fs + t0 - self._cur_t0
+        t_vals = np.arange(wfm_pts.size) / fs + t0 - self._cur_t0 - cur_t_off
         if ch_index == 0:   #I-Channel
             return wfm_pts * self.IQAmplitude * np.cos(2 * np.pi * self.IQFrequency * t_vals) + self.IQdcOffset[0]
         elif ch_index == 1: #Q-Channel
@@ -213,3 +219,4 @@ class WFMT_ModulationIQ(WaveformTransformation):
     def _process_kwargs(self, kwargs):
         kwargs['phase'] = kwargs.get('phase', None)
         kwargs['phase_offset'] = kwargs.get('phase_offset', None)
+        kwargs['phase_segment'] = kwargs.get('phase_segment', None)

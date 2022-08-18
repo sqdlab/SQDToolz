@@ -37,7 +37,7 @@ class SW_BJT_RPi(Instrument):
         self._state_map = pins
         self._current_state = "P0"
         self._initialise_pins()
-        # super().__init__(name, **kwargs)
+        super().__init__(name, **kwargs)
         self.Position = self._current_state
 
     def read_line(self, channel):

@@ -30,7 +30,7 @@ class SW_BJT_RPi(Instrument):
             inputString += str(value) + ","
         inputString = inputString[:-1] 
         inputString += "\n"
-        print("INPUT STRING IS:", inputString)
+        # print("INPUT STRING IS:", inputString)
         self._stdin.write(inputString)
         self._stdout.flush()
         self._stdin.flush()

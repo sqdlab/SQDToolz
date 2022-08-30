@@ -78,7 +78,7 @@ class FileIOWriter:
                 
                 self._hf.swmr_mode = True
 
-    def push_datapkt(self, data_pkt, sweep_vars, sweepEx):
+    def push_datapkt(self, data_pkt, sweep_vars, sweepEx = {}):
         self._init_hdf5(sweep_vars, data_pkt, sweepEx)
 
         cur_data = np.vstack([data_pkt['data'][x].flatten() for x in self._meas_chs]).T

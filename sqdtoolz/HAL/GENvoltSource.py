@@ -1,4 +1,5 @@
 from sqdtoolz.HAL.HALbase import*
+import Pyro4
 
 class GENvoltSource(HALbase):
     def __init__(self, hal_name, lab, instr_gen_volt_src_channel):
@@ -11,6 +12,7 @@ class GENvoltSource(HALbase):
     def fromConfigDict(cls, config_dict, lab):
         return cls(config_dict["Name"], lab, config_dict["instrument"])
 
+    @Pyro4.expose
     @property
     def Output(self):
         return self._instr_volt.Output
@@ -18,6 +20,7 @@ class GENvoltSource(HALbase):
     def Output(self, val):
         self._instr_volt.Output = val
         
+    @Pyro4.expose
     @property
     def Voltage(self):
         return self._instr_volt.Voltage
@@ -25,6 +28,7 @@ class GENvoltSource(HALbase):
     def Voltage(self, val):
         self._instr_volt.Voltage = val
         
+    @Pyro4.expose
     @property
     def RampRate(self):
         return self._instr_volt.RampRate

@@ -1,4 +1,5 @@
 from sqdtoolz.HAL.LockableProperties import LockableProperties
+import Pyro4
 
 class HALbase(LockableProperties):
     def __init__(self, HAL_Name):
@@ -33,10 +34,12 @@ class HALbase(LockableProperties):
             cur_str += f"{cur_key}: {cur_dict[cur_key]}\n"
         return cur_str
 
+    @Pyro4.expose
     @property
     def Name(self):
         return self._name
 
+    @Pyro4.expose
     @property
     def Parent(self):
         return None

@@ -1,0 +1,7 @@
+instruments:
+  remote_smu:
+    driver: sqdtoolz.HAL.RemoteHAL
+    type: RemoteHAL
+    init:
+      uri: 'PYRO:obj_6e5a70763dd84b2bb13d6b2c1ad81564@localhost:59297'
+    enable_forced_reconnect: true

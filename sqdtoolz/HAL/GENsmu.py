@@ -1,5 +1,5 @@
 from sqdtoolz.HAL.HALbase import*
-
+import Pyro4
 class GENsmu(HALbase):
     def __init__(self, hal_name, lab, instr_gen_smu):
         #Note that this must be a specific channel if using a multi-channel SMU!
@@ -12,6 +12,7 @@ class GENsmu(HALbase):
     def fromConfigDict(cls, config_dict, lab):
         return cls(config_dict["Name"], lab, config_dict["instrument"])
 
+    @Pyro4.expose
     @property
     def Output(self):
         return self._instr_smu.Output
@@ -28,6 +29,7 @@ class GENsmu(HALbase):
         else:
             return self.Current
         
+    @Pyro4.expose
     @property
     def Voltage(self):
         return self._instr_smu.Voltage

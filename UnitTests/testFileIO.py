@@ -186,6 +186,24 @@ class TestExpFileIO(unittest.TestCase):
         reader = None
         self.cleanup()
 
+    def test_WriteFileDirect(self):
+        data_array = np.zeros( (2,3,4,2) )
+        param_names = ["power", "frequency", "flux"]
+        param_vals = [np.array([-10,0]), np.array([0,1,2]), np.array([0,1,2,3])]
+        dep_param_names = ['rf_I', 'rf_Q']
+        FileIOWriter.write_file_direct('testFile.h5', data_array, param_names, param_vals, dep_param_names)
+        #TODO: Write more test-cases verifying asserts...
+
+        tempRdr = FileIOReader('testFile.h5')
+        assert self.arr_equality(data_array, tempRdr.get_numpy_array()), "Writing HDF5 file directly caused error in data array."
+        assert param_names == tempRdr.param_names, "Writing HDF5 file directly caused error in parameter names."
+        assert len(param_vals) == len(tempRdr.param_vals), "Writing HDF5 file directly caused error in parameter values."
+        for m in range(len(param_vals)):
+            assert self.arr_equality(param_vals[m], tempRdr.param_vals[m]), f"Writing HDF5 file directly caused error in parameter values (index {m})."
+        assert dep_param_names == tempRdr.dep_params, "Writing HDF5 file directly caused error in dependent parameter names."
+        tempRdr.release()
+        tempRdr = None
+        os.remove('testFile.h5')
 
 if __name__ == '__main__':
     temp = TestExpFileIO()

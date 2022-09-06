@@ -34,4 +34,5 @@ Main structure:
 
 
 Other advanced use-cases:
+- [Synthesising SQDToolz HDF5 data files](Data_Write.md)
 - [Non-uniform data sampling](ACQ_NonUniformDataSampling.md)

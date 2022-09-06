@@ -96,6 +96,36 @@ class FileIOWriter:
             self._hf.close()
             self._hf = None
 
+    @staticmethod
+    def write_file_direct(filepath, data_array, param_names, param_vals, dep_param_names, **kwargs):
+        #TODO: Add support for time-stamps and one-many indexing...
+        assert isinstance(param_names, list), "Argument param_names must be a list of strings corresponding to each independent sweeping/slicing parameter."
+        assert isinstance(param_vals, list), "Argument param_names must be a list of numpy arrays corresponding to the values taken by each independent sweeping/slicing parameter."
+        assert len(param_names) == len(param_vals), "Number of param_names must match number of param_vals."
+        assert isinstance(data_array, np.ndarray), "Argument data_array must be a valid numpy array."
+        assert len(data_array.shape) == len(param_names)+1, "Number of dimensions of data_array must match number of param_names plus 1."
+        for m in range(len(param_names)):
+            assert isinstance(param_vals[m], np.ndarray), f"Argument param_vals must be a list of numpy-arrays, index {m} fails this."
+            assert len(param_vals[m].shape) == 1, "Argument param_vals must be a list of 1D numpy-arrays, index {m} fails this."
+        for m, val in enumerate(data_array.shape):
+            if m == len(param_vals):
+                assert len(dep_param_names) == val, "Size of last dimension in data_array must match number of dep_param_names."
+                break
+            assert param_vals[m].size == val, f"Dimension {m} in data_array does not match size of array {m} in param_vals (i.e. {param_names[m]})."
+
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        hf = h5py.File(filepath, 'a', libver='latest')
+        grp_params = hf.create_group('parameters')
+        for m in range(len(param_names)):
+            grp_params.create_dataset(param_names[m], data=np.hstack([m,param_vals[m]]))
+        grp_meas = hf.create_group('measurements')
+        for m in range(len(dep_param_names)):
+            grp_meas.create_dataset(dep_param_names[m], data=np.hstack([m]))
+        arr_size = int(np.prod(data_array.shape)/data_array.shape[-1])
+        hf.create_dataset("data", data=data_array.reshape((arr_size, len(dep_param_names))), compression="gzip")
+        hf.close()
+
 class FileIOReader:
     def __init__(self, filepath):
         self.file_path = filepath

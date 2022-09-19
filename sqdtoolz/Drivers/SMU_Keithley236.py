@@ -22,17 +22,15 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
         self.expectedMfr = "Keithley"
         self.expectedModel = "236"
 
-        #Remote ENABLE
-        self.write('REMOTE 716')
         #Reset
-        self.write('J0X\n')
+        # self.write('J0X\n')
 
         self.add_parameter('status_error', get_cmd='U1X\n')
         self.add_parameter('status_machine', get_cmd='U3X\n')
         self.add_parameter('status_measurement', get_cmd='U4X\n')
         self.add_parameter('status_compliance', get_cmd='U5X\n')
         self.add_parameter('status_suppression', get_cmd='U6X\n')
-        self.add_parameter('src_meas', get_cmd='G5,0,0\n')
+        self.add_parameter('src_meas', get_cmd='G5,0,0X\n')
 
         self.add_parameter('voltage',
                             label='Output Voltage',
@@ -64,6 +62,8 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
                             get_cmd=lambda : self.current.step/self.current.inter_delay,
                             set_cmd=self._set_ramp_rate_current)
 
+        self.parameters.pop('IDN')
+
     @property
     def Mode(self):
         res = self.status_measurement()
@@ -74,11 +74,14 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
             return 'SrcI_MeasV'
     @Mode.setter
     def Mode(self, mode):
-        #Using DC Mode by default in both cases...
+        pass
+        #Using DC Mode by default in both cases...  #TODO: FIX THIS AS IT CASUES ERRORS...
         if mode == 'SrcV_MeasI':
             self.write('F0,0X\n')
+            self._trigger()
         else:
             self.write('F1,0X\n')
+            self._trigger()
 
     @property
     def Output(self):
@@ -104,11 +107,15 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
         #Use auto-range and zero delay by default...
         self.write(f'B{val},0,0X\n')
 
+    def _trigger(self):
+        self.write('H0X\n')
+
     @property
     def Voltage(self):
         return self.voltage()
     @Voltage.setter
     def Voltage(self, val):
+        assert self.Mode == 'SrcI_MeasV', 'Cannot set current in Voltage source mode'
         self.voltage(val)
 
     def _get_current(self):
@@ -128,6 +135,7 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
         return self.current()
     @Current.setter
     def Current(self, val):
+        assert self.Mode == 'SrcI_MeasV', 'Cannot set current in Voltage source mode'
         self.current(val)
 
     @property

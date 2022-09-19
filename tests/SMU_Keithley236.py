@@ -10,9 +10,13 @@ new_lab.load_instrument('smu')
 
 smu_module = GENsmu('vSMU', new_lab, ['smu'])
 
-new_lab.HAL('vSMU').Output = True
+new_lab.HAL('vSMU').Current = 0.001
+print(new_lab.HAL('vSMU').Voltage)
+new_lab.HAL('vSMU').Current = 0.001
+print(new_lab.HAL('vSMU').Voltage)
 new_lab.HAL('vSMU').Mode = 'SrcI_MeasV'
+new_lab.HAL('vSMU').Output = True
 
 print(new_lab.HAL('vSMU'))
 
-input('Press ENTER')
+# input('Press ENTER')

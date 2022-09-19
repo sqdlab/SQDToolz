@@ -115,7 +115,7 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
         return self.voltage()
     @Voltage.setter
     def Voltage(self, val):
-        assert self.Mode == 'SrcI_MeasV', 'Cannot set current in Voltage source mode'
+        assert self.Mode == 'SrcV_MeasI', 'Cannot set voltage in Current source mode'
         self.voltage(val)
 
     def _get_current(self):

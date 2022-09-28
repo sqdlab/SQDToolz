@@ -351,7 +351,6 @@ class VNA_Agilent_N5232A(VisaInstrument):
         for cur_meas_name, cur_meas in cur_meas_traces:
             ret_data['data'][f'{cur_meas}_real'] = []
             ret_data['data'][f'{cur_meas}_imag'] = []
-
         #Strange behaviour when running the benchmark in the end is that ascii is the fastest at ~49ms per point (15 in total) while
         #bin32/bin64 are the same speed at ~59ms?!?! So there's no speed difference in transferring more data and yet it's faster to
         #transfer and encode ascii data?!
@@ -375,10 +374,14 @@ class VNA_Agilent_N5232A(VisaInstrument):
                         time.sleep(0.01)
                 else:
                     self.write('TRIG:SOUR MAN')
-                    try:
-                        self._set_visa_timeout(len(cur_meas_traces)*self.sweep_time.get() + 5)
-                    except AttributeError:
-                        self._set_visa_timeout(self.sweep_time.get() + 5)
+                    sweep_time = self.sweep_time.get()
+                    if sweep_time > 0 and sweep_time < 3600*24*365: # positive and less than one year
+                        try:
+                            self._set_visa_timeout(len(cur_meas_traces)*self.sweep_time.get() + 5)
+                        except AttributeError:
+                            self._set_visa_timeout(sweep_time + 5)
+                    else:
+                        self._set_visa_timeout(5)
                     self.write('ABORT; :INIT:IMM')
                     self.ask('*OPC?')
                 for cur_meas_name, cur_meas in cur_meas_traces:

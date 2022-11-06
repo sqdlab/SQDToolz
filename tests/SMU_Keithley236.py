@@ -15,4 +15,4 @@ new_lab.HAL('vSMU').Output = True
 
 print(new_lab.HAL('vSMU'))
 
-input('Press ENTER')
+# input('Press ENTER')

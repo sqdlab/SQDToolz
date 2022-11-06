@@ -1,0 +1,6 @@
+instruments:
+  PerfectPrimeThermometer:
+    driver: sqdtoolz.Drivers.THERM_TC0309
+    type: THERM_TC0309
+    address: 'COM4'
+    enable_forced_reconnect: true

@@ -25,8 +25,6 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
         self.expectedMfr = "Keithley"
         self.expectedModel = "236"
 
-        #Remote ENABLE
-        self.write('REMOTE 716')
         #Reset
         self.write('J0')
 
@@ -67,6 +65,8 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
                             get_cmd=lambda : self.current.step/self.current.inter_delay,
                             set_cmd=self._set_ramp_rate_current)
 
+        self.parameters.pop('IDN')
+
     @property
     def Mode(self):
         res = self.status_measurement()
@@ -77,7 +77,8 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
             return 'SrcI_MeasV'
     @Mode.setter
     def Mode(self, mode):
-        #Using DC Mode by default in both cases...
+        pass
+        #Using DC Mode by default in both cases...  #TODO: FIX THIS AS IT CASUES ERRORS...
         if mode == 'SrcV_MeasI':
             self.ask('F0,0')
         else:
@@ -112,6 +113,7 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
         return self.voltage()
     @Voltage.setter
     def Voltage(self, val):
+        assert self.Mode == 'SrcV_MeasI', 'Cannot set voltage in Current source mode'
         self.voltage(val)
 
     def _get_current(self):
@@ -131,6 +133,7 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
         return self.current()
     @Current.setter
     def Current(self, val):
+        assert self.Mode == 'SrcI_MeasV', 'Cannot set current in Voltage source mode'
         self.current(val)
 
     @property

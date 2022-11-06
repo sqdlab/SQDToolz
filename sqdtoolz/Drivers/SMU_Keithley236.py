@@ -12,6 +12,9 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
         https://codeshare.phy.cam.ac.uk/waw31/JISA/-/blob/9db4b0f103430be1458007b3f234fed3e38cc33f/src/JISA/Devices/K236.java
     """
 
+    def write(self, cmd):
+        super().write(cmd + 'H0X')
+
     def __init__(self, name, address, gpib_slot, **kwargs):
         super().__init__(address=address)
         Instrument.__init__(self, name, **kwargs)
@@ -25,14 +28,14 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
         #Remote ENABLE
         self.write('REMOTE 716')
         #Reset
-        self.write('J0X\n')
+        self.write('J0')
 
-        self.add_parameter('status_error', get_cmd='U1X\n')
-        self.add_parameter('status_machine', get_cmd='U3X\n')
-        self.add_parameter('status_measurement', get_cmd='U4X\n')
-        self.add_parameter('status_compliance', get_cmd='U5X\n')
-        self.add_parameter('status_suppression', get_cmd='U6X\n')
-        self.add_parameter('src_meas', get_cmd='G5,0,0\n')
+        self.add_parameter('status_error', get_cmd='U1')
+        self.add_parameter('status_machine', get_cmd='U3')
+        self.add_parameter('status_measurement', get_cmd='U4')
+        self.add_parameter('status_compliance', get_cmd='U5')
+        self.add_parameter('status_suppression', get_cmd='U6')
+        self.add_parameter('src_meas', get_cmd='G5,0,0')
 
         self.add_parameter('voltage',
                             label='Output Voltage',
@@ -76,9 +79,9 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
     def Mode(self, mode):
         #Using DC Mode by default in both cases...
         if mode == 'SrcV_MeasI':
-            self.write('F0,0X\n')
+            self.ask('F0,0')
         else:
-            self.write('F1,0X\n')
+            self.ask('F1,0')
 
     @property
     def Output(self):
@@ -88,9 +91,9 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
     @Output.setter
     def Output(self, val):
         if val:
-            self.write('N1X\n')
+            self.write('N1')
         else:
-            self.write('N0X\n')
+            self.write('N0')
 
     def _get_voltage(self):
         res = self.src_meas()
@@ -102,7 +105,7 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
             return float(res.split(',')[1][5:])
     def _set_voltage(self, val):
         #Use auto-range and zero delay by default...
-        self.write(f'B{val},0,0X\n')
+        self.write(f'B{val},0,0')
 
     @property
     def Voltage(self):
@@ -121,7 +124,7 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
             return float(res.split(',')[1][5:])
     def _set_current(self, val):
         #Use auto-range and zero delay by default...
-        self.write(f'B{val},0,0X\n')
+        self.write(f'B{val},0,0')
 
     @property
     def Current(self):
@@ -148,7 +151,8 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
     @ComplianceCurrent.setter
     def ComplianceCurrent(self, val):
         if self.Mode == 'SrcV_MeasI':
-            self.write(f'L{val},0X\n')
+            range = np.clip(10 + np.ceil(np.log10(val)), 1, 10) #Check Page 206 of manual
+            self.write(f'L{val},{int(range)}') # TODO: change this better
     
     @property
     def ComplianceVoltage(self):
@@ -160,7 +164,7 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
     @ComplianceVoltage.setter
     def ComplianceVoltage(self, val):
         if self.Mode == 'SrcI_MeasV':
-            self.write(f'L{val},0X\n')
+            self.write(f'L{val},0')
 
     @property
     def RampRateVoltage(self):
@@ -192,16 +196,8 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
             self.Mode = 'SrcI_MeasV'
 
     def _set_ramp_rate_volt(self, ramp_rate):
-        if ramp_rate < 0.01:
-            self.voltage.step = 0.001
-        elif ramp_rate < 0.1:
-            self.voltage.step = 0.010
-        elif ramp_rate < 1.0:
-            self.voltage.step = 0.100
-        else:
-            self.voltage.step = 1.0
-        self.voltage.inter_delay = self.voltage.step / ramp_rate
-
+        self.voltage.step = self.voltage.inter_delay * ramp_rate
+ 
     def _set_ramp_rate_current(self, ramp_rate):
         if ramp_rate < 0.01:
             self.current.step = 0.001

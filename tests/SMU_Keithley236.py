@@ -10,8 +10,8 @@ new_lab.load_instrument('smu')
 
 smu_module = GENsmu('vSMU', new_lab, ['smu'])
 
+new_lab.HAL('vSMU').Mode = 'SrcV_MeasI'
 new_lab.HAL('vSMU').Output = True
-new_lab.HAL('vSMU').Mode = 'SrcI_MeasV'
 
 print(new_lab.HAL('vSMU'))
 

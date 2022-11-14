@@ -1,0 +1,6 @@
+instruments:
+  dc_supply:
+    driver: sqdtoolz.Drivers.SMU_TENMA_72_2710
+    type: SMU_TENMA_72_2710
+    address: 'COM6'
+    enable_forced_reconnect: true

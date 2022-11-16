@@ -314,6 +314,7 @@ class DFitNotchResonance:
         dont_plot_estimates = kwargs.get('dont_plot_estimates', False)
         prop_detrend_start = kwargs.get('prop_detrend_start', 0.05)
         prop_detrend_end = kwargs.get('prop_detrend_end', 0.05)
+        dont_plot_anything = kwargs.get('dont_plot_anything', False)
 
         #Setup the axes...
         if dont_plot_estimates:
@@ -324,6 +325,8 @@ class DFitNotchResonance:
             axFitIQ  = plt.subplot(1, 3, 3)
             #
             axFitAmp.grid(); axFitPhs.grid(); axFitIQ.grid()
+        elif dont_plot_anything:
+            pass
         else:
             fig = plt.figure(); fig.set_figwidth(20)#; fig.set_figheight(7)
             #
@@ -340,7 +343,7 @@ class DFitNotchResonance:
 
         #Width estimation
         data_x, data_y = freq_vals, np.abs(i_vals + 1j*q_vals)
-        if dont_plot_estimates:
+        if dont_plot_estimates or dont_plot_anything:
             dpkt = DFitFanoResonance().get_fitted_plot(data_x, data_y**2, xLabel='Frequency (Hz)', yLabel='|IQ|^2', dontplot=True)
         else:
             dpkt = DFitFanoResonance().get_fitted_plot(data_x, data_y**2, xLabel='Frequency (Hz)', yLabel='|IQ|^2', axs=axWidth)
@@ -359,7 +362,7 @@ class DFitNotchResonance:
         coefs = 0.5*(coefs1+coefs2)
         #Plot the line...
         poly1d_fn = np.poly1d(coefs)
-        if not dont_plot_estimates:
+        if not dont_plot_estimates and not dont_plot_anything:
             axPhaseDetrend.plot(freq_vals, phase_vals)
             poly1d_fn0 = np.poly1d(coefs1)
             axPhaseDetrend.plot(freq_vals, poly1d_fn0(freq_vals), 'k', alpha=0.5)
@@ -381,13 +384,13 @@ class DFitNotchResonance:
             return y_smooth
         phase_derivs = np.diff(smooth(detrended_phase,5)) / np.diff(freq_vals)
         dfit = DFitPeakLorentzian()
-        if dont_plot_estimates:
+        if dont_plot_estimates or dont_plot_anything:
             dpkt = dfit.get_fitted_plot(freq_vals[:-1], phase_derivs, xLabel='Frequency (Hz)', yLabel='Phase Slope (rad/Hz)', dip=False, dontplot=True)
         else:
             dpkt = dfit.get_fitted_plot(freq_vals[:-1], phase_derivs, xLabel='Frequency (Hz)', yLabel='Phase Slope (rad/Hz)', dip=False, axs=axPhaseSlopeEst)
         ps = dpkt['amplitude']
         #Plot the Detrended+Slope Estimate...
-        if not dont_plot_estimates:
+        if not dont_plot_estimates and not dont_plot_anything:
             axPhaseSlopeEst.set_title('Estimate Phase Slope')
             axPhaseSlope.plot(freq_vals, phase_vals - poly1d_fn(freq_vals), alpha=0.5)
             tempYlims = axPhaseSlope.get_ylim()
@@ -441,22 +444,25 @@ class DFitNotchResonance:
                                             ])
 
         #Plot final fits...
-        axFitAmp.plot(freq_vals,np.abs(i_vals + 1j*q_vals), alpha=0.5)
-        axFitAmp.plot(freq_vals,np.abs(func(freq_vals, init_conds)))
-        axFitAmp.plot(freq_vals,np.abs(func(freq_vals, sol.x)))
-        axFitAmp.set_title('Fitted Amplitude'); axFitAmp.set_xlabel('Frequency (Hz)'); axFitAmp.set_ylabel('Amplitude')
-        #
-        axFitPhs.plot(freq_vals,phase_vals, alpha=0.5)
-        axFitPhs.plot(freq_vals,np.unwrap(np.angle(func(freq_vals, init_conds))))
-        axFitPhs.plot(freq_vals,np.unwrap(np.angle(func(freq_vals, sol.x))))
-        axFitPhs.set_title('Fitted Phase'); axFitPhs.set_xlabel('Frequency (Hz)'); axFitPhs.set_ylabel('Phase (rad)')
-        #
-        axFitIQ.plot(i_vals,q_vals, alpha=0.5)
-        axFitIQ.plot(np.real(func(freq_vals, init_conds)), np.imag(func(freq_vals, init_conds)))
-        axFitIQ.plot(np.real(func(freq_vals, sol.x)), np.imag(func(freq_vals, sol.x)))
-        axFitIQ.set_title('Fitted IQ'); axFitIQ.set_xlabel('I-Channel'); axFitIQ.set_ylabel('Q-Channel')
+        if dont_plot_anything:
+            pass
+        else:
+            axFitAmp.plot(freq_vals,np.abs(i_vals + 1j*q_vals), alpha=0.5)
+            axFitAmp.plot(freq_vals,np.abs(func(freq_vals, init_conds)))
+            axFitAmp.plot(freq_vals,np.abs(func(freq_vals, sol.x)))
+            axFitAmp.set_title('Fitted Amplitude'); axFitAmp.set_xlabel('Frequency (Hz)'); axFitAmp.set_ylabel('Amplitude')
+            #
+            axFitPhs.plot(freq_vals,phase_vals, alpha=0.5)
+            axFitPhs.plot(freq_vals,np.unwrap(np.angle(func(freq_vals, init_conds))))
+            axFitPhs.plot(freq_vals,np.unwrap(np.angle(func(freq_vals, sol.x))))
+            axFitPhs.set_title('Fitted Phase'); axFitPhs.set_xlabel('Frequency (Hz)'); axFitPhs.set_ylabel('Phase (rad)')
+            #
+            axFitIQ.plot(i_vals,q_vals, alpha=0.5)
+            axFitIQ.plot(np.real(func(freq_vals, init_conds)), np.imag(func(freq_vals, init_conds)))
+            axFitIQ.plot(np.real(func(freq_vals, sol.x)), np.imag(func(freq_vals, sol.x)))
+            axFitIQ.set_title('Fitted IQ'); axFitIQ.set_xlabel('I-Channel'); axFitIQ.set_ylabel('Q-Channel')
 
-        if not dont_plot_estimates:
+        if not dont_plot_estimates and not dont_plot_anything:
             fig.subplots_adjust(left=None, bottom=-1.1, right=None, top=None, wspace=None, hspace=None)
 
         # print(init_conds)

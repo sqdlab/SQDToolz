@@ -31,6 +31,8 @@ class FileIOWriter:
             else:
                 self._datapkt_size = np.prod(param_sizes)
             self._data_array_shape = [x[1].size for x in sweep_vars] + param_sizes
+            if len(param_sizes) == 0:
+                param_sizes = [1]
             #
             if os.path.isfile(self._filepath):
                 self._hf = h5py.File(self._filepath, 'a', libver='latest')

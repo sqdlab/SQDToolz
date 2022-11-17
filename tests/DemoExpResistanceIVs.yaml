@@ -1,0 +1,13 @@
+instruments:
+  smu_keithley:
+    driver: sqdtoolz.Drivers.SMU_Keithley236
+    type: SMU_Keithley236
+    address: '192.168.0.200'
+    init:
+      gpib_slot: 19
+    enable_forced_reconnect: true
+  PerfectPrimeThermometer:
+    driver: sqdtoolz.Drivers.THERM_TC0309
+    type: THERM_TC0309
+    address: 'COM4'
+    enable_forced_reconnect: true

@@ -112,14 +112,32 @@ class SMU_TENMA_72_2710(Instrument):
         return self.voltage.step/self.voltage.inter_delay
     @RampRateVoltage.setter
     def RampRateVoltage(self, val):
-        self.voltage.inter_delay = self.voltage.step/val
+        ramp_rate = val
+        if ramp_rate < 0.01:
+            self.voltage.step = 0.001
+        elif ramp_rate < 0.1:
+            self.voltage.step = 0.010
+        elif ramp_rate < 1.0:
+            self.voltage.step = 0.100
+        else:
+            self.voltage.step = 1.0
+        self.voltage.inter_delay = self.voltage.step / ramp_rate
 
     @property
     def RampRateCurrent(self):
         return self.current.step/self.current.inter_delay
     @RampRateCurrent.setter
     def RampRateCurrent(self, val):
-        self.current.inter_delay = self.current.step/val
+        ramp_rate = val
+        if ramp_rate < 0.01:
+            self.current.step = 0.001
+        elif ramp_rate < 0.1:
+            self.current.step = 0.010
+        elif ramp_rate < 1.0:
+            self.current.step = 0.100
+        else:
+            self.current.step = 1.0
+        self.current.inter_delay = self.current.step / ramp_rate
 
     @property
     def ProbeType(self):

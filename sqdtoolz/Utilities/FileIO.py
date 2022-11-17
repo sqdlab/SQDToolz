@@ -15,10 +15,23 @@ class FileIOWriter:
     def __init__(self, filepath, **kwargs):
         self._filepath = filepath
         self._hf = None
+        self._data_array_shape = None
         self.store_timestamps = kwargs.get('store_timestamps', True)
 
     def _init_hdf5(self, sweep_vars, data_pkt, sweepEx = {}):
         if self._hf == None:
+            random_dataset = next(iter(data_pkt['data'].values()))
+            if np.isscalar(random_dataset) or random_dataset.size == 1:
+                param_sizes = []
+            else:
+                param_sizes = list(random_dataset.shape)
+            #
+            if len(param_sizes) == 0:
+                self._datapkt_size = 1
+            else:
+                self._datapkt_size = np.prod(param_sizes)
+            self._data_array_shape = [x[1].size for x in sweep_vars] + param_sizes
+            #
             if os.path.isfile(self._filepath):
                 self._hf = h5py.File(self._filepath, 'a', libver='latest')
                 self._hf.swmr_mode = True
@@ -39,12 +52,6 @@ class FileIOWriter:
                         for ind, cur_var in enumerate(sweepEx[cur_mVar]['vars']):
                             grp_cur_var.create_dataset(cur_var.Name, data=np.hstack([ind,sweepEx[cur_mVar]['var_vals'][:,ind]]))
                 #
-                random_dataset = next(iter(data_pkt['data'].values()))
-                if np.isscalar(random_dataset):
-                    param_sizes = (1,)
-                else:
-                    param_sizes = random_dataset.shape
-                #
                 for m, cur_param in enumerate(data_pkt['parameters']):
                     if 'parameter_values' in data_pkt and cur_param in data_pkt['parameter_values']:
                         assert data_pkt['parameter_values'][cur_param].size == param_sizes[m], f"The dataset parameter {cur_param} has {data_pkt['parameter_values'][cur_param].size} values, while the corresponding array index is of size {param_sizes[m]}."
@@ -59,13 +66,7 @@ class FileIOWriter:
                     grp_meas.create_dataset(cur_meas_ch, data=np.hstack([m]))
                     self._meas_chs += [cur_meas_ch]
 
-                if len(param_sizes) == 0:
-                    self._datapkt_size = 1
-                else:
-                    self._datapkt_size = np.prod(list(param_sizes))
-
-                data_array_shape = [x[1].size for x in sweep_vars] + list(param_sizes)
-                arr_size = int(np.prod(data_array_shape))
+                arr_size = int(np.prod(self._data_array_shape))
                 arr = np.zeros((arr_size, len(data_pkt['data'].keys())))
                 arr[:] = np.nan
                 self._dset = self._hf.create_dataset("data", data=arr, compression="gzip")
@@ -91,10 +92,36 @@ class FileIOWriter:
         self._dset_ind += 1
         self._dset.flush()
     
+    def query_data(self, slice_indices):
+        #Given as a LIST of arrays
+        assert len(slice_indices) <= len(self._data_array_shape), f"Number of slice indices {len(slice_indices)} must correspond to shape of stored array {len(self._data_array_shape)}"
+        #Pad out remaining indices as [:]...
+        if len(slice_indices) < len(self._data_array_shape):
+            slice_indices = list(slice_indices)
+            for m in range(len(slice_indices), len(self._data_array_shape)):
+                slice_indices += [np.arange(self._data_array_shape[m])]
+
+        #Doing this as ravel_multi_index is too primitive...
+        data_inds = np.array([])
+        for m in range(len(slice_indices)-1,-1,-1):
+            if m == len(slice_indices)-1:
+                fac = 1
+                data_inds = np.array(slice_indices[m])
+            else:
+                fac = np.prod(self._data_array_shape[m+1:])
+                data_inds = [fac*np.array(slice_indices[m])+x for x in data_inds]
+                data_inds = np.ndarray.flatten(np.array(data_inds))
+
+        #data_inds = np.ravel_multi_index(slice_indices, self._data_array_shape)
+        data_inds = np.sort(data_inds)
+        ret_data = self._dset[data_inds]    #Second index = #columns or #dep_params
+        return ret_data.reshape(tuple([np.array(x).size for x in slice_indices]+[ret_data.shape[1]]))
+
     def close(self):
         if self._hf:
             self._hf.close()
             self._hf = None
+            self._data_array_shape = None
 
     @staticmethod
     def write_file_direct(filepath, data_array, param_names, param_vals, dep_param_names, **kwargs):

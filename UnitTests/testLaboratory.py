@@ -869,9 +869,229 @@ class TestSweeps(unittest.TestCase):
         shutil.rmtree('test_save_dir')
         self.cleanup()
 
+class TestExpFeatures(unittest.TestCase):
+    def initialise(self):
+        self.lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir/')
+
+        self.lab.load_instrument('virACQ')
+        self.lab.load_instrument('virDDG')
+        self.lab.load_instrument('virAWG')
+        self.lab.load_instrument('virMWS')
+        self.lab.load_instrument('virMWS2')
+
+        #Initialise test-modules
+        hal_acq = ACQ("dum_acq", self.lab, 'virACQ')
+        hal_ddg = DDG("ddg", self.lab, 'virDDG', )
+        awg_wfm = WaveformAWG("Wfm1", self.lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9)
+        hal_mw = GENmwSource("MW-Src", self.lab, 'virMWS', 'CH1')
+        hal_mw2 = GENmwSource("MW-Src2", self.lab, 'virMWS2', 'CH1')
+
+        #Reinitialise the waveform
+        read_segs = []
+        read_segs2 = []
+        awg_wfm.clear_segments()
+        awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, 10e-9, 0.0))
+        for m in range(4):
+            awg_wfm.add_waveform_segment(WFS_Gaussian(f"init{m}", None, 20e-9, 0.5-0.1*m))
+            awg_wfm.add_waveform_segment(WFS_Constant(f"zero1{m}", None, 30e-9, 0.1*m))
+            awg_wfm.add_waveform_segment(WFS_Gaussian(f"init2{m}", None, 45e-9, 0.5-0.1*m))
+            awg_wfm.add_waveform_segment(WFS_Constant(f"zero2{m}", None, 77e-9*(m+1), 0.0))
+            read_segs += [f"init{m}"]
+            read_segs2 += [f"zero2{m}"]
+        awg_wfm.get_output_channel(0).marker(1).set_markers_to_segments(read_segs)
+        awg_wfm.get_output_channel(1).marker(0).set_markers_to_segments(read_segs2)
+        awg_wfm.AutoCompression = 'None'#'Basic'
+
+        expConfig = ExperimentConfiguration('testConf', self.lab, 1.0, ['ddg', 'Wfm1', 'MW-Src'], 'dum_acq')
+        expConfig = ExperimentConfiguration('testConf2', self.lab, 1.0, ['ddg', 'MW-Src'], 'dum_acq')
+
+        VariableInternal('myFreq', self.lab)
+        VariableProperty('testAmpl', self.lab, self.lab.HAL("Wfm1").get_waveform_segment('init0'), 'Amplitude')
+        self.lab.VAR('testAmpl').Value = 86
+        VariableProperty('test RepTime', self.lab, self.lab.HAL("ddg"), 'RepetitionTime')
+        self.lab.VAR('test RepTime').Value = 99
+        VariableInternal('myDura1', self.lab)
+        self.lab.VAR('myDura1').Value = 2016
+        VariableProperty('myDura2', self.lab, self.lab.HAL("Wfm1").get_waveform_segment('init2'), 'Duration')
+        VariableSpaced('testSpace', self.lab, 'myDura1', 'myDura2', 3.1415926)
+        self.lab.VAR('testSpace').Value = 2016
+
+        WFMT_ModulationIQ("IQmod", self.lab, 49e6)
+        self.lab.WFMT("IQmod").IQFrequency = 84e7
+        self.lab.WFMT("IQmod").IQAmplitude = 9.4
+        self.lab.WFMT("IQmod").IQAmplitudeFactor = 78.1
+        self.lab.WFMT("IQmod").IQPhaseOffset = 54.3
+        self.lab.WFMT("IQmod").IQdcOffset = (9,1)
+        self.lab.WFMT("IQmod").IQUpperSideband = False
+
+    def cleanup(self):
+        self.lab.release_all_instruments()
+        self.lab = None
+
+    def arr_equality(self, arr1, arr2):
+        if arr1.size != arr2.size:
+            return False
+        return np.sum(np.abs(arr1 - arr2)) < 1e-15
+
+    def test_RecParams(self):
+        self.initialise()
+        
+        #Check out recorded parameter storage
+        #
+        #Check basic parameter storage with VARs
+        exp = Experiment("test", self.lab.CONFIG('testConf'))
+        self.lab.VAR('myFreq').Value = 5
+        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1))], delay=1, rec_params=[self.lab.VAR('myFreq'), self.lab.VAR('testAmpl')])
+        assert hasattr(exp, 'last_rec_params'), "Running an experiment with rec_params did not create an attribute \'last_rec_params\'."
+        assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array().shape), np.array([3,2]))
+        assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array()), np.array([[5,0],[5,1],[5,2]]))
+        assert self.arr_equality(np.array(exp.last_rec_params.param_vals[0]), np.arange(0,3,1))
+        res.release()
+        #
+        #Check basic parameter storage with a WFMT
+        exp = Experiment("test", self.lab.CONFIG('testConf'))
+        self.lab.VAR('myFreq').Value = 5
+        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1))], delay=1, rec_params=[(self.lab.WFMT("IQmod"), 'IQFrequency'), self.lab.VAR('testAmpl')])
+        assert hasattr(exp, 'last_rec_params'), "Running an experiment with rec_params did not create an attribute \'last_rec_params\'."
+        assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array().shape), np.array([3,2]))
+        val = self.lab.WFMT("IQmod").IQFrequency
+        assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array()), np.array([[val,0],[val,1],[val,2]]))
+        assert self.arr_equality(np.array(exp.last_rec_params.param_vals[0]), np.arange(0,3,1))
+        res.release()
+        #
+        #Check basic parameter storage with a HAL and 2D sweep
+        exp = Experiment("test", self.lab.CONFIG('testConf'))
+        self.lab.VAR('myFreq').Value = 5
+        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1)), (self.lab.VAR('test RepTime'), np.linspace(9,12,4))], rec_params=[(self.lab.WFMT("IQmod"), 'IQFrequency'), (self.lab.HAL("MW-Src"), 'Power')])
+        assert hasattr(exp, 'last_rec_params'), "Running an experiment with rec_params did not create an attribute \'last_rec_params\'."
+        assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array().shape), np.array([3,4,2]))
+        val = self.lab.WFMT("IQmod").IQFrequency
+        val2 = self.lab.HAL("MW-Src").Power
+        assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array()), np.array([[[val,val2]]*4]*3))
+        assert self.arr_equality(np.array(exp.last_rec_params.param_vals[0]), np.arange(0,3,1))
+        assert self.arr_equality(np.array(exp.last_rec_params.param_vals[1]), np.linspace(9,12,4))
+        res.release()
+        #
+        #Check case when there are no sweeping points
+        time.sleep(1)   #Otherwise it writes to the same file as the previous test...
+        exp = Experiment("test", self.lab.CONFIG('testConf'))
+        self.lab.VAR('myFreq').Value = 5
+        res = self.lab.run_single(exp, rec_params=[(self.lab.WFMT("IQmod"), 'IQFrequency'), (self.lab.HAL("MW-Src"), 'Power'), (self.lab.HAL("Wfm1").get_waveform_segment('init0'), 'Duration')])
+        assert hasattr(exp, 'last_rec_params'), "Running an experiment with rec_params did not create an attribute \'last_rec_params\'."
+        assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array().shape), np.array([3]))
+        val = self.lab.WFMT("IQmod").IQFrequency
+        val2 = self.lab.HAL("MW-Src").Power
+        val3 = self.lab.HAL("Wfm1").get_waveform_segment('init0').Duration
+        assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array()), np.array([val,val2,val3]))
+        assert self.arr_equality(np.array(exp.last_rec_params.param_vals), np.array([]))
+        res.release()
+        exp = None
+
+        shutil.rmtree('test_save_dir')
+        self.cleanup()
+
+    class miniExp(Experiment):
+        def __init__(self, name, expt_config, testObj):
+            super().__init__(name, expt_config)
+            self.testObj = testObj
+            self._freq = 0
+            self._ampl = 20
+
+        def _mid_process(self):
+            cur_sweep_inds = self._retrieve_current_sweep_values()
+            assert cur_sweep_inds['myFreq'] == self._freq, "Error in retriving current sweeping values in mid-process"
+            assert cur_sweep_inds['testAmpl'] == self._ampl, "Error in retriving current sweeping values in mid-process"
+            self._ampl += 1
+            if self._has_completed_iteration('myFreq'):
+                self._freq += 1
+                self._ampl = 20
+                vals = self._query_current_array_iteration('data', 'myFreq')
+                assert self.testObj.arr_equality(np.array(vals.shape), np.array([10, 1, 1, 10, 2])), "FileIO query error during mid-process."
+
+    class miniExp2(Experiment):
+        def __init__(self, name, expt_config, testObj):
+            super().__init__(name, expt_config)
+            self.testObj = testObj
+
+        def _init_aux_datafiles(self):
+            self._init_data_file('auxilia')
+            self._cntr = 0
+
+        def _mid_process(self):
+            if self._has_completed_iteration('myFreq'):
+                vals = self._query_current_array_iteration('rec_params', 'myFreq')
+                assert self.testObj.arr_equality(vals, np.vstack([np.arange(20,30,1), [self._cntr]*10]).T), "FileIO query error during mid-process"
+                self._cntr += 1
+                averages = np.mean(vals,axis=0)
+                data_pkt = {
+                    'parameters' : [],
+                    'data' : { 'AverageA' : averages[0]+averages[1], 'AverageF' : averages[1]}
+                }
+                self._push_data_mid_iteration('auxilia', 'myFreq', data_pkt)
+
+    class miniExp3(Experiment):
+        def __init__(self, name, expt_config, testObj):
+            super().__init__(name, expt_config)
+            self.testObj = testObj
+
+        def _init_aux_datafiles(self):
+            self._init_data_file('auxilia')
+            self._cntr = 0
+
+        def _mid_process(self):
+            if self._has_completed_iteration('myFreq'):
+                vals = self._query_current_array_iteration('rec_params', 'myFreq')
+                assert self.testObj.arr_equality(vals, np.vstack([np.arange(20,30,1), [self._cntr % 10]*10]).T), "FileIO query error during mid-process"
+                self._cntr += 1
+                averages = np.mean(vals,axis=0)
+                data_pkt = {
+                    'parameters' : [],
+                    'data' : { 'AverageA' : (averages[0]+averages[1])*self.testObj.lab.VAR("myDura1").Value }
+                }
+                self._push_data_mid_iteration('auxilia', 'myFreq', data_pkt)
+
+    def test_MidProcess(self):
+        self.initialise()
+
+        exp = self.miniExp("test", self.lab.CONFIG('testConf2'), self)
+        res = self.lab.run_single(exp, [(self.lab.VAR("myFreq"), np.arange(0,10,1)), (self.lab.VAR("testAmpl"), np.arange(20,30,1))])
+
+        time.sleep(1)
+
+        exp = self.miniExp2("test", self.lab.CONFIG('testConf2'), self)
+        res = self.lab.run_single(exp, [(self.lab.VAR("myFreq"), np.arange(0,10,1)), (self.lab.VAR("testAmpl"), np.arange(20,30,1))], rec_params=[(self.lab.VAR("testAmpl"), 'Value'), (self.lab.VAR("myFreq"), 'Value')])
+        res = exp.retrieve_last_aux_dataset('auxilia')
+        assert len(res.param_names) == 1, "Error in recording data during mid-process."
+        assert res.param_names[0] == "myFreq", "Error in recording data during mid-process."
+        assert len(res.dep_params) == 2, "Error in recording data during mid-process."
+        assert res.dep_params[0] == 'AverageA', "Error in recording data during mid-process."
+        assert res.dep_params[1] == 'AverageF', "Error in recording data during mid-process."
+        arr = res.get_numpy_array()
+        assert self.arr_equality(arr[:,0], np.mean(np.arange(20,30,1))+np.arange(0,10,1)), "Error in recording data during mid-process."
+        assert self.arr_equality(arr[:,1], np.arange(10)), "Error in recording data during mid-process."
+
+        time.sleep(1)
+        
+        exp = self.miniExp3("test", self.lab.CONFIG('testConf2'), self)
+        res = self.lab.run_single(exp, [(self.lab.VAR("myDura1"), np.arange(0,1,0.2)), (self.lab.VAR("myFreq"), np.arange(0,10,1)), (self.lab.VAR("testAmpl"), np.arange(20,30,1))], rec_params=[(self.lab.VAR("testAmpl"), 'Value'), (self.lab.VAR("myFreq"), 'Value')])
+        res = exp.retrieve_last_aux_dataset('auxilia')
+        assert len(res.param_names) == 2, "Error in recording data during mid-process."
+        assert res.param_names[0] == "myDura1", "Error in recording data during mid-process."
+        assert res.param_names[1] == "myFreq", "Error in recording data during mid-process."
+        assert len(res.dep_params) == 1, "Error in recording data during mid-process."
+        assert res.dep_params[0] == 'AverageA', "Error in recording data during mid-process."
+        arr = res.get_numpy_array()
+        assert self.arr_equality(arr[:,:,0], np.array([(np.mean(np.arange(20,30,1))+np.arange(0,10,1))*x for x in np.arange(0,1,0.2)])), "Error in recording data during mid-process."
+        res.release()
+        exp = None
+
+        shutil.rmtree('test_save_dir')
+        self.cleanup()
+
+
 if __name__ == '__main__':
     # temp = TestColdReload()
     # temp.test_LabAndExpConfigs() #test_SPECs()
-    temp = TestSweeps()
-    temp.test_Exp()
+    temp = TestExpFeatures()
+    temp.test_MidProcess()
     unittest.main()

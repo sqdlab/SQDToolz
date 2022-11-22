@@ -18,6 +18,8 @@ from sqdtoolz.HAL.Processors.CPU.CPU_DDC import*
 from sqdtoolz.HAL.Processors.CPU.CPU_FIR import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Mean import*
 
+from pathlib import Path
+
 import numpy as np
 import shutil
 import os.path
@@ -205,7 +207,49 @@ class TestExpFileIO(unittest.TestCase):
         tempRdr = None
         os.remove('testFile.h5')
 
+    def test_DataResizing(self):
+        self.initialise()
+        VariableInternal('test_var', self.lab, 0)
+
+        wrtr = FileIOWriter('test_save_dir/test.h5', store_timestamps=False)    
+        for m in range(1,10):
+            sweep_arr = [(self.lab.VAR('test_var'), np.arange(m)), (self.lab.VAR("myFreq"), np.arange(3))]
+            data_pkt = self.lab.HAL("dum_acq").get_data()
+            for n in range(3):
+                wrtr.push_datapkt(data_pkt, sweep_arr)
+        wrtr.close()
+        wrtr = None
+        #
+        leData = FileIOReader('test_save_dir/test.h5')
+        arr = leData.get_numpy_array()
+        assert arr.shape[0] == 9, "Something went wrong in the resizing?"
+        assert self.arr_equality(leData.param_vals[0], np.arange(9)), "The parameter array did not write properly on resizing..."
+        leData.release()
+        leData = None
+
+        wrtr = FileIOWriter('test_save_dir/test2.h5', store_timestamps=True)    
+        for m in range(1,10):
+            sweep_arr = [(self.lab.VAR('test_var'), np.arange(m)), (self.lab.VAR("myFreq"), np.arange(3))]
+            data_pkt = self.lab.HAL("dum_acq").get_data()
+            for n in range(3):
+                wrtr.push_datapkt(data_pkt, sweep_arr)
+        wrtr.close()
+        wrtr = None
+        #
+        leData = FileIOReader('test_save_dir/test2.h5')
+        arr = leData.get_numpy_array()
+        assert arr.shape[0] == 9, "Something went wrong in the resizing?"
+        assert self.arr_equality(leData.param_vals[0], np.arange(9)), "The parameter array did not write properly on resizing..."
+        arrTS = leData.get_time_stamps()
+        assert arrTS.shape[0] == 9, "Something went wrong in the resizing time-stamps?"
+        leData.release()
+        leData = None
+
+
+        self.cleanup()
+
+
 if __name__ == '__main__':
     temp = TestExpFileIO()
-    temp.test_ManyOneSampling()
+    temp.test_DataResizing()
     unittest.main()

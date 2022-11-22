@@ -18,21 +18,27 @@ class FileIOWriter:
         self._data_array_shape = None
         self.store_timestamps = kwargs.get('store_timestamps', True)
 
+    def _get_dataset_sizes(self, sweep_vars, data_pkt):
+        random_dataset = next(iter(data_pkt['data'].values()))
+        if np.isscalar(random_dataset) or random_dataset.size == 1:
+            param_sizes = []
+        else:
+            param_sizes = list(random_dataset.shape)
+        #
+        if len(param_sizes) == 0:
+            data_pkt_size = 1
+        else:
+            data_pkt_size = np.prod(param_sizes)
+        data_array_shape = [x[1].size for x in sweep_vars] + param_sizes
+        if len(param_sizes) == 0:
+            param_sizes = [1]
+        
+        return data_pkt_size, param_sizes, data_array_shape
+
+
     def _init_hdf5(self, sweep_vars, data_pkt, sweepEx = {}):
         if self._hf == None:
-            random_dataset = next(iter(data_pkt['data'].values()))
-            if np.isscalar(random_dataset) or random_dataset.size == 1:
-                param_sizes = []
-            else:
-                param_sizes = list(random_dataset.shape)
-            #
-            if len(param_sizes) == 0:
-                self._datapkt_size = 1
-            else:
-                self._datapkt_size = np.prod(param_sizes)
-            self._data_array_shape = [x[1].size for x in sweep_vars] + param_sizes
-            if len(param_sizes) == 0:
-                param_sizes = [1]
+            self._datapkt_size, param_sizes, self._data_array_shape = self._get_dataset_sizes(sweep_vars, data_pkt)
             #
             if os.path.isfile(self._filepath):
                 self._hf = h5py.File(self._filepath, 'a', libver='latest')
@@ -44,7 +50,7 @@ class FileIOWriter:
                 grp_params = self._hf.create_group('parameters')
                 #Assumes uniformity - TODO: Look into padding with NaNs if the inner data packets change in shape (e.g. different repetitions etc...)
                 for m, cur_param in enumerate(sweep_vars):
-                    grp_params.create_dataset(cur_param[0].Name, data=np.hstack([m,cur_param[1]]))
+                    grp_params.create_dataset(cur_param[0].Name, data=np.hstack([m,cur_param[1]]), maxshape=(None,), chunks=True)
                 offset = len(sweep_vars)
                 #
                 if len(sweepEx) > 0:
@@ -52,7 +58,7 @@ class FileIOWriter:
                     for cur_mVar in sweepEx:
                         grp_cur_var = grp_paramEx.create_group(cur_mVar)
                         for ind, cur_var in enumerate(sweepEx[cur_mVar]['vars']):
-                            grp_cur_var.create_dataset(cur_var.Name, data=np.hstack([ind,sweepEx[cur_mVar]['var_vals'][:,ind]]))
+                            grp_cur_var.create_dataset(cur_var.Name, data=np.hstack([ind,sweepEx[cur_mVar]['var_vals'][:,ind]]), maxshape=(None,))
                 #
                 for m, cur_param in enumerate(data_pkt['parameters']):
                     if 'parameter_values' in data_pkt and cur_param in data_pkt['parameter_values']:
@@ -65,24 +71,48 @@ class FileIOWriter:
                 grp_meas = self._hf.create_group('measurements')
                 self._meas_chs = []
                 for m, cur_meas_ch in enumerate(data_pkt['data'].keys()):
-                    grp_meas.create_dataset(cur_meas_ch, data=np.hstack([m]))
+                    grp_meas.create_dataset(cur_meas_ch, data=np.hstack([m]), maxshape=(None,))
                     self._meas_chs += [cur_meas_ch]
 
                 arr_size = int(np.prod(self._data_array_shape))
-                arr = np.zeros((arr_size, len(data_pkt['data'].keys())))
+                self._num_cols = len(data_pkt['data'].keys())
+                arr = np.zeros((arr_size, self._num_cols))
                 arr[:] = np.nan
-                self._dset = self._hf.create_dataset("data", data=arr, compression="gzip")
+                #TODO: Change this if allowing resizing on other sweeping axes...
+                max_shape = list(arr.shape)
+                max_shape[0] = None
+                self._dset = self._hf.create_dataset("data", data=arr, compression="gzip", maxshape=max_shape)
                 self._dset_ind = 0
                 #Time-stamps (usually length 27 bytes)
                 if self.store_timestamps:
                     self._ts_len = len( np.datetime_as_string(np.datetime64(datetime.now()),timezone='UTC').encode('utf-8') )
                     arr = np.array([np.datetime64()]*arr_size, dtype=f'S{self._ts_len}')
-                    self._dsetTS = self._hf.create_dataset("timeStamps", data=arr, compression="gzip")
+                    #TODO: Change this if allowing resizing on other sweeping axes...
+                    max_shape = list(arr.shape)
+                    max_shape[0] = None
+                    self._dsetTS = self._hf.create_dataset("timeStamps", data=arr, compression="gzip", maxshape=max_shape)
                 
                 self._hf.swmr_mode = True
 
     def push_datapkt(self, data_pkt, sweep_vars, sweepEx = {}):
         self._init_hdf5(sweep_vars, data_pkt, sweepEx)
+
+        cur_shape = self._dset.shape
+        leSize, params, leShape = self._get_dataset_sizes(sweep_vars, data_pkt)
+        proposed_arr_size = int(np.prod(leShape))
+        if proposed_arr_size > cur_shape[0]:
+            assert len(sweepEx) == 0, "Many-one sweeps are not supported with array resizing at the moment."
+            if len(sweep_vars) > 1:
+                for m, cur_sweep_var in enumerate(sweep_vars[1:]):
+                    assert cur_sweep_var[1].size == self._data_array_shape[m+1], "Array resizing is only supported for the left-most sweeping variable for now."
+            self._dset.resize( (proposed_arr_size, self._num_cols) )
+            #
+            self._hf['parameters'][sweep_vars[0][0].Name].resize((sweep_vars[0][1].size+1,))
+            self._hf['parameters'][sweep_vars[0][0].Name][1:] = sweep_vars[0][1]    #TODO: Can optimise by not writing previous values here?
+            #
+            if self.store_timestamps:
+                ts_shape = self._dsetTS.shape
+                self._dsetTS.resize((proposed_arr_size,))
 
         cur_data = np.vstack([data_pkt['data'][x].flatten() for x in self._meas_chs]).T
         self._dset[self._dset_ind*self._datapkt_size : (self._dset_ind+1)*self._datapkt_size] = cur_data

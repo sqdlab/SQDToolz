@@ -248,8 +248,43 @@ class TestExpFileIO(unittest.TestCase):
 
         self.cleanup()
 
+    def test_Datalogger(self):
+        self.initialise()
+
+        VariableInternal('test_var1', self.lab, 0)
+        VariableInternal('test_var2', self.lab, 0)
+
+        test_arr = np.array([[0, 5], [12, 17], [15, -7], [27, -100]])
+        dataLog = FileIODatalogger('test_save_dir/test.h5', [self.lab.VAR('test_var1'), self.lab.VAR('test_var2')], 'Iterations')
+        for m in range(test_arr.shape[0]):
+            self.lab.VAR('test_var1').Value, self.lab.VAR('test_var2').Value = test_arr[m]
+            dataLog.push_data()
+        dataLog.close()
+        leData = FileIOReader('test_save_dir/test.h5')
+        arr = leData.get_numpy_array()
+        assert leData.param_names == ['Iterations'], "Data logging failed to store correct sweeping parameter name."
+        assert leData.dep_params == ['test_var1', 'test_var2'], "Data logging failed to store correct dependent parameter names."
+        assert self.arr_equality(arr, test_arr), "Data logging failed to store correct values."
+        leData.release()
+        leData = None
+
+        test_arr = np.array([[0], [12], [15], [29], [42]])
+        dataLog = FileIODatalogger('test_save_dir/test2.h5', [self.lab.VAR('test_var1')], 'Iterations')
+        for m in range(test_arr.shape[0]):
+            self.lab.VAR('test_var1').Value = test_arr[m]
+            dataLog.push_data()
+        dataLog.close()
+        leData = FileIOReader('test_save_dir/test2.h5')
+        arr = leData.get_numpy_array()
+        assert leData.param_names == ['Iterations'], "Data logging failed to store correct sweeping parameter name."
+        assert leData.dep_params == ['test_var1'], "Data logging failed to store correct dependent parameter names."
+        assert self.arr_equality(arr, test_arr), "Data logging failed to store correct values."
+        leData.release()
+        leData = None
+    
+        self.cleanup()
 
 if __name__ == '__main__':
     temp = TestExpFileIO()
-    temp.test_DataResizing()
+    temp.test_Datalogger()
     unittest.main()

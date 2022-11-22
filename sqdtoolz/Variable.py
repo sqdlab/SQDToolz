@@ -189,6 +189,32 @@ class VariableProperty(VariableBase):
     def _get_written_objs(self):
         return [(self._obj_res_list, self._prop)]
 
+class VariableInternalTransient:
+    def __init__(self, name, init_val = 0):
+        self._name = name
+        self._val = init_val
+
+    @property
+    def Name(self):
+        return self._name
+
+    @property
+    def Value(self):
+        return self.get_raw()
+    @Value.setter
+    def Value(self, val):
+        self.set_raw(val)
+
+    def get_raw(self):
+        return self._val
+
+    def set_raw(self, value):
+        self._val = value
+
+    def _get_written_objs(self):
+        print("How did this even get called?")
+        return []   #Shouldn't actually get called?
+
 class VariablePropertyTransient:
     def __init__(self, name, sqdtoolz_obj, prop_name):
         self._name = name

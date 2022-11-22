@@ -11,6 +11,9 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import matplotlib.collections
 from numpy.core.fromnumeric import argsort
+
+from sqdtoolz.Variable import VariableBase, VariableInternalTransient
+
 class FileIOWriter:
     def __init__(self, filepath, **kwargs):
         self._filepath = filepath
@@ -184,6 +187,29 @@ class FileIOWriter:
         arr_size = int(np.prod(data_array.shape)/data_array.shape[-1])
         hf.create_dataset("data", data=data_array.reshape((arr_size, len(dep_param_names))), compression="gzip")
         hf.close()
+
+class FileIODatalogger:
+    def __init__(self, filepath, vars, iter_name='Iterations'):
+        self._filewriter = FileIOWriter(filepath, store_timestamps=True)
+
+        assert isinstance(vars, list), "Argument vars must be a list of VAR objects."
+        for cur_var in vars:
+            assert isinstance(cur_var, VariableBase), "Argument vars must be a list of VAR objects."        
+        self._vars = vars[:]
+        self._iter_var = VariableInternalTransient(iter_name, 1)
+
+    def push_data(self):
+        data_pkt = {
+                'parameters' : [],
+                'data' : { f'{cur_var.Name}' : np.array([cur_var.Value]) for cur_var in self._vars }
+            }
+        self._filewriter.push_datapkt(data_pkt, [(self._iter_var, np.arange(self._iter_var.Value))])
+        self._iter_var.Value += 1
+
+    def close(self):
+        if self._filewriter != None:
+            self._filewriter.close()
+        self._filewriter = None
 
 class FileIOReader:
     def __init__(self, filepath):

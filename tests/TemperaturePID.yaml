@@ -1,0 +1,11 @@
+instruments:
+  PerfectPrimeThermometer:
+    driver: sqdtoolz.Drivers.THERM_TC0309
+    type: THERM_TC0309
+    address: 'COM5'
+    enable_forced_reconnect: true
+  dc_supply:
+    driver: sqdtoolz.Drivers.SMU_TENMA_72_2710
+    type: SMU_TENMA_72_2710
+    address: 'COM4'
+    enable_forced_reconnect: true

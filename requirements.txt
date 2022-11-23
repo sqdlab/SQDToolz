@@ -88,6 +88,7 @@ Pygments                == 2.10.0
 pyOpenSSL               == 21.0.0
 pyparsing               == 2.4.7
 Pyro4                   == 4.81
+pyserial                == 3.5
 pyrsistent              == 0.18.0
 PySocks                 == 1.7.1
 python-dateutil         == 2.8.2

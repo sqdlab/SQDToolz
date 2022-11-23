@@ -136,7 +136,7 @@ class ExperimentConfiguration:
         self._init_config = cur_config
         return cur_config
 
-    def update_config(self, conf, commit_changes_to_HALsPROCs=True):
+    def update_config(self, conf, commit_changes_to_HALsPROCs=True, **kwargs):
         #TODO: Check if these checks here are probably overkill and possibly obsolete?
         for cur_dict in conf['HALs']:
             found_hal = False
@@ -149,6 +149,8 @@ class ExperimentConfiguration:
                 if cur_hal.Name == cur_dict['Name']:
                     found_hal = True
                     if commit_changes_to_HALsPROCs:
+                        for cur_key in kwargs:
+                            cur_dict[cur_key] = kwargs[cur_key]
                         cur_hal._set_current_config(cur_dict, self._lab)
                     break
             assert found_hal, f"HAL object {cur_dict['Name']} does not exist in the current ExperimentConfiguration object."
@@ -234,7 +236,7 @@ class ExperimentConfiguration:
             ret_trans_vars += [ VariablePropertyTransient(var_name, awg_hal.get_waveform_segment(segment_name), property_name) ]
         return ret_trans_vars
 
-    def init_instruments(self):
+    def init_instruments(self, **kwargs):
         cur_spec_targets = []
         #Get all parameters all ExperimentSpecifications will set
         for cur_spec in self._list_spec_names:
@@ -247,7 +249,7 @@ class ExperimentConfiguration:
             cur_obj._property_lock(cur_target[1])
 
         #Setup HALs and PROCs...
-        self.update_config(self._init_config)
+        self.update_config(self._init_config, **kwargs)
 
         #Unlock properties that are to be set by SPEC
         for cur_target in cur_spec_targets:

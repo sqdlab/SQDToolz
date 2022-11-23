@@ -71,7 +71,6 @@ class Experiment:
         kill_signal = kwargs.get('kill_signal')
         ping_iteration(reset=True)
         disable_progress_bar = kwargs.get('disable_progress_bar', False)
-        callback_iteration = kwargs.get('callback_iteration', None)
 
         self._data_file_index = kwargs.get('data_file_index', -1)
         self._store_timestamps = kwargs.get('store_timestamps', True)
@@ -86,7 +85,7 @@ class Experiment:
         self._init_aux_datafiles()
 
         if not kwargs.get('skip_init_instruments', False):
-            self._expt_config.init_instruments()
+            self._expt_config.init_instruments(data_file_path=file_path, data_file_index=self._data_file_index)
 
         waveform_updates = kwargs.get('update_waveforms', None)
         if waveform_updates != None:
@@ -166,8 +165,6 @@ class Experiment:
                     self._mid_process()
                     if not disable_progress_bar:
                         ping_iteration((ind_coord+1)/self._sweep_grids.shape[0])
-                    if callback_iteration != None:
-                        callback_iteration()
 
         #Close all data files
         for cur_file in self._cur_filewriters:

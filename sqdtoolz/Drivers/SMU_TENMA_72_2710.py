@@ -18,7 +18,7 @@ class SMU_TENMA_72_2710(Instrument):
         idn_str = self.query('*IDN?')
         assert idn_str[:5] == self.expectedMfr and idn_str[6:13] == self.expectedModel, "Could not verify model " + self.description
 
-        self.write('LOCK1')
+        # self.write('LOCK1')
 
         self.add_parameter(name = 'voltage',
                            label = 'Set Voltage',

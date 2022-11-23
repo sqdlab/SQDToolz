@@ -22,7 +22,7 @@ dc_supply.Output = True
 
 stz.ExperimentConfiguration('test', lab, 1, [], None)
 
-stz.VariableInternal('tempSetPt', lab, 100)
+stz.VariableInternal('tempSetPt', lab, 200)
 stz.VariableProperty('voltOut', lab, lab.HAL('DC_SUPPLY'), 'Voltage')
 stz.VariableProperty('tempMeas', lab, lab.HAL('therm'), 'Temperature')
 
@@ -33,5 +33,7 @@ expt = stz.Experiment('test', lab.CONFIG('test'))
 exptPID = ExpPID(expt, lab.VAR('tempSetPt'), lab.VAR('tempMeas'), lab.VAR('voltOut'), 0.2, 0.005, 0.1, output_min=0, output_max=10)
 lab.run_single(exptPID, [(lab.VAR('dummy'), np.arange(500))], rec_params=[(lab.HAL('therm'), 'Temperature'), (lab.HAL('DC_SUPPLY'), 'Voltage')], delay=1)
 # lab.run_single(exptPID, [(lab.VAR('dummy'), np.arange(200))], delay=1)
+
+dc_supply.Voltage = 0
 
 a=0

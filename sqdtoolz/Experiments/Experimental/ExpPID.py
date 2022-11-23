@@ -31,8 +31,10 @@ class ExpPID(Experiment):
         self._filt_deriv_cutoff = kwargs.get('filt_deriv_cutoff', 0.1)
         self._filt_deriv_taps = kwargs.get('filt_deriv_taps', 50)
 
-    def _run_PID(self):        
-        err = self._VAR_setpt.Value - self._VAR_Measure.Value
+    def _run_PID(self):
+        cur_value = self._VAR_Measure.Value
+        err = self._VAR_setpt.Value - cur_value
+        self._tempsMeas += [cur_value]
 
         #Calculate Integral
         dt = time.time() - self.last_time
@@ -42,7 +44,7 @@ class ExpPID(Experiment):
         self._VAR_integral.Value = self._integral
 
         #Calculate Derivative
-        if len(self._tempsMeas) == 0:
+        if len(self._tempsMeas) <= 1:
             deriv = 0
         else:
             cutoff = self._filt_deriv_cutoff

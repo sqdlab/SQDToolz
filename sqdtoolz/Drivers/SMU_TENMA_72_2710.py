@@ -166,5 +166,7 @@ class SMU_TENMA_72_2710(Instrument):
 
         return output, cv
         
+    def get_idn(self):
+        return {'vendor': 'Tenma', 'model': '72-2710', 'serial': None, 'firmware': None}
 
         

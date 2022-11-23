@@ -65,5 +65,8 @@ class THERM_TC0309(Instrument):
         self.last_refresh_time = datetime.datetime.now()
         self.data = data
 
+    def get_idn(self):
+        return {'vendor': 'Perfect Prime', 'model': 'TC0309', 'serial': None, 'firmware': None}
+
 # drv = THERM_TC0309('test', 'COM4')
 # drv.refresh_stats()

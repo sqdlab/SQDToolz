@@ -22,7 +22,7 @@ class SMU_TENMA_72_2710(Instrument):
 
         self.add_parameter(name = 'voltage',
                            label = 'Set Voltage',
-                           get_cmd = lambda: float(self.query('VSET1?')),
+                           get_cmd = lambda: self._try_get_voltage(),
                            set_cmd = lambda x: self.write(f'VSET1:{x:2.2f}'),
                            vals = vals.Numbers(0, 30),
                            inter_delay = 0.05,
@@ -32,7 +32,7 @@ class SMU_TENMA_72_2710(Instrument):
                            label = 'Set Current',
                            get_cmd = lambda: float(self.query('ISET1?')),
                            set_cmd = lambda x: self.write(f'ISET1:{x:2.2f}'),
-                           vals = vals.Numbers(0, 3),
+                           vals = vals.Numbers(0, 5.1),
                            inter_delay = 0.05,
                            step = 0.01)
 
@@ -54,7 +54,7 @@ class SMU_TENMA_72_2710(Instrument):
                            label = 'Overcurrent protection',
                            set_cmd = lambda x: self.write(f'OCP{x}'),
                            val_mapping={True:  1, False : 0})
-        self.ocp(True)
+        self.ocp(False)
 
     @property
     def Voltage(self):
@@ -62,6 +62,16 @@ class SMU_TENMA_72_2710(Instrument):
     @Voltage.setter
     def Voltage(self, val):
         self.voltage.set(val)
+
+    def _try_get_voltage(self):
+        num_tries = 1000
+        while(num_tries > 0):
+            num_tries -= 1
+            try:
+                return float(self.query('VSET1?'))
+            except:
+                continue
+        assert False, "Error getting voltage on Tenma PSU..."
 
     @property
     def Current(self):

@@ -194,7 +194,7 @@ class FileIODatalogger:
 
         assert isinstance(vars, list), "Argument vars must be a list of VAR objects."
         for cur_var in vars:
-            assert isinstance(cur_var, VariableBase), "Argument vars must be a list of VAR objects."        
+            assert isinstance(cur_var, VariableBase) or isinstance(cur_var, VariableInternalTransient), "Argument vars must be a list of VAR objects."        
         self._vars = vars[:]
         self._iter_var = VariableInternalTransient(iter_name, 1)
 

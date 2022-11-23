@@ -4,11 +4,10 @@ import numpy as np
 
 class ExpResistanceIVs(Experiment):
     def __init__(self, name, expt_config, VAR_volt_set, volt_array, VAR_volt_sense, VAR_current, **kwargs):
-        #NOTE: Only provide dummy sweeping variables. Do not provide dummy counter or voltage sweeping - just
-        #run it. Anything provided will be prepended as further outer loops to the already present dummy and voltage
-        #sweeps. Also, rec_params will already record sense voltage and current. So only add in additional ones (e.g.
-        #temperature as required).
-        #Also VAR_volt_sense can be same as VAR_volt_set - doesn't really matter...
+        #NOTE: Do not provide voltage sweeping variable; just have other variables (e.g. a dummy variable. Anything
+        #provided will be prepended as further outer loops to the already present dummy and voltage sweeps. Also,
+        #rec_params will already record sense voltage and current. So only add in additional ones (e.g. temperature
+        #as required). Also VAR_volt_sense can be same as VAR_volt_set - doesn't really matter...
         super().__init__(name, expt_config)
 
         self._VAR_volt_set = VAR_volt_set

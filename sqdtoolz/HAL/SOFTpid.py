@@ -97,15 +97,14 @@ class SOFTpid(HALbase):
     def _get_current_config(self):
         ret_dict = {
             'Name' : self.Name,
-            'instrument' : self._instr_id,
             'Type' : self.__class__.__name__
             }
         self.pack_properties_to_dict(['SetPoint', 'Kp', 'Ki', 'Kd', 'OutputMin', 'OutputMax', 'FilterDerivCutoff', 'FilterDerivTaps'], ret_dict)
         return ret_dict
 
     def _set_current_config(self, dict_config, lab):
-        assert dict_config['Type'] == self.__class__.__name__, 'Cannot set configuration to a Switch with a configuration that is of type ' + dict_config['Type']
-        self.SetPoint = dict_config['SetPoint']
+        assert dict_config['Type'] == self.__class__.__name__, 'Cannot set configuration to a SoPID with a configuration that is of type ' + dict_config['Type']
+        # self.SetPoint = dict_config['SetPoint']
         self.Kp = dict_config['Kp']
         self.Ki = dict_config['Ki']
         self.Kd = dict_config['Kd']
@@ -120,9 +119,9 @@ class SOFTpid(HALbase):
             if data_file_index >= 0:
                 data_file_name = f'PID{self.Name}{data_file_index}.h5'
             else:
-                data_file_name = 'PID{self.Name}.h5'
+                data_file_name = f'PID{self.Name}.h5'
             self._data_file_name = dict_config['data_file_path'] + data_file_name
-            self._data_file = FileIODatalogger(self._data_file_name, [self._VAR_setpt, self._VAR_Measure, self._VAR_OutputSet, self._VAR_Kp, self._VAR_Ki, self._VAR_Kd, self._VAR_integral, self._VAR_deriv])
+            self._data_file = FileIODatalogger(self._data_file_name, [self._VAR_setpoint, self._VAR_Measure, self._VAR_OutputSet, self._VAR_Kp, self._VAR_Ki, self._VAR_Kd, self._VAR_integral, self._VAR_deriv])
             self._integral = 0
             self._tempsMeas = []
             self.last_time = time.time()

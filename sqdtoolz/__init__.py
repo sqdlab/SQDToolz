@@ -16,6 +16,7 @@ from sqdtoolz.HAL.GENvoltSource import GENvoltSource
 from sqdtoolz.HAL.GENatten import GENatten
 from sqdtoolz.HAL.GENswitch import GENswitch
 from sqdtoolz.HAL.GENtherm import GENtherm
+from sqdtoolz.HAL.SOFTpid import SOFTpid
 from sqdtoolz.HAL.ACQvna import ACQvna
 from sqdtoolz.HAL.GENsmu import GENsmu
 from sqdtoolz.HAL.WaveformSegments import*

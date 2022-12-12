@@ -119,3 +119,9 @@ class GENsmu(HALbase):
         self.ComplianceCurrent = dict_config['ComplianceCurrent']
         self.Output = dict_config['Output']
         self.ManualActivation = dict_config.get('ManualActivation', False)
+
+    def activate(self):
+        self.Output = True
+    
+    def deactivate(self):
+        self.Output = False

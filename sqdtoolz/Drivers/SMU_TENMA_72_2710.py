@@ -116,6 +116,10 @@ class SMU_TENMA_72_2710(Instrument):
             return 'SrcV_MeasI'
         else:
             return 'SrcI_MeasV'
+    @Mode.setter
+    def Mode(self, val):
+        pass    #Cannot set the mode on this one...
+    
     
     @property
     def RampRateVoltage(self):
@@ -152,6 +156,9 @@ class SMU_TENMA_72_2710(Instrument):
     @property
     def ProbeType(self):
         return 'TwoWire'
+    @ProbeType.setter
+    def ProbeType(self, val):
+        pass    #Can't set this one...
     
     def write(self, cmd):
         self.ser.write(bytes(cmd,encoding='utf-8'))

@@ -98,12 +98,13 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
 
     def _get_voltage(self):
         res = self.src_meas()
-        if self.Mode == 'SrcV_MeasI':
-            assert res[1:5] == 'SDCV', "COM Error when reading source-measure"
+        #Just infer the mode instead of querying Mode - it's faster as the F0/F1 call takes 64ms in itself...
+        if res[1:5] == 'SDCV':
             return float(res.split(',')[0][5:])
-        else:
-            assert res.split(',')[1][1:5] == 'MDCV', "COM Error when reading source-measure"
+        elif res.split(',')[1][1:5] == 'MDCV':
             return float(res.split(',')[1][5:])
+        else:
+            assert False, "COM Error when reading source-measure"
     def _set_voltage(self, val):
         #Use auto-range and zero delay by default...
         self.write(f'B{val},0,0')
@@ -118,12 +119,13 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
 
     def _get_current(self):
         res = self.src_meas()
-        if self.Mode == 'SrcI_MeasV':
-            assert res[1:5] == 'SDCI', "COM Error when reading source-measure"
+        #Just infer the mode instead of querying Mode - it's faster as the F0/F1 call takes 64ms in itself...
+        if res[1:5] == 'SDCI':
             return float(res.split(',')[0][5:])
-        else:
-            assert res.split(',')[1][1:5] == 'MDCI', "COM Error when reading source-measure"
+        elif res.split(',')[1][1:5] == 'MDCI':
             return float(res.split(',')[1][5:])
+        else:
+            assert False, "COM Error when reading source-measure"
     def _set_current(self, val):
         #Use auto-range and zero delay by default...
         self.write(f'B{val},0,0')

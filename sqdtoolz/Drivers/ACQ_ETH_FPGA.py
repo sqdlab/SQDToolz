@@ -25,12 +25,10 @@ class ETHFPGA(Instrument):
             if self._remote_name not in self._proxy.get_instrument_names():
                 raise ValueError('Instrument {} not recognized by server.'.format(self._remote_name))
         assert self._proxy != None, "The FPGA card was not properly initialised with the Pyro Server."
-
-        self._set_app(app_name)
         
         self.add_parameter('mem_hold', label='Memory Hold', 
                            get_cmd=lambda : self._get('mem_hold'), vals=valids.Bool(),
-                           set_cmd=lambda x : self._set('mem_hold', x), initial_value=True)        
+                           set_cmd=lambda x : self._set('mem_hold', x), initial_value=False)        
         #!!!!!ONLY UserPin1 and UserPin4 are available in TVModeV02 !!!!!
         #TODO: Tie the trigger port selection to this internally via the HAL later...
         self.add_parameter('trigger_src_shot', label='Individual segment trigger', 
@@ -112,6 +110,7 @@ class ETHFPGA(Instrument):
                            get_cmd=lambda : self._get('tv_two_channel_mode'), vals=valids.Bool(),
                            set_cmd=lambda x : self._set('tv_two_channel_mode', x), initial_value=False)
 
+        self._set_app(app_name)
 
         ''' program a chebychev low-pass filter with a given bandwidth and gain '''
         bandwidth=0.1
@@ -147,7 +146,7 @@ class ETHFPGA(Instrument):
 
     def _set_app(self, appname):
         result = self._proxy.set_app(self._remote_name, appname)
-        if appname == 'TVMODEV2':
+        if appname == 'TVMODEV02':
             self._call('set_app', 'TVMODEV02')
 
             self._set('mem_hold', False),

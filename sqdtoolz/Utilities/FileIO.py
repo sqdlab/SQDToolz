@@ -124,6 +124,7 @@ class FileIOWriter:
             cur_times = [np.datetime64(datetime.now())] * cur_data.shape[0]
             utc_strs = np.array( [np.datetime_as_string(n,timezone='UTC').encode('utf-8') for n in cur_times] )
             self._dsetTS[self._dset_ind*self._datapkt_size : (self._dset_ind+1)*self._datapkt_size] = utc_strs
+            self._dsetTS.flush()
         self._dset_ind += 1
         self._dset.flush()
     

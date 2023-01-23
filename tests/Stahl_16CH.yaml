@@ -1,0 +1,5 @@
+instruments:
+  stahl_volt:
+    driver: sqdtoolz.Drivers.VOLT_Stahl_16CH
+    type: VOLT_Stahl_16CH
+    address: 'ASRL3'

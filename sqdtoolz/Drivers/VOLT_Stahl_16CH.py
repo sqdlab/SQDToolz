@@ -65,7 +65,7 @@ class StahlChannel(InstrumentChannel):
 
         self.add_parameter(
             "voltage",
-            get_cmd=f"{self.parent.identifier} U{self._channel_string}",
+            get_cmd=f"{self.parent.identifier} GET{self._channel_string}",
             get_parser=chain(
                 #re.compile(r"^([+\-]\d+,\d+) V$").findall,
                 lambda x: x.replace('V', ''),

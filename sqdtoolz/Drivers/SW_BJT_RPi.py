@@ -21,7 +21,7 @@ class SW_BJT_RPi(Instrument):
         except :
             assert False, f"Unable to connect to RPi at {address}"
 
-        self._stdin, self._stdout, self._stderr = self._ssh.exec_command("python3 RPi_gpio_interface.py\n")
+        self._stdin, self._stdout, self._stderr = self._ssh.exec_command("python3 SQDdevRPi/scripts/RPi_gpio_interface.py\n")
         res = self.read_line(self._stdout)
 
         # Generate String for setting up pins
@@ -75,6 +75,7 @@ class SW_BJT_RPi(Instrument):
         Wrapper method to handle setting of state
         @param state <String> : Switch position e.g. "P1"
         """
+        assert state in self._state_map, f"State {state} is non-existent on this switch! Check configuration and/or the state itself..."
         # RESET SWITCH
         #self._set_gpio(self._state_map[self._current_state], False) # Turn off current state GPIO
         self._set_gpio(self._state_map["P0"], True) # Trigger reset

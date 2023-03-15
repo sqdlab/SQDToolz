@@ -167,6 +167,8 @@ class SW_RPiRadial(VisaInstrument):
 
         submodule.set('route', init_pos)
 
+        print("THE SW_RPiCryo DRIVER IS DEPRECATED - USE SW_BJT_RPi DRIVER INSTEAD.")
+
         self.connect_message()
 
     @property

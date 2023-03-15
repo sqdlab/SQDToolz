@@ -1,17 +1,22 @@
 from sqdtoolz.Drivers.SW_BJT_RPi import SW_BJT_RPi
 
 
-switch = SW_BJT_RPi("switch", "192.168.0.115", "pi", "Experiment", pins = {"P0" : 19, "P1" : 16, "P2" : 26, "P4" : 20, "P5" : 21})
+switch = SW_BJT_RPi("switch", "TCPIP::192.168.1.6::4000::SOCKET", pins = {"P0" : 10, "P1" : 3, "P2" : 5, "P3" : 7, "P4" : 11})
 switch.Position = "P0"
 print("")
 switch.Position = "P1"
-switch.Position = "P5"
+switch.Position = "P2"
+switch.Position = "P3"
+switch.Position = "P4"
+switch.Position = "P0"
 switch.Position = "P1"
-switch.Position = "P5"
+switch.Position = "P2"
+switch.Position = "P3"
+switch.Position = "P4"
 switch.Position = "P1"
-switch.Position = "P5"
-switch.Position = "P1"
-switch.Position = "P5"
+switch.Position = "P2"
+switch.Position = "P3"
+switch.Position = "P4"
 switch.Position = "P0"
 print("")
 switch.Position = "P2"

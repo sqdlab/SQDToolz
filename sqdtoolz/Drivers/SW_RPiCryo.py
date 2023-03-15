@@ -136,6 +136,8 @@ class SW_RPiCryo(VisaInstrument):
 
         #NOTE THAT P3 IS THE COMMON PIN TO WHICH P1, P2, P4 and P5 SWITCH TO...
 
+        print("THE SW_RPiCryo DRIVER IS DEPRECATED - USE SW_BJT_RPi DRIVER INSTEAD.")
+
         # en and in lines are shared between both switches
         cground0 = DriverChannel(21, 22)
         cground1 = DriverChannel(23, 24) # now unused
@@ -181,5 +183,5 @@ class SW_RPiCryo(VisaInstrument):
     def get_all_switch_contacts(self):
         return self._cur_contacts[:]
 
-# sw = SW_RPiCryo('test', 'TCPIP::192.168.1.144::4000::SOCKET', 1)
-# a=0
+sw = SW_RPiCryo('test', 'TCPIP::192.168.1.16::4000::SOCKET', 1)
+a=0

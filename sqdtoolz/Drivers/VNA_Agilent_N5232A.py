@@ -12,7 +12,6 @@ from qcodes import (
 class VNA_Agilent_N5232A(VisaInstrument):
     def __init__(self, name, address, **kwargs):
         super().__init__(name, address, terminator='\n', timeout=60, **kwargs)
-        self._data_processor = None
         #By default we are working with the channel number 1, so SENSe<cnum>: if all queries is just SENSe1: ...
         
         # if 'P9373' in self.ask('*IDN?'):
@@ -141,6 +140,8 @@ class VNA_Agilent_N5232A(VisaInstrument):
             get_cmd = 'TRIG:SOUR?',
             set_cmd = 'TRIG:SOUR {}', vals = vals.Enum('EXT', 'IMM', 'MAN'))
         
+        self._time_1f_switched = False
+
         self._num_repetitions = 1
         self._segment_freqs = []
 
@@ -149,7 +150,7 @@ class VNA_Agilent_N5232A(VisaInstrument):
 
     @property
     def SupportedSweepModes(self):
-        return ['Linear', 'Decade', 'Power-1f', 'Time-1f', 'Segmented']
+        return ['Linear', 'Decade', 'Power-1f', 'Time-1f', 'Segmented', 'Time-1f-SW']
 
     @property
     def SweepMode(self):
@@ -160,7 +161,10 @@ class VNA_Agilent_N5232A(VisaInstrument):
         elif self.sweep_type() == 'POW':
             return 'Power-1f'
         elif self.sweep_type() == 'CW':
-            return 'Time-1f'
+            if self._time_1f_switched:
+                return 'Time-1f-SW'
+            else:
+                return 'Time-1f'
         elif self.sweep_type() == 'SEGM':
             return 'Segmented'
         else:
@@ -170,6 +174,7 @@ class VNA_Agilent_N5232A(VisaInstrument):
     @SweepMode.setter
     def SweepMode(self, new_mode):
         assert new_mode in self.SupportedSweepModes, f"Mode {new_mode} is invalid for this VNA."
+        self._time_1f_switched = False
         if new_mode == 'Linear':
             self.sweep_type.set('LIN')
         elif new_mode == 'Decade':
@@ -177,6 +182,9 @@ class VNA_Agilent_N5232A(VisaInstrument):
         elif new_mode == 'Power-1f':
             self.sweep_type.set('POW')
         elif new_mode == 'Time-1f':
+            self.sweep_type.set('CW')
+        elif new_mode == 'Time-1f-SW':
+            self._time_1f_switched = True
             self.sweep_type.set('CW')
         elif new_mode == 'Segmented':
             self.sweep_type.set('SEGM')
@@ -319,6 +327,33 @@ class VNA_Agilent_N5232A(VisaInstrument):
             self.write(f'DISP:WIND:TRAC{i+1}:FEED {cur_name}')
         # self.ElecDelayTime = prev_elec_delay
 
+        if self.SweepMode == 'Time-1f-SW':
+            assert not self.AveragesEnable, 'No averaging for this measurement. You may do that in post processing'
+
+            # The measurement assumes the sweep mode, start and stop points have been defined correctly.
+            # That is, every n (number_of_switch_ports) points measured will be combined into one S-matrix. 
+            # If these are set up to be different frequencies, that might not be useful. 
+            if not hasattr(self, 'switch_ports'):
+                self.switch_ports = 3
+
+            # to change auxillary trig out to point or sweep mode TRIG:CHAN:AUX:INT POI|SWE
+            # to change trigger to point trigger SENS:SWE:TRIG:POIN ON|OFF
+            # change trigger source TRIG:SOUR EXT|IMM|MAN
+            # SENS:SWE:MODE CONT|GRO|HOLD|SING
+            
+            # Set External BNC as trigger source
+            self.trigger_source('EXT')
+            # Change trigger mode to acquire a single sweep
+            self.trigger('sing')
+            # set point trigger
+            self.write('SENS:SWE:TRIG:POIN ON')
+            # set aux trig out to point mode, 1 us duration, positive edge, enable it
+            self.write('TRIG:CHAN:AUX:INT POI')
+            self.write('TRIG:CHAN:AUX:DUR 1e-6')
+            self.write('TRIG:CHAN:AUX:IPOL POS')
+            self.write('TRIG:CHAN:AUX ON')
+            self.write('CONTrol:SIGNal:TRIGger:ATBA 1') #Accept Trigger before Armed! 
+
     def ask(self, *args, **kwargs):
         got_data_without_errors = False
         while not got_data_without_errors:
@@ -331,7 +366,13 @@ class VNA_Agilent_N5232A(VisaInstrument):
                 # print('UnicodeDecodeError!')
         return final_data
 
-    def get_data(self):
+    def get_data(self, **kwargs):
+        if self.SweepMode == 'Time-1f-SW':
+            return self._get_data_SW(**kwargs)
+
+        #Set it to sweep mode just in case...
+        self.write('SENS:SWE:TRIG:MODE SWE')
+
         #Just check what data traces are being measured at the moment just in case...
         cur_meas_traces = self.ask('CALC:PAR:CAT:EXT?').strip('"').split(',')
         assert len(cur_meas_traces) >= 2 and len(cur_meas_traces) % 2 == 0, "There appears to be no valid traces/measurements upon which to measure on the VNA."
@@ -460,9 +501,77 @@ class VNA_Agilent_N5232A(VisaInstrument):
             ret_data['data'][f'{cur_meas}_real'] = np.vstack(ret_data['data'][f'{cur_meas}_real'])
             ret_data['data'][f'{cur_meas}_imag'] = np.vstack(ret_data['data'][f'{cur_meas}_imag'])
         
-        if self._data_processor is not None:
-            self._data_processor.push_data(ret_data)
-            return self._data_processor.get_all_data()
+        leProc = kwargs.get('data_processor', None)
+        if leProc is not None:
+            leProc.push_data(ret_data)
+            return leProc.get_all_data()
+        return ret_data
+
+    def _get_data_SW(self, **kwargs):
+        assert 'trig_func' in kwargs, "Must provide a trigger function to manually trigger the VNA for time-1f-SW!"
+        trig_func = kwargs.get('trig_func')
+
+        #Just check what data traces are being measured at the moment just in case...
+        cur_meas_traces = self.ask('CALC:PAR:CAT:EXT?').strip('"').split(',')
+        assert len(cur_meas_traces) >= 2 and len(cur_meas_traces) % 2 == 0, "There appears to be no valid traces/measurements upon which to measure on the VNA."
+        b=iter(cur_meas_traces)
+        cur_meas_traces = list(zip(b,b))
+        #For each measurement, gather the trace data...
+        x_var_name = 'time'
+        ret_data = {
+                    'parameters' : ['repetition', x_var_name],
+                    'data' : {},
+                    'parameter_values' : {}
+                }
+        for cur_meas_name, cur_meas in cur_meas_traces:
+            ret_data['data'][f'{cur_meas}_real'] = []
+            ret_data['data'][f'{cur_meas}_imag'] = []
+
+        # assuming 'bin32' format for now
+        #Set data-type to be float-32 - can be 64 as well...
+        self.write('FORM:DATA REAL,32')
+        #Set output to be real-imaginary...
+        self.write(f'MMEM:STOR:TRAC:FORM:SNP RI')
+
+        av_enabled = self.AveragesEnable
+        for r in range(self.NumRepetitions):
+            self.write('ABORT')
+            if av_enabled:
+                self.clear_averages()
+                while not self._finished_averaging():
+                    time.sleep(0.01)
+            else:
+                try:
+                    self._set_visa_timeout(len(cur_meas_traces)*self.sweep_time.get() + 20)
+                except AttributeError:
+                    self._set_visa_timeout(self.sweep_time.get() + 20)
+                self.trigger('sing')
+                time.sleep(0.1)
+                # self.trigger()
+                # self.ask('*OPC?')
+                # self.write('ABORT')
+                
+                trig_func()
+
+                self.ask('*OPC?')
+            for cur_meas_name, cur_meas in cur_meas_traces:
+                self.write(f'CALC:PAR:SEL \'{cur_meas_name}\'')
+                #Note that SDATA just means complex-valued...
+                s_data_raw = self.visa_handle.query_binary_values('CALC:DATA? SDATA', datatype=u'f', is_big_endian=self._is_big_endian, expect_termination=True)
+                assert len(s_data_raw) != 0, "Something went wrong with VNA data transfer. Check RAM usage and potential issues with COM lines."
+                ret_data['data'][f'{cur_meas}_real'] += [s_data_raw[::2]]
+                ret_data['data'][f'{cur_meas}_imag'] += [s_data_raw[1::2]]
+        for cur_ch in ret_data['data']:
+            ret_data['data'][cur_ch] = np.array(ret_data['data'][cur_ch])
+        # self.visa_handle.read_raw()
+        self.ask('*OPC?')
+        ret_data['parameter_values'][x_var_name] = np.array(self.visa_handle.query_binary_values('CALC:X?', datatype=u'f', is_big_endian=self._is_big_endian))
+        self.ask('*OPC?')
+       
+        leProc = kwargs.get('data_processor', None)
+        if leProc is not None:
+            leProc.push_data(ret_data)
+            return leProc.get_all_data()
         return ret_data
 
     def abort(self):

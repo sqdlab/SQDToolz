@@ -212,6 +212,9 @@ class Laboratory:
         return resolution_tree[::-1]
 
     def _get_resolved_obj(self, res_list):
+        if len(res_list) == 0:
+            return None
+
         ret_obj = None
         if res_list[0][1] == 'HAL':
             ret_obj = self.HAL(res_list[0][0])

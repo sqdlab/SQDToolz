@@ -203,8 +203,30 @@ class DG645(VisaInstrument):
     def RepetitionTime(self, val):
         self.trigger_rate(1/val)
 
+    @property
+    def TriggerSource(self):
+        cur_src = self.trigger_source()
+        if cur_src == 'Internal':
+            return 'INT'
+        elif cur_src == 'External rising edge':
+            return 'EXT'
+        elif cur_src == 'Single shot':
+            return 'MAN'
+    @TriggerSource.setter
+    def TriggerSource(self, val):
+        if val == 'INT':
+            self.trigger_source('Internal')
+        elif val == 'EXT':
+            self.trigger_source('External rising edge')
+        elif val == 'MAN':
+            self.trigger_source('Single shot')
+        #TODO: Add InputTriggerEdge property and support EXT falling/rising...
+
     def get_trigger_output(self, identifier):
         return self._trig_sources[identifier]
 
     def get_all_trigger_sources(self):
         return [(x,self._trig_sources[x]) for x in self._trig_sources]
+    
+    def manual_trigger(self):
+        self.write('*TRG')

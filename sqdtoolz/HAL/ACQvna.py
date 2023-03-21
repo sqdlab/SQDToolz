@@ -7,6 +7,10 @@ class ACQvna(HALbase):
         self._instr_id = instr_vna
         self._instr_vna = lab._get_instrument(instr_vna)
         lab._register_HAL(self)
+        self._lab = lab
+        self._trigger_HAL = None
+        self._trigger_HAL_address = []
+        self.data_processor = None
 
     @classmethod
     def fromConfigDict(cls, config_dict, lab):
@@ -132,18 +136,41 @@ class ACQvna(HALbase):
 
     def activate(self):
         self.Output = True
+        self._trigger_HAL = self._lab._get_resolved_obj(self._trigger_HAL_address)
 
     def deactivate(self):
         self.Output = False
 
+    def set_data_processor(self, proc_obj):
+        self.data_processor = proc_obj
+
     def get_data(self):
-        return self._instr_vna.get_data()
+        return self._instr_vna.get_data(data_processor = self.data_processor, trig_func = lambda : self._trigger_HAL.ManualTrigger())
+
+    @property
+    def ManualTriggerHAL(self):
+        self._trigger_HAL = self._lab._get_resolved_obj(self._trigger_HAL_address)
+        return self._trigger_HAL
+    @ManualTriggerHAL.setter
+    def ManualTriggerHAL(self, sqdtoolz_obj):
+        if sqdtoolz_obj == None:
+            self._trigger_HAL = None
+            self._trigger_HAL_address = []
+        else:
+            assert hasattr(sqdtoolz_obj, 'ManualTrigger'), "The HAL object must have a ManualTrigger defined in order to be triggerable..."
+            self._trigger_HAL_address = self._lab._resolve_sqdobj_tree(sqdtoolz_obj)
 
     def _get_current_config(self):
+        if self.data_processor:
+            proc_name = self.data_processor.Name
+        else:
+            proc_name = ''
         ret_dict = {
             'Name' : self.Name,
             'instrument' : self._instr_id,
             'Type' : self.__class__.__name__,
+            'ManualTriggerHAL' : self._trigger_HAL_address,
+            'Processor' : proc_name
             }
         #Not adding in FrequencyCentre and FrequencySpan to avoid strange contradictions...
         self.pack_properties_to_dict(['SweepMode', 'FrequencyStart', 'FrequencyEnd', 'Power', 'SweepPoints', 'AveragesNum', 'AveragesEnable',
@@ -160,3 +187,6 @@ class ACQvna(HALbase):
         if cur_mode == 'Segmented':
             self.setup_segmented_sweep(dict_config['FrequencySegments'])
         self.SweepMode = cur_mode
+        self._trigger_HAL_address = dict_config.get('ManualTriggerHAL', [])
+        if dict_config['Processor'] != '':
+            self.data_processor = lab.PROC(dict_config['Processor'])

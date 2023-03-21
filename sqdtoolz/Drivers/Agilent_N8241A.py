@@ -414,6 +414,8 @@ class Agilent_N8241A(Instrument):
     """
     def __init__(self, name: str, ivi_dll: str, address: str, init_clk_src='Internal', init_sync_mode='Independent', reset: bool=False, **kwargs) -> None:
 
+        init_ref_clock_source = kwargs.pop('ref_clock_source', 'External')
+
         super().__init__(name=name, **kwargs)
 
         # load agilent dll
@@ -546,7 +548,7 @@ class Agilent_N8241A(Instrument):
         #PROCEEDING ONWARDS.
 
         #Setup clock to be internal for this case...
-        self.ref_clock_source('External')
+        self.ref_clock_source(init_ref_clock_source)
         if init_clk_src == 'Internal':
             self.configure_sample_clock(source=0, freq=1.25e9)
         else:
@@ -594,6 +596,9 @@ class Agilent_N8241A(Instrument):
         self.trigger_threshold_B(0.7)
 
         self.get_all()
+
+    def get_idn(self):
+        return 'Agilent N8241A AWG'
 
     def _init(self, id_query=True, reset=False):
         '''
@@ -653,7 +658,7 @@ class Agilent_N8241A(Instrument):
             1001: advanced sequence
                 
         '''
-        display(output_mode)
+        # display(output_mode)
         rc = self._dll.AGN6030A_ConfigureOutputMode(
             self._handle, ViInt32(output_mode))
         self._status_handle(rc)

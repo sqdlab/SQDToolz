@@ -28,6 +28,16 @@ class DDG(TriggerOutputCompatible, HALbase):
     def RepetitionTime(self, val):
         self._instr_ddg.RepetitionTime = val
 
+    @property
+    def TriggerSource(self):
+        return self._instr_ddg.TriggerSource
+    @TriggerSource.setter
+    def TriggerSource(self, val):
+        self._instr_ddg.TriggerSource = val
+
+    def ManualTrigger(self):
+        self._instr_ddg.manual_trigger()
+
     def _get_child(self, tuple_name_group):
         cur_name, cur_type = tuple_name_group
         if cur_name in self._output_trigs:
@@ -69,7 +79,8 @@ class DDG(TriggerOutputCompatible, HALbase):
             'instrument' : self._instr_ddg.name,
             'Type' : self.__class__.__name__,
             'RepetitionTime' : self.RepetitionTime,
-            'triggers' : trigDict
+            'triggers' : trigDict,
+            'TriggerSource' : self.TriggerSource
             #Ignoring ManualActivation
             }
         return retDict
@@ -79,3 +90,4 @@ class DDG(TriggerOutputCompatible, HALbase):
         for cur_trig_name in dict_config['triggers']:
             self.get_trigger_output(cur_trig_name)._set_current_config(dict_config['triggers'][cur_trig_name])
         self.RepetitionTime = dict_config['RepetitionTime']
+        self.TriggerSource = dict_config.get('TriggerSource', 'INT')

@@ -24,6 +24,7 @@ from sqdtoolz.HAL.Processors.CPU.CPU_Rename import*
 from sqdtoolz.HAL.Processors.CPU.CPU_ChannelArithmetic import*
 from sqdtoolz.HAL.Processors.CPU.CPU_ConstantArithmetic import*
 from sqdtoolz.HAL.Processors.CPU.CPU_MeanBlock import*
+from sqdtoolz.HAL.Processors.CPU.CPU_kMeans import*
 
 from sqdtoolz.HAL.Processors.CPU.CPU_FFT import*
 from sqdtoolz.HAL.Processors.CPU.CPU_ESD import*

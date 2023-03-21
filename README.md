@@ -63,6 +63,14 @@ pip install -e sqdtoolz
 ```
 This should install all required dependencies.
 
+### Updating new required packages
+
+Just log into the virtual environment, navigate to the sqdtoolz folder (where `requirements.txt` is stored) and then run:
+
+```
+python -m pip install -r requirements.txt
+```
+
 ## Basic design overview:
 
 The stack is structured as follows:

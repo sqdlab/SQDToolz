@@ -98,13 +98,14 @@ class Experiment:
             if not kill_signal():
                 self._expt_config.prepare_instruments()
                 if not kill_signal():
-                    data = self._expt_config.get_data()
-                    data_file.push_datapkt(data, sweep_vars)
+                    self._data = self._expt_config.get_data()
+                    data_file.push_datapkt(self._data, sweep_vars)
                     if len(rec_params) > 0:
                         rec_data_file.push_datapkt(self._prepare_rec_params(rec_params, rec_params_extra), sweep_vars)
                     self._cur_ind_coord = 0
                     self._sweep_shape = [1]
                     self._mid_process()
+                    self._data = None
                     time.sleep(delay)
             #################################
         else:
@@ -157,12 +158,13 @@ class Experiment:
                     if kill_signal():
                         break
 
-                    data = self._expt_config.get_data()
-                    data_file.push_datapkt(data, sweep_vars2, sweepEx)
+                    self._data = self._expt_config.get_data()
+                    data_file.push_datapkt(self._data, sweep_vars2, sweepEx)
                     if len(rec_params) > 0:
                         rec_data_file.push_datapkt(self._prepare_rec_params(rec_params, rec_params_extra), sweep_vars2, sweepEx)
                     self._sweep_vars = sweep_vars2
                     self._mid_process()
+                    self._data = None
                     if not disable_progress_bar:
                         ping_iteration((ind_coord+1)/self._sweep_grids.shape[0])
 
@@ -229,10 +231,18 @@ class Experiment:
             return np.ndarray.flatten(ret_data)
         return ret_data.reshape(ret_data.shape[var_ind+1:])
 
+    def _query_current_iteration_data(self):
+        return self._data
+
     def _push_data_mid_iteration(self, datafilename, last_sweep_var, data_pkt):
-        assert last_sweep_var in self._cur_names, f"Variable {last_sweep_var} is not in the list of sweeping variables."
-        var_ind = self._cur_names.index(last_sweep_var)
-        self._cur_filewriters[datafilename].push_datapkt(data_pkt, self._sweep_vars[:var_ind+1])
+        if isinstance(last_sweep_var, str):
+            assert last_sweep_var in self._cur_names, f"Variable {last_sweep_var} is not in the list of sweeping variables."
+            var_ind = self._cur_names.index(last_sweep_var)
+            self._cur_filewriters[datafilename].push_datapkt(data_pkt, self._sweep_vars[:var_ind+1])
+        elif last_sweep_var == None:
+            self._cur_filewriters[datafilename].push_datapkt(data_pkt, self._sweep_vars)
+        else:
+            assert False, 'The parameter \'last_sweep_var\' must be given as a string or None.'
 
     def _retrieve_current_sweep_values(self):
         if not isinstance(self._sweep_grids, np.ndarray):

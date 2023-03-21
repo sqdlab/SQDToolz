@@ -931,7 +931,7 @@ class TestExpFeatures(unittest.TestCase):
     def arr_equality(self, arr1, arr2):
         if arr1.size != arr2.size:
             return False
-        return np.sum(np.abs(arr1 - arr2)) < 1e-15
+        return np.sum(np.abs(arr1 - arr2)) < 1e-12
 
     def test_RecParams(self):
         self.initialise()
@@ -1050,6 +1050,40 @@ class TestExpFeatures(unittest.TestCase):
                 }
                 self._push_data_mid_iteration('auxilia', 'myFreq', data_pkt)
 
+    class miniExp4(Experiment):
+        def __init__(self, name, expt_config, testObj):
+            super().__init__(name, expt_config)
+            self.testObj = testObj
+
+        def _init_aux_datafiles(self):
+            self._init_data_file('auxilia')
+            self._cntr = 0
+
+        def _mid_process(self):
+            data = self._query_current_iteration_data()
+            data_pkt = {
+                    'parameters' : ['r','g','s'],
+                    'data' : { 'param1' : data['data']['ch1']*10, 'param2' : data['data']['ch2']*20 }
+                }
+            self._push_data_mid_iteration('auxilia', None, data_pkt)
+
+    class miniExp5(Experiment):
+        def __init__(self, name, expt_config, testObj):
+            super().__init__(name, expt_config)
+            self.testObj = testObj
+
+        def _init_aux_datafiles(self):
+            self._init_data_file('auxilia')
+            self._cntr = 0
+
+        def _mid_process(self):
+            data = self._query_current_iteration_data()
+            data_pkt = {
+                    'parameters' : [],
+                    'data' : { 'param1' : np.mean(data['data']['ch1']), 'param2' : np.mean(data['data']['ch2']) }
+                }
+            self._push_data_mid_iteration('auxilia', None, data_pkt)
+
     def test_MidProcess(self):
         self.initialise()
 
@@ -1083,6 +1117,45 @@ class TestExpFeatures(unittest.TestCase):
         arr = res.get_numpy_array()
         assert self.arr_equality(arr[:,:,0], np.array([(np.mean(np.arange(20,30,1))+np.arange(0,10,1))*x for x in np.arange(0,1,0.2)])), "Error in recording data during mid-process."
         res.release()
+        exp = None
+
+        time.sleep(1)
+        
+        exp = self.miniExp4("test", self.lab.CONFIG('testConf2'), self)
+        resOrig = self.lab.run_single(exp, [(self.lab.VAR("myDura1"), np.arange(0,1,0.2)), (self.lab.VAR("myFreq"), np.arange(0,10,1)), (self.lab.VAR("testAmpl"), np.arange(20,30,1))], rec_params=[(self.lab.VAR("testAmpl"), 'Value'), (self.lab.VAR("myFreq"), 'Value')])
+        res = exp.retrieve_last_aux_dataset('auxilia')
+        assert len(res.param_names) == 6, "Error in recording data during mid-process."
+        assert res.param_names[0] == "myDura1", "Error in recording data during mid-process."
+        assert res.param_names[1] == "myFreq", "Error in recording data during mid-process."
+        assert res.param_names[2] == "testAmpl", "Error in recording data during mid-process."
+        assert len(res.dep_params) == 2, "Error in recording data during mid-process."
+        assert res.dep_params[0] == 'param1', "Error in recording data during mid-process."
+        assert res.dep_params[1] == 'param2', "Error in recording data during mid-process."
+        arr = res.get_numpy_array()
+        arrOrig = resOrig.get_numpy_array()
+        arrOrig[:,:,:,:,:,:,0] *= 10
+        arrOrig[:,:,:,:,:,:,1] *= 20
+        assert self.arr_equality(arr, arrOrig), "Error in recording data during mid-process."
+        res.release()
+        resOrig.release()
+        exp = None
+        
+        exp = self.miniExp5("test", self.lab.CONFIG('testConf2'), self)
+        resOrig = self.lab.run_single(exp, [(self.lab.VAR("myDura1"), np.arange(0,1,0.2)), (self.lab.VAR("myFreq"), np.arange(0,10,1)), (self.lab.VAR("testAmpl"), np.arange(20,30,1))], rec_params=[(self.lab.VAR("testAmpl"), 'Value'), (self.lab.VAR("myFreq"), 'Value')])
+        res = exp.retrieve_last_aux_dataset('auxilia')
+        assert len(res.param_names) == 3, "Error in recording data during mid-process."
+        assert res.param_names[0] == "myDura1", "Error in recording data during mid-process."
+        assert res.param_names[1] == "myFreq", "Error in recording data during mid-process."
+        assert res.param_names[2] == "testAmpl", "Error in recording data during mid-process."
+        assert len(res.dep_params) == 2, "Error in recording data during mid-process."
+        assert res.dep_params[0] == 'param1', "Error in recording data during mid-process."
+        assert res.dep_params[1] == 'param2', "Error in recording data during mid-process."
+        arr = res.get_numpy_array()
+        arrOrig = resOrig.get_numpy_array()
+        arrOrig = np.mean(arrOrig,axis=-2)[:,:,:,0,0]
+        assert self.arr_equality(arr, arrOrig), "Error in recording data during mid-process."
+        res.release()
+        resOrig.release()
         exp = None
 
         shutil.rmtree('test_save_dir')

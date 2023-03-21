@@ -56,7 +56,6 @@ class DummyDDGchannel(InstrumentChannel):
     def TrigPulseDelay(self, val):
         self.trigPulseDelay(val)
 
-        
 
 
   
@@ -77,7 +76,16 @@ class DummyDDG(Instrument):
             self.add_submodule(ch_name, cur_channel)
             self._trig_sources[ch_name] = cur_channel
 
+        self._trigSrc = 'INT'
+        self.add_parameter(
+            'trigger_source', label='Trigger Source', 
+            get_cmd=lambda : self._trigSrc,
+            set_cmd=self._set_trigSrc)
+
         self._rep_time = 100e-9
+
+    def _set_trigSrc(self, val):
+        self._trigSrc = val
 
     @property
     def RepetitionTime(self):
@@ -92,3 +100,9 @@ class DummyDDG(Instrument):
     def get_all_trigger_sources(self):
         return [(x,self._trig_sources[x]) for x in self._trig_sources]
 
+    @property
+    def TriggerSource(self):
+        return self.trigger_source()
+    @TriggerSource.setter
+    def TriggerSource(self, val):
+        self.trigger_source(val)

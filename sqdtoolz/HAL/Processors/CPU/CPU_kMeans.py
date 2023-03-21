@@ -1,5 +1,8 @@
 from sqdtoolz.HAL.Processors.ProcessorCPU import ProcNodeCPU
-from pomegranate.kmeans import Kmeans
+try:
+    from pomegranate.kmeans import Kmeans
+except ModuleNotFoundError:
+    pass
 import numpy as np
 
 class CPU_kMeans(ProcNodeCPU):

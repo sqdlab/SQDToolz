@@ -93,14 +93,53 @@ class GENsmu(HALbase):
     def ProbeType(self, val):
         self._instr_smu.ProbeType = val
 
+
+    @property
+    def SupportsSweeping(self):
+        return self._instr_smu.SupportsSweeping
+
+    @property
+    def SweepSampleTime(self):
+        return self._instr_smu.SweepSampleTime
+    @SweepSampleTime.setter
+    def SweepSampleTime(self, smpl_time_seconds):
+        self._instr_smu.SweepSampleTime = smpl_time_seconds
+
+    @property
+    def SweepSamplePoints(self):
+        return self._instr_smu.SweepSamplePoints
+    @SweepSamplePoints.setter
+    def SweepSamplePoints(self, smpl_pts):
+        self._instr_smu.SweepSamplePoints = smpl_pts
+
+    @property
+    def SweepStartValue(self):
+        return self._instr_smu.SweepStartValue
+    @SweepStartValue.setter
+    def SweepStartValue(self, val):
+        self._instr_smu.SweepStartValue = val
+
+    @property
+    def SweepEndValue(self):
+        return self._instr_smu.SweepEndValue
+    @SweepEndValue.setter
+    def SweepEndValue(self, val):
+        self._instr_smu.SweepEndValue = val
+
+    def get_data(self):
+        return self._instr_smu.get_data()
+
     def _get_current_config(self):
         ret_dict = {
             'Name' : self.Name,
             'instrument' : self._instr_id,
             'Type' : self.__class__.__name__,
             #Ignoring ManualActivation
+            'SupportsSweeping' : self.SupportsSweeping
             }
         self.pack_properties_to_dict(['Mode', 'Voltage', 'Current', 'RampRateVoltage', 'RampRateCurrent', 'ProbeType', 'Output', 'SenseVoltage', 'SenseCurrent', 'ComplianceVoltage', 'ComplianceCurrent'], ret_dict)
+        if self.SupportsSweeping:
+            self.pack_properties_to_dict(['SweepSampleTime', 'SweepSamplePoints', 'SweepStartValue', 'SweepEndValue'], ret_dict)
         return ret_dict
 
     def _set_current_config(self, dict_config, lab):
@@ -119,6 +158,16 @@ class GENsmu(HALbase):
         self.ComplianceCurrent = dict_config['ComplianceCurrent']
         self.Output = dict_config['Output']
         self.ManualActivation = dict_config.get('ManualActivation', False)
+        if self.SupportsSweeping:
+            if 'SweepSampleTime' in dict_config:
+                self.SweepSampleTime = dict_config['SweepSampleTime']
+            if 'SweepSamplePoints' in dict_config:
+                self.SweepSamplePoints = dict_config['SweepSamplePoints']
+            if 'SweepStartValue' in dict_config:
+                self.SweepStartValue = dict_config['SweepStartValue']
+            if 'SweepEndValue' in dict_config:
+                self.SweepEndValue = dict_config['SweepEndValue']
+            
 
     def activate(self):
         self.Output = True

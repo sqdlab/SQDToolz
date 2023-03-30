@@ -66,8 +66,22 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
                             vals=vals.Numbers(0.001, 100),
                             get_cmd=lambda : self.current.step/self.current.inter_delay,
                             set_cmd=self._set_ramp_rate_current)
+        
+        self._sweep_safe_mode = True
+        self.add_parameter('sweep_safe_mode',
+                           get_cmd=lambda: self._sweep_safe_mode,
+                           set_cmd=lambda x: self._set_sweep_safe_mode(x),
+                           get_parser=bool,
+                           set_parser=bool)
+        self._sweep_sample_time_ms = 1
+        self._sweep_sample_points = 20
+        self._sweep_sample_start = 0
+        self._sweep_sample_end = 1e-4
 
         self.parameters.pop('IDN')
+
+    def _set_sweep_safe_mode(self, x):
+        self._sweep_safe_mode = x
 
     @property
     def Mode(self):
@@ -202,6 +216,41 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
         else:
             self.write('O1')
 
+    
+    @property
+    def SupportsSweeping(self):
+        return True
+
+    @property
+    def SweepSampleTime(self):
+        return self._sweep_sample_time_ms / 1000
+    @SweepSampleTime.setter
+    def SweepSampleTime(self, smpl_time_seconds):
+        self._sweep_sample_time_ms = smpl_time_seconds*1000
+    
+    @property
+    def SweepSamplePoints(self):
+        return self._sweep_sample_points
+    @SweepSamplePoints.setter
+    def SweepSamplePoints(self, smpl_pts):
+        self._sweep_sample_points = smpl_pts
+    
+    @property
+    def SweepStartValue(self):
+        return self._sweep_sample_start
+    @SweepStartValue.setter
+    def SweepStartValue(self, start_val):
+        self._sweep_sample_start = start_val
+
+    @property
+    def SweepEndValue(self):
+        return self._sweep_sample_end
+    @SweepEndValue.setter
+    def SweepEndValue(self, end_val):
+        self._sweep_sample_end = end_val
+
+
+
     def _set_ramp_rate_volt(self, ramp_rate):
         if ramp_rate < 0.01:
             self.voltage.step = 0.001
@@ -224,20 +273,28 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
             self.current.step = 1.0
         self.current.inter_delay = self.current.step / ramp_rate
 
-    def resistance(self, start_v, stop_v, step, delay, safe=True):
+    def get_data(self):
         '''
         Function to handle measuring resistance only. This currently constitutes of a voltage sweep, measuring current.
         While this can be done using a standard sweep and the GENsmu HAL, this one is used to speed up a sweep.
         For example the Keithley 236 is best used with a programmed sweep.
-
+        
         Note: If safe is False, the function assumes that it is safe to send the two extreme voltages set.
               It will jump to the start_v voltage value, sweep to the stop_v voltage value and then jump to the set bias value.
 
               If safe is True, the bias value must be zero and three voltage_sweeps are used. The first from 0V to start_v,
               the second used for the actual measurement and the third going back to 0V.
+
+              Set in YAML using sweep_safe_mode parameter...
         '''
+        safe = self.sweep_safe_mode()
+
         self.write('G1,2,0') # get source bias
         bias = float(self.read())
+
+        start_v, stop_v = self.SweepStartValue, self.SweepEndValue
+        step = np.abs(stop_v - start_v) / self.SweepSamplePoints
+        delay = self._sweep_sample_time_ms
 
         if safe:
             assert bias == 0, 'The bias value is not zero. This is unsafe.'
@@ -284,4 +341,9 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
 
         self.Mode = old_mode
 
-        return currents, voltages
+        data_pkt = {
+                    'parameters' : ['Points'],
+                    'data' : { 'Current' : currents, 'Voltage' : voltages }
+                }
+
+        return data_pkt

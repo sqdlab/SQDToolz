@@ -119,7 +119,10 @@ class SMU_TENMA_72_2710(Instrument):
     @Mode.setter
     def Mode(self, val):
         pass    #Cannot set the mode on this one...
-    
+
+    @property
+    def SupportsSweeping(self):
+        return False
     
     @property
     def RampRateVoltage(self):

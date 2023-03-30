@@ -191,6 +191,10 @@ class SMU_B2901A(VisaInstrument):
         self.current_ramp_rate(val)
 
     @property
+    def SupportsSweeping(self):
+        return False    #TODO: Write automatic sweeping functions...
+    
+    @property
     def ProbeType(self):
         return self.meas_probe_type()
     @ProbeType.setter

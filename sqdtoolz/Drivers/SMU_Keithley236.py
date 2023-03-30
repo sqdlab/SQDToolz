@@ -1,5 +1,7 @@
 from qcodes import Instrument, InstrumentChannel, VisaInstrument, validators as vals
 import numpy as np
+import logging
+import time
 
 from sqdtoolz.Drivers.Dependencies.PrologixGPIBEthernet import PrologixGPIBEthernet
 
@@ -185,10 +187,10 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
     def RampRateCurrent(self, val):
         self.current_ramp_rate(val)
 
-    #Basically ProbeType and Mode are the same on thus SMU?
     @property
     def ProbeType(self):
-        if self.Mode == 'SrcV_MeasI':
+        value = self.ask('U4')
+        if value.split('O')[1][0] == '0':
             return 'TwoWire'
         else:
             return 'FourWire'
@@ -196,13 +198,21 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
     def ProbeType(self, connection):
         assert connection == 'TwoWire' or connection == 'FourWire', "ProbeType must be FourWire or TwoWire"
         if connection == 'TwoWire':
-            self.Mode = 'SrcV_MeasI'
+            self.write('O0')
         else:
-            self.Mode = 'SrcI_MeasV'
+            self.write('O1')
 
     def _set_ramp_rate_volt(self, ramp_rate):
-        self.voltage.step = self.voltage.inter_delay * ramp_rate
- 
+        if ramp_rate < 0.01:
+            self.voltage.step = 0.001
+        elif ramp_rate < 0.1:
+            self.voltage.step = 0.010
+        elif ramp_rate < 1.0:
+            self.voltage.step = 0.100
+        else:
+            self.voltage.step = 1.0
+        self.voltage.inter_delay = self.voltage.step / ramp_rate
+
     def _set_ramp_rate_current(self, ramp_rate):
         if ramp_rate < 0.01:
             self.current.step = 0.001
@@ -213,3 +223,65 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
         else:
             self.current.step = 1.0
         self.current.inter_delay = self.current.step / ramp_rate
+
+    def resistance(self, start_v, stop_v, step, delay, safe=True):
+        '''
+        Function to handle measuring resistance only. This currently constitutes of a voltage sweep, measuring current.
+        While this can be done using a standard sweep and the GENsmu HAL, this one is used to speed up a sweep.
+        For example the Keithley 236 is best used with a programmed sweep.
+
+        Note: If safe is False, the function assumes that it is safe to send the two extreme voltages set.
+              It will jump to the start_v voltage value, sweep to the stop_v voltage value and then jump to the set bias value.
+
+              If safe is True, the bias value must be zero and three voltage_sweeps are used. The first from 0V to start_v,
+              the second used for the actual measurement and the third going back to 0V.
+        '''
+        self.write('G1,2,0') # get source bias
+        bias = float(self.read())
+
+        if safe:
+            assert bias == 0, 'The bias value is not zero. This is unsafe.'
+
+        old_mode = self.Mode
+        if old_mode == 'SrcV_MeasI':
+            self.ask('F0,1')
+        else:
+            self.ask('F1,1')
+
+        # set the communication to only acquire measured values, in ascii, and get all sweep values at once.
+        # self.ask('G5,2,2')
+        # self.read()
+
+        if safe:
+            cmd = 'Q1'
+            if start_v != 0:
+                cmd = f'Q1,{0},{start_v},{step},0,{delay}XQ7'
+                # self.write(f'Q1,{0},{start_v},{step},0,{delay}')
+            cmd = f'{cmd},{start_v},{stop_v},{step},0,{delay}'
+                # self.write(f'{cmd},{start_v},{stop_v},{step},0,{delay}')
+            if stop_v != 0:
+                cmd += f'XQ7,{stop_v},{0},{step},0,{delay}'
+            # self.write(f'Q7,{stop_v},{0},{step},0,{delay}')
+        else:
+            cmd = f'Q1,{start_v},{stop_v},{step},0,{delay}'
+            # self.write(f'Q1,{start_v},{stop_v},{step},0,{delay}')
+        # self.write('R1')
+        # self.write('N1')
+        # self.write('H0')
+        # self.read()
+
+        self.write(cmd + 'XR1XN1')
+
+        while self.serial_poll() & 0b00000010 == 0:
+            time.sleep(delay*1e-3)
+        result = self.ask('G5,2,2')
+        while result[-2:] != '\r\n':
+            result += self._recv(1024)
+        currents = np.fromstring(result, sep=',')
+        voltages = currents[::2]
+        currents = currents[1::2]
+        self.write('N0')
+
+        self.Mode = old_mode
+
+        return currents, voltages

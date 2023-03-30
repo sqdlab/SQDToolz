@@ -22,7 +22,7 @@ class SMU_TENMA_72_2710(Instrument):
 
         self.add_parameter(name = 'voltage',
                            label = 'Set Voltage',
-                           get_cmd = lambda: self._try_get_voltage(),
+                           get_cmd = lambda: float(self._try_get_voltage()),
                            set_cmd = lambda x: self.write(f'VSET1:{x:2.2f}'),
                            vals = vals.Numbers(0, 30),
                            inter_delay = 0.05,

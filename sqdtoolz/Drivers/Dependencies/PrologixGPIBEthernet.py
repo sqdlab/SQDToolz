@@ -31,11 +31,11 @@ class PrologixGPIBEthernet:
         self._send('++read eoi')
         return self._recv(num_bytes)
 
-    def query(self, cmd, buffer_size=2048*1024):
+    def query(self, cmd, buffer_size=1024*1024):
         self.write(cmd)
         return self.read(buffer_size)
         
-    def ask(self, cmd, buffer_size=2048*1024):
+    def ask(self, cmd, buffer_size=1024*1024):
         self.write(cmd)
         return self.read(buffer_size)
 
@@ -46,6 +46,10 @@ class PrologixGPIBEthernet:
     def _recv(self, byte_num):
         value = self.socket.recv(byte_num)
         return value.decode('ascii')
+
+    def serial_poll(self):
+        self._send('++spoll')
+        return int(self._recv(1024))
 
     def _setup(self):
         # set device to CONTROLLER mode

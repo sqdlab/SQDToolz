@@ -399,6 +399,8 @@ class Laboratory:
 
         #Reset kill-switch state
         self._kill_switch_reset(cur_exp_path)
+        kwargs['kill_signal'] = self._kill_switch_check
+        kwargs['kill_signal_send'] = self._kill_signal_send_internal
 
         #Verify and condition rec_params to be purely object-property pairs along with their unique resolution name...
         rec_params = kwargs.get('rec_params', [])
@@ -426,7 +428,7 @@ class Laboratory:
             new_rec_params += [(new_rec_param[0], new_rec_param[1], cur_param_name)]
         kwargs['rec_params'] = new_rec_params
 
-        ret_vals = expt_obj._run(cur_exp_path, sweep_vars, ping_iteration=self._update_progress_bar, kill_signal=self._kill_switch_check, **kwargs)
+        ret_vals = expt_obj._run(cur_exp_path, sweep_vars, ping_iteration=self._update_progress_bar, **kwargs)
         self._group_dir['ExptIndex'] += 1
 
         #Save the experiment configuration
@@ -559,18 +561,27 @@ class Laboratory:
         full_abs_path = os.path.abspath(self._save_dir) + '/'    #Extra / as abspath doesn't include it...
         os.system(f'start \"temp\" cmd /k \"{drive} && cd \"{cur_dir}/Utilities\" && python ExperimentViewer.py \"{full_abs_path}\"\"')
 
+    def _kill_signal_send_internal(self):
+        self._kill_internal = True
     def _kill_switch_reset(self, cur_exp_path):
         halt_loc = self._save_dir + 'HALT.txt'
         if os.path.exists(halt_loc):
             os.remove(halt_loc)
         self._kill_switch_dir = cur_exp_path
         self._killed_expt = False
+        self._kill_internal = False
     def _kill_switch_check(self):
         halt_loc = self._save_dir + 'HALT.txt'
         if os.path.exists(halt_loc):
             os.remove(halt_loc)
             #Notify the experiment directory of the halting...
             open(self._kill_switch_dir + 'EXPERIMENT MANUALLY HALTED.txt', 'a').close()
+            self._killed_expt = True
+            return True
+        elif self._kill_internal:
+            self._kill_internal = False
+            #Notify the experiment directory of the halting...
+            open(self._kill_switch_dir + 'EXPERIMENT INTERNALLY HALTED.txt', 'a').close()
             self._killed_expt = True
             return True
         return False

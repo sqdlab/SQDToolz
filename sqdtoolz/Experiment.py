@@ -69,6 +69,7 @@ class Experiment:
         delay = kwargs.get('delay', 0.0)
         ping_iteration = kwargs.get('ping_iteration')
         kill_signal = kwargs.get('kill_signal')
+        self._abort_gracefully = kwargs.get('kill_signal_send')     #Used in mid_process to abort...
         ping_iteration(reset=True)
         disable_progress_bar = kwargs.get('disable_progress_bar', False)
 

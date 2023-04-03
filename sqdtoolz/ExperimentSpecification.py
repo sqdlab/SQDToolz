@@ -62,13 +62,15 @@ class ExperimentSpecification:
 
     def add(self, entry_name, value, dest_obj = None, dest_prop_name = ""):
         self._cur_mappings[entry_name] = {'Value' : value}
-        self._lab._resolve_sqdobj_tree(dest_obj)
         if dest_obj != None:
             self.set_destination(entry_name, dest_obj, dest_prop_name)
         else:
             self._cur_mappings[entry_name]['Destination'] = self._lab._resolve_sqdobj_tree(None)
             self._cur_mappings[entry_name]['Property'] = ""
     
+    def remove(self, entry_name):
+        self._cur_mappings.pop(entry_name, None)
+
     def set_destination(self, entry_name, dest_obj, dest_prop_name = ""):
         assert entry_name in self._cur_mappings, f"Entry \'{entry_name}\' does not exist and must first be added via the \'add\' function."
         if isinstance(dest_obj, VariableBase) and dest_prop_name == "":

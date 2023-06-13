@@ -31,17 +31,17 @@ WFS_Gaussian("Hill", None, 40e-9, 0.7)
 WFS_Gaussian("Hill", None, 40e-9, 0.7, num_sd=3)
 ```
 
-The Gaussian lineshape is constructed from a normalised Gaussian for the given standard deviation <img src="https://render.githubusercontent.com/render/math?math=\sigma">:
+The Gaussian lineshape is constructed from a normalised Gaussian for the given standard deviation $\sigma$:
 
-<img src="https://render.githubusercontent.com/render/math?math=G(x)=\exp\left(-\tfrac{x^2}{\sigma^2}\right)">
+$$G(x)=\exp\left(-\frac{x^2}{\sigma^2}\right)$$
 
-in which <img src="https://render.githubusercontent.com/render/math?math=x"> is taken from <img src="https://render.githubusercontent.com/render/math?math=-\sigma"> to <img src="https://render.githubusercontent.com/render/math?math=%2B\sigma">. Then the horizontal axis is scaled across the samples over the given duration. Then the waveform is vertically moved down such that the start and end points are zero. Finally, the vertical centre is scaled to match the prescribed amplitude.
+in which $x$ is taken from $-\sigma$ to $+\sigma$. Then the horizontal axis is scaled across the samples over the given duration. Then the waveform is vertically moved down such that the start and end points are zero. Finally, the vertical centre is scaled to match the prescribed amplitude.
 
 The `WFS_Gaussian` object consists of the properties:
 
 - `Duration` - length of waveform
 - `Amplitude` - the height of the Gaussian waveform
-- `NumStdDev` - number of standard deviations <img src="https://render.githubusercontent.com/render/math?math=\sigma"> taken on either side of the Gaussian
+- `NumStdDev` - number of standard deviations $\sigma$ taken on either side of the Gaussian
 
 ## WFS Cosine
 
@@ -49,12 +49,12 @@ The `WFS_Gaussian` object consists of the properties:
 
 Nonetheless, `WFS_Cosine` provides a cosine defined by:
 
-<img src="https://render.githubusercontent.com/render/math?math=f(t)=A\cos(2\pi ft %2B\phi)">
+$$f(t)=A\cos(2\pi ft +\phi)$$
 
 where the symbols and their associated `WFS_Cosine` properties are:
 
-- *A*, `Amplitude` - amplitude of the sinusoid
-- *f*, `Frequency` - frequency of the sinusoid
-- *ɸ*, `Phase` - phase of the sinusoid
+- $A$, `Amplitude` - amplitude of the sinusoid
+- $f$, `Frequency` - frequency of the sinusoid
+- $\phi$, `Phase` - phase of the sinusoid
 
 and as usual the `Duration` property defines the length of the waveform segment.

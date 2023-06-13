@@ -19,24 +19,15 @@ This document lists all the GPU processing nodes that can be used with the `Proc
 
 `GPU_DDC` performs the digital downconversion stage required for IQ-demodulation. That is, consider the following ipnut signal:
 
-<img src="https://render.githubusercontent.com/render/math?math={\quad\quad\quad M(t)=A\cos(2\pi ft %2B \phi) %2B k}#gh-light-mode-only">
-<img src="https://render.githubusercontent.com/render/math?math={\quad\quad\quad \color{white}M(t)=A\cos(2\pi ft %2B \phi) %2B k}#gh-dark-mode-only">
+$$M(t)=A\cos(2\pi ft + \phi) + k$$
 
 where the amplitude *A* and phase *ɸ* of the sinusoidal signal of frequency *f* is desired. The `GPU_DDC` node will take every channel and demodulate each channel to produce two new outputs (thereby replacing the each input with two new output channels):
 
-<img src="https://render.githubusercontent.com/render/math?math={\quad\quad\quad \begin{align*}I(t) %26 =2\cos(2\pi ft)\cdot M(t)\equiv A\cos(\phi) \color{darkgray}%2B 2k\cos(2\pi ft) %2B A\cos(2(2\pi f)t %2B \phi)\\ Q(t) %26 =-2\sin(2\pi ft)\cdot M(t) \equiv A\sin(\phi) \color{darkgray}- 2k\sin(2\pi ft) - A\sin(2(2\pi f)t %2B \phi)\end{align*}}#gh-light-mode-only">
-
-<img src="https://render.githubusercontent.com/render/math?math={\quad\quad\quad \color{white}\begin{align*}I(t) %26 =2\cos(2\pi ft)\cdot M(t)\equiv A\cos(\phi) \color{darkgray}%2B 2k\cos(2\pi ft) %2B A\cos(2(2\pi f)t %2B \phi)\\ Q(t) %26 =-2\sin(2\pi ft)\cdot M(t) \equiv A\sin(\phi) \color{darkgray}- 2k\sin(2\pi ft) - A\sin(2(2\pi f)t %2B \phi)\end{align*}}#gh-dark-mode-only">
+$$\begin{align*}I(t) & =2\cos(2\pi ft)\cdot M(t)\equiv A\cos(\phi) \color{darkgray}+ 2k\cos(2\pi ft) + A\cos(2(2\pi f)t + \phi)\\ Q(t) & =-2\sin(2\pi ft)\cdot M(t) \equiv A\sin(\phi) \color{darkgray}- 2k\sin(2\pi ft) - A\sin(2(2\pi f)t + \phi)\end{align*}$$
 
 The *I* and *Q* outputs have constant terms that are of interest. The time-varying sinusoidal terms (marked in grey) are culled via a low-pass filter (such as a `GPU_FIR` stage that follows the `GPU_DDC` stage). The cut-off frequency of the low-pass filter (must be evidently smaller than *f*) sets the bandwidth of the resulting signal given in *A*. The actual amplitude and phase can be extracted via:
 
-<img src="https://render.githubusercontent.com/render/math?math={\quad\quad\quad A=\sqrt{I^2 %2B Q^2}}#gh-light-mode-only">
-
-<img src="https://render.githubusercontent.com/render/math?math={\quad\quad\quad \phi=\arg(I %2B jQ)}#gh-light-mode-only">
-
-<img src="https://render.githubusercontent.com/render/math?math={\quad\quad\quad \color{white}A=\sqrt{I^2 %2B Q^2}}#gh-dark-mode-only">
-
-<img src="https://render.githubusercontent.com/render/math?math={\quad\quad\quad \color{white}\phi=\arg(I %2B jQ)}#gh-dark-mode-only">
+$$\begin{align*}A&=\sqrt{I^2 + Q^2}\\\phi&=\arg(I + jQ)\end{align*}$$
 
 To use the `GPU_DDC` stage, consider the following code (assuming that `lab` is a valid `Laboratory` object):
 

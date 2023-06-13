@@ -15,17 +15,16 @@ The different waveform transformations available in SQDToolz are highlighted in 
 
 `WFMT_ModulationIQ` applies to a two-channel waveform in which the first and second channels represent the I and Q channels of an IQ-modulated waveform:
 
-<img src="https://render.githubusercontent.com/render/math?math=I(t)=A\cos(2\pi f t%2B\phi)%2BI_{dc}">
-
-<img src="https://render.githubusercontent.com/render/math?math=Q(t)=aA\cos(2\pi f t %2B \phi %2B \varphi)%2BQ_{dc}">
+$$\begin{align*}I(t)&=A\cos(2\pi f t+\phi)+I_{dc}\\
+Q(t)&=aA\cos(2\pi f t+\phi+\varphi)+Q_{dc}\end{align*}$$
 
 Note that the modulation signals given above are multiplied onto the envelopes specified by the main pulse segment. The symbols and their associated `WFMT_ModulationIQ` properties are:
 
-- *f*, `IQFrequency` - IQ modulation frequency
-- <img src="https://render.githubusercontent.com/render/math?math=I_{dc},Q_{dc}">, `IQdcOffset` - DC offsets on the I and Q channels as specified by a tuple. This accounts for nonlinearities in the output channels as found from, for example, a mixer LO leakage calibration.
-- *a*, `IQAmplitudeFactor` - IQ amplitude calibration factor. This accounts for the differences in the signal attenuation between the I and Q channels as found from, for example, a mixer sideband calibration.
-- *φ*, `IQPhaseOffset` - IQ phase offset calibration. This accounts for the differences in the line lengths between the I and Q channels as found from, for example, a mixer sideband calibration.
-- *A*, `IQAmplitude` - IQ modulation amplitude. It is usually just set to unity as the envelope specified in the pulse segment provides a nice method to control the amplitude.
+- $f$, `IQFrequency` - IQ modulation frequency
+- $(I_{dc}, Q_{dc})$, `IQdcOffset` - DC offsets on the I and Q channels as specified by a tuple. This accounts for nonlinearities in the output channels as found from, for example, a mixer LO leakage calibration.
+- $a$, `IQAmplitudeFactor` - IQ amplitude calibration factor. This accounts for the differences in the signal attenuation between the I and Q channels as found from, for example, a mixer sideband calibration.
+- $\varphi$, `IQPhaseOffset` - IQ phase offset calibration. This accounts for the differences in the line lengths between the I and Q channels as found from, for example, a mixer sideband calibration.
+- $A$, `IQAmplitude` - IQ modulation amplitude. It is usually just set to unity as the envelope specified in the pulse segment provides a nice method to control the amplitude.
 
 Note that the IQ modulation phase *ɸ* is controlled automatically by the engine. It can be however, controlled in the pulse segment definitions via `phase` and `phase_offset` arguments supplied to the `apply()` function:
 

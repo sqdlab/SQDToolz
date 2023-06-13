@@ -96,6 +96,8 @@ The compatible SQDToolz object types whose properties that one may link are:
 
 Note that the third use-case is more niche and not recommended in general.
 
+See also: [Sweeping AWG waveform parameters using VARs](AWG_VARs.md)
+
 ## VariableSpaced
 
 There are cases where one wishes to set a parameter to a value while automatically setting a second parameter to the same value but spaced by some amount. The definition requires the name, `Laboratory` object, two variable objects and the spacing value:

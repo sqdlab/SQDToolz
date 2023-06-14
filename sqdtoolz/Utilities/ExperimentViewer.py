@@ -9,11 +9,164 @@ import sys
 
 from numpy import isin
 
+
+class DoubleScrollBarFrame:
+    """
+    A vertically scrolled Frame that can be treated like any other Frame
+    ie it needs a master and layout and it can be a master.
+    keyword arguments are passed to the underlying Frame
+    except the keyword arguments 'width' and 'height', which
+    are passed to the underlying Canvas
+    note that a widget layed out in this frame will have Canvas as self.master,
+    if you subclass this there is no built in way for the children to access it.
+    You need to provide the controller separately.
+    """
+    def __init__(self, master, **kwargs):
+        width = kwargs.pop('width', None)
+        height = kwargs.pop('height', None)
+        self.outer = tk.Frame(master, **kwargs)
+
+        self.vsb = ttk.Scrollbar(self.outer, orient=tk.VERTICAL)
+        self.vsb.grid(row=0, column=1, sticky='ns')
+        self.hsb = ttk.Scrollbar(self.outer, orient=tk.HORIZONTAL)
+        self.hsb.grid(row=1, column=0, sticky='ew')
+        self.canvas = tk.Canvas(self.outer, highlightthickness=0, width=width, height=height)
+        self.canvas.grid(row=0, column=0, sticky='nsew')
+        self.outer.rowconfigure(0, weight=1)
+        self.outer.columnconfigure(0, weight=1)
+        self.canvas['yscrollcommand'] = self.vsb.set
+        self.canvas['xscrollcommand'] = self.hsb.set
+        # mouse scroll does not seem to work with just "bind"; You have
+        # to use "bind_all". Therefore to use multiple windows you have
+        # to bind_all in the current widget
+        self.canvas.bind("<Enter>", self._bind_mouse)
+        self.canvas.bind("<Leave>", self._unbind_mouse)
+        self.vsb['command'] = self.canvas.yview
+        self.hsb['command'] = self.canvas.xview
+
+        self.inner = tk.Frame(self.canvas)
+        # pack the inner Frame into the Canvas with the topleft corner 4 pixels offset
+        self.canvas.create_window(4, 4, window=self.inner, anchor='nw')
+        self.inner.bind("<Configure>", self._on_frame_configure)
+
+        self.outer_attr = set(dir(tk.Widget))
+
+    def __getattr__(self, item):
+        if item in self.outer_attr:
+            # geometry attributes etc (eg pack, destroy, tkraise) are passed on to self.outer
+            return getattr(self.outer, item)
+        else:
+            # all other attributes (_w, children, etc) are passed to self.inner
+            return getattr(self.inner, item)
+
+    def _on_frame_configure(self, event=None):
+        x1, y1, x2, y2 = self.canvas.bbox("all")
+        height = self.canvas.winfo_height()
+        width = self.canvas.winfo_width()
+        self.canvas.config(scrollregion = (0,0, max(x2, width), max(y2, height)))
+
+    def _bind_mouse(self, event=None):
+        self.canvas.bind_all("<4>", self._on_mousewheel)
+        self.canvas.bind_all("<5>", self._on_mousewheel)
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+
+    def _unbind_mouse(self, event=None):
+        self.canvas.unbind_all("<4>")
+        self.canvas.unbind_all("<5>")
+        self.canvas.unbind_all("<MouseWheel>")
+        
+    def _on_mousewheel(self, event):
+        """Linux uses event.num; Windows / Mac uses event.delta"""
+        func = self.canvas.xview_scroll if event.state & 1 else self.canvas.yview_scroll 
+        if event.num == 4 or event.delta > 0:
+            func(-1, "units" )
+        elif event.num == 5 or event.delta < 0:
+            func(1, "units" )
+    
+    def __str__(self):
+        return str(self.outer)
+
+class HorizontalScrollBarFrame:
+    """
+    A vertically scrolled Frame that can be treated like any other Frame
+    ie it needs a master and layout and it can be a master.
+    keyword arguments are passed to the underlying Frame
+    except the keyword arguments 'width' and 'height', which
+    are passed to the underlying Canvas
+    note that a widget layed out in this frame will have Canvas as self.master,
+    if you subclass this there is no built in way for the children to access it.
+    You need to provide the controller separately.
+    """
+    def __init__(self, master, **kwargs):
+        width = kwargs.pop('width', None)
+        height = kwargs.pop('height', None)
+        self.outer = tk.Frame(master, **kwargs)
+
+        self.hsb = ttk.Scrollbar(self.outer, orient=tk.HORIZONTAL)
+        self.hsb.grid(row=1, column=0, sticky='ew')
+        self.canvas = tk.Canvas(self.outer, highlightthickness=0, width=width, height=height)
+        self.canvas.grid(row=0, column=0, sticky='nsew')
+        self.outer.rowconfigure(0, weight=1)
+        self.outer.columnconfigure(0, weight=1)
+        self.canvas['xscrollcommand'] = self.hsb.set
+        # mouse scroll does not seem to work with just "bind"; You have
+        # to use "bind_all". Therefore to use multiple windows you have
+        # to bind_all in the current widget
+        self.canvas.bind("<Enter>", self._bind_mouse)
+        self.canvas.bind("<Leave>", self._unbind_mouse)
+        self.hsb['command'] = self.canvas.xview
+
+        self.inner = tk.LabelFrame(self.canvas)
+        # pack the inner Frame into the Canvas with the topleft corner 4 pixels offset
+        self.canvas_frame = self.canvas.create_window(0, 0, window=self.inner, anchor='nw')
+        self.inner.bind("<Configure>", self._on_frame_configure)
+        self.canvas.bind('<Configure>', self._frame_size)
+
+        self.outer_attr = set(dir(tk.Widget))
+
+    def __getattr__(self, item):
+        if item in self.outer_attr:
+            # geometry attributes etc (eg pack, destroy, tkraise) are passed on to self.outer
+            return getattr(self.outer, item)
+        else:
+            # all other attributes (_w, children, etc) are passed to self.inner
+            return getattr(self.inner, item)
+
+    def _on_frame_configure(self, event=None):
+        x1, y1, x2, y2 = self.canvas.bbox("all")
+        height = self.canvas.winfo_height()
+        width = self.canvas.winfo_width()
+        self.canvas.config(scrollregion = (0,0, max(x2, width), max(y2, event.height-4)))
+
+    def _frame_size(self, event=None):
+        self.canvas.itemconfig(self.canvas_frame, height = event.height)
+
+    def _bind_mouse(self, event=None):
+        self.canvas.bind_all("<4>", self._on_mousewheel)
+        self.canvas.bind_all("<5>", self._on_mousewheel)
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+
+    def _unbind_mouse(self, event=None):
+        self.canvas.unbind_all("<4>")
+        self.canvas.unbind_all("<5>")
+        self.canvas.unbind_all("<MouseWheel>")
+        
+    def _on_mousewheel(self, event):
+        """Linux uses event.num; Windows / Mac uses event.delta"""
+        func = self.canvas.xview_scroll
+        if event.num == 4 or event.delta > 0:
+            func(-1, "units" )
+        elif event.num == 5 or event.delta < 0:
+            func(1, "units" )
+    
+    def __str__(self):
+        return str(self.outer)
+
 class ListBoxScrollBar:
     def __init__(self, parent_ui_element):
         self.frame = Frame(master=parent_ui_element)
 
-        self.listbox = Listbox(self.frame, exportselection=0)
+        self.listbox = Listbox(self.frame, exportselection=0, height = 6)
         self.listbox.grid(row=0, column=0, sticky="news")
         self.scrollbar = Scrollbar(self.frame)
         self.scrollbar.grid(row=0, column=1, sticky="nes")
@@ -41,8 +194,13 @@ class ListBoxScrollBar:
 
         #Clear listbox
         self.listbox.delete(0,'end')
-        for values in list_vals:
-            self.listbox.insert(END, values)
+        for m, values in enumerate(list_vals):
+            if isinstance(values, list) or isinstance(values, tuple):
+                val, col = values
+                self.listbox.insert(END, val)
+                self.listbox.itemconfig(m, bg=col)
+            else:
+                self.listbox.insert(END, values)
         
         #Colour the values if applicable:
         if cols != None:
@@ -100,7 +258,7 @@ class ExperimentViewer:
         class ElemLabelListBox:
             def __init__(self, parent):
                 self.frame = Frame(parent)
-                self.frame.pack(side=LEFT)
+                self.frame.pack(side=LEFT, fill=Y, expand=1)
                 self.lbl = Label(self.frame, text="", justify=LEFT)
                 self.lstbx = ListBoxScrollBar(self.frame)
             
@@ -112,8 +270,9 @@ class ExperimentViewer:
                 self.frame.columnconfigure(0, weight=1)
                 self.frame.rowconfigure(0, weight=0)
                 self.frame.rowconfigure(1, weight=1)
-                self.lbl.grid(row=0, column=0, sticky='news')
+                self.lbl.grid(row=0, column=0, sticky='nws')
                 self.lstbx.frame.grid(row=1, column=0, sticky='news')
+
         class ElemListBox:
             def __init__(self, parent):
                 self.lstbx = ListBoxScrollBar(parent)
@@ -122,10 +281,12 @@ class ExperimentViewer:
             def set_list(self, list_elems):
                 self.lstbx.update_vals(list_elems)
 
-        def __init__(self, root, group_name):
+        def __init__(self, root, group_name, is_scroll=False):
             self.entries = []
-            self.frame = LabelFrame(master=root, text = group_name)
-            ExperimentViewer.DashboardGroup.ElemSimpleLabel
+            if is_scroll:
+                self.frame = HorizontalScrollBarFrame(root, width=10)
+            else:
+                self.frame = LabelFrame(master=root, text = group_name)
 
         def _populate_elements(self, elem_type, num_elem):
             #Trim off any elements that are not of the given type...
@@ -149,6 +310,11 @@ class ExperimentViewer:
 
         def set_simple_label_list(self, cur_str_and_cols_list):
             self._populate_elements(ExperimentViewer.DashboardGroup.ElemLabelListBox, len(cur_str_and_cols_list))
+            for ind, cur_lbl in enumerate(cur_str_and_cols_list):
+                self.entries[ind].set_text_col_list(cur_lbl[0], cur_lbl[1], cur_lbl[2])
+
+        def set_simple_label_waveforms(self, cur_str_and_cols_list):
+            self._populate_elements(ExperimentViewer.DashboardGroup.ElemLabelWaveforms, len(cur_str_and_cols_list))
             for ind, cur_lbl in enumerate(cur_str_and_cols_list):
                 self.entries[ind].set_text_col_list(cur_lbl[0], cur_lbl[1], cur_lbl[2])
 
@@ -182,25 +348,35 @@ class ExperimentViewer:
         self.pw_dash_LR_UI.pack(expand = 1, fill ="both")
 
         #Create Dashboard Groups:
-        self.dash_MWs = ExperimentViewer.DashboardGroup(frame_dash_right, "Microwave Sources")
-        self.dash_WFMs = ExperimentViewer.DashboardGroup(frame_dash_right, "Waveforms")
-        self.dash_VOLTs = ExperimentViewer.DashboardGroup(frame_dash_right, "Voltage Sources")
-        
-        frame_grp1 = Frame(master=frame_dash_right)
-        self.dash_ATTENs = ExperimentViewer.DashboardGroup(frame_grp1, "Attenuators")
-        self.dash_ATTENs.frame.pack(side=LEFT)
-        self.dash_SWs = ExperimentViewer.DashboardGroup(frame_grp1, "Switches")
-        self.dash_SWs.frame.pack(side=LEFT)
+        frame_grp0 = Frame(master=frame_dash_right)
+        self.dash_DDGs = ExperimentViewer.DashboardGroup(frame_grp0, "DDGs")
+        self.dash_DDGs.frame.pack(side=LEFT, fill=Y)
+        self.dash_MWs = ExperimentViewer.DashboardGroup(frame_grp0, "Microwave Sources")
+        self.dash_MWs.frame.pack(side=LEFT, fill=Y)
+
+        frame_grp1 = LabelFrame(master=frame_dash_right, text="Waveforms")
+        self.dash_WFMs = ExperimentViewer.DashboardGroup(frame_grp1, "", True)
+        self.dash_WFMs.frame.pack(expand = 1, fill =X)
 
         frame_grp2 = Frame(master=frame_dash_right)
-        self.dash_WFMTs = ExperimentViewer.DashboardGroup(frame_grp2, "Waveform Transformations")
+        self.dash_ATTENs = ExperimentViewer.DashboardGroup(frame_grp2, "Attenuators")
+        self.dash_ATTENs.frame.pack(side=LEFT)
+        self.dash_SWs = ExperimentViewer.DashboardGroup(frame_grp2, "Switches")
+        self.dash_SWs.frame.pack(side=LEFT)
+
+        frame_grp3 = Frame(master=frame_dash_right)
+        self.dash_VOLTs = ExperimentViewer.DashboardGroup(frame_grp3, "Voltage Sources")
+        self.dash_VOLTs.frame.pack(side=LEFT)
+
+        frame_grp4 = Frame(master=frame_dash_right)
+        self.dash_WFMTs = ExperimentViewer.DashboardGroup(frame_grp4, "Waveform Transformations")
         self.dash_WFMTs.frame.pack(side=LEFT)
         
-        self.dash_MWs.frame.pack(side=TOP)
-        self.dash_WFMs.frame.pack(side=TOP)
-        frame_grp1.pack(side=TOP)
-        self.dash_VOLTs.frame.pack(side=TOP)
-        frame_grp2.pack(side=TOP)
+        frame_grp0.pack(side=TOP, fill=X)
+        frame_grp1.pack(side=TOP, fill=X)
+        frame_grp2.pack(side=TOP, fill=X)
+        frame_grp3.pack(side=TOP, fill=X)
+        frame_grp4.pack(side=TOP, fill=X)
 
 
         ###############################
@@ -342,6 +518,7 @@ class ExperimentViewer:
                 continue
 
             #Process the HALs...
+            cur_ddgs = []
             cur_mws = []
             cur_sws = []
             cur_volts = []
@@ -363,7 +540,28 @@ class ExperimentViewer:
                             else:
                                 ampl_val = ""
                             #Trim the WFS_ in the Type...
-                            cur_list += [f'\t{cur_seg["Name"]}, [{cur_seg["Type"][4:]}], {self._get_units(cur_seg["Duration"])}s, {ampl_val}\n']
+                            cur_list.append((f'\t{cur_seg["Name"]}, [{cur_seg["Type"][4:]}], {self._get_units(cur_seg["Duration"])}s, {ampl_val}\n', 'white'))
+                    elif cur_key == "triggers": #Custom processing for DDG pulses...
+                        for cur_output in cur_hal[cur_key]:
+                            cur_dict = cur_hal[cur_key][cur_output]
+                            cur_strTrig = cur_output + ": "
+                            if "TrigPulseLength" in cur_dict:
+                                cur_strTrig += self._get_units(cur_dict["TrigPulseLength"]) + "s,"
+                            if "TrigPulseDelay" in cur_dict:
+                                if float(cur_dict["TrigPulseDelay"]) > 0:
+                                    cur_strTrig += self._get_units(cur_dict["TrigPulseDelay"]) + "s dly,"
+                            col='white'
+                            if "TrigEnable" in cur_dict:
+                                if cur_dict["TrigEnable"]:
+                                    col = '#80ff80'
+                                else:
+                                    col = '#ffafaf'
+                            if "TrigPolarity" in cur_dict:
+                                if float(cur_dict["TrigPolarity"]) == 1:
+                                    cur_strTrig += "POS"
+                                else:
+                                    cur_strTrig += "NEG"
+                            cur_list.append((cur_strTrig,col))
                 
                 #Get state-colours based on the Output key...
                 cur_on_key = ''
@@ -379,6 +577,8 @@ class ExperimentViewer:
                 else:
                     col = 'white'
 
+                if cur_hal['Type'] == 'DDG':
+                    cur_ddgs += [(cur_str[:-1], col, cur_list)]    #:-1 is to remove the last \n
                 if cur_hal['Type'] == 'GENmwSource':
                     cur_mws += [(cur_str[:-1], col)]    #:-1 is to remove the last \n
                 if cur_hal['Type'] == 'GENswitch':
@@ -421,6 +621,7 @@ class ExperimentViewer:
                         self.dash_SPECs.insert(tree_cur_spec, "end", text=cur_str, tags=[cur_key])
 
             #Setup the dashboard of labels...
+            self.dash_DDGs.set_simple_label_list(cur_ddgs)
             self.dash_MWs.set_simple_labels(cur_mws)
             self.dash_VOLTs.set_simple_labels(cur_volts)
             self.dash_SWs.set_simple_labels(cur_sws)
@@ -549,8 +750,9 @@ class ExperimentViewer:
         self.lstbx_comps.update_vals(list_vals)
 
 
-    def _compare_dicts(self, list_left, list_right):
+    def _compare_dicts(self, list_left, list_right, level=0):
         list_vals = []
+        level_header = '---'*level
         while len(list_left) > 0:
             cur_dict = list_left.pop(0)
             #Find corresponding on the right-list if it exists
@@ -560,19 +762,34 @@ class ExperimentViewer:
                     right_comp = list_right.pop(cur_right_dict_ind)
                     break
             
-            if right_comp == None:
-                list_vals += [f"Killed {cur_dict['Name']}"]
-            else:
-                all_same = True
-                for cur_key in cur_dict:
-                    if cur_dict.get(cur_key, '') != right_comp.get(cur_key, ''):
-                        if all_same:
-                            list_vals += [cur_dict['Name']]
-                            all_same = False
-                        list_vals += [f"---{cur_key}: {cur_dict.get(cur_key, '')} → {right_comp.get(cur_key, '')}"]
+            #Don't need to pop 'Name' as it won't flag as a comparison anyway...
+            vals = self._compare_dict(cur_dict, right_comp, level + 1)
+            if len(vals) > 0:
+                list_vals += [level_header+cur_dict['Name']]
+                list_vals += vals
         while len(list_right) > 0:
             right_comp = list_right.pop(0)
-            list_vals += [f"Added {right_comp['Name']}"]
+            list_vals += [level_header+f"Added {right_comp['Name']}"]
+        
+        return list_vals
+
+    def _compare_dict(self, left, right, level):
+        list_vals = []
+        level_header = '---'*level
+        for cur_key in left:
+            if not cur_key in right:
+                list_vals += [level_header+f"Killed {cur_key}"]
+            else:
+                right_val = right.pop(cur_key)
+                if (isinstance(left.get(cur_key), dict) and isinstance(right_val, dict)):
+                    vals = self._compare_dict(left.get(cur_key), right_val, level + 1)
+                    if len(vals) > 0:
+                        list_vals += [level_header+cur_key]
+                        list_vals += vals
+                elif left.get(cur_key) != right_val:
+                    list_vals += [level_header+f"{cur_key}: {left.get(cur_key)} → {right_val}"]
+        for cur_right_key in right:
+            list_vals += [level_header+f"Added {cur_right_key}"]
         
         return list_vals
 
@@ -582,3 +799,5 @@ if __name__ == '__main__':
         print(sys.argv[1])
         ExperimentViewer(sys.argv[1]).main_loop()
 
+ExperimentViewer(r'D:\WorkUQ\Other Projects\VNA Chevrons\\').main_loop()
+a=0

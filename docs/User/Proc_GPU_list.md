@@ -23,11 +23,13 @@ $$M(t)=A\cos(2\pi ft + \phi) + k$$
 
 where the amplitude *A* and phase *ɸ* of the sinusoidal signal of frequency *f* is desired. The `GPU_DDC` node will take every channel and demodulate each channel to produce two new outputs (thereby replacing the each input with two new output channels):
 
-$$\begin{align*}I(t) & =2\cos(2\pi ft)\cdot M(t)\equiv A\cos(\phi) \color{darkgray}+ 2k\cos(2\pi ft) + A\cos(2(2\pi f)t + \phi)\\ Q(t) & =-2\sin(2\pi ft)\cdot M(t) \equiv A\sin(\phi) \color{darkgray}- 2k\sin(2\pi ft) - A\sin(2(2\pi f)t + \phi)\end{align*}$$
+$$\begin{align*}I(t) & =2\cos(2\pi ft)\cdot M(t)\equiv A\cos(\phi) \color{darkgray}+ 2k\cos(2\pi ft) + A\cos(2(2\pi f)t + \phi)\\
+Q(t) & =-2\sin(2\pi ft)\cdot M(t) \equiv A\sin(\phi) \color{darkgray}- 2k\sin(2\pi ft) - A\sin(2(2\pi f)t + \phi)\end{align*}$$
 
 The *I* and *Q* outputs have constant terms that are of interest. The time-varying sinusoidal terms (marked in grey) are culled via a low-pass filter (such as a `GPU_FIR` stage that follows the `GPU_DDC` stage). The cut-off frequency of the low-pass filter (must be evidently smaller than *f*) sets the bandwidth of the resulting signal given in *A*. The actual amplitude and phase can be extracted via:
 
-$$\begin{align*}A&=\sqrt{I^2 + Q^2}\\\phi&=\arg(I + jQ)\end{align*}$$
+$$\begin{align*}A&=\sqrt{I^2 + Q^2}\\
+\phi&=\arg(I + jQ)\end{align*}$$
 
 To use the `GPU_DDC` stage, consider the following code (assuming that `lab` is a valid `Laboratory` object):
 

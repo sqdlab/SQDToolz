@@ -50,7 +50,12 @@ class DFitPeakLorentzian:
         }
 
         return datapkt
-            
+
+    def get_plot_data_from_dpkt(self, data_x, dpkt):
+        def func(x, a, w, x0, c):
+            return a * (0.5*w)**2/((x-x0)**2 + (0.5*w)**2) + c
+        return func(data_x, dpkt['amplitude'], dpkt['width'], dpkt['centre'], dpkt['offset'])
+
 
 class DFitFanoResonance:
     def __init__(self):
@@ -94,9 +99,13 @@ class DFitFanoResonance:
         if func(x1, popt[0], b, w, x0, popt[4]) > func(x2, popt[0], b, w, x0, popt[4]):
             xMinimum = x2
             xMaximum = x1
+            yMinimum = func(x2, popt[0], b, w, x0, popt[4])
+            yMaximum = func(x1, popt[0], b, w, x0, popt[4])
         else:
             xMinimum = x1
             xMaximum = x2
+            yMinimum = func(x1, popt[0], b, w, x0, popt[4])
+            yMaximum = func(x2, popt[0], b, w, x0, popt[4])
 
         fig = None
         if not dontplot:
@@ -115,6 +124,8 @@ class DFitFanoResonance:
             'offset' : popt[4],
             'xMinimum': xMinimum,
             'xMaximum': xMaximum,
+            'yMinimum': yMinimum,
+            'yMaximum': yMaximum,
             'fig'   : fig
         }
 
@@ -470,4 +481,170 @@ class DFitNotchResonance:
             'tau': sol.x[1],
             'alpha': sol.x[2],
             'ampl' : sol.x[0]
+        }
+
+class DFitReflectanceResonance:
+    def __init__(self):
+        #It fits a dip according to the equation given in P. Pakkiam's thesis.
+        #https://unsworks.unsw.edu.au/entities/publication/6d9ea387-bc52-49d2-b5c2-6979779f4d30 (check Appendix D)
+        pass
+
+    def get_fitted_plot(self, freq_vals, i_vals, q_vals, **kwargs):
+        dont_plot = kwargs.get('dont_plot', False)
+        dont_plot_estimates = kwargs.get('dont_plot_estimates', False)
+        prop_detrend_start = kwargs.get('prop_detrend_start', 0.05)
+        prop_detrend_end = kwargs.get('prop_detrend_end', 0.05)
+        phase_slope_smooth_num = kwargs.get('phase_slope_smooth_num', 25)
+        assert phase_slope_smooth_num % 2 == 1, "Make sure \'phase_slope_smooth_num\' is an odd number."
+        
+        # iq_vals = i_vals + 1j*q_vals
+        # iq_vals = iq_vals * np.exp(-1j*np.angle(iq_vals[0]))
+        # i_vals, q_vals = np.real(iq_vals), np.imag(iq_vals)
+
+        def get_min_max(val1, val2):
+            return min(val1,val2), max(val1,val2)
+        
+        if not dont_plot:
+            if dont_plot_estimates:
+                fig, axs = plt.subplots(ncols=3); fig.set_figwidth(20)
+                axAmp, axPhs, axIQ = axs
+                axAmp.grid(); axPhs.grid(); axIQ.grid()
+            else:
+                fig = plt.figure(); fig.set_figwidth(15); fig.set_figheight(12)
+
+                gs = fig.add_gridspec(2,6)
+                axPhsDetrend = fig.add_subplot(gs[0, 0:2])
+                axPhs = fig.add_subplot(gs[0, 2:4])
+                axPhaseSlope = fig.add_subplot(gs[0, 4:6])
+                axAmp = fig.add_subplot(gs[1, 0:3])
+                axIQ = fig.add_subplot(gs[1, 3:6])
+                gs.update(left=0.0,right=1.0,top=1.0,bottom=0.0,wspace=0.3,hspace=0.09)
+
+                axAmp.grid(); axPhs.grid(); axPhsDetrend.grid(); axPhaseSlope.grid(); axIQ.grid()
+
+        #Phase detrending estimation
+        phase_vals = np.unwrap(np.angle(i_vals + 1j*q_vals))
+        #Take the average of the lines fitted to the the starting and ending sections...
+        cut_ind = int(freq_vals.size*prop_detrend_start)
+        coefs1 = np.polyfit(freq_vals[0:cut_ind], phase_vals[0:cut_ind], 1)
+        cut_ind2 = int(freq_vals.size-freq_vals.size*prop_detrend_end)
+        coefs2 = np.polyfit(freq_vals[cut_ind2:], phase_vals[cut_ind2:], 1)
+        coefs = 0.5*(coefs1+coefs2)
+        # coefs[1] = coefs1[1]
+        #Plot the line...
+        poly1d_fn = np.poly1d(coefs)
+        if not dont_plot and not dont_plot_estimates:
+            axPhsDetrend.plot(freq_vals, phase_vals, 'k', alpha=0.5)
+            poly1d_fn0 = np.poly1d(coefs1)
+            axPhsDetrend.plot(freq_vals, poly1d_fn0(freq_vals), 'r', alpha=0.5)
+            poly1d_fn0 = np.poly1d(coefs2)
+            axPhsDetrend.plot(freq_vals, poly1d_fn0(freq_vals), 'r', alpha=0.5)
+            axPhsDetrend.plot(freq_vals, poly1d_fn(freq_vals), 'r')
+            axPhsDetrend.set_xlabel('Frequency (Hz)')
+            axPhsDetrend.set_ylabel('Phase (rad)')
+            axPhsDetrend.set_title('Estimate Phase Trend')
+            axPhsDetrend.axvspan(freq_vals[0], freq_vals[cut_ind-1], alpha=0.2)
+            axPhsDetrend.axvspan(freq_vals[cut_ind2-1], freq_vals[-1], alpha=0.2)
+
+        #Phase slope estimation
+        detrended_phase = phase_vals - poly1d_fn(freq_vals)
+        def smooth(y, box_pts):
+            box = np.ones(box_pts)/box_pts
+            y_smooth = np.convolve(y, box, mode='valid')
+            return y_smooth
+        phase_slope_freqs = freq_vals[int((phase_slope_smooth_num-1)/2):int(freq_vals.size-(phase_slope_smooth_num+1)/2+1)]
+        phase_derivs = np.diff(smooth(detrended_phase,phase_slope_smooth_num)) / np.diff(phase_slope_freqs)
+        dfit = DFitPeakLorentzian()
+        leDip = np.abs(np.min(phase_derivs)) > np.abs(np.max(phase_derivs))
+        if dont_plot or dont_plot_estimates:
+            dpkt = dfit.get_fitted_plot(phase_slope_freqs[:-1], phase_derivs, xLabel='Frequency (Hz)', yLabel='Phase Slope (rad/Hz)', dip=leDip, dontplot=True)
+        else:
+            dpkt = dfit.get_fitted_plot(phase_slope_freqs[:-1], phase_derivs, xLabel='Frequency (Hz)', yLabel='Phase Slope (rad/Hz)', dip=leDip, axs=axPhaseSlope)
+        ps = dpkt['amplitude']
+        f0 = dpkt['centre']
+        #Plot the Detrended+Slope Estimate...
+        if not dont_plot:
+            axPhs.plot(freq_vals, phase_vals - poly1d_fn(freq_vals), 'k', alpha=0.5)
+            if not dont_plot_estimates:
+                tempYlims = axPhs.get_ylim()
+                axPhs.plot(freq_vals, ps*(freq_vals-f0), 'r', alpha=0.5)
+                axPhs.set_ylim(tempYlims)
+                axPhs.set_xlabel('Frequency (Hz)')
+                axPhs.set_ylabel('Detrended Phase (rad)')
+                axPhs.set_title('Estimate Phase Slope')
+                axPhaseSlope.set_title(f'Detrended Phase Slope (smoothed {phase_slope_smooth_num})')
+
+        #Min-Max Amplitude Estimation
+        data_x, data_y = freq_vals, np.abs(i_vals + 1j*q_vals)
+        dpkt = DFitPeakLorentzian().get_fitted_plot(data_x, data_y, xLabel='Frequency (Hz)', yLabel='|IQ|', dip=True, dontplot=True)
+        #
+        Vmin, Vmax = get_min_max(dpkt['amplitude']+dpkt['offset'], dpkt['offset'])
+        if not dont_plot:
+            axAmp.plot(data_x, data_y, 'k', alpha=0.5)
+            if not dont_plot_estimates:
+                y_data = DFitPeakLorentzian().get_plot_data_from_dpkt(data_x, dpkt)
+                axAmp.plot(data_x, y_data, 'r', alpha=0.5)
+
+        #Calculate initial estimates - check Table D.1
+        w0 = f0*2*np.pi
+        k = Vmax
+        h = 1/k*(Vmax - Vmin)
+        p = ps/(np.pi*2)
+        Qint = (h-1)*w0/(h*(h-2))*np.abs(p)
+        if p > 0:
+            Qext = -(h-1)*w0/h**2*p
+        else:
+            Qext = (h-1)*w0/(h-2)**2*p
+        p0 = coefs[0]/(np.pi*2)
+        phi0 = coefs[1]
+        l = coefs[0]*3e8/(4*np.pi)
+
+        #Perform actual fitting...
+        def func(f, params):
+            k, Qint, Qext, f0, l, phi = params
+            return -k * (1-Qext/Qint*(1+1j*Qint*(f/f0-f0/f))) / (1+Qext/Qint*(1+1j*Qint*(f/f0-f0/f))) * np.exp(2j*2*np.pi*f*l/3e8) * np.exp(1j*phi)
+        def cost_func(params, iq_vals):
+            iq_valsC = iq_vals[0] + 1j*iq_vals[1]
+            func_vals = func(freq_vals, params)
+            k, Qint, Qext, f0, l, phi = params
+            return (np.abs(iq_valsC - func_vals)*np.exp((freq_vals-f0)**2/(freq_vals[-1]-freq_vals[0])**2)).sum()
+            # return (np.abs(iq_valsC - func_vals)).sum()
+        #
+        #Run it once to refine the estimate for tau0 and alpha0, then run it with the same i.c.s to refine the estimate...
+        init_conds = [k, Qint, Qext, f0, l, phi0]
+        sol = scipy.optimize.minimize(cost_func, init_conds, args=[i_vals, q_vals], method='Nelder-Mead',
+                                        bounds = [
+                                            get_min_max(k*0.5,k*1.5),
+                                            get_min_max(Qint*0.5,Qint*2.0),
+                                            get_min_max(Qext*0.5,Qext*2.0),
+                                            ((np.min(freq_vals)+f0)*0.5, (np.max(freq_vals)+f0)*0.5),
+                                            get_min_max(l*0.5,l*1.5),
+                                            get_min_max(phi0*0.75,phi0*1.25)
+                                        ])
+
+        if not dont_plot:
+            axAmp.plot(freq_vals,np.abs(func(freq_vals, init_conds)))
+            axAmp.plot(freq_vals,np.abs(func(freq_vals, sol.x)))
+            axAmp.legend(['Data', 'Helper', 'Guess', 'Fitted'])
+            axAmp.set_xlabel('Frequency (Hz)')
+            axAmp.set_ylabel('Amplitude')
+
+            axPhs.plot(freq_vals,np.angle(func(freq_vals, init_conds[:4]+[0,0])))
+            axPhs.plot(freq_vals,np.angle(func(freq_vals, sol.x[:4].tolist()+[0,0])))
+
+            axIQ.plot(i_vals, q_vals, 'k', alpha=0.5)
+            axIQ.plot(np.real(func(freq_vals, init_conds)), np.imag(func(freq_vals, init_conds)))
+            axIQ.plot(np.real(func(freq_vals, sol.x)), np.imag(func(freq_vals, sol.x)))
+            axIQ.legend(['Data', 'Guess', 'Fitted'])
+            axIQ.set_xlabel('I-Channel')
+            axIQ.set_ylabel('Q-Channel')
+
+        return {
+            'fres' : sol.x[3],
+            'Qint' : sol.x[1],
+            'Qext' : sol.x[2],
+            'Qeff' : sol.x[1]*sol.x[2]/(sol.x[1]+sol.x[2]),
+            'Length': sol.x[4],
+            'Amplitude': sol.x[0],
+            'Phase' : sol.x[5]
         }

@@ -40,6 +40,7 @@ from sqdtoolz.HAL.Processors.GPU.GPU_ConstantArithmetic import*
 from sqdtoolz.HAL.Processors.GPU.GPU_MeanBlock import*
 from sqdtoolz.HAL.Processors.GPU.GPU_FFT import*
 from sqdtoolz.HAL.Processors.GPU.GPU_ESD import*
+from sqdtoolz.HAL.Processors.GPU.GPU_Decimation import*
 
 class ProcessorGPU(DataProcessor):
     def __init__(self, proc_name, lab, pipeline_main = [], pipeline_end = []):

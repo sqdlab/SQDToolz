@@ -391,7 +391,9 @@ class TaborP2584M_AWG(InstrumentChannel):
             self._parent._set_cmd(':TASK:COMP:ENAB', cur_task.trig_src)
       
         #Download task table to channel
+        self._parent._send_cmd(':TASK:COMP:DTR 1')
         self._parent._send_cmd(':TASK:COMP:WRIT')
+        
         # self._set_cmd(':FUNC:MODE', 'TASK')
 
         #Check for errors...
@@ -500,7 +502,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
                 f'trigger{i + 1}Source', label='Source of trigger for selected channel',
                 get_cmd=partial(self._chan_get_cmd, i + 1, ':DIG:TRIG:SOUR?'),
                 set_cmd=partial(self._chan_set_cmd, i + 1, ':DIG:TRIG:SOUR'),
-                val_mapping = {"CPU" : "CPU", "EXT" : "EXT", "CH1" : "CH1", "CH2" : "CH2"},
+                val_mapping = {"CPU" : "CPU", "EXT" : "EXT", "CH1" : "CH1", "CH2" : "CH2", "TASK1" : "TASK1"},
                 initial_value = "EXT")
 
             self.add_parameter(
@@ -623,6 +625,8 @@ class TaborP2584M_ACQ(InstrumentChannel):
         # Select the external-trigger as start-capturing trigger:
         self.trigger1Source("EXT")
         self.trigger2Source("EXT")
+        # self.trigger1Source("TASK1")
+        # self.trigger2Source("TASK1")
         self.extTriggerType("EDGE")
         self.setup_data_path(default = True)
         self._dsp_channels = {"DDC1" : "OFF", "DDC2" : "OFF"}
@@ -730,6 +734,36 @@ class TaborP2584M_ACQ(InstrumentChannel):
         self._last_mem_frames_samples = (self.NumRepetitions, self.NumSegments, self.NumSamples)
         self._parent._chk_err('after allocating readout ACQ memory.')
 
+    def set_svm(self) :
+        # inst.send_scpi_cmd(':DSP:DEC:IQP:SEL DSP1')
+        # inst.send_scpi_cmd(':DSP:DEC:IQP:OUTP SVM')
+        # inst.send_scpi_cmd(':DSP:DEC:IQP:LINE 1,-0.625,-5')
+        # inst.send_scpi_cmd(':DSP:DEC:IQP:LINE 2,1.0125,0.5')
+        # inst.send_scpi_cmd(':DSP:DEC:IQP:LINE 3,0,0')
+        Frame_len = 960
+        DSP_DEC_LEN = Frame_len / 2 - 10
+
+        self._parent._set_cmd(':DSP:STOR1', 'DSP1')
+        self._parent._set_cmd(f':DSP:DEC:FRAM', f'{DSP_DEC_LEN}')
+        
+        # % DSP1 IQ demodulation kernel data
+        # COE_FILE = 'sfir_51_tap.csv';
+        # [ki,kq] = pfunc.iq_kernel(DIG_SCLK,DDC_NCO,COE_FILE);
+        # mem = pfunc.pack_kernel_data(ki,kq,true);
+        # mem = uint32(mem);
+        # mem = typecast(mem, 'uint8');
+        self._parent._set_cmd(':DSP:IQD:SEL', 'IQ4')
+        self._parent._set_cmd(':DSP:DEC:IQP:SEL', 'DSP1')
+        
+        #res = inst.WriteBinaryData(':DSP:IQD:KER:DATA ', mem)
+        self._parent._set_cmd(':DSP:DEC:IQP:SEL', 'DSP1')
+        self._parent._set_cmd(':DSP:DEC:IQP:OUTP', 'SVM')
+        #self._parent._set_cmd(':DSP:DEC:MAPP', '1,DEC1')  
+        # Line, Slope, Intercept
+        self._parent._set_cmd(':DSP:DEC:IQP:LINE', '1,0,0')
+        self._parent._set_cmd(':DSP:DEC:IQP:LINE', '2,1,0')
+        self._parent._set_cmd(':DSP:DEC:IQP:LINE', '3,-1,0')
+
     def get_frame_data(self):
         #Read all frames from Memory
         # 
@@ -792,6 +826,8 @@ class TaborP2584M_ACQ(InstrumentChannel):
             outprint += 'Max Amp: {0}\n'.format(maxVpp)
             outprint += 'Min TimeStamp: {0}\n'.format(timeStamp)
             outprint += 'Decision: {0} + j* {1}\n'.format(decisionReal,decisionIm)
+            outprint += 'State1: {0}\n'.format(state1) 
+            outprint += 'State2: {0}\n'.format(state2)
             print(outprint)
             
         dec_vals = Q_dec + 1j*I_dec # ... and fix it down here 
@@ -885,9 +921,9 @@ class TaborP2584M_ACQ(InstrumentChannel):
                     }
         # Only return data which matches channels that are active
         if (self.ChannelStates[0]) :
-            ret_val['data']['CH1'] = wav1.astype(np.int32)
+            ret_val['data']['CH1'] = self.wav1.astype(np.int32)
         if (self.ChannelStates[1]) :
-            ret_val['data']['CH2'] = wav2.astype(np.int32)
+            ret_val['data']['CH2'] = self.wav2.astype(np.int32)
 
         cur_processor.push_data(ret_val)
 
@@ -1063,7 +1099,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
             k_i[l] = loi[l] * b
         
         print('sigma bn = {0}'.format(b))
-        return(k_i,k_q)
+        return(k_i,k_q) 
 
 
     def setup_kernel(self, path, coefficients, flo, kl=10240) :
@@ -1086,6 +1122,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
         self._parent._inst.write_binary_data(':DSP:IQD:KER:DATA', mem)
         resp = self._parent._inst.send_scpi_query(':SYST:ERR?')
         print(resp)
+        return ki, kq
 
 
     def setup_filter(self, filter_channel, filter_array, **kwargs) :
@@ -1219,16 +1256,18 @@ class TaborP2584M_ACQ(InstrumentChannel):
                 if (self.ddr1_store() == "DIR1") :
                     wav1 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
                     wav1 = wav1.reshape(self.NumRepetitions, self.NumSegments, int(fakeNumSamples))
-                else :
-                    wav1 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
-                    wav1 = wav1.reshape(self.NumRepetitions, self.NumSegments, int(fakeNumSamples))
+                elif ("DSP" in self.ddr1_store()) :
+                    wav1 = np.zeros(wavlen, dtype=np.uint32)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
+                    wav1 = wav1[:int(len(wav1)/2)]
+                    wav1 = wav1.reshape(self.NumRepetitions, self.NumSegments, int(np.floor(fakeNumSamples/2)))
             #if (self.ChannelStates[1]) :
             if (self.ddr2_store() == "DIR2") :
                 wav2 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
                 wav2 = wav2.reshape(self.NumRepetitions, self.NumSegments, int(fakeNumSamples)) # self.NumSamples
-            else :
-                wav2 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
-                wav2 = wav2.reshape(self.NumRepetitions, self.NumSegments, int(fakeNumSamples)) # self.NumSamples
+            elif ("DSP" in self.ddr1_store()) :
+                wav2 = np.zeros(wavlen, dtype=np.uint32)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
+                wav1 = wav1[:int(len(wav1)/2)]
+                wav2 = wav2.reshape(self.NumRepetitions, self.NumSegments, int(np.floor(fakeNumSamples/2))) # self.NumSamples
         
             # Ensure all previous commands have been executed
             while (not self._parent._get_cmd('*OPC?')):

@@ -45,6 +45,25 @@ import time
 import unittest
 import matplotlib.pyplot as plt
 
+### ==========================GLOBAL PARAMETERS================================= ###
+PULSE_SHAPE = True
+PW          = 5e-7
+PHASE       = 0
+FRAME_NMB   = 10000 # this value maust be divided by 4
+P_FREQ      = 415000000
+ADC_CLOCK   = 2700000000
+DIG_SCLK = ADC_CLOCK
+SCLK = DIG_SCLK / 10 * 32
+WAVE_TIME = PW
+GAUS_PW = PW
+GAUS_PHASE = PHASE
+DDC_NCO = P_FREQ
+DUC_INTERP = 1
+Frame_len = 960
+DSP_DEC_LEN = Frame_len / 2 - 10
+Debug = False
+FRAME_NUM = FRAME_NMB
+GEN_CH = 1
 
 ### ==========================INSTRUMENT SETUP================================== ###
 # Create New Laboratory Class
@@ -52,6 +71,36 @@ lab = Laboratory(instr_config_file = "tests\\TaborTest_JD.yaml", save_dir = "myS
 
 # Load the Tabor into the lab class to use
 lab.load_instrument('TaborAWG')
+
+# Create interface to send SCPI commands over
+acq_module = ACQ("TaborACQ", lab, ['TaborAWG', 'ACQ'])
+tab_module = acq_module._instr_acq._parent
+
+# Setup Generator
+tab_module._send_cmd('*CLS')
+tab_module._send_cmd('*RST')
+tab_module._send_cmd(':FREQ:RAST 2500E6')
+tab_module._send_cmd(f':INT X {DUC_INTERP}')
+tab_module._send_cmd(':ROSC:SOUR INT')
+tab_module._send_cmd(f':FREQ:RAST {SCLK}')
+tab_module._send_cmd(f':INST:CHAN {GEN_CH}')
+tab_module._send_cmd(f':OUTP:VOLT 0.55')
+tab_module._send_cmd(':TRAC:DEL:ALL')
+
+# Creating gaussian square pulse
+
+# Download wave to segment 1 to 4
+
+# Create a DC wave
+
+# Download DC wave to segment 5
+
+# Create task table
+
+# Setup Digitizer
+
+# Setup DSP and capturing
+
 
 # Define the modulation waveform transformation
 #WFMT_ModulationIQ("myTestMod", lab, 100e6)
@@ -797,26 +846,24 @@ def test_awg_driver_9() :
     print("Running AWG Driver Test 9")
     # Waveform transformation
     WFMT_ModulationIQ("OscMod", lab, 100e6)
-    filt_coeffs = scipy.signal.firwin(51, 10e6, fs=lab._get_instrument('TaborAWG').ACQ.sample_rate())
-    #filt_coeffs = np.ones(51)
-    print(filt_coeffs)
+
     # Setup waveforms
     awg_wfm1 = WaveformAWG("Waveform CH1", lab,  [(['TaborAWG', 'AWG'], 'CH1')], 1e9)
-    #awg_wfm2 = WaveformAWG("Waveform CH2", lab,  [(['TaborAWG', 'AWG'], 'CH2')], 1e9)
+    awg_wfm2 = WaveformAWG("Waveform CH2", lab,  [(['TaborAWG', 'AWG'], 'CH2')], 1e9)
 
     # Add Segments to CH1
     
     #awg_wfm1.add_waveform_segment(WFS_Constant(f"CH1_init", None, 1024e-9, 0.4)) # lab.WFMT('OscMod').apply()
     #awg_wfm1.add_waveform_segment(WFS_Constant(f"CH1_init1", None, 1024e-9, 0.4)) # lab.WFMT('OscMod').apply()
     #awg_wfm1.add_waveform_segment(WFS_Constant(f"init", lab.WFMT('OscMod').apply(), 512e-9-384e-9, 0.25))
-    awg_wfm1.add_waveform_segment(WFS_Cosine(f"CH1_init", None, 3*1024e-9, amplitude=-0.3, frequency=100e6, phase=np.pi))
+    awg_wfm1.add_waveform_segment(WFS_Cosine(f"CH1_init", None, 2*1024e-9, amplitude=0.25, frequency=100e6, phase=0.0))
     #awg_wfm1.add_waveform_segment(WFS_Cosine(f"CH1_init1", None, 1024e-9, amplitude=0.25, frequency=100e6, phase=0.0))
-    awg_wfm1.add_waveform_segment(WFS_Constant(f"CH1_zero2", None, 1*1024e-9, 0.0))
+    awg_wfm1.add_waveform_segment(WFS_Constant(f"CH1_zero2", None, 576e-9, 0.0))
 
     # Add Segments to CH2
-    #awg_wfm2.add_waveform_segment(WFS_Cosine(f"CH2_init", None, 2*1024e-9, amplitude=0.0, frequency=100e6, phase=0.0))
+    awg_wfm2.add_waveform_segment(WFS_Cosine(f"CH2_init", None, 2*1024e-9, amplitude=0.25, frequency=100e6, phase=0.0))
     #awg_wfm2.add_waveform_segment(WFS_Constant(f"CH2_init1", None, 1024e-9, 0.1)) 
-    #awg_wfm2.add_waveform_segment(WFS_Constant(f"CH2_zero2", None, 2*1024e-9, 0.0))
+    awg_wfm2.add_waveform_segment(WFS_Constant(f"CH2_zero2", None, 576e-9, 0.0))
     
     # Setup trigger 
     awg_wfm1.get_output_channel(0).marker(0).set_markers_to_segments(["CH1_init"])
@@ -824,23 +871,22 @@ def test_awg_driver_9() :
     # Prepare waveforms and output them
     awg_wfm1.prepare_initial()
     awg_wfm1.prepare_final()
-    #awg_wfm2.prepare_initial()
-    #awg_wfm2.prepare_final()
+    awg_wfm2.prepare_initial()
+    awg_wfm2.prepare_final()
 
     # Set output channel to true
     awg_wfm1.get_output_channel(0).Output = True
-    #awg_wfm2.get_output_channel(0).Output = True
+    awg_wfm2.get_output_channel(0).Output = True
     instr = lab._get_instrument('TaborAWG')
     
     acq_module = ACQ("TaborACQ", lab, ['TaborAWG', 'ACQ'])
     acq_module._instr_acq.setup_data_path(ddc_mode = "REAL", acq_mode = "DUAL", ddr1_store = "DSP1", ddr2_store = "DSP2")
-    ki,kq = acq_module._instr_acq.setup_kernel("IQ4", filt_coeffs, flo = 100e6)
     acq_module.set_data_processor(None)
     acq_module._instr_acq.set_svm()
     acq_module.NumSamples = 4800
     acq_module.NumSegments = 1
     acq_module.NumRepetitions = 1
-    
+
 
     leData = acq_module.get_data()
     leDecisions = instr.ACQ.get_frame_data() # THIS PROVIDES FRAME DATA, NEED TO CALIBRATE FEED BACK FROM THIS
@@ -848,14 +894,14 @@ def test_awg_driver_9() :
     import matplotlib.pyplot as plt
     for r in range(acq_module.NumRepetitions) :
         for s in range(acq_module.NumSegments) :
-            dataCH1 = np.sqrt(leData['data']['CH1'][r][s][1::2] ** 2 + leData['data']['CH1'][r][s][0::2] ** 2)     #I
-            #dataCH2 = np.sqrt(leData['data']['CH2'][r][s][1::2] ** 2 + leData['data']['CH2'][r][s][0::2] ** 2)
-            #plt.plot(dataCH1)
-            #plt.plot(dataCH2)
+            # dataCH1 = np.sqrt(leData['data']['CH1'][r][s][1::2] ** 2 + leData['data']['CH1'][r][s][0::2] ** 2)     #I
+            # dataCH2 = np.sqrt(leData['data']['CH2'][r][s][1::2] ** 2 + leData['data']['CH2'][r][s][0::2] ** 2)
+            # plt.plot(dataCH1)
+            # plt.plot(dataCH2)
             CH1_Idata = leData['data']['CH1'][r][s][1::2]    #I
-            #plt.plot(CH1_Idata)
+            plt.plot(CH1_Idata)
             CH1_Qdata = leData['data']['CH1'][r][s][0::2]    #Q
-            #plt.plot(CH1_Qdata)
+            plt.plot(CH1_Qdata)
             CH1_I_val = np.sum(CH1_Idata)
             CH1_Q_val = np.sum(CH1_Qdata)
             print(f"I Val: {CH1_I_val}, Q Val: {CH1_Q_val}")
@@ -871,7 +917,7 @@ def test_awg_driver_9() :
 
 def test_svm_driver_1() :
     acq_module = ACQ("TaborACQ", lab, ['TaborAWG', 'ACQ'])
-
+    
     acq_module._instr_acq.setup_data_path(ddc_mode = "REAL", acq_mode = "DUAL", ddr1_store = "DSP1", ddr2_store = "DSP2")
     acq_module.set_data_processor(None)
     acq_module._instr_acq.set_svm()
@@ -905,8 +951,8 @@ def test_svm_driver_1() :
 # test_acq_driver_4()
 
 ### AWG TESTS ###
-# test_awg_driver_9()
-test_awg_driver_2()
+test_awg_driver_9()
+# test_awg_driver_2()
 # test_awg_driver_3()
 # test_awg_driver_4()
 # test_awg_driver_5()

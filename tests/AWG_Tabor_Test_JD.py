@@ -550,7 +550,7 @@ def test_awg_driver_2() :
     acq_module = ACQ("TaborACQ", lab, ['TaborAWG', 'ACQ'])
     acq_module.NumSamples = 4800
     acq_module.NumSegments = 1
-    acq_module.NumRepetitions = 1
+    acq_module.NumRepetitions = 2
 
 
     leData = acq_module.get_data()
@@ -559,8 +559,9 @@ def test_awg_driver_2() :
     import matplotlib.pyplot as plt
     for r in range(acq_module.NumRepetitions) :
         for s in range(acq_module.NumSegments) :
-            data = np.sqrt(leData['data']['CH1'][r][s][1::2] ** 2 + leData['data']['CH1'][r][s][0::2] ** 2)     #I
-            plt.plot(data)
+            times = np.arange(acq_module.NumSamples)/acq_module.SampleRate
+            plt.plot(times, leData['data']['CH1'][r][s])
+            plt.plot(times, leData['data']['CH2'][r][s])            
     plt.show()
     awg_wfm1.get_output_channel(0).Output = False
     input('Press ENTER to finish test.')

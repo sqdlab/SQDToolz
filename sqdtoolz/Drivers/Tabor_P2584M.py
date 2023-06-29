@@ -163,11 +163,12 @@ class AWG_TaborP2584M_channel(InstrumentChannel):
         self.offset.inter_delay = self.offset.step / ramp_rate
 
 class AWG_TaborP2584M_task:
-    def __init__(self, seg_num, num_cycles, next_task_ind, trig_src='NONE'):
+    def __init__(self, seg_num, num_cycles, next_task_ind, trig_src='NONE', trig_adc=False):
         self.seg_num = seg_num
         self.num_cycles = num_cycles
         self.next_task_ind = next_task_ind  #NOTE: Indexed from 1
         self.trig_src = trig_src
+        self.trig_adc = trig_adc
 
 class TaborP2584M_AWG(InstrumentChannel):
     """
@@ -255,7 +256,7 @@ class TaborP2584M_AWG(InstrumentChannel):
         self._trigger_edge = pol
 
     def num_supported_markers(self, channel_name):
-        return 2
+        return 3
 
     @property
     def AutoCompressionSupport(self):
@@ -345,6 +346,51 @@ class TaborP2584M_AWG(InstrumentChannel):
         #Select channel
         self._parent._set_cmd(':INST:CHAN', chan_ind+1)
 
+        #Split the waveform into task segments if there are internally triggered markers...
+        if dict_wfm_data['markers'][0][2].size > 0:
+            assert np.abs(self.SampleRate / self._parent.ACQ.SampleRate - 0.8) < 1e-5, "AWG sample rate must be 80% the ACQ sample rate when using internal trigger."
+            assert len(dict_wfm_data['seq_ids']) == 1, "Currently internal triggers are only supported for non-compression mode."   #TODO: Fix this...
+            #Build the task list as per the ADC triggers...
+            int_mkrs = dict_wfm_data['markers'][0][2].astype(np.int8)
+            diffs = np.concatenate([[int_mkrs[0]-int_mkrs[-1]], int_mkrs[1:]-int_mkrs[:-1]])
+            if self._parent.ACQ.TriggerInputEdge == 1:
+                edges = np.where(diffs==1)[0]
+            else:
+                edges = np.where(diffs==-1)[0]
+            #Split waveforms based on internal trigger edges
+            dict_wfm_data['waveforms'] = [x for x in np.split(dict_wfm_data['waveforms'][0], edges) if x.size > 0]
+            #Split all markers based on internal trigger edges
+            if dict_wfm_data['markers'][0][0].size > 0:
+                mkr1 = [x for x in np.split(dict_wfm_data['markers'][0][0], edges) if x.size > 0]
+            else:
+                mkr1 = [np.array([]) for x in range(len(dict_wfm_data['waveforms']))]
+            if dict_wfm_data['markers'][0][1].size > 0:
+                mkr2 = [x for x in np.split(dict_wfm_data['markers'][0][1], edges) if x.size > 0]
+            else:
+                mkr2 = [np.array([]) for x in range(len(dict_wfm_data['waveforms']))]
+            mkrInt = [x for x in np.split(dict_wfm_data['markers'][0][2], edges) if x.size > 0]
+            dict_wfm_data['markers'] = [[mkr1[x], mkr2[x], mkrInt[x]] for x in range(len(dict_wfm_data['waveforms']))]
+            #Create task table
+            task_list = []
+            cur_ind = 0
+            for seg_id in range(len(dict_wfm_data['waveforms'])):
+                task_list += [AWG_TaborP2584M_task(seg_id+1 + seg_offset, 1, (seg_id+1)+1, trig_adc=cur_ind in edges)]
+                cur_ind += dict_wfm_data['waveforms'][seg_id].size
+            task_list[0].trig_src = cur_chnl.trig_src()     #First task is triggered off the TRIG source
+            task_list[-1].next_task_ind = 1                 #Last task maps back onto the first task
+            self._parent.ACQ.trigger1Source(f'TASK{chan_ind+1}')
+            self._parent.ACQ.trigger2Source(f'TASK{chan_ind+1}')
+            # Set Trigger AWG delay to 0 - ?????
+            self._parent._send_cmd(':DIG:TRIG:AWG:TDEL {0}'.format(4e-9))
+        else:
+            self._parent.ACQ.trigger1Source('EXT')
+            self._parent.ACQ.trigger2Source('EXT')
+            task_list = []
+            for m, seg_id in enumerate(dict_wfm_data['seq_ids']):
+                task_list += [AWG_TaborP2584M_task(seg_id+1 + seg_offset, 1, (m+1)+1)]
+            task_list[0].trig_src = cur_chnl.trig_src()     #First task is triggered off the TRIG source
+            task_list[-1].next_task_ind = 1                 #Last task maps back onto the first task
+
         #Program the memory banks
         for m in range(len(dict_wfm_data['waveforms'])):
             cur_data = dict_wfm_data['waveforms'][m]
@@ -353,12 +399,7 @@ class TaborP2584M_AWG(InstrumentChannel):
             cur_data = (cur_data - cur_off)/cur_amp
             assert (max(cur_data) < np.abs(cur_chnl.Amplitude + cur_chnl.Offset)), "The Amplitude and Offset are too large, output will be saturated"
             self._send_data_to_memory(m+1 + seg_offset, cur_data, dict_wfm_data['markers'][m])
-        #Program the task table...
-        task_list = []
-        for m, seg_id in enumerate(dict_wfm_data['seq_ids']):
-            task_list += [AWG_TaborP2584M_task(seg_id+1 + seg_offset, 1, (m+1)+1)]
-        task_list[0].trig_src = cur_chnl.trig_src()     #First task is triggered off the TRIG source
-        task_list[-1].next_task_ind = 1                 #Last task maps back onto the first task
+        #Program the task table...            
         self._program_task_table(chan_ind+1, task_list)
         
         self._parent._set_cmd('FUNC:MODE', 'TASK')
@@ -387,6 +428,8 @@ class TaborP2584M_AWG(InstrumentChannel):
             #Set task parameters...
             self._parent._set_cmd(':TASK:COMP:LOOP', cur_task.num_cycles)
             self._parent._set_cmd(':TASK:COMP:SEGM', cur_task.seg_num)
+            if cur_task.trig_adc:
+                self._parent._set_cmd(':TASK:COMP:DTRigger', 'ON')
             self._parent._set_cmd(':TASK:COMP:NEXT1', cur_task.next_task_ind)
             self._parent._set_cmd(':TASK:COMP:ENAB', cur_task.trig_src)
       
@@ -428,7 +471,7 @@ class TaborP2584M_AWG(InstrumentChannel):
         self._parent._chk_err('after writing binary values to AWG waveform memory.')
 
         total_mkrs = np.array([])
-        for mkr_ind, cur_mkr_data in enumerate(mkr_data):
+        for mkr_ind, cur_mkr_data in enumerate(mkr_data[:2]):   #3rd marker is internal
             if mkr_data[mkr_ind].size == 0:
                 continue
             # self._set_cmd(':MARK:SEL', mkr_ind+1)
@@ -552,22 +595,13 @@ class TaborP2584M_ACQ(InstrumentChannel):
             initial_value = "REAL")
 
         self.add_parameter(
-            'ddr1_store', label='Data path to be stored in DDR1',
-            get_cmd=partial(self._parent._get_cmd, ':DSP:STOR1?'),
-            set_cmd=partial(self._parent._set_cmd, ':DSP:STOR1'),
-            val_mapping = {"DIR1" : "DIR1", "DIR2" : "DIR2", "DSP1":"DSP1",\
+            'ddr_store', label='Data path to be stored in DDR1',
+            get_cmd=partial(self._parent._get_cmd, ':DSP:STOR?'),
+            set_cmd=partial(self._parent._set_cmd, ':DSP:STOR'),
+            val_mapping = {"DIR" : "DIR, DIR", "DSP1":"DSP1",\
                 "DSP2":"DSP2", "DSP3":"DSP3", "DSP4":"DSP4", "FFTI":"FFTI",\
                 "FFTO":"FFTO"},
-            initial_value = "DIR1")
-
-        self.add_parameter(
-            'ddr2_store', label='Data path to be stored in DDR2',
-            get_cmd=partial(self._parent._get_cmd, ':DSP:STOR2?'),
-            set_cmd=partial(self._parent._set_cmd, ':DSP:STOR2'),
-            val_mapping = {"DIR1" : "DIR1", "DIR2" : "DIR2", "DSP1":"DSP1",\
-                "DSP2":"DSP2", "DSP3":"DSP3", "DSP4":"DSP4", "FFTI":"FFTI",\
-                "FFTO":"FFTO"},
-            initial_value = "DIR2")
+            initial_value = "DIR")
 
         self.add_parameter(
             'iq_demod', label='Select IQ demodulation block to configure (REAL mode)',
@@ -852,14 +886,14 @@ class TaborP2584M_ACQ(InstrumentChannel):
             wavlen = int(blocksize*self.NumSegments*self.NumSamples)
             # print(self.num_bytes)
             #TODO : Run a check on DSP before setting up the waves, NEED TO KNOW WHAT CHANNEL AS WELL
-            if (self.ddr1_store() == "DIR1") :
+            if (self.ddr1_store() == "DIR") :
                 wav1 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
                 wav1 = wav1.reshape(blocksize, self.NumSegments, self.NumSamples)
             else :
                 wav1 = np.zeros(wavlen, dtype=np.uint32)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
                 wav1 = wav1.reshape(blocksize, self.NumSegments, self.NumSamples)
 
-            if (self.ddr2_store() == "DIR2") :
+            if (self.ddr2_store() == "DIR") :
                 wav2 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
                 wav2 = wav2.reshape(blocksize, self.NumSegments, self.NumSamples)
             else :
@@ -1051,15 +1085,14 @@ class TaborP2584M_ACQ(InstrumentChannel):
                 # Set Default Values
                 self.acq_mode("DUAL")
                 self.ddc_mode("REAL")
-                self.ddr1_store("DIR1")
-                self.ddr2_store("DIR2")
+                self.ddr_store("DIR")
+                # self._parent._send_cmd(':DIG:DDC:CLKS AWG')
                 return
 
         # Assign variables
         self.acq_mode(kwargs.get("acq_mode", self.acq_mode()))
         self.ddc_mode(kwargs.get("ddc_mode", self.ddc_mode()))
-        self.ddr1_store(kwargs.get("ddr1_store", self.ddr1_store()))
-        self.ddr2_store(kwargs.get("ddr2_store", self.ddr2_store()))
+        self.ddr_store(kwargs.get("ddr_store", self.ddr_store()))
         # self.ddc_mode("COMP")
         # self.ddc_mode("REAL")
         # If in Complex mode, storage options are limited 
@@ -1245,6 +1278,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
             self._parent._set_cmd(':DIG:DATA:TYPE', 'FRAM')
             
             # Get the total data size (in bytes)
+            self._parent._set_cmd(':DIG:CHAN:SEL', 1)
             resp = self._parent._get_cmd(':DIG:DATA:SIZE?')
             num_bytes = np.uint64(resp)
             #print(num_bytes, 'hi', self._parent._get_cmd(':DIG:DATA:FRAM?'))
@@ -1253,21 +1287,21 @@ class TaborP2584M_ACQ(InstrumentChannel):
             fakeNumSamples = num_bytes / (self.NumSegments*2)
             # TODO: NEED TO CHANGE DATATYPE BASED ON DSP MODE # NOTE: WE NO LONGER HAVE TO?!?!?! WHATS GOING ON HERE
             if (self.ChannelStates[0]) :
-                if (self.ddr1_store() == "DIR1") :
+                if (self.ddr_store() == "DIR") :
                     wav1 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
-                    wav1 = wav1.reshape(self.NumRepetitions, self.NumSegments, int(fakeNumSamples))
-                elif ("DSP" in self.ddr1_store()) :
+                    # wav1 = wav1.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)
+                elif ("DSP" in self.ddr_store()) :
                     wav1 = np.zeros(wavlen, dtype=np.uint32)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
                     wav1 = wav1[:int(len(wav1)/2)]
                     wav1 = wav1.reshape(self.NumRepetitions, self.NumSegments, int(np.floor(fakeNumSamples/2)))
-            #if (self.ChannelStates[1]) :
-            if (self.ddr2_store() == "DIR2") :
-                wav2 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
-                wav2 = wav2.reshape(self.NumRepetitions, self.NumSegments, int(fakeNumSamples)) # self.NumSamples
-            elif ("DSP" in self.ddr1_store()) :
-                wav2 = np.zeros(wavlen, dtype=np.uint32)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
-                wav1 = wav1[:int(len(wav1)/2)]
-                wav2 = wav2.reshape(self.NumRepetitions, self.NumSegments, int(np.floor(fakeNumSamples/2))) # self.NumSamples
+            if (self.ChannelStates[1]) :
+                if (self.ddr_store() == "DIR") :
+                    wav2 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
+                    # wav2 = wav2.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples) # self.NumSamples
+                elif ("DSP" in self.ddr_store()) :
+                    wav2 = np.zeros(wavlen, dtype=np.uint32)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
+                    wav1 = wav1[:int(len(wav1)/2)]
+                    wav2 = wav2.reshape(self.NumRepetitions, self.NumSegments, int(np.floor(fakeNumSamples/2))) # self.NumSamples
         
             # Ensure all previous commands have been executed
             while (not self._parent._get_cmd('*OPC?')):
@@ -1276,6 +1310,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
                 # Read from channel 1
                 self._parent._set_cmd(':DIG:CHAN:SEL', 1)
                 rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav1, num_bytes)
+                wav1 = wav1.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)
                 # Ensure all previous commands have been executed
                 while (not self._parent._get_cmd('*OPC?')):
                     pass
@@ -1283,6 +1318,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
                 # read from channel 2
                 self._parent._set_cmd(':DIG:CHAN:SEL', 2)
                 rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav2, num_bytes)
+                wav2 = wav2.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)
                 # Ensure all previous commands have been executed
                 while (not self._parent._get_cmd('*OPC?')):
                     pass

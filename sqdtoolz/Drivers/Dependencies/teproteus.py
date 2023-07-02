@@ -106,7 +106,7 @@ class TEProteusAdmin(object):
             lib_path = os.path.join(script_dir, 'TEProteus.dll')
             if os.path.exists(lib_path):
                 lib_dir_path = script_dir
-
+        
         if lib_dir_path is not None:
             libpath = os.path.join(lib_dir_path, 'TEProteus.dll')
         else:
@@ -114,8 +114,11 @@ class TEProteusAdmin(object):
             if not libpath:
                 sys32path = str('C:/Windows/System32/TEProteus.dll')
                 if os.path.exists(sys32path):
-                    libpath = sys32path
-
+                    libpath = sys32path	
+                else:
+                    print('TEProteus.dll is not present at : C:/Windows/System32')
+        
+        print('Load TEProteus.dll from : {0}'.format(libpath))
         teplib = ct.cdll.LoadLibrary(libpath)
 
         if teplib is None:
@@ -652,6 +655,7 @@ class TEProteusAdmin(object):
                 instid = inst._instr_id
                 self._inst_dict[instid] = inst
                 return inst
+        print('unable to connect to instrument')
         return None
 
     def open_multi_slots_instrument(self, slot_ids, reset_hot_flag=True):

@@ -14,7 +14,7 @@ import numpy as np
 from functools import partial
 
 from copy import deepcopy
-
+import scipy.signal
 class AWG_TaborP2584M_channel(InstrumentChannel):
     """
     AWG Channel class for the Tabor Proteus RF Transceiver
@@ -85,31 +85,31 @@ class AWG_TaborP2584M_channel(InstrumentChannel):
 
     def _get_cmd(self, cmd):
         #Perform channel-select
-        self._parent.parent._inst.send_scpi_cmd(f':INST:CHAN {self._channel}')
+        self._parent.parent._send_cmd(f':INST:CHAN {self._channel}')
         #Query command
         return self._parent.parent._inst.send_scpi_query(cmd)
 
     def _set_cmd(self, cmd, value):
         #Perform channel-select
-        self._parent.parent._inst.send_scpi_cmd(f':INST:CHAN {self._channel}')
+        self._parent.parent._send_cmd(f':INST:CHAN {self._channel}')
         #Perform command
-        self._parent.parent._inst.send_scpi_cmd(f'{cmd} {value}')
+        self._parent.parent._send_cmd(f'{cmd} {value}')
 
     def _get_mkr_cmd(self, cmd, mkr_num):
         #Perform channel-select
-        self._parent.parent._inst.send_scpi_cmd(f':INST:CHAN {self._channel}')
+        self._parent.parent._send_cmd(f':INST:CHAN {self._channel}')
         #Perform marker-select
-        self._parent.parent._inst.send_scpi_cmd(f':MARK:SEL {mkr_num}')
+        self._parent.parent._send_cmd(f':MARK:SEL {mkr_num}')
         #Perform command
         return self._parent.parent._inst.send_scpi_query(cmd)
 
     def _set_mkr_cmd(self, cmd, mkr_num, value):
         #Perform channel-select
-        self._parent.parent._inst.send_scpi_cmd(f':INST:CHAN {self._channel}')
+        self._parent.parent._send_cmd(f':INST:CHAN {self._channel}')
         #Perform marker-select
-        self._parent.parent._inst.send_scpi_cmd(f':MARK:SEL {mkr_num}')
+        self._parent.parent._send_cmd(f':MARK:SEL {mkr_num}')
         #Perform command
-        self._parent.parent._inst.send_scpi_cmd(f'{cmd} {value}')
+        self._parent.parent._send_cmd(f'{cmd} {value}')
 
 
     @property
@@ -240,6 +240,7 @@ class TaborP2584M_AWG(InstrumentChannel):
         self._used_memory_segments = [None]*2
 
         self._sequence_lens = [None]*4
+        self._cur_internal_trigs = [False]*4
 
     @property
     def SampleRate(self):
@@ -280,6 +281,12 @@ class TaborP2584M_AWG(InstrumentChannel):
         """
         chan_ind = self._ch_list.index(chan_id)
         self._sequence_lens[chan_ind] = seg_lens
+        dict_wfm_data = kwargs['raw_data']
+        if dict_wfm_data['markers'][0][2].size > 0:
+            assert len(dict_wfm_data['seq_ids']) == 1, "Currently internal triggers are only supported for non-compression mode."   #TODO: Fix this...
+            self._cur_internal_trigs[chan_ind] = True
+        else:
+            self._cur_internal_trigs[chan_ind] = False
         self._banks_setup = False
 
     def _setup_memory_banks(self):
@@ -596,9 +603,9 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
         self.add_parameter(
             'ddr_store', label='Data path to be stored in DDR1',
-            get_cmd=partial(self._parent._get_cmd, ':DSP:STOR?'),
+            get_cmd=lambda : self._parent._get_cmd(':DSP:STOR?').split(',')[0],
             set_cmd=partial(self._parent._set_cmd, ':DSP:STOR'),
-            val_mapping = {"DIR" : "DIR, DIR", "DSP1":"DSP1",\
+            val_mapping = {"DIR" : "DIR", "DSP":"DSP",\
                 "DSP2":"DSP2", "DSP3":"DSP3", "DSP4":"DSP4", "FFTI":"FFTI",\
                 "FFTO":"FFTO"},
             initial_value = "DIR")
@@ -608,7 +615,8 @@ class TaborP2584M_ACQ(InstrumentChannel):
             get_cmd=partial(self._parent._get_cmd, ':DSP:IQD:SEL?'),
             set_cmd=partial(self._parent._set_cmd, ':DSP:IQD:SEL'),
             val_mapping = {"DBUG":"DBUG", "IQ4":"IQ4", "IQ5":"IQ5", "IQ6":"IQ6",\
-                "IQ7":"IQ7"})
+                "IQ7":"IQ7", "IQ8":"IQ8", "IQ9":"IQ9", "IQ10":"IQ10", "IQ11":"IQ11",\
+                "IQ12":"IQ12", "IQ13":"IQ13"})
 
         """
         self.add_parameter(
@@ -739,9 +747,9 @@ class TaborP2584M_ACQ(InstrumentChannel):
         Method to manage switching to active channel before running set command
         """
         #Perform channel-select
-        self.activeChannel(ch) #self._parent._inst.send_scpi_cmd(f':DIG:CHAN {self._active_channel}')
+        self.activeChannel(ch) #self._parent._send_cmd(f':DIG:CHAN {self._active_channel}')
         #Perform command
-        self._parent._inst.send_scpi_cmd(f'{cmd} {value}')
+        self._parent._send_cmd(f'{cmd} {value}')
 
     def _allocate_frame_memory(self):
         """
@@ -798,11 +806,119 @@ class TaborP2584M_ACQ(InstrumentChannel):
         self._parent._set_cmd(':DSP:DEC:IQP:LINE', '2,1,0')
         self._parent._set_cmd(':DSP:DEC:IQP:LINE', '3,-1,0')
 
-    def get_frame_data(self):
+    def _get_captured_header(self, printHeader=False,N=1,buf=[]):
+        header_size=72
+        number_of_frames = N
+        num_bytes = number_of_frames * header_size
+        Proteus_header = []
+
+        
+        class header(object):
+            def __init__(self):
+                self.TriggerPos = 0
+                self.GateLength = 0
+                self.minVpp = 0
+                self.maxVpp = 0
+                self.TimeStamp = 0
+                self.real1_dec = 0
+                self.im1_dec = 0
+                self.real2_dec = 0
+                self.im2_dec = 0
+                self.real3_dec = 0
+                self.im3_dec = 0
+                self.real4_dec = 0
+                self.im4_dec = 0
+                self.real5_dec = 0
+                self.im5_dec = 0
+                self.state1 = 0
+                self.state2 = 0
+                self.state3 = 0
+                self.state4 = 0
+                self.state5 = 0
+
+        # create sets of header classes
+        for i in range(number_of_frames):
+            Proteus_header.append(header())
+
+        for i in range(number_of_frames):
+            idx = i* header_size
+            Proteus_header[i].TriggerPos = buf[idx+0]*(1 << 0) + buf[idx+1]*(1 << 8) + buf[idx+2]*(1 << 16) + buf[idx+3]*(1 << 24)
+            Proteus_header[i].GateLength = buf[idx+4]*(1 << 0) + buf[idx+5]*(1 << 8) + buf[idx+6]*(1 << 16) + buf[idx+7]*(1 << 24)
+            Proteus_header[i].minVpp     = buf[idx+8]*(1 << 0) + buf[idx+9]*(1 << 8)
+            Proteus_header[i].maxVpp     = buf[idx+10]*(1 << 0) + buf[idx+11]*(1 << 8)
+            
+            timeStamp1 = buf[idx+12]*(1 << 0)
+            timeStamp2 = buf[idx+13]*(1 << 8)  
+            timeStamp3 = buf[idx+14]*(1 << 16) 
+            timeStamp4 = buf[idx+15]*(1 << 32) / 256
+            timeStamp5 = buf[idx+16]*(1 << 32) 
+            timeStamp6 = buf[idx+17]*(1 << 40) 
+            timeStamp7 = buf[idx+18]*(1 << 48) 
+            timeStamp8 = buf[idx+19]*(1 << 56)
+
+            Proteus_header[i].TimeStamp = timeStamp1 + timeStamp2 + timeStamp3 + timeStamp4 + timeStamp5 + timeStamp6 + timeStamp7 + timeStamp8
+            
+            decisionRe1 = buf[idx+20]*(1 << 0) + buf[idx+21]*(1 << 8) + buf[idx+22]*(1 << 16) + buf[idx+23]*(1 << 24)
+            decisionIm1 = buf[idx+24]*(1 << 0) + buf[idx+25]*(1 << 8) + buf[idx+26]*(1 << 16) + buf[idx+27]*(1 << 24)
+            decisionRe2 = buf[idx+28]*(1 << 0) + buf[idx+29]*(1 << 8) + buf[idx+30]*(1 << 16) + buf[idx+31]*(1 << 24)
+            decisionIm2 = buf[idx+32]*(1 << 0) + buf[idx+33]*(1 << 8) + buf[idx+34]*(1 << 16) + buf[idx+35]*(1 << 24)
+            decisionRe3 = buf[idx+36]*(1 << 0) + buf[idx+37]*(1 << 8) + buf[idx+38]*(1 << 16) + buf[idx+39]*(1 << 24)
+            decisionIm3 = buf[idx+40]*(1 << 0) + buf[idx+41]*(1 << 8) + buf[idx+42]*(1 << 16) + buf[idx+43]*(1 << 24)
+            decisionRe4 = buf[idx+44]*(1 << 0) + buf[idx+45]*(1 << 8) + buf[idx+46]*(1 << 16) + buf[idx+47]*(1 << 24)
+            decisionIm4 = buf[idx+48]*(1 << 0) + buf[idx+49]*(1 << 8) + buf[idx+50]*(1 << 16) + buf[idx+51]*(1 << 24)
+            decisionRe5 = buf[idx+52]*(1 << 0) + buf[idx+53]*(1 << 8) + buf[idx+54]*(1 << 16) + buf[idx+55]*(1 << 24)
+            decisionIm5 = buf[idx+56]*(1 << 0) + buf[idx+57]*(1 << 8) + buf[idx+58]*(1 << 16) + buf[idx+59]*(1 << 24)
+
+
+            Proteus_header[i].real1_dec = decisionRe1
+            Proteus_header[i].im1_dec = decisionIm1
+            Proteus_header[i].real2_dec = decisionRe2
+            Proteus_header[i].im2_dec = decisionIm2
+            Proteus_header[i].real3_dec = decisionRe3
+            Proteus_header[i].im3_dec = decisionIm3
+            Proteus_header[i].real4_dec = decisionRe4
+            Proteus_header[i].im4_dec = decisionIm4
+            Proteus_header[i].real5_dec = decisionRe5
+            Proteus_header[i].im5_dec = decisionIm5
+            
+            state1 = buf[idx+60]*(1 << 0)
+            state2 = buf[idx+61]*(1 << 0)
+            state3 = buf[idx+62]*(1 << 0)
+            state4 = buf[idx+63]*(1 << 0)
+            state5 = buf[idx+64]*(1 << 0)
+            
+            Proteus_header[i].state1 = state1
+            Proteus_header[i].state2 = state2
+            Proteus_header[i].state3 = state3
+            Proteus_header[i].state4 = state4
+            Proteus_header[i].state5 = state5
+        
+        if(printHeader==True):
+            i=0
+            outprint = 'header# {0}\n'.format(i)
+            outprint += 'TriggerPos: {0}\n'.format(Proteus_header[i].TriggerPos)
+            outprint += 'GateLength: {0}\n'.format(Proteus_header[i].GateLength )
+            outprint += 'Min Amp: {0}\n'.format(Proteus_header[i].minVpp)
+            outprint += 'Max Amp: {0}\n'.format(Proteus_header[i].maxVpp)
+            outprint += 'TimeStamp: {0}\n'.format(Proteus_header[i].TimeStamp)
+            outprint += 'Decision1: {0} + j* {1}\n'.format(Proteus_header[i].real1_dec,Proteus_header[i].im1_dec)
+            outprint += 'Decision2: {0} + j* {1}\n'.format(Proteus_header[i].real2_dec,Proteus_header[i].im2_dec)
+            outprint += 'Decision3: {0} + j* {1}\n'.format(Proteus_header[i].real3_dec,Proteus_header[i].im3_dec)
+            outprint += 'Decision4: {0} + j* {1}\n'.format(Proteus_header[i].real4_dec,Proteus_header[i].im4_dec)
+            outprint += 'Decision5: {0} + j* {1}\n'.format(Proteus_header[i].real5_dec,Proteus_header[i].im5_dec)
+            outprint += 'STATE1: {0}\n'.format(Proteus_header[i].state1)
+            outprint += 'STATE2: {0}\n'.format(Proteus_header[i].state2)
+            outprint += 'STATE3: {0}\n'.format(Proteus_header[i].state3)
+            outprint += 'STATE4: {0}\n'.format(Proteus_header[i].state4)
+            outprint += 'STATE5: {0}\n'.format(Proteus_header[i].state5)
+            print(outprint)
+            
+        return Proteus_header
+
+    def get_frame_data(self, ddr_num):
         #Read all frames from Memory
         # 
-        #Choose which frames to read (all in this example)
-        self._parent._set_cmd(':DIG:DATA:SEL', 'ALL')
+        self._parent._set_cmd(':DIG:CHAN:SEL', ddr_num)
         #Choose what to read (only the frame-data without the header in this example)
         self._parent._set_cmd(':DIG:DATA:TYPE', 'HEAD')
         if (self.acq_mode() == "DUAL") :
@@ -821,51 +937,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
             pass
         self._parent._chk_err('in reading frame data.')
 
-        #print(wav2)
-        headerDict = {}
-        trig_loc = np.zeros(number_of_frames,np.uint32)
-        I_dec= np.zeros(number_of_frames,np.int32)
-        Q_dec= np.zeros(number_of_frames,np.int64)
-        for i in range(number_of_frames):
-            idx = i* header_size
-            trigPos = wav2[idx]
-            gateLen = wav2[idx+1]
-            minVpp = wav2[idx+2] & 0xFFFF
-            maxVpp = wav2[idx+2] & 0xFFFF0000 >> 16
-            timeStamp = wav2[idx+3] + wav2[idx+4] << 32
-            decisionReal =  (wav2[idx+20]) + (wav2[idx+21] <<8) + \
-                            (wav2[idx+22] << 16) + (wav2[idx+23] <<24) + \
-                            (wav2[idx+24] << 32) + (wav2[idx+25] <<40) + \
-                            (wav2[idx+26] << 48)+ (wav2[idx+27] << 56)
-            decisionIm = (wav2[idx+28]) + (wav2[idx+29] << 8) + (wav2[idx+30] << 16) + (wav2[idx+31] << 24)
-            state1 = wav2[idx+36]*(1 << 0)
-            state2 = wav2[idx+37]*(1 << 0)
-            # NOTE: they mix up I and Q here ...
-            Q_dec[i]= decisionReal
-            I_dec[i]= decisionIm
-            headerDict["header#"] = i
-            headerDict["TriggerPos"] = trigPos
-            headerDict["GateLength"] = gateLen
-            headerDict["MinAmp"] = minVpp
-            headerDict["MaxAmp"] = maxVpp
-            headerDict["MinTimeStamp"] = timeStamp
-            headerDict["I"] = I_dec[i]
-            headerDict["Q"] = Q_dec[i]  
-            headerDict["state1"] = state1
-            headerDict["state2"] = state2
-            outprint = 'header# {0}\n'.format(i)
-            outprint += 'TriggerPos: {0}\n'.format(trigPos)
-            outprint += 'GateLength: {0}\n'.format(gateLen)
-            outprint += 'Min Amp: {0}\n'.format(minVpp)
-            outprint += 'Max Amp: {0}\n'.format(maxVpp)
-            outprint += 'Min TimeStamp: {0}\n'.format(timeStamp)
-            outprint += 'Decision: {0} + j* {1}\n'.format(decisionReal,decisionIm)
-            outprint += 'State1: {0}\n'.format(state1) 
-            outprint += 'State2: {0}\n'.format(state2)
-            print(outprint)
-            
-        dec_vals = Q_dec + 1j*I_dec # ... and fix it down here 
-        return headerDict #dec_vals
+        return self._get_captured_header(printHeader=False, N=number_of_frames, buf=wav2) #dec_vals
 
     def process_block(self, block_idx, cur_processor, blocksize):
         if block_idx == 0:
@@ -1043,21 +1115,21 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
         out_q = np.array(out_q)
 
-        fout_i = np.zeros(out_i.size)
-        fout_q = np.zeros(out_q.size)
+        fout_i = np.zeros(out_i.size,dtype=np.uint16)
+        fout_q = np.zeros(out_q.size,dtype=np.uint16)
 
         for i in range(out_i.size):
             if(out_i[i] >16383):
-                fout_i[i] = out_i[i] - 32768
+                fout_i[i] = out_i[i] #- 32768
             else:
                 fout_i[i] = out_i[i]
 
         for i in range(out_q.size):
             if(out_q[i] >16383):
-                fout_q[i] = out_q[i] - 32768
+                fout_q[i] = out_q[i] #- 32768
             else:
                 fout_q[i] = out_q[i]
-        
+
         for i in range(L*4):
             kernel_data[i] = out_q[i]*(1 << 16) + out_i[i]
         sim_kernel_data = []
@@ -1093,6 +1165,9 @@ class TaborP2584M_ACQ(InstrumentChannel):
         self.acq_mode(kwargs.get("acq_mode", self.acq_mode()))
         self.ddc_mode(kwargs.get("ddc_mode", self.ddc_mode()))
         self.ddr_store(kwargs.get("ddr_store", self.ddr_store()))
+        if self.ddr_store() == "DSP":
+            DSP_DEC_LEN = int(self.NumSamples / 12 - 10)
+            self._parent._send_cmd(':DSP:DEC:FRAM {0}'.format(DSP_DEC_LEN))
         # self.ddc_mode("COMP")
         # self.ddc_mode("REAL")
         # If in Complex mode, storage options are limited 
@@ -1135,7 +1210,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
         return(k_i,k_q) 
 
 
-    def setup_kernel(self, path, coefficients, flo, kl=10240) :
+    def setup_kernel(self, path, coefficients, flo, kl=3456) :
         """
         Method to setup kernel on real path
         @param path:
@@ -1143,18 +1218,19 @@ class TaborP2584M_ACQ(InstrumentChannel):
         @param flo
         @param kl
         """
-        valid_paths = ["DBUG", "IQ4", "IQ5", "IQ6", "IQ7"]
+        valid_paths = ["DBUG", "IQ4", "IQ5", "IQ6", "IQ7", "IQ8", "IQ9", "IQ10", "IQ11", "IQ12", "IQ13"]
         if path not in valid_paths :
-            print("Not a valid iq demodulation kernel to program, must be one of: 'DBUG' 'IQ4' 'IQ5' 'IQ6' 'IQ7'")
+            print("Not a valid iq demodulation kernel to program, must be one of: 'DBUG' 'IQ4' 'IQ5' ... 'IQ13'")
             return
         self.iq_demod(path)
         ki,kq = self.iq_kernel(coefficients, flo=flo, fs = self.SampleRate, kl=kl)
         #ki = np.linspace(0,1,ki.size)
         #kq = np.linspace(0,-1,ki.size)
         mem = self.pack_kernel_data(ki,kq)
+        self._parent._set_cmd(':DSP:IQD:SEL', path)
+        self._parent._chk_err("after trying to setup the IQ path.")
         self._parent._inst.write_binary_data(':DSP:IQD:KER:DATA', mem)
-        resp = self._parent._inst.send_scpi_query(':SYST:ERR?')
-        print(resp)
+        self._parent._chk_err("after trying to setup the IQ kernel.")
         return ki, kq
 
 
@@ -1182,25 +1258,25 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
         # dsp decision frame
         # TODO: what is the frame size of the calculation
-        self._parent._inst.send_scpi_cmd(':DSP:DEC:FRAM {0}'.format(1024))
+        self._parent._send_cmd(':DSP:DEC:FRAM {0}'.format(1024))
         resp = self._parent._inst.send_scpi_query(':SYST:ERR?')
         print(resp)
 
         # Load in filter coefficients
         for i in range(0, len(filter_array)) :
-            self._parent._inst.send_scpi_cmd(':DSP:FIR:COEF {},{}'.format(i, filter_array[i]))
+            self._parent._send_cmd(':DSP:FIR:COEF {},{}'.format(i, filter_array[i]))
             
-        # self._parent._inst.send_scpi_cmd(':DSP:IQD:SEL IQ4')           # DBUG | IQ4 | IQ5 | IQ6 | IQ7
-        # self._parent._inst.send_scpi_cmd(':DSP:IQD:KER:DATA', mem)
+        # self._parent._send_cmd(':DSP:IQD:SEL IQ4')           # DBUG | IQ4 | IQ5 | IQ6 | IQ7
+        # self._parent._send_cmd(':DSP:IQD:KER:DATA', mem)
         # resp =  self._parent._inst.send_scpi_query(':SYST:ERR?')
         # print(resp)
 
         # define decision DSP1 path SVM
-        # self._parent._inst.send_scpi_cmd(':DSP:DEC:IQP:SEL DSP1')
-        # self._parent._inst.send_scpi_cmd(':DSP:DEC:IQP:OUTP SVM')
-        # self._parent._inst.send_scpi_cmd(':DSP:DEC:IQP:LINE 1,-0.625,-5')
-        # self._parent._inst.send_scpi_cmd(':DSP:DEC:IQP:LINE 2,1.0125,0.5')
-        # self._parent._inst.send_scpi_cmd(':DSP:DEC:IQP:LINE 3,0,0')
+        # self._parent._send_cmd(':DSP:DEC:IQP:SEL DSP1')
+        # self._parent._send_cmd(':DSP:DEC:IQP:OUTP SVM')
+        # self._parent._send_cmd(':DSP:DEC:IQP:LINE 1,-0.625,-5')
+        # self._parent._send_cmd(':DSP:DEC:IQP:LINE 2,1.0125,0.5')
+        # self._parent._send_cmd(':DSP:DEC:IQP:LINE 3,0,0')
 
     def get_data(self, **kwargs):
         self.blocksize(self.NumRepetitions)
@@ -1222,6 +1298,18 @@ class TaborP2584M_ACQ(InstrumentChannel):
         event). Multiple frame acquisitions (or Multi-Frame) require the definition of the number of 
         frames to be captured.
         """
+
+        #Settle Triggers
+        #TODO: Currently, by design, the Trigger1 and Trigger 2 Sources are from the same task - it doesn't have to be :\ Would this imply multiple ACQ modules?
+        assert self._parent.AWG._cur_internal_trigs.count(True) <= 1, "Only one internal trigger is allowed to trigger both ADC channels. Separate triggering is not yet supported."
+        if self._parent.AWG._cur_internal_trigs.count(True) > 0:
+            chan_ind = self._parent.AWG._cur_internal_trigs.index(True)
+            self._parent.ACQ.trigger1Source(f'TASK{chan_ind+1}')
+            self._parent.ACQ.trigger2Source(f'TASK{chan_ind+1}')
+        else:
+            self._parent.ACQ.trigger1Source('EXT')
+            self._parent.ACQ.trigger2Source('EXT')
+
         blocksize = min(self.blocksize(), self.NumRepetitions)
 
         assert self.NumSamples % 48 == 0, "The number of samples must be divisible by 48 if in DUAL mode."
@@ -1232,9 +1320,21 @@ class TaborP2584M_ACQ(InstrumentChannel):
             self._allocate_frame_memory()
 
         # Clean memory 
-        self._parent._send_cmd(':DIG:ACQ:ZERO:ALL 0') # NOTE: This didnt have the '0' argument originally
+        self._parent._send_cmd(':DIG:ACQ:ZERO:ALL')
 
         self._parent._chk_err('after clearing memory.')
+
+        filt_coeffs = scipy.signal.firwin(51, 10e6, fs=2.5e9)
+
+        self.ddr_store('DSP')
+        Frame_len = self.NumSamples
+        DSP_DEC_LEN = Frame_len / 12 - 10
+        self._parent._set_cmd(f':DSP:DEC:FRAM', f'{int(DSP_DEC_LEN)}')
+        self._parent._set_cmd(':DSP:STOR', 'DSP')
+        self._parent._chk_err('after setting to DSP.')
+
+        self.setup_kernel("IQ4", filt_coeffs, flo = 100e6)
+        self.setup_kernel("IQ9", filt_coeffs, flo = 100e6)
 
         self._parent._chk_err('before')
         self._parent._set_cmd(':DIG:INIT', 'ON')
@@ -1283,32 +1383,14 @@ class TaborP2584M_ACQ(InstrumentChannel):
             num_bytes = np.uint64(resp)
             #print(num_bytes, 'hi', self._parent._get_cmd(':DIG:DATA:FRAM?'))
 
-            wavlen = int(num_bytes // 2)
-            fakeNumSamples = num_bytes / (self.NumSegments*2)
-            # TODO: NEED TO CHANGE DATATYPE BASED ON DSP MODE # NOTE: WE NO LONGER HAVE TO?!?!?! WHATS GOING ON HERE
-            if (self.ChannelStates[0]) :
-                if (self.ddr_store() == "DIR") :
-                    wav1 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
-                    # wav1 = wav1.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)
-                elif ("DSP" in self.ddr_store()) :
-                    wav1 = np.zeros(wavlen, dtype=np.uint32)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
-                    wav1 = wav1[:int(len(wav1)/2)]
-                    wav1 = wav1.reshape(self.NumRepetitions, self.NumSegments, int(np.floor(fakeNumSamples/2)))
-            if (self.ChannelStates[1]) :
-                if (self.ddr_store() == "DIR") :
-                    wav2 = np.zeros(wavlen, dtype=np.uint16)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
-                    # wav2 = wav2.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples) # self.NumSamples
-                elif ("DSP" in self.ddr_store()) :
-                    wav2 = np.zeros(wavlen, dtype=np.uint32)   #NOTE!!! FOR DSP, THIS MUST BE np.uint32 - SO MAKE SURE TO SWITCH/CHANGE (uint16 otherwise)
-                    wav1 = wav1[:int(len(wav1)/2)]
-                    wav2 = wav2.reshape(self.NumRepetitions, self.NumSegments, int(np.floor(fakeNumSamples/2))) # self.NumSamples
-        
+            wavlen = int(num_bytes // 2)        
             # Ensure all previous commands have been executed
             while (not self._parent._get_cmd('*OPC?')):
                 pass
             if (self.ChannelStates[0]) :
                 # Read from channel 1
                 self._parent._set_cmd(':DIG:CHAN:SEL', 1)
+                wav1 = np.zeros(wavlen, dtype=np.uint16)
                 rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav1, num_bytes)
                 wav1 = wav1.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)
                 # Ensure all previous commands have been executed
@@ -1317,6 +1399,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
             if (self.ChannelStates[1]) :
                 # read from channel 2
                 self._parent._set_cmd(':DIG:CHAN:SEL', 2)
+                wav2 = np.zeros(wavlen, dtype=np.uint16)
                 rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav2, num_bytes)
                 wav2 = wav2.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)
                 # Ensure all previous commands have been executed
@@ -1358,18 +1441,26 @@ class Tabor_P2584M(Instrument):
         # Change it only if you know what you are doing
         lib_dir_path = None
         self._admin = TepAdmin(lib_dir_path)
-
-        self._inst = self._admin.open_instrument(slot_id=pxi_slot)
-        assert self._inst != None, "Failed to load the Tabor AWG instrument - check slot ID perhaps."
+        self._admin.open_inst_admin()
+        self._inst = self._admin.open_instrument(slot_id=pxi_slot, reset_hot_flag=True)
+        assert self._inst != None, "Failed to load the Tabor AWG instrument - check slot ID perhaps or whether the Tabor unit is being used in another Python instance."
 
         #Tabor's driver will print error messages if any are present after every command - it is an extra query, but provides security
         self._inst.default_paranoia_level = 2
 
+        self._debug_logs = ''
+        self._debug = True
+
+        resp = self._inst.send_scpi_query('*IDN?')
+        print('Connected to: ' + resp)
+        resp = self._inst.send_scpi_query(":SYST:iNF:MODel?")
+        print("Model: " + resp)
+
         #Get HW options
         # self._inst.send_scpi_query("*OPT?")
         #Reset - must!
-        self._inst.send_scpi_cmd( "*CLS")
-        self._inst.send_scpi_cmd( "*RST")
+        self._send_cmd( "*CLS")
+        self._send_cmd( "*RST")
 
         #ENSURE THAT THE REF-IN IS CONNECTED TO Rb Oven if using EXT 10MHz source!
         self.add_parameter(
@@ -1385,9 +1476,6 @@ class Tabor_P2584M(Instrument):
             val_mapping={10e6: '10M', 100e6: '100M'}
             )
 
-        self._debug_logs = ''
-        self._debug = True
-
         #Add the AWG and ACQ submodules to cordon off the different sub-instrument properties...
         self.add_submodule('AWG', TaborP2584M_AWG(self))    #!!!NOTE: If this name is changed from 'AWG', make sure to change it in the TaborP2584M_AWG class initializer!
         self.add_submodule('ACQ', TaborP2584M_ACQ(self))    #!!!NOTE: If this name is changed from 'ACQ', make sure to change it in the TaborP2584M_ACQ class initializer!
@@ -1402,7 +1490,9 @@ class Tabor_P2584M(Instrument):
 
 
     def _send_cmd(self, cmd):
-        self._inst.send_scpi_cmd(cmd)
+        if self._debug:
+            self._debug_logs += cmd + '\n'
+        self._inst.send_scpi_query(cmd)
     
     def _get_cmd(self, cmd):
         if self._debug:
@@ -1411,7 +1501,7 @@ class Tabor_P2584M(Instrument):
     def _set_cmd(self, cmd, value):
         if self._debug:
             self._debug_logs += f"{cmd} {value}\n"
-        self._inst.send_scpi_cmd(f"{cmd} {value}")
+        self._inst.send_scpi_query(f"{cmd} {value}")
     
     def _chk_err(self, msg):
         resp = self._get_cmd(':SYST:ERR?')

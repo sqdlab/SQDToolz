@@ -779,18 +779,21 @@ class TaborP2584M_ACQ(InstrumentChannel):
         num_frames = self.NumRepetitions*self.NumSegments
         if final_dsp_order['avRepetitions']:
             num_frames = 1
+        num_samples = self.NumSamples
+        if final_dsp_order['dsp_active']:
+            num_samples = int(self.NumSamples*12/10)
 
-        if self._last_mem_frames_segs_samples[0] == self.NumRepetitions and self._last_mem_frames_segs_samples[1] == self.NumSegments and self._last_mem_frames_segs_samples[2] == self.NumSamples:
+        if self._last_mem_frames_segs_samples[0] == self.NumRepetitions and self._last_mem_frames_segs_samples[1] == self.NumSegments and self._last_mem_frames_segs_samples[2] == num_samples:
             return
 
         if (self.acq_mode() == "DUAL") :
-            assert (self.NumSamples % 48) == 0, \
+            assert (num_samples % 48) == 0, \
                 "In DUAL mode, number of samples must be an integer multiple of 48"
         else :
-            assert (self.NumSamples % 96) == 0, \
+            assert (num_samples % 96) == 0, \
                 "In SINGLE mode, number of samples must be an integer multiple of 96"
         #Allocate four frames of self.NumSample (defaults to 48000) 
-        cmd = ':DIG:ACQuire:FRAM:DEF {0},{1}'.format(num_frames, self.NumSamples)
+        cmd = ':DIG:ACQuire:FRAM:DEF {0},{1}'.format(num_frames, num_samples)
         self._parent._send_cmd(cmd)
 
         #Select the frames for the capturing
@@ -798,7 +801,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
         cmd = ":DIG:ACQuire:FRAM:CAPT {0},{1}".format(capture_first, capture_count)
         self._parent._send_cmd(cmd)
 
-        self._last_mem_frames_segs_samples = (self.NumRepetitions, self.NumSegments, self.NumSamples)
+        self._last_mem_frames_segs_samples = (self.NumRepetitions, self.NumSegments, num_samples)
         self._parent._chk_err('after allocating readout ACQ memory.')
 
     def set_svm(self) :
@@ -1247,6 +1250,11 @@ class TaborP2584M_ACQ(InstrumentChannel):
                 elif param == 'repetition':
                     assert not final_dsp_order['avRepetitions'], "There is already a repetition averaging stage."
                     assert self.NumSegments == 1, "The P2584M does not currently support repetition averaging over multiple segments."
+                    #TODO: Modify in a future firmware release...
+                    if len(final_dsp_order['kernels']) == 1:
+                        assert len(final_dsp_order['kernels'][0]) <= 2, "The current firmware on the P2584M does not support averaging on more than 2 channels. Wait for a future release."
+                    elif len(final_dsp_order['kernels']) == 2:
+                        assert len(final_dsp_order['kernels'][0]) + len(final_dsp_order['kernels'][1]) <= 2, "The current firmware on the P2584M does not support averaging on more than 2 channels. Wait for a future release."
                     final_dsp_order['avRepetitions'] = True
                 else:
                     assert False, f"Cannot average over \'{param}\'"
@@ -1364,7 +1372,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
     def conv_data(self, data, final_dsp_order):
         if final_dsp_order['avRepetitions']:
-            return self.NormalAVGSignal(data, self.NumRepetitions, final_dsp_order['dsp_active'])*1.0
+            return data*1.0 #self.NormalAVGSignal(data, self.NumRepetitions, final_dsp_order['dsp_active'])*1.0
         else:
             return (data*1.0 - 2**15) / 2**16
 
@@ -1381,10 +1389,13 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
         if final_dsp_order['avRepetitions']:
             wavlen = int(num_bytes // 4)    #32bits as it's a 28bit counter...
-            fin_shape = (1, self.NumSegments, self.NumSamples)
+            fin_shape = (1, self.NumSegments, int(self.NumSamples*12/10))
         else:
             wavlen = int(num_bytes // 2)
-            fin_shape = (self.NumRepetitions, self.NumSegments, self.NumSamples)
+            if final_dsp_order['dsp_active']:
+                fin_shape = (self.NumRepetitions, self.NumSegments, int(self.NumSamples*12/10))
+            else:
+                fin_shape = (self.NumRepetitions, self.NumSegments, self.NumSamples)
         # Ensure all previous commands have been executed
         while (not self._parent._get_cmd('*OPC?')):
             pass
@@ -1441,8 +1452,11 @@ class TaborP2584M_ACQ(InstrumentChannel):
             offset = 0
             for m in range(num_ch_divs[0]):
                 if final_dsp_order['avRepetitions']:
-                    ret_val['data'][f'CH1_{m}_I'] = wav1[0,:,int(2*(m+offset)+1)::10] * final_scale
-                    ret_val['data'][f'CH1_{m}_Q'] = wav1[0,:,int(2*(m+offset))::10] * final_scale
+                    ret_val['data'][f'CH1_{m}_I'] = wav1[0,:,int(2*(m+offset)+1)::2][:,:int(self.NumSamples/10)] * final_scale  #TODO: Review after new firmware release
+                    ret_val['data'][f'CH1_{m}_Q'] = wav1[0,:,int(2*(m+offset))::2][:,:int(self.NumSamples/10)] * final_scale    #TODO: Review after new firmware release
+                    #TODO: Change after new firmware release...
+                    wav1 =self.conv_data(wav2, final_dsp_order)
+                    offset = -1
                 else:
                     ret_val['data'][f'CH1_{m}_I'] = wav1[:,:,int(2*(m+offset)+1)::12] * final_scale
                     ret_val['data'][f'CH1_{m}_Q'] = wav1[:,:,int(2*(m+offset))::12] * final_scale
@@ -1504,11 +1518,11 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
         self._allocate_frame_memory(final_dsp_order)
 
-        # Clean memory 
+        #Clean memory 
         self._parent._send_cmd(':DIG:ACQ:ZERO:ALL')
-
         self._parent._chk_err('after clearing memory.')
 
+        #Setup DSP blocks if applicable
         num_ch_divs = []
         if final_dsp_order['dsp_active']:
             assert self.ChannelStates[0]==1 and self.ChannelStates[1]==1, "Must be in DUAL-mode (i.e. both channels active) to use DSP."
@@ -1519,7 +1533,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
             self.ddr_store('DSP')
             self._parent._chk_err('after setting to DSP.')
             Frame_len = self.NumSamples
-            DSP_DEC_LEN = Frame_len / 10# - 10
+            DSP_DEC_LEN = Frame_len / 12# - 10
             self._parent._set_cmd(f':DSP:DEC:FRAM', f'{int(DSP_DEC_LEN)}')
             self._parent._set_cmd(':DSP:STOR', 'DSP')
             self._parent._chk_err('after setting up DSP.')

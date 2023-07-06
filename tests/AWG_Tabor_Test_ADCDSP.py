@@ -77,7 +77,7 @@ ProcessorFPGA('fpga_dsp', lab)
 lab.PROC('fpga_dsp').add_stage(FPGA_DDC([[105e6],[100e6]]))
 lab.PROC('fpga_dsp').add_stage(FPGA_Decimation('sample', 10))
 # lab.PROC('fpga_dsp').add_stage(FPGA_Integrate('sample'))
-lab.PROC('fpga_dsp').add_stage(FPGA_Integrate('repetition'))
+# lab.PROC('fpga_dsp').add_stage(FPGA_Integrate('repetition'))
 
 acq_module.set_data_processor(lab.PROC('fpga_dsp'))
 leData = acq_module.get_data()
@@ -89,26 +89,26 @@ leData = acq_module.get_data()
 #         plt.plot(times, leData['data']['CH1'][r][s])
 #         # plt.plot(times, leData['data']['CH1'][r][s])
 
-# fig, ax = plt.subplots(nrows=2)
-# for r in range(acq_module.NumRepetitions) :
-#     for s in range(acq_module.NumSegments) :
-#         times = np.arange(acq_module.NumSamples)/acq_module.SampleRate * 1e9
-#         ax[0].plot(leData['data']['CH1_0_I'][r][s])
-#         ax[1].plot(leData['data']['CH1_0_Q'][r][s])
-#         # ax[0].plot(leData['data']['CH1_1_I'][r][s])
-#         # ax[1].plot(leData['data']['CH1_1_Q'][r][s])
-#         ax[0].plot(leData['data']['CH2_0_I'][r][s])
-#         ax[1].plot(leData['data']['CH2_0_Q'][r][s])
-
 fig, ax = plt.subplots(nrows=2)
-for s in range(acq_module.NumSegments) :
-    times = np.arange(acq_module.NumSamples)/acq_module.SampleRate * 1e9
-    ax[0].plot(leData['data']['CH1_0_I'][s])
-    ax[1].plot(leData['data']['CH1_0_Q'][s])
-    # ax[0].plot(leData['data']['CH1_1_I'][s])
-    # ax[1].plot(leData['data']['CH1_1_Q'][s])
-    ax[0].plot(leData['data']['CH2_0_I'][s])
-    ax[1].plot(leData['data']['CH2_0_Q'][s])
+for r in range(acq_module.NumRepetitions) :
+    for s in range(acq_module.NumSegments) :
+        times = np.arange(acq_module.NumSamples)/acq_module.SampleRate * 1e9
+        ax[0].plot(leData['data']['CH1_0_I'][r][s])
+        ax[1].plot(leData['data']['CH1_0_Q'][r][s])
+        # ax[0].plot(leData['data']['CH1_1_I'][r][s])
+        # ax[1].plot(leData['data']['CH1_1_Q'][r][s])
+        ax[0].plot(leData['data']['CH2_0_I'][r][s])
+        ax[1].plot(leData['data']['CH2_0_Q'][r][s])
+
+# fig, ax = plt.subplots(nrows=2)
+# for s in range(acq_module.NumSegments) :
+#     times = np.arange(acq_module.NumSamples)/acq_module.SampleRate * 1e9
+#     ax[0].plot(leData['data']['CH1_0_I'][s])
+#     ax[1].plot(leData['data']['CH1_0_Q'][s])
+#     # ax[0].plot(leData['data']['CH1_1_I'][s])
+#     # ax[1].plot(leData['data']['CH1_1_Q'][s])
+#     # ax[0].plot(leData['data']['CH2_0_I'][s])
+#     # ax[1].plot(leData['data']['CH2_0_Q'][s])
 
 # fig, ax = plt.subplots(nrows=2)
 # for r in range(acq_module.NumRepetitions) :

@@ -43,11 +43,18 @@ class GENmwSource(HALbase, TriggerInputCompatible, TriggerInput):
         self._instr_mw_output.Phase = val
         
     @property
+    def PhaseModAmplitude(self):
+        return self._instr_mw_output.PhaseModAmplitude
+    @PhaseModAmplitude.setter
+    def PhaseModAmplitude(self, val):
+        self._instr_mw_output.PhaseModAmplitude = val
+        
+    @property
     def Mode(self):
         return self._instr_mw_output.Mode
     @Mode.setter
     def Mode(self, new_mode):
-        assert new_mode == 'Continuous' or new_mode == 'PulseModulated', "MW source output mode must either be Continuous or PulseModulated."
+        assert new_mode in ['Continuous', 'PulseModulated', 'PhaseModulated'], "MW source output mode must either be Continuous, PulseModulated or PhaseModulated."
         self._instr_mw_output.Mode = new_mode
 
     def activate(self):
@@ -86,7 +93,7 @@ class GENmwSource(HALbase, TriggerInputCompatible, TriggerInput):
             'InputTriggerEdge' : self._instr_mw_output.TriggerInputEdge,
             'ManualActivation' : self.ManualActivation
             }
-        self.pack_properties_to_dict(['Power', 'Frequency', 'Phase', 'Mode', 'Output'], ret_dict)
+        self.pack_properties_to_dict(['Power', 'Frequency', 'Phase', 'PhaseModAmplitude', 'Mode', 'Output'], ret_dict)
         return ret_dict
 
     def _set_current_config(self, dict_config, lab):
@@ -95,6 +102,7 @@ class GENmwSource(HALbase, TriggerInputCompatible, TriggerInput):
         self.Power = dict_config['Power']
         self.Frequency = dict_config['Frequency']
         self.Phase = dict_config['Phase']
+        self.PhaseModAmplitude = dict_config['PhaseModAmplitude']
         self.Mode = dict_config['Mode']
         self.Output = dict_config.get('Output', False)
         self.ManualActivation = dict_config.get('ManualActivation', False)

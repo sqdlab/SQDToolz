@@ -1,6 +1,6 @@
 from qcodes import Instrument, InstrumentChannel, VisaInstrument, validators as vals
 
-class MWS_SGS100A_Channel(InstrumentChannel):
+class MWS_SMB100A_Channel(InstrumentChannel):
     def __init__(self, parent:Instrument, name:str) -> None:
         super().__init__(parent, name)
         self._mode = 'Continuous'   #Can be: Continuous, PulseModulated
@@ -35,6 +35,32 @@ class MWS_SGS100A_Channel(InstrumentChannel):
                             get_cmd='SOUR:PULM:SOUR?',
                             set_cmd='SOUR:PULM:SOUR {}',
                             vals=vals.Enum('INT', 'EXT'))
+        #
+        self.add_parameter('phasemod_state',
+                            get_cmd=':SOUR:PM:STAT?',
+                            set_cmd=':SOUR:PM:STAT {}',
+                            set_parser=int,
+                            val_mapping={'ON':  1, 'OFF': 0})
+        self.add_parameter('phasemod_mode',
+                            get_cmd='SOUR:PM:MODE?',
+                            set_cmd='SOUR:PM:MODE {}',
+                            vals=vals.Enum('HDEViation', 'NORMal', 'LNOise'),
+                            initial_value='NORMal')
+        self.add_parameter('phasemod_source',
+                            get_cmd='SOUR:PM:SOUR?',
+                            set_cmd='SOUR:PM:SOUR {}',
+                            vals=vals.Enum('INT', 'EXT'))
+        self.add_parameter('phasemod_amplitude',
+                            get_cmd='SOUR:PM:EXTernal:DEViation?',
+                            set_cmd='SOUR:PM:EXTernal:DEViation {}',
+                            get_parser=float,
+                            vals=vals.Numbers(0, 20),
+                            initial_value=5)
+        self.add_parameter('phasemod_ext_coupling',
+                            get_cmd='SOUR:PM:EXTernal:COUPling?',
+                            set_cmd='SOUR:PM:EXTernal:COUPling {}',
+                            vals=vals.Enum('AC', 'DC'),
+                            initial_value='AC')
 
     @property
     def Output(self):
@@ -69,10 +95,10 @@ class MWS_SGS100A_Channel(InstrumentChannel):
 
     @property
     def PhaseModAmplitude(self):
-        return 0
+        return self.phasemod_amplitude()
     @PhaseModAmplitude.setter
     def PhaseModAmplitude(self, val):
-        pass
+        self.phasemod_amplitude(val)    
 
     @property
     def TriggerInputEdge(self):
@@ -91,13 +117,17 @@ class MWS_SGS100A_Channel(InstrumentChannel):
         self._mode = new_mode
         if new_mode == 'Continuous':
             self.pulsemod_state('OFF')
+            self.phasemod_state('OFF')
         elif new_mode == 'PulseModulated':
             self.pulsemod_state('ON')
+            self.phasemod_state('OFF')
             self.pulsemod_source('EXT')
         elif new_mode == 'PhaseModulated':
-            assert False, "The SGS100A does not support external phase modulation."
+            self.pulsemod_state('OFF')
+            self.phasemod_state('ON')
+            self.pulsemod_source('EXT')
 
-class MWS_SGS100A(VisaInstrument):
+class MWS_SMB100A(VisaInstrument):
     """
     This is the qcodes driver for the Rohde & Schwarz SGS100A signal generator
 
@@ -131,12 +161,6 @@ class MWS_SGS100A(VisaInstrument):
                            get_cmd='SOUR:ROSC:SOUR?',
                            set_cmd='SOUR:ROSC:SOUR {}',
                            vals=vals.Enum('INT', 'EXT'))
-        # Frequency mw_source outputs when used as a reference
-        self.add_parameter('ref_osc_output_freq',
-                           label='Reference oscillator output frequency',
-                           get_cmd='SOUR:ROSC:OUTP:FREQ?',
-                           set_cmd='SOUR:ROSC:OUTP:FREQ {}',
-                           vals=vals.Enum('10MHz', '100MHz', '1000MHz'))
         # Frequency of the external reference mw_source uses
         self.add_parameter('ref_osc_external_freq',
                            label='Reference oscillator external frequency',
@@ -156,7 +180,7 @@ class MWS_SGS100A(VisaInstrument):
         # Output channels added to both the module for snapshots and internal output sources for use in queries
         self._source_outputs = {}
         for ch_name in ['RFOUT']:
-            cur_channel = MWS_SGS100A_Channel(self, ch_name)
+            cur_channel = MWS_SMB100A_Channel(self, ch_name)
             self.add_submodule(ch_name, cur_channel)
             self._source_outputs[ch_name] = cur_channel
 

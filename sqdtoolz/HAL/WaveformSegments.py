@@ -547,3 +547,55 @@ class WFS_Arbitrary(WaveformSegmentBase):
         cur_dict['Duration'] = self.Duration
         cur_dict['Amplitudes'] = self._amplitudes
         return cur_dict
+    
+class WFS_RandomGaussian(WaveformSegmentBase):
+    def __init__(self, name, transform_func, time_len, sd=1.96, mean=0, seed=42):
+        super().__init__(name, transform_func, time_len)
+        #TODO: Add in a classmethod to use sigma and truncate...
+        self._mean = mean
+        self._sd = sd
+        self._seed = seed
+
+    @classmethod
+    def fromConfigDict(cls, config_dict):
+        assert 'Type' in config_dict, "Configuration dictionary does not have the key: type"
+        assert config_dict['Type'] == cls.__name__, "Configuration dictionary has the wrong type."
+        for cur_key in ["Name", "Duration", "Mean", "StdDev", "Seed"]:
+            assert cur_key in config_dict, "Configuration dictionary does not have the key: " + cur_key
+        if config_dict['Mod Func']['Name'] == '':
+            wfmt_obj = None
+        else:
+            wfmt_obj = WaveformTransformationArgs(config_dict['Mod Func']['Name'], config_dict['Mod Func']['Args'])
+        return cls(config_dict["Name"], wfmt_obj, config_dict["Duration"], config_dict["StdDev"], config_dict["Mean"], config_dict["Seed"])
+
+    @property
+    def Mean(self):
+        return self._mean
+    @Mean.setter
+    def Mean(self, mean):
+        self._mean = mean
+
+    @property
+    def StdDev(self):
+        return self._sd
+    @StdDev.setter
+    def StdDev(self, sd):
+        self._sd = sd
+    
+    @property
+    def Seed(self):
+        return self._seed
+    @Seed.setter
+    def Seed(self, val):
+        self._seed = val
+
+    def _get_waveform(self, lab, fs, t0_ind, ch_index):
+        return np.random.default_rng(seed=self.Seed).normal(self.Mean, self.StdDev, size=self.NumPts(fs))
+
+    def _get_current_config(self):
+        cur_dict = WaveformSegmentBase._get_current_config(self)
+        cur_dict['Duration'] = self.Duration
+        cur_dict['Mean'] = self.Mean
+        cur_dict['StdDev'] = self.StdDev
+        cur_dict['Seed'] = self.Seed
+        return cur_dict

@@ -77,7 +77,7 @@ class FileIOWriter:
                     grp_meas.create_dataset(cur_meas_ch, data=np.hstack([m]), maxshape=(None,))
                     self._meas_chs += [cur_meas_ch]
 
-                arr_size = int(np.prod(self._data_array_shape))
+                arr_size = int(np.prod(np.array(self._data_array_shape, dtype=np.int64)))
                 self._num_cols = len(data_pkt['data'].keys())
                 arr = np.zeros((arr_size, self._num_cols))
                 arr[:] = np.nan

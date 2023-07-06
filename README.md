@@ -1,4 +1,4 @@
-# SQDTOOLz
+# SQDToolz
 
 This is a toolbox to control instruments to run a general lab experiments. This was designed to supersede *UQTools*, keeping simplicity, scalability and efficiency in check. It currently uses QCoDeS to communicate with the instruments, while providing higher level functionality such as timing control, pulse generation, automatic parameter updates and data/configuration storage.
 

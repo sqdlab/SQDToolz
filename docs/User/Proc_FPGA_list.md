@@ -17,8 +17,8 @@ Q(t) & =-2\sin(2\pi ft)\cdot M(t) \equiv A\sin(\phi) \color{darkgray}- 2c\sin(2\
 
 To isolate the required DC components, an appropriate low-pass filter $h[k]$ with a cut-off below $f$ is applied over the discretised signals (with sample rate $f_s$):
 
-$$\begin{align*}I_F[n]&=(h*I)[n]=\sum_{k=0}^\infty h[k]\cdot I[n-k]=\sum_{k=0}^\infty h[k]\cdot 2\cos\left(\tfrac{2\pi f}{f_s}(n-k)\right)\cdot M[n-k]\\
-Q_F[n]&=(h*Q)[n]=\sum_{k=0}^\infty h[k]\cdot Q[n-k]=-\sum_{k=0}^\infty h[k]\cdot 2\sin\left(\tfrac{2\pi f}{f_s}(n-k)\right)\cdot M[n-k]\end{align*}$$
+$$\begin{align*}I_F[n]&=(h * I)[n]=\sum_{k=0}^\infty h[k]\cdot I[n-k]=\sum_{k=0}^\infty h[k]\cdot 2\cos\left(\tfrac{2\pi f}{f_s}(n-k)\right)\cdot M[n-k]\\
+Q_F[n]&=(h * Q)[n]=\sum_{k=0}^\infty h[k]\cdot Q[n-k]=-\sum_{k=0}^\infty h[k]\cdot 2\sin\left(\tfrac{2\pi f}{f_s}(n-k)\right)\cdot M[n-k]\end{align*}$$
 
 where the filter $h[k]$ is taken to be causal. Upon integrating the signal (for a signal $M[n]$ of length $N$ being zero outside $[0,N]$):
 

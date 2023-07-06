@@ -412,7 +412,7 @@ class Agilent_N8241A(Instrument):
             'TCPIP0::192.168.15.100::inst0::INSTR'
         **kwargs: passed to base class
     """
-    def __init__(self, name: str, ivi_dll: str, address: str, init_clk_src='Internal', init_sync_mode='Independent', reset: bool=False, **kwargs) -> None:
+    def __init__(self, name: str, ivi_dll: str, address: str, init_clk_src='Internal', init_sync_mode='Independent', trig_type='EXT', reset: bool=False, **kwargs) -> None:
 
         init_ref_clock_source = kwargs.pop('ref_clock_source', 'External')
 
@@ -561,10 +561,13 @@ class Agilent_N8241A(Instrument):
             set_cmd=self._set_awg_sync_state)
         self.Sync_State(self._sync_state)
 
-        #Setup default mode to be burst
-        self.ch1.operation_mode('Burst')
+        assert trig_type in ["EXT", "INT"], "trig_type must be either \'EXT\' or \'INT\'."
+
+        #Setup default mode to be burst/continuous
+        opMode = 'Burst' if trig_type == 'EXT' else 'Continuous'
+        self.ch1.operation_mode(opMode)
         self.ch1.burst_count(1)
-        self.ch2.operation_mode('Burst')
+        self.ch2.operation_mode(opMode)
         self.ch2.burst_count(1)
         #Use amplified output
         self.ch1.output_configuration('Amplified')
@@ -583,10 +586,12 @@ class Agilent_N8241A(Instrument):
         self.ch2.output(True)
         #Setup clock and triggers
         # self.clock_source('Internal')
-        #self.ch1.configure_trigger_source(1024) # No Trigger flag
-        #self.ch2.configure_trigger_source(1024) # No Trigger flag
-        self.ch1.configure_trigger_source(1|1026|1028|1032|1040) # any hardware trigger input
-        self.ch2.configure_trigger_source(1|1026|1028|1032|1040) # any hardware trigger input
+        if trig_type == 'INT':
+            self.ch1.configure_trigger_source(1024) # No Trigger flag
+            self.ch2.configure_trigger_source(1024) # No Trigger flag
+        else:
+            self.ch1.configure_trigger_source(1|1026|1028|1032|1040) # any hardware trigger input
+            self.ch2.configure_trigger_source(1|1026|1028|1032|1040) # any hardware trigger input
         #Setup the marker sources to be for channels 1 and 2.
         self.m1.source('Channel 1 Marker 1')
         self.m2.source('Channel 1 Marker 2')

@@ -2,6 +2,11 @@ import os
 import sys
 from sqdtoolz.Drivers.Dependencies.teproteus import TEProteusAdmin as TepAdmin
 from sqdtoolz.Drivers.Dependencies.teproteus import TEProteusInst as TepInst
+from sqdtoolz.HAL.Processors.ProcessorFPGA import ProcessorFPGA
+from sqdtoolz.HAL.Processors.FPGA.FPGA_DDCFIR import FPGA_DDCFIR
+from sqdtoolz.HAL.Processors.FPGA.FPGA_DDC import FPGA_DDC
+from sqdtoolz.HAL.Processors.FPGA.FPGA_Integrate import FPGA_Integrate
+from sqdtoolz.HAL.Processors.FPGA.FPGA_Decimation import FPGA_Decimation
 
 import numpy as np
 import math
@@ -618,6 +623,18 @@ class TaborP2584M_ACQ(InstrumentChannel):
                 "IQ7":"IQ7", "IQ8":"IQ8", "IQ9":"IQ9", "IQ10":"IQ10", "IQ11":"IQ11",\
                 "IQ12":"IQ12", "IQ13":"IQ13"})
 
+        self.add_parameter(
+            f'averageEnable', label=f'Enable Averages',
+            get_cmd=partial(self._parent._get_cmd, ':DIG:ACQuire:AVERage:STAT?'),
+            set_cmd=partial(self._parent._set_cmd, ':DIG:ACQuire:AVERage:STAT'),
+            val_mapping={True: 'ON', False: 'OFF'})
+
+        self.add_parameter(
+            f'ddcBindChannels', label=f'Whether all DDCs are fed from CH1',
+            get_cmd=partial(self._parent._get_cmd, ':DIG:DDC:BIND?'),
+            set_cmd=partial(self._parent._set_cmd, ':DIG:DDC:BIND'),
+            val_mapping={True: 'ON', False: 'OFF'})
+
         """
         self.add_parameter(
             'iq_path', label='Select IQ input path to configure',
@@ -677,7 +694,9 @@ class TaborP2584M_ACQ(InstrumentChannel):
         self._num_samples = 4800 # Number of samples per frame
         self._num_segs = 4 # Number of frames per repetition
         self._num_repetitions = 1 
-        self._last_mem_frames_samples = (-1,-1)
+        self._last_mem_frames_segs_samples = (-1,-1,-1)
+
+        self._dsp_kernel_coefs = [None]*10
 
     @property
     def NumSamples(self):
@@ -751,29 +770,35 @@ class TaborP2584M_ACQ(InstrumentChannel):
         #Perform command
         self._parent._send_cmd(f'{cmd} {value}')
 
-    def _allocate_frame_memory(self):
+    def _allocate_frame_memory(self, final_dsp_order):
         """
         Method that allocates memory for digitizer (acquisition) 
         In DUAL mode the number of samples per frame should be a multiple of 48
         (96 for SINGLE mode)
         """
+        num_frames = self.NumRepetitions*self.NumSegments
+        if final_dsp_order['avRepetitions']:
+            num_frames = 1
+
+        if self._last_mem_frames_segs_samples[0] == self.NumRepetitions and self._last_mem_frames_segs_samples[1] == self.NumSegments and self._last_mem_frames_segs_samples[2] == self.NumSamples:
+            return
+
         if (self.acq_mode() == "DUAL") :
             assert (self.NumSamples % 48) == 0, \
                 "In DUAL mode, number of samples must be an integer multiple of 48"
         else :
             assert (self.NumSamples % 96) == 0, \
                 "In SINGLE mode, number of samples must be an integer multiple of 96"
-        # Allocate four frames of self.NumSample (defaults to 48000) 
-        cmd = ':DIG:ACQuire:FRAM:DEF {0},{1}'.format(self.NumRepetitions*self.NumSegments, self.NumSamples) #NOTE Unsure as to where these members are set
+        #Allocate four frames of self.NumSample (defaults to 48000) 
+        cmd = ':DIG:ACQuire:FRAM:DEF {0},{1}'.format(num_frames, self.NumSamples)
         self._parent._send_cmd(cmd)
 
-        # Select the frames for the capturing 
-        # (all the four frames in this example)
-        capture_first, capture_count = 1, self.NumRepetitions*self.NumSegments
+        #Select the frames for the capturing
+        capture_first, capture_count = 1, num_frames
         cmd = ":DIG:ACQuire:FRAM:CAPT {0},{1}".format(capture_first, capture_count)
         self._parent._send_cmd(cmd)
 
-        self._last_mem_frames_samples = (self.NumRepetitions, self.NumSegments, self.NumSamples)
+        self._last_mem_frames_segs_samples = (self.NumRepetitions, self.NumSegments, self.NumSamples)
         self._parent._chk_err('after allocating readout ACQ memory.')
 
     def set_svm(self) :
@@ -806,46 +831,22 @@ class TaborP2584M_ACQ(InstrumentChannel):
         self._parent._set_cmd(':DSP:DEC:IQP:LINE', '2,1,0')
         self._parent._set_cmd(':DSP:DEC:IQP:LINE', '3,-1,0')
 
-    def _get_captured_header(self, printHeader=False,N=1,buf=[]):
+    def _get_captured_header(self, N=1,buf=[]):
         header_size=72
         number_of_frames = N
         num_bytes = number_of_frames * header_size
         Proteus_header = []
 
-        
-        class header(object):
-            def __init__(self):
-                self.TriggerPos = 0
-                self.GateLength = 0
-                self.minVpp = 0
-                self.maxVpp = 0
-                self.TimeStamp = 0
-                self.real1_dec = 0
-                self.im1_dec = 0
-                self.real2_dec = 0
-                self.im2_dec = 0
-                self.real3_dec = 0
-                self.im3_dec = 0
-                self.real4_dec = 0
-                self.im4_dec = 0
-                self.real5_dec = 0
-                self.im5_dec = 0
-                self.state1 = 0
-                self.state2 = 0
-                self.state3 = 0
-                self.state4 = 0
-                self.state5 = 0
-
         # create sets of header classes
         for i in range(number_of_frames):
-            Proteus_header.append(header())
+            Proteus_header.append({})
 
         for i in range(number_of_frames):
             idx = i* header_size
-            Proteus_header[i].TriggerPos = buf[idx+0]*(1 << 0) + buf[idx+1]*(1 << 8) + buf[idx+2]*(1 << 16) + buf[idx+3]*(1 << 24)
-            Proteus_header[i].GateLength = buf[idx+4]*(1 << 0) + buf[idx+5]*(1 << 8) + buf[idx+6]*(1 << 16) + buf[idx+7]*(1 << 24)
-            Proteus_header[i].minVpp     = buf[idx+8]*(1 << 0) + buf[idx+9]*(1 << 8)
-            Proteus_header[i].maxVpp     = buf[idx+10]*(1 << 0) + buf[idx+11]*(1 << 8)
+            Proteus_header[i]['TriggerPos'] = buf[idx+0]*(1 << 0) + buf[idx+1]*(1 << 8) + buf[idx+2]*(1 << 16) + buf[idx+3]*(1 << 24)
+            Proteus_header[i]['GateLength'] = buf[idx+4]*(1 << 0) + buf[idx+5]*(1 << 8) + buf[idx+6]*(1 << 16) + buf[idx+7]*(1 << 24)
+            Proteus_header[i]['minVpp']     = buf[idx+8]*(1 << 0) + buf[idx+9]*(1 << 8)
+            Proteus_header[i]['maxVpp']     = buf[idx+10]*(1 << 0) + buf[idx+11]*(1 << 8)
             
             timeStamp1 = buf[idx+12]*(1 << 0)
             timeStamp2 = buf[idx+13]*(1 << 8)  
@@ -856,7 +857,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
             timeStamp7 = buf[idx+18]*(1 << 48) 
             timeStamp8 = buf[idx+19]*(1 << 56)
 
-            Proteus_header[i].TimeStamp = timeStamp1 + timeStamp2 + timeStamp3 + timeStamp4 + timeStamp5 + timeStamp6 + timeStamp7 + timeStamp8
+            Proteus_header[i]['TimeStamp'] = timeStamp1 + timeStamp2 + timeStamp3 + timeStamp4 + timeStamp5 + timeStamp6 + timeStamp7 + timeStamp8
             
             decisionRe1 = buf[idx+20]*(1 << 0) + buf[idx+21]*(1 << 8) + buf[idx+22]*(1 << 16) + buf[idx+23]*(1 << 24)
             decisionIm1 = buf[idx+24]*(1 << 0) + buf[idx+25]*(1 << 8) + buf[idx+26]*(1 << 16) + buf[idx+27]*(1 << 24)
@@ -870,16 +871,16 @@ class TaborP2584M_ACQ(InstrumentChannel):
             decisionIm5 = buf[idx+56]*(1 << 0) + buf[idx+57]*(1 << 8) + buf[idx+58]*(1 << 16) + buf[idx+59]*(1 << 24)
 
 
-            Proteus_header[i].real1_dec = decisionRe1
-            Proteus_header[i].im1_dec = decisionIm1
-            Proteus_header[i].real2_dec = decisionRe2
-            Proteus_header[i].im2_dec = decisionIm2
-            Proteus_header[i].real3_dec = decisionRe3
-            Proteus_header[i].im3_dec = decisionIm3
-            Proteus_header[i].real4_dec = decisionRe4
-            Proteus_header[i].im4_dec = decisionIm4
-            Proteus_header[i].real5_dec = decisionRe5
-            Proteus_header[i].im5_dec = decisionIm5
+            Proteus_header[i]['real1_dec'] = decisionRe1
+            Proteus_header[i]['im1_dec'] = decisionIm1
+            Proteus_header[i]['real2_dec'] = decisionRe2
+            Proteus_header[i]['im2_dec'] = decisionIm2
+            Proteus_header[i]['real3_dec'] = decisionRe3
+            Proteus_header[i]['im3_dec'] = decisionIm3
+            Proteus_header[i]['real4_dec'] = decisionRe4
+            Proteus_header[i]['im4_dec'] = decisionIm4
+            Proteus_header[i]['real5_dec'] = decisionRe5
+            Proteus_header[i]['im5_dec'] = decisionIm5
             
             state1 = buf[idx+60]*(1 << 0)
             state2 = buf[idx+61]*(1 << 0)
@@ -887,35 +888,15 @@ class TaborP2584M_ACQ(InstrumentChannel):
             state4 = buf[idx+63]*(1 << 0)
             state5 = buf[idx+64]*(1 << 0)
             
-            Proteus_header[i].state1 = state1
-            Proteus_header[i].state2 = state2
-            Proteus_header[i].state3 = state3
-            Proteus_header[i].state4 = state4
-            Proteus_header[i].state5 = state5
-        
-        if(printHeader==True):
-            i=0
-            outprint = 'header# {0}\n'.format(i)
-            outprint += 'TriggerPos: {0}\n'.format(Proteus_header[i].TriggerPos)
-            outprint += 'GateLength: {0}\n'.format(Proteus_header[i].GateLength )
-            outprint += 'Min Amp: {0}\n'.format(Proteus_header[i].minVpp)
-            outprint += 'Max Amp: {0}\n'.format(Proteus_header[i].maxVpp)
-            outprint += 'TimeStamp: {0}\n'.format(Proteus_header[i].TimeStamp)
-            outprint += 'Decision1: {0} + j* {1}\n'.format(Proteus_header[i].real1_dec,Proteus_header[i].im1_dec)
-            outprint += 'Decision2: {0} + j* {1}\n'.format(Proteus_header[i].real2_dec,Proteus_header[i].im2_dec)
-            outprint += 'Decision3: {0} + j* {1}\n'.format(Proteus_header[i].real3_dec,Proteus_header[i].im3_dec)
-            outprint += 'Decision4: {0} + j* {1}\n'.format(Proteus_header[i].real4_dec,Proteus_header[i].im4_dec)
-            outprint += 'Decision5: {0} + j* {1}\n'.format(Proteus_header[i].real5_dec,Proteus_header[i].im5_dec)
-            outprint += 'STATE1: {0}\n'.format(Proteus_header[i].state1)
-            outprint += 'STATE2: {0}\n'.format(Proteus_header[i].state2)
-            outprint += 'STATE3: {0}\n'.format(Proteus_header[i].state3)
-            outprint += 'STATE4: {0}\n'.format(Proteus_header[i].state4)
-            outprint += 'STATE5: {0}\n'.format(Proteus_header[i].state5)
-            print(outprint)
+            Proteus_header[i]['state1'] = state1
+            Proteus_header[i]['state2'] = state2
+            Proteus_header[i]['state3'] = state3
+            Proteus_header[i]['state4'] = state4
+            Proteus_header[i]['state5'] = state5
             
         return Proteus_header
 
-    def get_frame_data(self, ddr_num):
+    def get_header_data(self, ddr_num):
         #Read all frames from Memory
         # 
         self._parent._set_cmd(':DIG:CHAN:SEL', ddr_num)
@@ -937,7 +918,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
             pass
         self._parent._chk_err('in reading frame data.')
 
-        return self._get_captured_header(printHeader=False, N=number_of_frames, buf=wav2) #dec_vals
+        return self._get_captured_header(N=number_of_frames, buf=wav2) #dec_vals
 
     def process_block(self, block_idx, cur_processor, blocksize):
         if block_idx == 0:
@@ -1179,61 +1160,6 @@ class TaborP2584M_ACQ(InstrumentChannel):
         #     self.ddr1_store(kwargs.get("ddr1_store", self.ddr1_store()))
         #     self.ddr2_store(kwargs.get("ddr2_store", self.ddr2_store()))
 
-    def iq_kernel(self, coefficients, fs, flo=400e6, kl=10240):
-        """
-        Method to sythesise an IQ kernel for frequency extraction
-        """
-        TAP = coefficients.size
-        # print('loaded {0} TAP filter from {1}'.format(TAP,coe_file_path))
-        res = 10
-        L = res * math.ceil(kl / res)
-        k = np.ones(L+TAP)
-        
-        pi = math.pi
-        ts = 1 / fs
-        t = np.linspace(0, L*ts, L, endpoint=False)
-        
-        loi = np.cos(2 * pi * flo * t)
-        loq = -(np.sin(2 * pi * flo * t))
-        
-        k_i = np.zeros(L)
-        k_q = np.zeros(L)
-        
-        for l in range(L):
-            b = 0
-            for n in range(TAP):
-                b += k[l+n]*coefficients[n]
-            k_q[l] = loq[l] * b
-            k_i[l] = loi[l] * b
-        
-        print('sigma bn = {0}'.format(b))
-        return(k_i,k_q) 
-
-
-    def setup_kernel(self, path, coefficients, flo, kl=3456) :
-        """
-        Method to setup kernel on real path
-        @param path:
-        @param coefficients:
-        @param flo
-        @param kl
-        """
-        valid_paths = ["DBUG", "IQ4", "IQ5", "IQ6", "IQ7", "IQ8", "IQ9", "IQ10", "IQ11", "IQ12", "IQ13"]
-        if path not in valid_paths :
-            print("Not a valid iq demodulation kernel to program, must be one of: 'DBUG' 'IQ4' 'IQ5' ... 'IQ13'")
-            return
-        self.iq_demod(path)
-        ki,kq = self.iq_kernel(coefficients, flo=flo, fs = self.SampleRate, kl=kl)
-        #ki = np.linspace(0,1,ki.size)
-        #kq = np.linspace(0,-1,ki.size)
-        mem = self.pack_kernel_data(ki,kq)
-        self._parent._set_cmd(':DSP:IQD:SEL', path)
-        self._parent._chk_err("after trying to setup the IQ path.")
-        self._parent._inst.write_binary_data(':DSP:IQD:KER:DATA', mem)
-        self._parent._chk_err("after trying to setup the IQ kernel.")
-        return ki, kq
-
-
     def setup_filter(self, filter_channel, filter_array, **kwargs) :
         """
         Method to set coefficients for specific FIR filter on Tabor
@@ -1278,6 +1204,265 @@ class TaborP2584M_ACQ(InstrumentChannel):
         # self._parent._send_cmd(':DSP:DEC:IQP:LINE 2,1.0125,0.5')
         # self._parent._send_cmd(':DSP:DEC:IQP:LINE 3,0,0')
 
+    def settle_dsp_processors(self, cur_processor):
+        final_dsp_order = {
+            'dsp_active' : False,
+            'kernels' : [],
+            'read_IQ': True,
+            'final_scale_factor' : 1
+        }
+
+        kernel_settled = False
+        decimation = False
+        final_dsp_order['avSamples'] = False
+        final_dsp_order['avRepetitions'] = False
+
+        if isinstance(cur_processor, ProcessorFPGA) and len(cur_processor.pipeline) == 0:
+            return final_dsp_order
+        else:
+            final_dsp_order['dsp_active'] = True
+
+        for m, cur_node in enumerate(cur_processor.pipeline):
+            if isinstance(cur_node, FPGA_DDCFIR) or isinstance(cur_node, FPGA_DDC):
+                assert not kernel_settled, "The P2584M only supports one kernel stage (e.g. variants of DDCs)."
+                assert not decimation, "The P2584M only supports kernel stages (e.g. variants of DDCs) before decimation."
+                assert not final_dsp_order['avSamples'], "The P2584M only supports kernel stages (e.g. variants of DDCs) before averaging."
+                assert not final_dsp_order['avRepetitions'], "The P2584M only supports kernel stages (e.g. variants of DDCs) before averaging."
+                final_dsp_order['kernels'], final_dsp_order['final_scale_factor'] = cur_node.get_params(sample_rate = [self.SampleRate]*2,  num_samples = self.NumSamples)
+                kernel_settled = True
+            elif isinstance(cur_node, FPGA_Decimation):
+                assert not final_dsp_order['avSamples'], "The P2584M only supports decimation before averaging."
+                assert not final_dsp_order['avRepetitions'], "The P2584M only supports decimation before averaging."
+                param, fac = cur_node.get_params()
+                assert param == 'sample', "The P2584M only supports mandatory 10x decimation on the samples."
+                assert fac == 10, "The P2584M only supports mandatory 10x decimation on the samples."
+                decimation = True
+            elif isinstance(cur_node, FPGA_Integrate):
+                assert decimation, "The P2584M only supports averaging after a 10x mandatory decimation (do it via an \'FPGA_Integrate\' stage)."
+                param = cur_node.get_params()
+                if param == 'sample':
+                    assert not final_dsp_order['avSamples'], "There is already a sample averaging stage."
+                    assert not final_dsp_order['avRepetitions'], "Cannot average samples after averaging over repetitions."
+                    final_dsp_order['avSamples'] = True
+                elif param == 'repetition':
+                    assert not final_dsp_order['avRepetitions'], "There is already a repetition averaging stage."
+                    assert self.NumSegments == 1, "The P2584M does not currently support repetition averaging over multiple segments."
+                    final_dsp_order['avRepetitions'] = True
+                else:
+                    assert False, f"Cannot average over \'{param}\'"
+        #If no Kernel, it's just a passthrough...
+        if len(final_dsp_order['kernels']) == 0:
+            if self.ChannelStates[0]:
+                final_dsp_order['kernels'] += [[(np.ones(self.NumSamples), np.zeros(self.NumSamples))]]
+            if self.ChannelStates[1]:
+                final_dsp_order['kernels'] += [[(np.ones(self.NumSamples), np.zeros(self.NumSamples))]]
+            final_dsp_order['read_IQ'] = False
+        return final_dsp_order
+
+                
+
+    def process_dsp_kernel(self, kernelIQs):
+        if len(kernelIQs) == 2:
+            assert len(kernelIQs[0]) <= 5, "The Tabor P2584M does not support more than 5 demodulations per channel when demodulating across 2 channels."
+            assert len(kernelIQs[1]) <= 5, "The Tabor P2584M does not support more than 5 demodulations per channel when demodulating across 2 channels."
+            self.ddcBindChannels(False)
+            num_ch_divs = (len(kernelIQs[0]), len(kernelIQs[1]))
+        else:
+            self.ddcBindChannels(True)
+            num_ch_divs = (len(kernelIQs[0]), 0)                    
+        curIQpath = 4
+        for cur_ch in kernelIQs:
+            for k, cur_kernel_IQ in enumerate(cur_ch):
+                kI, kQ = cur_kernel_IQ
+                mem = self.pack_kernel_data(kI, kQ)
+                self._parent._set_cmd(':DSP:IQD:SEL', f"IQ{curIQpath}")
+                self._parent._chk_err("after trying to setup the IQ path.")
+                self._parent._inst.write_binary_data(':DSP:IQD:KER:DATA', mem)
+                self._parent._chk_err("after trying to setup the IQ kernel.")
+                curIQpath += 1
+            curIQpath = 9   #CH2 starts from IQ9 onwards
+        return num_ch_divs
+
+    def _perform_data_capture(self, cur_processor, final_dsp_order, blocksize):
+        num_frames = self.NumRepetitions*self.NumSegments
+        if final_dsp_order['avRepetitions']:
+            num_frames = 1
+
+        self._parent._chk_err('before')
+        self._parent._set_cmd(':DIG:INIT', 'ON')
+        self._parent._chk_err('dig:on')
+        
+        #Poll for status bit
+        loopcount = 0
+        captured_frame_count = 0
+        while captured_frame_count < num_frames:
+            resp = self._parent._get_cmd(":DIG:ACQuire:FRAM:STATus?")
+            resp_items = resp.split(',')
+            captured_frame_count = int(resp_items[3])
+            done = int(resp_items[1])
+            #print("{0}. {1}".format(done, resp_items))
+            loopcount += 1
+            if loopcount > 100000 and captured_frame_count == 0:    #As in nothing captured over 100000 check-loops...
+                #print("No Trigger was detected")
+                assert False, "No trigger detected during the acquisiton sniffing window."
+
+        #TODO: Write some blocked caching code here (like with the M4i)...
+        # If processor is supplied apply it
+        #The blocks are for the GPU - i.e. it cannot process it all in one go at times...
+        if cur_processor and not isinstance(cur_processor, ProcessorFPGA):
+            self.process_block(0, cur_processor, blocksize)
+            block_idx = 1
+            while block_idx*blocksize < self.NumRepetitions*self.NumSegments: # NOTE : some strange logic, perhaps tied to the logic above
+                self.process_block(block_idx, cur_processor, blocksize)
+                block_idx += 1
+            return cur_processor.get_all_data()
+        else:
+            # No processor supplied
+            done = 0
+            while not done:
+                done = int(self._parent._get_cmd(":DIG:ACQuire:FRAM:STATus?").split(',')[3])
+            # Stop the digitizer's capturing machine (to be on the safe side)
+            self._parent._set_cmd(':DIG:INIT', 'OFF')
+            self._parent._chk_err('after actual acquisition.')
+
+    def NormalAVGSignal(self, wav,AvgCount,is_dsp,ADCFS=1000,BINOFFSET=False):
+        def getAvgDivFactor(AvgCount=1000,is_dsp=False):
+            AvgDivFactor = int(np.log2(AvgCount))
+            if not is_dsp:
+                AvgDivFactor = 0 if (AvgDivFactor + 12 <= 28) else AvgDivFactor + 12 - 28
+            else:
+                AvgDivFactor = 0 if (AvgDivFactor + 15 <= 28) else AvgDivFactor + 15 - 28
+            return AvgDivFactor
+        def convert_binoffset_to_signed(inp,bitnum):
+            return inp - 2**(bitnum-1)
+        def convertTimeSignedDataTomV(x,adcfs=1000,bitnum=15):
+            maxadc = 2**(bitnum-1) - 1
+            return adcfs * (x / maxadc)
+
+        AvgDivFactor = getAvgDivFactor(AvgCount,is_dsp)
+        # taking into acount the 28bit position inside the 36bit word inside the FPGA
+        AvgCount = AvgCount // 2**AvgDivFactor
+        
+        if not is_dsp:
+            BITNUM = 12
+        else:
+            BITNUM = 15
+        if BINOFFSET == False:    
+            signed_wav = np.zeros(wav.shape, dtype=np.int32)
+            # convert binary offset to signed presentation
+            signed_wav = convert_binoffset_to_signed(wav*1.0,28)
+            # Normaling
+            wavNorm = signed_wav // AvgCount
+            # convert to mV
+            mVwavNorm = convertTimeSignedDataTomV(wavNorm,ADCFS,bitnum=BITNUM)
+        
+            return mVwavNorm
+        else:
+            wav = wav // AvgCount
+            
+            return wav
+
+    def conv_data(self, data, final_dsp_order):
+        if final_dsp_order['avRepetitions']:
+            return self.NormalAVGSignal(data, self.NumRepetitions, final_dsp_order['dsp_active'])*1.0
+        else:
+            return (data*1.0 - 2**15) / 2**16
+
+    def _read_data_frames(self, final_dsp_order):
+        #Choose to read all frames
+        self._parent._set_cmd(':DIG:DATA:SEL', 'ALL')
+        #Read frame-data without the header
+        self._parent._set_cmd(':DIG:DATA:TYPE', 'FRAM')
+        
+        #Get the total data size (in bytes)
+        self._parent._set_cmd(':DIG:CHAN:SEL', 1)
+        resp = self._parent._get_cmd(':DIG:DATA:SIZE?')
+        num_bytes = np.uint64(resp)
+
+        if final_dsp_order['avRepetitions']:
+            wavlen = int(num_bytes // 4)    #32bits as it's a 28bit counter...
+            fin_shape = (1, self.NumSegments, self.NumSamples)
+        else:
+            wavlen = int(num_bytes // 2)
+            fin_shape = (self.NumRepetitions, self.NumSegments, self.NumSamples)
+        # Ensure all previous commands have been executed
+        while (not self._parent._get_cmd('*OPC?')):
+            pass
+        if self.ChannelStates[0]:
+            # Read from channel 1
+            self._parent._set_cmd(':DIG:CHAN:SEL', 1)
+            if final_dsp_order['avRepetitions']:
+                wav1 = np.zeros(wavlen, dtype=np.uint32)
+            else:
+                wav1 = np.zeros(wavlen, dtype=np.uint16)
+            rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav1, num_bytes)
+            wav1 = wav1.reshape(*fin_shape)
+            # Ensure all previous commands have been executed
+            while (not self._parent._get_cmd('*OPC?')):
+                pass
+        if self.ChannelStates[1]:
+            # read from channel 2
+            self._parent._set_cmd(':DIG:CHAN:SEL', 2)
+            if final_dsp_order['avRepetitions']:
+                wav2 = np.zeros(wavlen, dtype=np.uint32)
+            else:
+                wav2 = np.zeros(wavlen, dtype=np.uint16)
+            rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav2, num_bytes)
+            wav2 = wav2.reshape(*fin_shape)
+            # Ensure all previous commands have been executed
+            while (not self._parent._get_cmd('*OPC?')):
+                pass
+        # Check errors
+        self._parent._chk_err('after downloading the ACQ data from the FGPA DRAM.')
+        
+        ret_val = {
+                    'data' : {},
+                    'misc' : {}
+                }
+        if final_dsp_order['avRepetitions']:
+            ret_val['parameters'] = ['segment', 'sample']
+        else:
+            ret_val['parameters'] = ['repetition', 'segment', 'sample']
+        leSampleRates = []
+        num_ch_divs = final_dsp_order['num_ch_divs']
+        final_scale = final_dsp_order['final_scale_factor']
+        if not final_dsp_order['dsp_active']:
+            # Only return data which matches channels that are active
+            if (self.ChannelStates[0]) :
+                ret_val['data']['CH1'] = self.conv_data(wav1) * final_scale
+                leSampleRates += [self.SampleRate]
+            if (self.ChannelStates[1]) :
+                ret_val['data']['CH2'] = self.conv_data(wav2) * final_scale
+                leSampleRates += [self.SampleRate]
+            ret_val['misc']['SampleRates'] = leSampleRates
+        else:
+            if num_ch_divs[0] > 0:
+                wav1 = self.conv_data(wav1, final_dsp_order)
+            offset = 0
+            for m in range(num_ch_divs[0]):
+                if final_dsp_order['avRepetitions']:
+                    ret_val['data'][f'CH1_{m}_I'] = wav1[0,:,int(2*(m+offset)+1)::10] * final_scale
+                    ret_val['data'][f'CH1_{m}_Q'] = wav1[0,:,int(2*(m+offset))::10] * final_scale
+                else:
+                    ret_val['data'][f'CH1_{m}_I'] = wav1[:,:,int(2*(m+offset)+1)::12] * final_scale
+                    ret_val['data'][f'CH1_{m}_Q'] = wav1[:,:,int(2*(m+offset))::12] * final_scale
+                leSampleRates += [self.SampleRate / 10]*2
+                if m == 4:
+                    wav1 = self.conv_data(wav2, final_dsp_order)    #This is relevant in the BIND mode...
+                    offset = -5
+            if num_ch_divs[1] > 0:
+                wav2 =self.conv_data(wav2, final_dsp_order)
+            for m in range(num_ch_divs[1]):
+                if final_dsp_order['avRepetitions']:
+                    ret_val['data'][f'CH2_{m}_I'] = wav2[0,:,int(2*m+1)::10] * final_scale
+                    ret_val['data'][f'CH2_{m}_Q'] = wav2[0,:,int(2*m)::10] * final_scale
+                else:
+                    ret_val['data'][f'CH2_{m}_I'] = wav2[:,:,int(2*m+1)::12] * final_scale
+                    ret_val['data'][f'CH2_{m}_Q'] = wav2[:,:,int(2*m)::12] * final_scale
+                leSampleRates += [self.SampleRate / 10]*2
+            ret_val['misc']['SampleRates'] = leSampleRates
+        return ret_val
+
     def get_data(self, **kwargs):
         self.blocksize(self.NumRepetitions)
         #TODO:
@@ -1315,121 +1500,80 @@ class TaborP2584M_ACQ(InstrumentChannel):
         assert self.NumSamples % 48 == 0, "The number of samples must be divisible by 48 if in DUAL mode."
 
         cur_processor = kwargs.get('data_processor', None)
+        final_dsp_order = self.settle_dsp_processors(cur_processor)
 
-        if self._last_mem_frames_samples[0] != self.NumRepetitions or self._last_mem_frames_samples[1] != self.NumSegments or self._last_mem_frames_samples[2] != self.NumSamples:
-            self._allocate_frame_memory()
+        self._allocate_frame_memory(final_dsp_order)
 
         # Clean memory 
         self._parent._send_cmd(':DIG:ACQ:ZERO:ALL')
 
         self._parent._chk_err('after clearing memory.')
 
-        filt_coeffs = scipy.signal.firwin(51, 10e6, fs=2.5e9)
+        num_ch_divs = []
+        if final_dsp_order['dsp_active']:
+            assert self.ChannelStates[0]==1 and self.ChannelStates[1]==1, "Must be in DUAL-mode (i.e. both channels active) to use DSP."
+            assert self.NumSamples % 360 == 0, "If using FPGA DSP blocks, the number of samples must be divisible by 360. Note that it is 10x decimated."
+            assert self.NumSamples <= 10240, "If using FPGA DSP blocks, the number of samples must be limited to 10240."
 
-        self.ddr_store('DSP')
-        Frame_len = self.NumSamples
-        DSP_DEC_LEN = Frame_len / 12 - 10
-        self._parent._set_cmd(f':DSP:DEC:FRAM', f'{int(DSP_DEC_LEN)}')
-        self._parent._set_cmd(':DSP:STOR', 'DSP')
-        self._parent._chk_err('after setting to DSP.')
+            #It's DSP time
+            self.ddr_store('DSP')
+            self._parent._chk_err('after setting to DSP.')
+            Frame_len = self.NumSamples
+            DSP_DEC_LEN = Frame_len / 10# - 10
+            self._parent._set_cmd(f':DSP:DEC:FRAM', f'{int(DSP_DEC_LEN)}')
+            self._parent._set_cmd(':DSP:STOR', 'DSP')
+            self._parent._chk_err('after setting up DSP.')
 
-        self.setup_kernel("IQ4", filt_coeffs, flo = 100e6)
-        self.setup_kernel("IQ9", filt_coeffs, flo = 100e6)
+            #Setup kernel block
+            final_dsp_order['num_ch_divs'] = self.process_dsp_kernel(final_dsp_order['kernels'])
+            #Setup repetition averaging if requested
+            if final_dsp_order['avRepetitions']:
+                self.averageEnable(True)
+                self._parent._set_cmd(':DIG:ACQuire:AVERage:COUNt', self.NumRepetitions)
+            else:
+                self.averageEnable(False)
 
-        self._parent._chk_err('before')
-        self._parent._set_cmd(':DIG:INIT', 'ON')
-        self._parent._chk_err('dig:on')
-        
-        #Poll for status bit
-        loopcount = 0
-        captured_frame_count = 0
-        while captured_frame_count < blocksize: #NOTE : WHy is this being compared to repititions and not repititions * numFrames
-            resp = self._parent._get_cmd(":DIG:ACQuire:FRAM:STATus?")
-            resp_items = resp.split(',')
-            captured_frame_count = int(resp_items[3])
-            done = int(resp_items[1])
-            #print("{0}. {1}".format(done, resp_items))
-            loopcount += 1
-            if loopcount > 100000 and captured_frame_count == 0:    #As in nothing captured over 1000 check-loops...
-                #print("No Trigger was detected")
-                assert False, "No trigger detected during the acquisiton sniffing window."
-                done = 1
+        self._perform_data_capture(cur_processor, final_dsp_order, blocksize)
 
-        # If processor is supplied apply it
-        if cur_processor:
-            self.process_block(0, cur_processor, blocksize)
-            block_idx = 1
-            while block_idx*blocksize < self.NumRepetitions*self.NumSegments: # NOTE : some strange logic, perhaps tied to the logic above
-                self.process_block(block_idx, cur_processor, blocksize)
-                block_idx += 1
-            return cur_processor.get_all_data()
-        else:
-            # No processor supplied
-            done = 0
-            while not done:
-                done = int(self._parent._get_cmd(":DIG:ACQuire:FRAM:STATus?").split(',')[3])
-            # Stop the digitizer's capturing machine (to be on the safe side)
-            self._parent._set_cmd(':DIG:INIT', 'OFF')
-
-            self._parent._chk_err('after actual acquisition.')
-            #Choose which frames to read (all in this example)
-            self._parent._set_cmd(':DIG:DATA:SEL', 'ALL')
-            #Choose what to read (only the frame-data without the header in this example)
-            self._parent._set_cmd(':DIG:DATA:TYPE', 'FRAM')
-            
-            # Get the total data size (in bytes)
-            self._parent._set_cmd(':DIG:CHAN:SEL', 1)
-            resp = self._parent._get_cmd(':DIG:DATA:SIZE?')
-            num_bytes = np.uint64(resp)
-            #print(num_bytes, 'hi', self._parent._get_cmd(':DIG:DATA:FRAM?'))
-
-            wavlen = int(num_bytes // 2)        
-            # Ensure all previous commands have been executed
-            while (not self._parent._get_cmd('*OPC?')):
-                pass
-            if (self.ChannelStates[0]) :
-                # Read from channel 1
-                self._parent._set_cmd(':DIG:CHAN:SEL', 1)
-                wav1 = np.zeros(wavlen, dtype=np.uint16)
-                rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav1, num_bytes)
-                wav1 = wav1.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)
-                # Ensure all previous commands have been executed
-                while (not self._parent._get_cmd('*OPC?')):
-                    pass
-            if (self.ChannelStates[1]) :
-                # read from channel 2
-                self._parent._set_cmd(':DIG:CHAN:SEL', 2)
-                wav2 = np.zeros(wavlen, dtype=np.uint16)
-                rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav2, num_bytes)
-                wav2 = wav2.reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)
-                # Ensure all previous commands have been executed
-                while (not self._parent._get_cmd('*OPC?')):
-                    pass
-            # Check errors
-            self._parent._chk_err('after downloading the ACQ data from the FGPA DRAM.')
-
-            #TODO: Write some blocked caching code here (like with the M4i)...
-            """
+        if final_dsp_order['avSamples']:
             ret_val = {
-                        'parameters' : ['repetition', 'segment', 'sample'],
-                        'data' : {
-                                    'CH1' : wav1.astype(np.int32),
-                                    'CH2' : wav2.astype(np.int32),
-                                    },
-                        'misc' : {'SampleRates' : [self.SampleRate]*2}
-                    }
-            """
-            ret_val = {
-                        'parameters' : ['repetition', 'segment', 'sample'],
-                        'data' : {},
-                        'misc' : {'SampleRates' : [self.SampleRate]*2}
-                    }
-            # Only return data which matches channels that are active
-            if (self.ChannelStates[0]) :
-                ret_val['data']['CH1'] = wav1.astype(np.int32)
-            if (self.ChannelStates[1]) :
-                ret_val['data']['CH2'] = wav2.astype(np.int32)
+                    'parameters' : ['repetition', 'segment'],
+                    'data' : {},
+                    'misc' : {}
+                }
+            if final_dsp_order['avRepetitions']:
+                ret_val['parameters'].pop(0)
+            leSampleRates = []
+            num_ch_divs = final_dsp_order['num_ch_divs']
+            #
+            headers1 = self.get_header_data(1)
+            if final_dsp_order['num_ch_divs'][0] > 5 or final_dsp_order['num_ch_divs'][1] > 0:
+                headers2 = self.get_header_data(2)
+            else:
+                headers2 = []
+            def proc_data(data, final_dsp_order, ret_val):
+                if final_dsp_order['avRepetitions']:
+                    #TODO: Later make this read straight off decision block changes in their newer firmware releases
+                    return np.array([np.mean(data)])*final_dsp_order['final_scale_factor']
+                else:
+                    return np.array([data])*final_dsp_order['final_scale_factor']
+            offset = 0
+            for m in range(num_ch_divs[0]):
+                ret_val['data'][f'CH1_{m}_I'] = proc_data( np.array([x[f'real{m-offset+1}_dec'] for x in headers1]), final_dsp_order, ret_val )
+                ret_val['data'][f'CH1_{m}_Q'] = proc_data( np.array([x[f'im{m-offset+1}_dec'] for x in headers1]), final_dsp_order, ret_val )
+                leSampleRates += [self.SampleRate / 10]*2
+                if m == 4:
+                    headers1 = headers2    #This is relevant in the BIND mode...
+                    offset = -5
+            for m in range(num_ch_divs[1]):
+                ret_val['data'][f'CH2_{m}_I'] = proc_data( np.array([x[f'real{m+1}_dec'] for x in headers2]), final_dsp_order, ret_val )
+                ret_val['data'][f'CH2_{m}_Q'] = proc_data( np.array([x[f'im{m+1}_dec'] for x in headers2]), final_dsp_order, ret_val )
+                leSampleRates += [self.SampleRate / 10]*2
+            ret_val['misc']['SampleRates'] = leSampleRates
             return ret_val
+        else:
+            return self._read_data_frames(final_dsp_order)
+
 
 class Tabor_P2584M(Instrument):
     def __init__(self, name, pxi_chassis: int,  pxi_slot: int, **kwargs):

@@ -17,7 +17,7 @@ This document lists all the GPU processing nodes that can be used with the `Proc
 
 ## GPU DDC
 
-`GPU_DDC` performs the digital downconversion stage required for IQ-demodulation. That is, consider the following ipnut signal:
+`GPU_DDC` performs the digital downconversion stage required for IQ-demodulation. That is, consider the following input signal:
 
 $$M(t)=A\cos(2\pi ft + \phi) + k$$
 

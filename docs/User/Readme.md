@@ -17,6 +17,8 @@ Main structure:
         - [Available CPU processors](Proc_CPU_list.md)
         - [GPU Processor - Overview](Proc_GPU_Overview.md)
         - [Available GPU processors](Proc_GPU_list.md)
+        - [FPGA Processor - Overview](Proc_FPGA_Overview.md)
+        - [Available FPGA processors](Proc_FPGA_list.md)
 - Combine HAL settings to form `ExperimentConfiguration` objects:
     - [Creating ExperimentConfiguration objects](Exp_Config_Basic.md)
     - [Defining Variables](Var_Defns.md)

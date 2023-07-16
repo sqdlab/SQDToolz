@@ -14,7 +14,7 @@ class MWS_SGS100A_Channel(InstrumentChannel):
                             get_cmd='SOUR:FREQ' + '?',
                             set_cmd='SOUR:FREQ' + ' {:.2f}',
                             get_parser=float,
-                            vals=vals.Numbers(1e6, 20e9))
+                            vals=vals.Numbers(1e6, 12.75e9))
         #This is the reference phase taken when synchronising with a reference clock...
         self.add_parameter('phase', label='Output Phase', unit='deg',
                             get_cmd='SOUR:PHAS' + '?',

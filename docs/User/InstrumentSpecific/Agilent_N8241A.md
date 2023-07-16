@@ -38,7 +38,7 @@ Note the following:
 
 - There is only one external trigger; however, it can be fed into any of the 4 SMB trigger ports highlighted.
 - Internally, the markers are split equally across the two output channels.
-- The setup requires an external sample clock at 1.25GHz at at 0dBm output power
+- The setup requires an external sample clock at 1.25GHz at at 0dBm output power. **This signal must be feeding the unit before instantiation** (that is, before calling `load_instrument(Agi1)`).
 - The negative outputs do not work (like with the Tektronix AWGs; it only does so when set to differential outputs) for debugging with oscilloscopes etc.
 
 
@@ -73,7 +73,7 @@ Note the following:
         initial_value: 1.25e9
 ```
 
-Just set the IP address correctly. If the `ivi_dll` location throws an error (e.g. DLL not found), check that the N8241A IVI drivers have been properly installed. The AWG should be wired up as follows:
+Just set the IP addresses correctly. If the `ivi_dll` location throws an error (e.g. DLL not found), check that the N8241A IVI drivers have been properly installed. The AWG should be wired up as follows:
 
 ![My Diagram3](Agilent_N8241A_MS.drawio.svg)
 
@@ -81,7 +81,7 @@ The master unit is shown on top, while the slave unit is shown on the bottom. No
 
 - There is only one external trigger; however, it can be fed into any of the first 3 SMB trigger ports highlighted on the master unit.
 - Internally, the markers are split equally across the two output channels (with the master unit losing a marker channel on the second channel).
-- The setup requires an external sample clock at 1.25GHz at at 0dBm output power. A splitter feeds the signal into both units.
+- The setup requires an external sample clock at 1.25GHz at at 0dBm output power. A splitter feeds the signal into both units. **This signal must be feeding both the units before instantiation** (that is, before calling `load_instrument(Agi1)` and `load_instrument(Agi2)`).
 - The negative outputs do not work (like with the Tektronix AWGs; it only does so when set to differential outputs) for debugging with oscilloscopes etc.
 
 Note that the drivers must load the master first before instantiating the slave unit (that is, calling [`load_instrument`](../Exp_Overview.md)).

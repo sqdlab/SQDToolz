@@ -9,3 +9,5 @@ Arbitrary waveform generators (AWGs):
 FPGA DSP units:
 - [Tabor P2584M](Tabor_P2584M.md)
 
+Microwave sources:
+- [Rohde & Schwarz SGS100A](RohdeAndSchwarz_SGS100A.md)

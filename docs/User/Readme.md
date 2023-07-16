@@ -19,6 +19,8 @@ Main structure:
         - [Available GPU processors](Proc_GPU_list.md)
         - [FPGA Processor - Overview](Proc_FPGA_Overview.md)
         - [Available FPGA processors](Proc_FPGA_list.md)
+    - General purpose HALs:
+        - [Microwave sources](GENmwSource.md)
 - Combine HAL settings to form `ExperimentConfiguration` objects:
     - [Creating ExperimentConfiguration objects](Exp_Config_Basic.md)
     - [Defining Variables](Var_Defns.md)
@@ -38,3 +40,5 @@ Main structure:
 Other advanced use-cases:
 - [Synthesising SQDToolz HDF5 data files](Data_Write.md)
 - [Non-uniform data sampling](ACQ_NonUniformDataSampling.md)
+
+**Driver-level documentation** on setting up the hardware (e.g. template YAML and wiring diagrams) can be found [here](InstrumentSpecific/Readme.md).

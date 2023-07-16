@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="sqdtoolz",
-    version="0.0.1.dev1",
+    version="0.0.2.dev1",
     author="Prasanna Pakkiam, Rohit Beriwal",
     author_email="p.pakkiam@uq.edu.au, r.beriwal@uq.edu.au",
     description="toolbox to control and run a experiments",

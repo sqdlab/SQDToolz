@@ -508,10 +508,10 @@ class Agilent_N8241A(Instrument):
                            vals=vals.Numbers(-4.3, 4.3),
                            parameter_class=AGN_Parameter)
 
-        self.add_submodule('ch1', AGN_Channel(self, 'ch1', 1))
-        self.add_submodule('ch2', AGN_Channel(self, 'ch2', 2))
-        self._seq_wfms = {'ch1' : [], 'ch2' : []}
-        self._seq_handles = {'ch1' : None, 'ch2' : None}
+        self.add_submodule('CH1', AGN_Channel(self, 'CH1', 1))
+        self.add_submodule('CH2', AGN_Channel(self, 'CH2', 2))
+        self._seq_wfms = {'CH1' : [], 'CH2' : []}
+        self._seq_handles = {'CH1' : None, 'CH2' : None}
         self.done_programming = True
         self._raw_wfm_data = {}
         self._seq_mode = False
@@ -1576,38 +1576,38 @@ class Agilent_N8241A(Instrument):
         #Since the channels cannot be independently programmed, this function must be called after programming both channels (i.e. calling prepare_waveform_memory).
         #Just be aware of this during debugging.
 
-        # if len(self._seq_wfms['ch1']) > 0:
+        # if len(self._seq_wfms['CH1']) > 0:
         #     #TODO: Implement the update-flag discriminator here... (If it's even possible with this AWG?)
-        #     for cur_wgm_handle in self._seq_wfms['ch1']:
+        #     for cur_wgm_handle in self._seq_wfms['CH1']:
         #         self.clear_arb_waveform(cur_wgm_handle)
-        # self._seq_wfms['ch1'] = []
-        # if len(self._seq_wfms['ch2']) > 0:
+        # self._seq_wfms['CH1'] = []
+        # if len(self._seq_wfms['CH2']) > 0:
         #     #TODO: Implement the update-flag discriminator here... (If it's even possible with this AWG?)
-        #     for cur_wgm_handle in self._seq_wfms['ch2']:
+        #     for cur_wgm_handle in self._seq_wfms['CH2']:
         #         self.clear_arb_waveform(cur_wgm_handle)
-        # self._seq_wfms['ch2'] = []
+        # self._seq_wfms['CH2'] = []
         #In case the last programming event had an error or abortion...
         self.stop()
-        if len(self._seq_wfms['ch1']) > 0 or len(self._seq_wfms['ch2']) > 0:
+        if len(self._seq_wfms['CH1']) > 0 or len(self._seq_wfms['CH2']) > 0:
             #Some reason, clear-arbitrary-memory only works when in advanced sequence mode?!
             self.output_mode('Advanced Sequence')
             self.clear_arb_memory()
             self.output_mode('Arbitrary Waveform')
-            self._seq_wfms['ch1'] = []
-            self._seq_wfms['ch2'] = []
+            self._seq_wfms['CH1'] = []
+            self._seq_wfms['CH2'] = []
 
         if self._seq_mode:
             self._program_channels_sequence()
         else:
             #There is at most one waveform committed to each channel. So use Arbitrary mode...
-            if 'ch1' in self._raw_wfm_data:
-                self._program_channel_non_sequence('ch1', self._raw_wfm_data['ch1']['waveforms'][0], self._raw_wfm_data['ch1']['markers'][0])
-                if 'ch2' in self._raw_wfm_data:
-                    self._program_channel_non_sequence('ch2', self._raw_wfm_data['ch2']['waveforms'][0], self._raw_wfm_data['ch2']['markers'][0])
+            if 'CH1' in self._raw_wfm_data:
+                self._program_channel_non_sequence('CH1', self._raw_wfm_data['CH1']['waveforms'][0], self._raw_wfm_data['CH1']['markers'][0])
+                if 'CH2' in self._raw_wfm_data:
+                    self._program_channel_non_sequence('CH2', self._raw_wfm_data['CH2']['waveforms'][0], self._raw_wfm_data['CH2']['markers'][0])
             else:
                 #Channel 2 has a waveform, but Channel 1 is empty. Due to the waveform handle restrictions, a dummy waveform is filled in channel 1's memory to enable writes to Channel 2...
                 self._wfm_clog_memory()
-                self._program_channel_non_sequence('ch2', self._raw_wfm_data['ch2']['waveforms'][0], self._raw_wfm_data['ch2']['markers'][0])
+                self._program_channel_non_sequence('CH2', self._raw_wfm_data['CH2']['waveforms'][0], self._raw_wfm_data['CH2']['markers'][0])
 
         self.done_programming = True
         self._seq_mode = False
@@ -1688,62 +1688,62 @@ class Agilent_N8241A(Instrument):
         gain_1 = self.ch1.gain()
         gain_2 = self.ch2.gain()
 
-        if 'ch1' in self._raw_wfm_data:
-            num_wfms1 = len(self._raw_wfm_data['ch1']['waveforms'])
+        if 'CH1' in self._raw_wfm_data:
+            num_wfms1 = len(self._raw_wfm_data['CH1']['waveforms'])
         else:
             num_wfms1 = 0
-        if 'ch2' in self._raw_wfm_data:
-            num_wfms2 = len(self._raw_wfm_data['ch2']['waveforms'])
+        if 'CH2' in self._raw_wfm_data:
+            num_wfms2 = len(self._raw_wfm_data['CH2']['waveforms'])
         else:
             num_wfms2 = 0
         num_seg_pairs = max(num_wfms1, num_wfms2)
 
         #If one of the waveforms is a single-segment waveform, then it must be split and possibly padded to ensure it meets the minimum 2 segment sequence requirement...
         if num_wfms1 == 1:
-            self._segment_single_waveform_into_2('ch1')
+            self._segment_single_waveform_into_2('CH1')
             num_wfms1 = 2
         if num_wfms2 == 1:
-            self._segment_single_waveform_into_2('ch2')
+            self._segment_single_waveform_into_2('CH2')
             num_wfms2 = 2
 
         for m in range(num_seg_pairs):
             if m == 40:
                 a=0
             if m < num_wfms1:
-                self._upload_waveforms('ch1', self._raw_wfm_data['ch1']['waveforms'][m], self._raw_wfm_data['ch1']['markers'][m], gain_1)
+                self._upload_waveforms('CH1', self._raw_wfm_data['CH1']['waveforms'][m], self._raw_wfm_data['CH1']['markers'][m], gain_1)
                 #A strange bug where the returned waveform handle is odd... Just reupload waveform...
-                while self._seq_wfms['ch1'][-1] % 2 == 1:
-                    self._seq_wfms['ch1'].pop(-1)
-                    self._upload_waveforms('ch1', self._raw_wfm_data['ch1']['waveforms'][m], self._raw_wfm_data['ch1']['markers'][m], gain_1)
+                while self._seq_wfms['CH1'][-1] % 2 == 1:
+                    self._seq_wfms['CH1'].pop(-1)
+                    self._upload_waveforms('CH1', self._raw_wfm_data['CH1']['waveforms'][m], self._raw_wfm_data['CH1']['markers'][m], gain_1)
             else:
-                self._seq_wfms['ch1'] += [self._wfm_clog_memory()]  #Clogs need to be registered to be ridden in the next episode...
+                self._seq_wfms['CH1'] += [self._wfm_clog_memory()]  #Clogs need to be registered to be ridden in the next episode...
                 #A strange bug where the returned waveform handle is odd... Just reupload waveform...
-                while self._seq_wfms['ch1'][-1] % 2 == 1:
-                    self._seq_wfms['ch1'].pop(-1)
-                    self._seq_wfms['ch1'] += [self._wfm_clog_memory()]
+                while self._seq_wfms['CH1'][-1] % 2 == 1:
+                    self._seq_wfms['CH1'].pop(-1)
+                    self._seq_wfms['CH1'] += [self._wfm_clog_memory()]
             if m < num_wfms2:
-                self._upload_waveforms('ch2', self._raw_wfm_data['ch2']['waveforms'][m], self._raw_wfm_data['ch2']['markers'][m], gain_2)
+                self._upload_waveforms('CH2', self._raw_wfm_data['CH2']['waveforms'][m], self._raw_wfm_data['CH2']['markers'][m], gain_2)
                 #A strange bug where the returned waveform handle is even... Just reupload waveform...
-                while self._seq_wfms['ch2'][-1] % 2 == 0:
-                    self._seq_wfms['ch2'].pop(-1)
-                    self._upload_waveforms('ch2', self._raw_wfm_data['ch2']['waveforms'][m], self._raw_wfm_data['ch2']['markers'][m], gain_2)
+                while self._seq_wfms['CH2'][-1] % 2 == 0:
+                    self._seq_wfms['CH2'].pop(-1)
+                    self._upload_waveforms('CH2', self._raw_wfm_data['CH2']['waveforms'][m], self._raw_wfm_data['CH2']['markers'][m], gain_2)
             else:
-                self._seq_wfms['ch2'] += [self._wfm_clog_memory()]  #Clogs need to be registered to be ridden in the next episode...
+                self._seq_wfms['CH2'] += [self._wfm_clog_memory()]  #Clogs need to be registered to be ridden in the next episode...
                 #A strange bug where the returned waveform handle is even... Just reupload waveform...
-                while self._seq_wfms['ch2'][-1] % 2 == 0:
-                    self._seq_wfms['ch2'].pop(-1)
-                    self._seq_wfms['ch2'] += [self._wfm_clog_memory()]
+                while self._seq_wfms['CH2'][-1] % 2 == 0:
+                    self._seq_wfms['CH2'].pop(-1)
+                    self._seq_wfms['CH2'] += [self._wfm_clog_memory()]
 
-        # seq_len_1 = len(self._raw_wfm_data['ch1']['seq_ids'])
-        # seq_len_2 = len(self._raw_wfm_data['ch2']['seq_ids'])
+        # seq_len_1 = len(self._raw_wfm_data['CH1']['seq_ids'])
+        # seq_len_2 = len(self._raw_wfm_data['CH2']['seq_ids'])
         # if seq_len_1 > seq_len_2:
-        #     self._raw_wfm_data['ch2']['seq_ids'] += [self._raw_wfm_data['ch2']['seq_ids'][-1]]*( seq_len_1 - seq_len_2 )
+        #     self._raw_wfm_data['CH2']['seq_ids'] += [self._raw_wfm_data['CH2']['seq_ids'][-1]]*( seq_len_1 - seq_len_2 )
         # if seq_len_2 > seq_len_1:
-        #     self._raw_wfm_data['ch1']['seq_ids'] += [self._raw_wfm_data['ch1']['seq_ids'][-1]]*( seq_len_2 - seq_len_1 ) 
+        #     self._raw_wfm_data['CH1']['seq_ids'] += [self._raw_wfm_data['CH1']['seq_ids'][-1]]*( seq_len_2 - seq_len_1 ) 
 
         num_wfms = (num_wfms1, num_wfms2)
         gains = (gain_1, gain_2)
-        for ind, chan_id in enumerate(['ch1', 'ch2']):
+        for ind, chan_id in enumerate(['CH1', 'CH2']):
             if num_wfms[ind] == 0:
                 continue
             #Clear previous sequence if it exists...    Don't need to do this as AGN6030A_ClearArbMemory does this automatically...
@@ -1754,8 +1754,8 @@ class Agilent_N8241A(Instrument):
             loop_counts = [1]*len(wfm_handle_seq)
             self._seq_handles[chan_id] = self.create_arb_sequence(wfm_handle_seq, loop_counts)
         
-        self.configure_arb_sequence(2, self._seq_handles['ch2'], gains[1], 0.0)
-        self.configure_arb_sequence(1, self._seq_handles['ch1'], gains[0], 0.0)
+        self.configure_arb_sequence(2, self._seq_handles['CH2'], gains[1], 0.0)
+        self.configure_arb_sequence(1, self._seq_handles['CH1'], gains[0], 0.0)
 
     def _program_channel_non_sequence(self, chan_id, wfm_data, mkr_data = np.array([])):
         self.output_mode('Arbitrary Waveform')
@@ -1768,18 +1768,18 @@ class Agilent_N8241A(Instrument):
             if len(mkr_data[1]) > 0:
                 mkr_data_reduced += mkr_data[1][::8] * 2**7
         #Program the channels
-        if chan_id == 'ch1':
+        if chan_id == 'CH1':
             if len(mkr_data) == 2:
-                self._seq_wfms['ch1'] = [self.create_arb_waveform_with_markers(wfm_data / self.ch1.gain(), mkr_data_reduced)]
+                self._seq_wfms['CH1'] = [self.create_arb_waveform_with_markers(wfm_data / self.ch1.gain(), mkr_data_reduced)]
             else:
-                self._seq_wfms['ch1'] = [self.create_arb_waveform(wfm_data / self.ch1.gain())]
-            self.configure_arb_waveform(1, self._seq_wfms['ch1'][0], self.ch1.gain(), 0.0)
-        elif chan_id == 'ch2':
+                self._seq_wfms['CH1'] = [self.create_arb_waveform(wfm_data / self.ch1.gain())]
+            self.configure_arb_waveform(1, self._seq_wfms['CH1'][0], self.ch1.gain(), 0.0)
+        elif chan_id == 'CH2':
             if len(mkr_data) == 2:
-                self._seq_wfms['ch2'] = [self.create_arb_waveform_with_markers(wfm_data / self.ch2.gain(), mkr_data_reduced)]
+                self._seq_wfms['CH2'] = [self.create_arb_waveform_with_markers(wfm_data / self.ch2.gain(), mkr_data_reduced)]
             else:
-                self._seq_wfms['ch2'] = [self.create_arb_waveform(wfm_data / self.ch2.gain())]
-            self.configure_arb_waveform(2, self._seq_wfms['ch2'][0], self.ch2.gain(), 0.0)
+                self._seq_wfms['CH2'] = [self.create_arb_waveform(wfm_data / self.ch2.gain())]
+            self.configure_arb_waveform(2, self._seq_wfms['CH2'][0], self.ch2.gain(), 0.0)
     
     def _get_awg_sync_state(self):
         return self._sync_state #TODO: Remove this redundant state variable and augment sync_mode?

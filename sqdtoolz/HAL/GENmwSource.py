@@ -50,11 +50,25 @@ class GENmwSource(HALbase, TriggerInputCompatible, TriggerInput):
         self._instr_mw_output.PhaseModAmplitude = val
         
     @property
+    def FrequencyModAmplitude(self):
+        return self._instr_mw_output.FrequencyModAmplitude
+    @FrequencyModAmplitude.setter
+    def FrequencyModAmplitude(self, val):
+        self._instr_mw_output.FrequencyModAmplitude = val
+
+    @property
+    def AmplitudeModDepth(self):
+        return self._instr_mw_output.AmplitudeModDepth
+    @AmplitudeModDepth.setter
+    def AmplitudeModDepth(self, val):
+        self._instr_mw_output.AmplitudeModDepth = val
+        
+    @property
     def Mode(self):
         return self._instr_mw_output.Mode
     @Mode.setter
     def Mode(self, new_mode):
-        assert new_mode in ['Continuous', 'PulseModulated', 'PhaseModulated'], "MW source output mode must either be Continuous, PulseModulated or PhaseModulated."
+        assert new_mode in ['Continuous', 'PulseModulated', 'PhaseModulated', 'FrequencyModulated', 'AmplitudeModulated'], "MW source output mode must either be Continuous, PulseModulated, FrequencyModulated, AmplitudeModulated or PhaseModulated."
         self._instr_mw_output.Mode = new_mode
 
     def activate(self):
@@ -93,7 +107,7 @@ class GENmwSource(HALbase, TriggerInputCompatible, TriggerInput):
             'InputTriggerEdge' : self._instr_mw_output.TriggerInputEdge,
             'ManualActivation' : self.ManualActivation
             }
-        self.pack_properties_to_dict(['Power', 'Frequency', 'Phase', 'PhaseModAmplitude', 'Mode', 'Output'], ret_dict)
+        self.pack_properties_to_dict(['Power', 'Frequency', 'Phase', 'AmplitudeModDepth', 'FrequencyModAmplitude', 'PhaseModAmplitude', 'Mode', 'Output'], ret_dict)
         return ret_dict
 
     def _set_current_config(self, dict_config, lab):
@@ -102,6 +116,8 @@ class GENmwSource(HALbase, TriggerInputCompatible, TriggerInput):
         self.Power = dict_config['Power']
         self.Frequency = dict_config['Frequency']
         self.Phase = dict_config['Phase']
+        self.FrequencyModAmplitude = dict_config['AmplitudeModDepth']
+        self.FrequencyModAmplitude = dict_config['FrequencyModAmplitude']
         self.PhaseModAmplitude = dict_config['PhaseModAmplitude']
         self.Mode = dict_config['Mode']
         self.Output = dict_config.get('Output', False)

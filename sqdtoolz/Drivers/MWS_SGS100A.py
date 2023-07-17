@@ -75,6 +75,20 @@ class MWS_SGS100A_Channel(InstrumentChannel):
         pass
 
     @property
+    def FrequencyModAmplitude(self):
+        return 0
+    @FrequencyModAmplitude.setter
+    def FrequencyModAmplitude(self, val):
+        pass
+
+    @property
+    def AmplitudeModDepth(self):
+        return 0
+    @AmplitudeModDepth.setter
+    def AmplitudeModDepth(self, val):
+        pass
+
+    @property
     def TriggerInputEdge(self):
         return 1
     @TriggerInputEdge.setter
@@ -87,7 +101,7 @@ class MWS_SGS100A_Channel(InstrumentChannel):
         return self._mode
     @Mode.setter
     def Mode(self, new_mode):
-        assert new_mode in ['Continuous', 'PulseModulated', 'PhaseModulated'], "MW source output mode must either be Continuous, PulseModulated or PhaseModulated."
+        assert new_mode in ['Continuous', 'PulseModulated', 'PhaseModulated', 'FrequencyModulated', 'AmplitudeModulated'], "MW source output mode must either be Continuous, PulseModulated, FrequencyModulated, AmplitudeModulated or PhaseModulated."
         self._mode = new_mode
         if new_mode == 'Continuous':
             self.pulsemod_state('OFF')
@@ -96,6 +110,10 @@ class MWS_SGS100A_Channel(InstrumentChannel):
             self.pulsemod_source('EXT')
         elif new_mode == 'PhaseModulated':
             assert False, "The SGS100A does not support external phase modulation."
+        elif new_mode == 'AmplitudeModulated':
+            assert False, "The SGS100A does not support external amplitude modulation."
+        elif new_mode == 'FrequencyModulated':
+            assert False, "The SGS100A does not support external frequency modulation."
 
 class MWS_SGS100A(VisaInstrument):
     """

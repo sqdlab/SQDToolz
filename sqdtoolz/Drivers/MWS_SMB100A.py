@@ -61,6 +61,58 @@ class MWS_SMB100A_Channel(InstrumentChannel):
                             set_cmd='SOUR:PM:EXTernal:COUPling {}',
                             vals=vals.Enum('AC', 'DC'),
                             initial_value='AC')
+        #
+        self.add_parameter('freqmod_state',
+                            get_cmd=':SOUR:FM:STAT?',
+                            set_cmd=':SOUR:FM:STAT {}',
+                            set_parser=int,
+                            val_mapping={'ON':  1, 'OFF': 0})
+        self.add_parameter('freqmod_mode',
+                            get_cmd='SOUR:FM:MODE?',
+                            set_cmd='SOUR:FM:MODE {}',
+                            vals=vals.Enum('HDEViation', 'NORMal', 'LNOise'),
+                            initial_value='NORMal')
+        self.add_parameter('freqmod_source',
+                            get_cmd='SOUR:FM:SOUR?',
+                            set_cmd='SOUR:FM:SOUR {}',
+                            vals=vals.Enum('INT', 'EXT'))
+        self.add_parameter('freqmod_amplitude',
+                            get_cmd='SOUR:FM:EXTernal:DEViation?',
+                            set_cmd='SOUR:FM:EXTernal:DEViation {}',
+                            get_parser=float,
+                            vals=vals.Numbers(0, 128e6),    #TODO: This value is dependent on the carrier frequency! Make function check this against datasheet...
+                            initial_value=1e6)
+        self.add_parameter('freqmod_ext_coupling',
+                            get_cmd='SOUR:FM:EXTernal:COUPling?',
+                            set_cmd='SOUR:FM:EXTernal:COUPling {}',
+                            vals=vals.Enum('AC', 'DC'),
+                            initial_value='AC')
+        #
+        self.add_parameter('amplmod_state',
+                            get_cmd=':SOUR:AM:STAT?',
+                            set_cmd=':SOUR:AM:STAT {}',
+                            set_parser=int,
+                            val_mapping={'ON':  1, 'OFF': 0})
+        self.add_parameter('amplmod_mode',
+                            get_cmd='SOUR:AM:MODE?',
+                            set_cmd='SOUR:AM:MODE {}',
+                            vals=vals.Enum('HDEViation', 'NORMal', 'LNOise'),
+                            initial_value='NORMal')
+        self.add_parameter('amplmod_source',
+                            get_cmd='SOUR:AM:SOUR?',
+                            set_cmd='SOUR:AM:SOUR {}',
+                            vals=vals.Enum('INT', 'EXT'))
+        self.add_parameter('amplmod_depth',
+                            get_cmd='SOUR:AM:DEPTh:LINear?',
+                            set_cmd='SOUR:AM:DEPTh:LINear {}',
+                            get_parser=float,
+                            vals=vals.Numbers(0, 100),
+                            initial_value=50)
+        self.add_parameter('amplmod_ext_coupling',
+                            get_cmd='SOUR:AM:EXTernal:COUPling?',
+                            set_cmd='SOUR:AM:EXTernal:COUPling {}',
+                            vals=vals.Enum('AC', 'DC'),
+                            initial_value='AC')
 
     @property
     def Output(self):
@@ -101,6 +153,20 @@ class MWS_SMB100A_Channel(InstrumentChannel):
         self.phasemod_amplitude(val)    
 
     @property
+    def FrequencyModAmplitude(self):
+        return self.freqmod_amplitude()
+    @FrequencyModAmplitude.setter
+    def FrequencyModAmplitude(self, val):
+        self.freqmod_amplitude(val)
+
+    @property
+    def AmplitudeModDepth(self):
+        return self.amplmod_depth()
+    @AmplitudeModDepth.setter
+    def AmplitudeModDepth(self, val):
+        self.amplmod_depth(val)    
+
+    @property
     def TriggerInputEdge(self):
         return 1
     @TriggerInputEdge.setter
@@ -113,19 +179,37 @@ class MWS_SMB100A_Channel(InstrumentChannel):
         return self._mode
     @Mode.setter
     def Mode(self, new_mode):
-        assert new_mode in ['Continuous', 'PulseModulated', 'PhaseModulated'], "MW source output mode must either be Continuous, PulseModulated or PhaseModulated."
+        assert new_mode in ['Continuous', 'PulseModulated', 'PhaseModulated', 'FrequencyModulated', 'AmplitudeModulated'], "MW source output mode must either be Continuous, PulseModulated, FrequencyModulated, AmplitudeModulated or PhaseModulated."
         self._mode = new_mode
         if new_mode == 'Continuous':
             self.pulsemod_state('OFF')
+            self.amplmod_state('OFF')
+            self.freqmod_state('OFF')
             self.phasemod_state('OFF')
         elif new_mode == 'PulseModulated':
             self.pulsemod_state('ON')
+            self.amplmod_state('OFF')
+            self.freqmod_state('OFF')
             self.phasemod_state('OFF')
             self.pulsemod_source('EXT')
         elif new_mode == 'PhaseModulated':
             self.pulsemod_state('OFF')
+            self.amplmod_state('OFF')
+            self.freqmod_state('OFF')
             self.phasemod_state('ON')
-            self.pulsemod_source('EXT')
+            self.phasemod_source('EXT')
+        elif new_mode == 'FrequencyModulated':
+            self.pulsemod_state('OFF')
+            self.amplmod_state('OFF')
+            self.freqmod_state('ON')
+            self.phasemod_state('OFF')
+            self.freqmod_source('EXT')
+        elif new_mode == 'AmplitudeModulated':
+            self.pulsemod_state('OFF')
+            self.amplmod_state('ON')
+            self.freqmod_state('OFF')
+            self.phasemod_state('OFF')
+            self.amplmod_source('EXT')
 
 class MWS_SMB100A(VisaInstrument):
     """

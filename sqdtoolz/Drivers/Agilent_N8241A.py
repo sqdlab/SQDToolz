@@ -565,33 +565,33 @@ class Agilent_N8241A(Instrument):
 
         #Setup default mode to be burst/continuous
         opMode = 'Burst' if trig_type == 'EXT' else 'Continuous'
-        self.ch1.operation_mode(opMode)
-        self.ch1.burst_count(1)
-        self.ch2.operation_mode(opMode)
-        self.ch2.burst_count(1)
+        self.CH1.operation_mode(opMode)
+        self.CH1.burst_count(1)
+        self.CH2.operation_mode(opMode)
+        self.CH2.burst_count(1)
         #Use amplified output
-        self.ch1.output_configuration('Amplified')
-        self.ch2.output_configuration('Amplified')
+        self.CH1.output_configuration('Amplified')
+        self.CH2.output_configuration('Amplified')
         self.predistortion(False)
-        self.ch1.output_filter(False)
-        self.ch2.output_filter(False)
-        self.ch1.gain(0.5)
-        self.ch2.gain(0.5)
-        #self.set_ch1_output_bandwidth(500e6)
-        #self.set_ch2_output_bandwidth(500e6)
+        self.CH1.output_filter(False)
+        self.CH2.output_filter(False)
+        self.CH1.gain(0.5)
+        self.CH2.gain(0.5)
+        #self.set_CH1_output_bandwidth(500e6)
+        #self.set_CH2_output_bandwidth(500e6)
         #Set output to be 50Ohm and ON by default
-        self.ch1.output_impedance(50)
-        self.ch2.output_impedance(50)
-        self.ch1.output(True)
-        self.ch2.output(True)
+        self.CH1.output_impedance(50)
+        self.CH2.output_impedance(50)
+        self.CH1.output(True)
+        self.CH2.output(True)
         #Setup clock and triggers
         # self.clock_source('Internal')
         if trig_type == 'INT':
-            self.ch1.configure_trigger_source(1024) # No Trigger flag
-            self.ch2.configure_trigger_source(1024) # No Trigger flag
+            self.CH1.configure_trigger_source(1024) # No Trigger flag
+            self.CH2.configure_trigger_source(1024) # No Trigger flag
         else:
-            self.ch1.configure_trigger_source(1|1026|1028|1032|1040) # any hardware trigger input
-            self.ch2.configure_trigger_source(1|1026|1028|1032|1040) # any hardware trigger input
+            self.CH1.configure_trigger_source(1|1026|1028|1032|1040) # any hardware trigger input
+            self.CH2.configure_trigger_source(1|1026|1028|1032|1040) # any hardware trigger input
         #Setup the marker sources to be for channels 1 and 2.
         self.m1.source('Channel 1 Marker 1')
         self.m2.source('Channel 1 Marker 2')
@@ -799,24 +799,24 @@ class Agilent_N8241A(Instrument):
         return array
 
     def _read_sequence_file(self, path, filename):
-        waveform_data_ch1 = []
-        waveform_data_ch2 = []
+        waveform_data_CH1 = []
+        waveform_data_CH2 = []
         
         # read sequence file
         with open(os.path.join(path, filename)) as filep:
-            files_ch1 = []
-            files_ch2 = []
+            files_CH1 = []
+            files_CH2 = []
             for line in filep:
                 match = re.match(r"\"(.*)\",\"(.*)\"", line)
-                files_ch1.append(match.group(1))
-                files_ch2.append(match.group(2))
-        #files_ch1, inverse_ch1 = np.unique(files_ch1, return_inverse=True)
-        #files_ch2, inverse_ch2 = np.unique(files_ch2, return_inverse=True)
-        inverse_ch1 = range(len(files_ch1))
-        inverse_ch2 = range(len(files_ch2))
+                files_CH1.append(match.group(1))
+                files_CH2.append(match.group(2))
+        #files_CH1, inverse_CH1 = np.unique(files_CH1, return_inverse=True)
+        #files_CH2, inverse_CH2 = np.unique(files_CH2, return_inverse=True)
+        inverse_CH1 = range(len(files_CH1))
+        inverse_CH2 = range(len(files_CH2))
 
         # allow programming of empty sequences        
-        if not len(files_ch1):
+        if not len(files_CH1):
             logging.warning('{0}: sequence file {1} is empty.'
                             .format(__name__, filename))
             min_size = self.min_wfm_size()
@@ -825,14 +825,14 @@ class Agilent_N8241A(Instrument):
             return (waveform_data_empty, waveform_data_empty), ([0], [0])
 
         # load waveform and marker files                
-        for waveform_data, files in [(waveform_data_ch1, files_ch1), 
-                                     (waveform_data_ch2, files_ch2)]:
+        for waveform_data, files in [(waveform_data_CH1, files_CH1), 
+                                     (waveform_data_CH2, files_CH2)]:
             for fn in files:
                 wfm = self._read_bin_file(path, fn, dtype="waveform")
                 marker = self._read_bin_file(path, "marker_" + fn, dtype="marker")
                 waveform_data.append((wfm, marker))
                 
-        return (waveform_data_ch1, waveform_data_ch2), (inverse_ch1, inverse_ch2)
+        return (waveform_data_CH1, waveform_data_CH2), (inverse_CH1, inverse_CH2)
 
     def _create_waveform_handles(self, ch_waveforms, ch_inverse):
         '''
@@ -1685,8 +1685,8 @@ class Agilent_N8241A(Instrument):
     def _program_channels_sequence(self):
         self.output_mode('Sequence')
 
-        gain_1 = self.ch1.gain()
-        gain_2 = self.ch2.gain()
+        gain_1 = self.CH1.gain()
+        gain_2 = self.CH2.gain()
 
         if 'CH1' in self._raw_wfm_data:
             num_wfms1 = len(self._raw_wfm_data['CH1']['waveforms'])
@@ -1770,16 +1770,16 @@ class Agilent_N8241A(Instrument):
         #Program the channels
         if chan_id == 'CH1':
             if len(mkr_data) == 2:
-                self._seq_wfms['CH1'] = [self.create_arb_waveform_with_markers(wfm_data / self.ch1.gain(), mkr_data_reduced)]
+                self._seq_wfms['CH1'] = [self.create_arb_waveform_with_markers(wfm_data / self.CH1.gain(), mkr_data_reduced)]
             else:
-                self._seq_wfms['CH1'] = [self.create_arb_waveform(wfm_data / self.ch1.gain())]
-            self.configure_arb_waveform(1, self._seq_wfms['CH1'][0], self.ch1.gain(), 0.0)
+                self._seq_wfms['CH1'] = [self.create_arb_waveform(wfm_data / self.CH1.gain())]
+            self.configure_arb_waveform(1, self._seq_wfms['CH1'][0], self.CH1.gain(), 0.0)
         elif chan_id == 'CH2':
             if len(mkr_data) == 2:
-                self._seq_wfms['CH2'] = [self.create_arb_waveform_with_markers(wfm_data / self.ch2.gain(), mkr_data_reduced)]
+                self._seq_wfms['CH2'] = [self.create_arb_waveform_with_markers(wfm_data / self.CH2.gain(), mkr_data_reduced)]
             else:
-                self._seq_wfms['CH2'] = [self.create_arb_waveform(wfm_data / self.ch2.gain())]
-            self.configure_arb_waveform(2, self._seq_wfms['CH2'][0], self.ch2.gain(), 0.0)
+                self._seq_wfms['CH2'] = [self.create_arb_waveform(wfm_data / self.CH2.gain())]
+            self.configure_arb_waveform(2, self._seq_wfms['CH2'][0], self.CH2.gain(), 0.0)
     
     def _get_awg_sync_state(self):
         return self._sync_state #TODO: Remove this redundant state variable and augment sync_mode?

@@ -101,7 +101,7 @@ class ExpACstarkRamseyGE(Experiment):
 
             dpkt = dfit.get_fitted_plot(data_x, data_y, 'Drive Amplitude', 'IQ Amplitude', fig, axs[0])
             axs[0].set_xlabel('Wait time'); axs[0].set_ylabel('Normalised Population')
-            axs[0].grid(b=True, which='minor'); axs[0].grid(b=True, which='major', color='k');
+            axs[0].grid(visible=True, which='minor'); axs[0].grid(visible=True, which='major', color='k');
         else:
             data_y = np.sqrt(arr[:,self._iq_indices[0]]**2 + arr[:,self._iq_indices[1]]**2)
             dpkt = dfit.get_fitted_plot(data_x, data_y, 'Drive Amplitude', 'IQ Amplitude')

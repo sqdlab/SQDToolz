@@ -68,7 +68,7 @@ class DataIQNormalise:
             ax.plot(self._calib_pts_IQ_state_1[:,0],self._calib_pts_IQ_state_1[:,1], 'o')
             ax.plot(iq_data_array[:,0], iq_data_array[:,1], 'ko', alpha=0.5)
             ax.set_xlabel('I'); ax.set_ylabel('Q')
-            ax.grid(b=True, which='minor'); ax.grid(b=True, which='major', color='k')
+            ax.grid(visible=True, which='minor'); ax.grid(visible=True, which='major', color='k')
 
         return finalData
 

@@ -87,7 +87,7 @@ class ExpPulsedCavitySpec(Experiment):
             ax.plot(self._cav_freq_range, dataE[:,self._iq_indices[0]]**2+dataE[:,self._iq_indices[1]]**2)
             legend_vals += ['Excited']
         ax.set_xlabel('Cavity Frequency'); ax.set_ylabel('|I+jQ|^2')
-        ax.grid(b=True, which='minor'); ax.grid(b=True, which='major', color='k')
+        ax.grid(visible=True, which='minor'); ax.grid(visible=True, which='major', color='k')
         ax.legend(legend_vals)
 
         fig.show()

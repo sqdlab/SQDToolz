@@ -93,7 +93,7 @@ class ExpCalibXrot(Experiment):
         x_vals = np.arange(0,self._numTotalRepeats+1)
         axs[0].plot(x_vals, data_y, 'kx')
         axs[0].set_xlabel('Number of Pulses'); axs[0].set_ylabel('Normalised Population')
-        axs[0].grid(b=True, which='minor'); axs[0].grid(b=True, which='major', color='k');
+        axs[0].grid(visible=True, which='minor'); axs[0].grid(visible=True, which='major', color='k');
 
         for m in range(self._rotDenom+1):
             axs[0].axhline(y=1.0/self._rotDenom*m, color='b', linestyle='dashed')

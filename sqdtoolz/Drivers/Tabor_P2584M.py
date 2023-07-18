@@ -289,6 +289,18 @@ class TaborP2584M_AWG(InstrumentChannel):
         dict_wfm_data = kwargs['raw_data']
         if dict_wfm_data['markers'][0][2].size > 0:
             assert len(dict_wfm_data['seq_ids']) == 1, "Currently internal triggers are only supported for non-compression mode."   #TODO: Fix this...
+            #Build the task list as per the ADC triggers...
+            int_mkrs = dict_wfm_data['markers'][0][2].astype(np.int8)
+            diffs = np.concatenate([[int_mkrs[0]-int_mkrs[-1]], int_mkrs[1:]-int_mkrs[:-1]])
+            if self._parent.ACQ.TriggerInputEdge == 1:
+                edges = np.where(diffs==1)[0]
+            else:
+                edges = np.where(diffs==-1)[0]
+            if edges[0] != 0:
+                edges = np.concatenate([[0], edges])
+            if edges[-1] != edges.size-1:
+                edges = np.concatenate([edges, [dict_wfm_data['markers'][0][2].size]])
+            self._sequence_lens[chan_ind] = np.diff(edges).tolist()
             self._cur_internal_trigs[chan_ind] = True
         else:
             self._cur_internal_trigs[chan_ind] = False
@@ -317,18 +329,24 @@ class TaborP2584M_AWG(InstrumentChannel):
         #Settle Memory Bank 1 (shared among channels 1 and 2) and Memory Bank 2 (shared among channels 3 and 4)
         seg_id = 1
         reset_remaining = False
+        done_reset_remaining = False
         for cur_ch_ind in range(4):
             if cur_ch_ind == 2:
                 seg_id = 1      #Going to the next memory bank now...
                 reset_remaining = False
+                done_reset_remaining = False
             if self._sequence_lens[cur_ch_ind] != None:
                 #Select current channel
                 self._parent._set_cmd(':INST:CHAN', cur_ch_ind+1) #NOTE I'm assuming cur_ch_index is zero indexed adn the command is 1 indexed, hence the +1
-                for cur_len in self._sequence_lens[cur_ch_ind]:
+                for m, cur_len in enumerate(self._sequence_lens[cur_ch_ind]):
+                    assert cur_len >= 1024, f"The partitions created for the internal marker have made segments (segment index {m} in this case) that are less than 1024 samples in size."
+                    assert cur_len % 32 == 0, f"The partitions created for the internal marker have made segments (segment index {m} in this case) that are not divisible by 32 samples."
                     self._parent._set_cmd(':TRACe:SEL', seg_id) # Select segment for clearing
                     cur_mem_len = self._parent._get_cmd(':TRAC:DEF:LENG?') # Find length of segment
                     if reset_remaining or cur_mem_len == '' or cur_len != int(cur_mem_len):
-                        self._parent._set_cmd(':TRAC:DEL', seg_id) # Clear the current segment
+                        if not done_reset_remaining:
+                            self._parent._send_cmd(':TRAC:DEL:ALL') # Clear the current segment
+                        done_reset_remaining = True
                         reset_remaining = True #NOTE UNSURE OF THIS LOGIC
                     self._parent._send_cmd(f':TRAC:DEF {seg_id}, {cur_len}') # Specify a segment and its corresponding length
                     seg_id += 1
@@ -694,7 +712,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
         self._num_samples = 4800 # Number of samples per frame
         self._num_segs = 4 # Number of frames per repetition
         self._num_repetitions = 1 
-        self._last_mem_frames_segs_samples = (-1,-1,-1)
+        self._last_mem_frames_segs_samples_avg = (-1,-1,-1, False)
 
         self._dsp_kernel_coefs = [None]*10
 
@@ -783,7 +801,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
         if final_dsp_order['dsp_active']:
             num_samples = int(self.NumSamples*12/10)
 
-        if self._last_mem_frames_segs_samples[0] == self.NumRepetitions and self._last_mem_frames_segs_samples[1] == self.NumSegments and self._last_mem_frames_segs_samples[2] == num_samples:
+        if self._last_mem_frames_segs_samples_avg[0] == self.NumRepetitions and self._last_mem_frames_segs_samples_avg[1] == self.NumSegments and self._last_mem_frames_segs_samples_avg[2] == num_samples and self._last_mem_frames_segs_samples_avg[3] == final_dsp_order['avRepetitions']:
             return
 
         if (self.acq_mode() == "DUAL") :
@@ -801,7 +819,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
         cmd = ":DIG:ACQuire:FRAM:CAPT {0},{1}".format(capture_first, capture_count)
         self._parent._send_cmd(cmd)
 
-        self._last_mem_frames_segs_samples = (self.NumRepetitions, self.NumSegments, num_samples)
+        self._last_mem_frames_segs_samples_avg = (self.NumRepetitions, self.NumSegments, num_samples, final_dsp_order['avRepetitions'])
         self._parent._chk_err('after allocating readout ACQ memory.')
 
     def set_svm(self) :
@@ -1362,6 +1380,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
             # Normaling
             wavNorm = signed_wav // AvgCount
             # convert to mV
+            ADCFS=1    #Making ADFS=1 for V instead of 1V
             mVwavNorm = convertTimeSignedDataTomV(wavNorm,ADCFS,bitnum=BITNUM)
         
             return mVwavNorm
@@ -1370,11 +1389,11 @@ class TaborP2584M_ACQ(InstrumentChannel):
             
             return wav
 
-    def conv_data(self, data, final_dsp_order):
+    def conv_data(self, data, final_dsp_order, fac=2**15):
         if final_dsp_order['avRepetitions']:
-            return data*1.0 #self.NormalAVGSignal(data, self.NumRepetitions, final_dsp_order['dsp_active'])*1.0
+            return self.NormalAVGSignal(data, self.NumRepetitions, final_dsp_order['dsp_active'])*1.0
         else:
-            return (data*1.0 - 2**15) / 2**16
+            return (data*1.0 - fac) / fac
 
     def _read_data_frames(self, final_dsp_order):
         #Choose to read all frames
@@ -1434,6 +1453,8 @@ class TaborP2584M_ACQ(InstrumentChannel):
             ret_val['parameters'] = ['segment', 'sample']
         else:
             ret_val['parameters'] = ['repetition', 'segment', 'sample']
+        #TODO: Change after new firmware release...
+        ret_val['parameters'].pop(-1)        
         leSampleRates = []
         num_ch_divs = final_dsp_order['num_ch_divs']
         final_scale = final_dsp_order['final_scale_factor']
@@ -1452,8 +1473,12 @@ class TaborP2584M_ACQ(InstrumentChannel):
             offset = 0
             for m in range(num_ch_divs[0]):
                 if final_dsp_order['avRepetitions']:
-                    ret_val['data'][f'CH1_{m}_I'] = wav1[0,:,int(2*(m+offset)+1)::2][:,:int(self.NumSamples/10)] * final_scale  #TODO: Review after new firmware release
-                    ret_val['data'][f'CH1_{m}_Q'] = wav1[0,:,int(2*(m+offset))::2][:,:int(self.NumSamples/10)] * final_scale    #TODO: Review after new firmware release
+                    ret_val['data'][f'CH1_{m}_I'] = wav1[0,:,int(2*(m+offset)+1)::2][:,:int(self.NumSamples/10)] * final_scale*self.NumRepetitions  #TODO: Review after new firmware release
+                    ret_val['data'][f'CH1_{m}_Q'] = wav1[0,:,int(2*(m+offset))::2][:,:int(self.NumSamples/10)] * final_scale*self.NumRepetitions    #TODO: Review after new firmware release
+                    #TODO: Change after new firmware release...
+                    if final_dsp_order['avSamples']:
+                        ret_val['data'][f'CH1_{m}_I'] = np.array([np.sum(ret_val['data'][f'CH1_{m}_I'])])*2.0
+                        ret_val['data'][f'CH1_{m}_Q'] = np.array([np.sum(ret_val['data'][f'CH1_{m}_Q'])])*2.0
                     #TODO: Change after new firmware release...
                     wav1 =self.conv_data(wav2, final_dsp_order)
                     offset = -1
@@ -1468,8 +1493,12 @@ class TaborP2584M_ACQ(InstrumentChannel):
                 wav2 =self.conv_data(wav2, final_dsp_order)
             for m in range(num_ch_divs[1]):
                 if final_dsp_order['avRepetitions']:
-                    ret_val['data'][f'CH2_{m}_I'] = wav2[0,:,int(2*m+1)::10] * final_scale
-                    ret_val['data'][f'CH2_{m}_Q'] = wav2[0,:,int(2*m)::10] * final_scale
+                    ret_val['data'][f'CH2_{m}_I'] = wav2[0,:,int(2*m+1)::10] * final_scale*self.NumRepetitions
+                    ret_val['data'][f'CH2_{m}_Q'] = wav2[0,:,int(2*m)::10] * final_scale*self.NumRepetitions
+                    #TODO: Change after new firmware release...
+                    if final_dsp_order['avSamples']:
+                        ret_val['data'][f'CH2_{m}_I'] = np.array([np.sum(ret_val['data'][f'CH2_{m}_I'])])*2.0
+                        ret_val['data'][f'CH2_{m}_Q'] = np.array([np.sum(ret_val['data'][f'CH2_{m}_Q'])])*2.0
                 else:
                     ret_val['data'][f'CH2_{m}_I'] = wav2[:,:,int(2*m+1)::12] * final_scale
                     ret_val['data'][f'CH2_{m}_Q'] = wav2[:,:,int(2*m)::12] * final_scale
@@ -1533,7 +1562,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
             self.ddr_store('DSP')
             self._parent._chk_err('after setting to DSP.')
             Frame_len = self.NumSamples
-            DSP_DEC_LEN = Frame_len / 12# - 10
+            DSP_DEC_LEN = Frame_len / 10# - 10
             self._parent._set_cmd(f':DSP:DEC:FRAM', f'{int(DSP_DEC_LEN)}')
             self._parent._set_cmd(':DSP:STOR', 'DSP')
             self._parent._chk_err('after setting up DSP.')
@@ -1549,7 +1578,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
         self._perform_data_capture(cur_processor, final_dsp_order, blocksize)
 
-        if final_dsp_order['avSamples']:
+        if final_dsp_order['avSamples'] and not final_dsp_order['avRepetitions']:   #TODO: Change after firmware update (i.e. read header for average)
             ret_val = {
                     'parameters' : ['repetition', 'segment'],
                     'data' : {},
@@ -1568,12 +1597,12 @@ class TaborP2584M_ACQ(InstrumentChannel):
             def proc_data(data, final_dsp_order, ret_val):
                 if final_dsp_order['avRepetitions']:
                     #TODO: Later make this read straight off decision block changes in their newer firmware releases
-                    return np.array([np.mean(data)])*final_dsp_order['final_scale_factor']
+                    return np.array([np.sum(data)])*final_dsp_order['final_scale_factor']
                 else:
-                    return np.array([data])*final_dsp_order['final_scale_factor']
+                    return self.conv_data(np.array([data])*final_dsp_order['final_scale_factor'], final_dsp_order, 2**14)*2.0   #x2 as the DSP takes the 15 MSBs
             offset = 0
             for m in range(num_ch_divs[0]):
-                ret_val['data'][f'CH1_{m}_I'] = proc_data( np.array([x[f'real{m-offset+1}_dec'] for x in headers1]), final_dsp_order, ret_val )
+                ret_val['data'][f'CH1_{m}_I'] = proc_data( np.array([x[f'real{m-offset+1}_dec'] for x in headers1])*1.0, final_dsp_order, ret_val )
                 ret_val['data'][f'CH1_{m}_Q'] = proc_data( np.array([x[f'im{m-offset+1}_dec'] for x in headers1]), final_dsp_order, ret_val )
                 leSampleRates += [self.SampleRate / 10]*2
                 if m == 4:

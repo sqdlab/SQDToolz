@@ -713,6 +713,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
         self._num_segs = 4 # Number of frames per repetition
         self._num_repetitions = 1 
         self._last_mem_frames_segs_samples_avg = (-1,-1,-1, False)
+        self._last_dsp_state = {}
 
         self._dsp_kernel_coefs = [None]*10
 
@@ -1545,8 +1546,12 @@ class TaborP2584M_ACQ(InstrumentChannel):
         cur_processor = kwargs.get('data_processor', None)
         if not isinstance(cur_processor, ProcessorFPGA):
             assert self.NumSamples % 48 == 0, "The number of samples must be divisible by 48 if in DUAL mode."
-
-        final_dsp_order = self.settle_dsp_processors(cur_processor)
+        else:
+            if not cur_processor.compare_pipeline_state(self._last_dsp_state) or self.ddr_store() != 'DSP': #The 2nd one is perhaps a harsh condition?
+                final_dsp_order = self.settle_dsp_processors(cur_processor)
+                reprogram_dsps = True
+            else:
+                reprogram_dsps = False
 
         self._allocate_frame_memory(final_dsp_order)
 
@@ -1556,7 +1561,8 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
         #Setup DSP blocks if applicable
         num_ch_divs = []
-        if final_dsp_order['dsp_active']:
+        #Idea is that the DSP functions (e.g. average or kernel) should only be touched by this API. Thus, the states should remain concurrent...
+        if final_dsp_order['dsp_active'] and reprogram_dsps:
             assert self.ChannelStates[0]==1 and self.ChannelStates[1]==1, "Must be in DUAL-mode (i.e. both channels active) to use DSP."
             assert (self.NumSamples) % 360 == 0, "If using FPGA DSP blocks, the number of samples must be divisible by 360. Note that it is 10x decimated."
             assert self.NumSamples <= 10240, "If using FPGA DSP blocks, the number of samples must be limited to 10240."
@@ -1578,6 +1584,8 @@ class TaborP2584M_ACQ(InstrumentChannel):
                 self._parent._set_cmd(':DIG:ACQuire:AVERage:COUNt', self.NumRepetitions)
             else:
                 self.averageEnable(False)
+
+            self._last_dsp_state = cur_processor.get_pipeline_state()
 
         self._perform_data_capture(cur_processor, final_dsp_order, blocksize)
 

@@ -79,3 +79,9 @@ class ProcessorFPGA(DataProcessor):
             cur_proc_type = globals()[cur_proc_type]
             new_proc = cur_proc_type.fromConfigDict(cur_proc)
             self.pipeline.append(new_proc)
+
+    def get_pipeline_state(self):
+        return self._get_current_config()
+    
+    def compare_pipeline_state(self, pipeline_state):
+        return pipeline_state == self._get_current_config()

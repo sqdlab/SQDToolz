@@ -23,6 +23,12 @@ try:
 except ModuleNotFoundError:
     pass
 
+from sqdtoolz.HAL.Processors.ProcessorFPGA import*
+from sqdtoolz.HAL.Processors.FPGA.FPGA_DDC import*
+from sqdtoolz.HAL.Processors.FPGA.FPGA_DDCFIR import*
+from sqdtoolz.HAL.Processors.FPGA.FPGA_Decimation import*
+from sqdtoolz.HAL.Processors.FPGA.FPGA_Integrate import*
+
 import random
 import matplotlib.pyplot as plt
 
@@ -2333,7 +2339,52 @@ class TestGPU(unittest.TestCase):
         self.cleanup()
 
 
+class TestFPGA(unittest.TestCase):
+    def initialise(self):
+        self.lab = Laboratory('', 'test_save_dir/')
+    
+    def cleanup(self):
+        self.lab.release_all_instruments()
+        self.lab = None
+        shutil.rmtree('test_save_dir')
+
+    def arr_equality(self, arr1, arr2):
+        if arr1.size != arr2.size:
+            return False
+        return np.max(np.abs(arr1 - arr2)) < self.ERR_TOL
+
+    def arr_equality_pct(self, arr1, arr2):
+        if arr1.size != arr2.size:
+            return False
+        return np.max(np.abs(arr1 - arr2)/np.abs(arr2 + 2*self.ERR_TOL)) < self.ERR_TOL
+    
+    def test_reprogram(self):
+        self.initialise()
+        test_proc = ProcessorFPGA('test',self.lab)
+
+        self.lab.PROC('test').reset_pipeline()
+        self.lab.PROC('test').add_stage(FPGA_DDC([[105e6],[100e6]]))
+        self.lab.PROC('test').add_stage(FPGA_Decimation('sample', 10))
+
+        leState = self.lab.PROC('test').get_pipeline_state()
+        assert self.lab.PROC('test').compare_pipeline_state(leState), "FPGA processor reprogramming check failed when there were no changes made."
+
+        self.lab.PROC('test').add_stage(FPGA_Integrate('sample'))
+        assert not self.lab.PROC('test').compare_pipeline_state(leState), "FPGA processor reprogramming check failed when changes were made."
+
+        self.lab.PROC('test').reset_pipeline()
+        self.lab.PROC('test').add_stage(FPGA_DDC([[105e6],[100e6]]))
+        self.lab.PROC('test').add_stage(FPGA_Decimation('sample', 10))
+        assert self.lab.PROC('test').compare_pipeline_state(leState), "FPGA processor reprogramming check failed when there were no changes made."
+
+        self.lab.PROC('test').reset_pipeline()
+        self.lab.PROC('test').add_stage(FPGA_DDC([[105e6],[100e6]]))
+        self.lab.PROC('test').add_stage(FPGA_Decimation('sample', 20))
+        assert not self.lab.PROC('test').compare_pipeline_state(leState), "FPGA processor reprogramming check failed when changes were made."
+
+        self.cleanup()
 
 if __name__ == '__main__':
-    TestGPU().test_ESD()
+    # TestGPU().test_ESD()
+    TestFPGA().test_reprogram()
     unittest.main()

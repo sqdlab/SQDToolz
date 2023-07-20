@@ -127,6 +127,27 @@ class MWS_WFSynthHDProV2_Channel(InstrumentChannel):
         #TODO: Figure out whether the gated polarity can be set...
         pass
 
+    @property
+    def PhaseModAmplitude(self):
+        return 0
+    @PhaseModAmplitude.setter
+    def PhaseModAmplitude(self, val):
+        pass
+
+    @property
+    def FrequencyModAmplitude(self):
+        return 0
+    @FrequencyModAmplitude.setter
+    def FrequencyModAmplitude(self, val):
+        pass
+
+    @property
+    def AmplitudeModDepth(self):
+        return 0
+    @AmplitudeModDepth.setter
+    def AmplitudeModDepth(self, val):
+        pass
+
     #!!!!!!!!!!!!!!!!!!!!!
     #!!!!!!!!!NOTE!!!!!!!!
     #The modulation is locked to both channels - so it's not a channel-dependent parameter and will do it for both

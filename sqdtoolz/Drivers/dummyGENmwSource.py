@@ -65,6 +65,27 @@ class DummyGENmwSrcChannel(InstrumentChannel):
         self._pulse_mod_edge = val
 
     @property
+    def PhaseModAmplitude(self):
+        return 0
+    @PhaseModAmplitude.setter
+    def PhaseModAmplitude(self, val):
+        pass
+
+    @property
+    def FrequencyModAmplitude(self):
+        return 0
+    @FrequencyModAmplitude.setter
+    def FrequencyModAmplitude(self, val):
+        pass
+
+    @property
+    def AmplitudeModDepth(self):
+        return 0
+    @AmplitudeModDepth.setter
+    def AmplitudeModDepth(self, val):
+        pass
+
+    @property
     def Mode(self):
         return self._mode
     @Mode.setter

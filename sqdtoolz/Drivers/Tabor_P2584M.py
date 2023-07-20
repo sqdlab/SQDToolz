@@ -804,12 +804,13 @@ class TaborP2584M_ACQ(InstrumentChannel):
         if self._last_mem_frames_segs_samples_avg[0] == self.NumRepetitions and self._last_mem_frames_segs_samples_avg[1] == self.NumSegments and self._last_mem_frames_segs_samples_avg[2] == num_samples and self._last_mem_frames_segs_samples_avg[3] == final_dsp_order['avRepetitions']:
             return
 
-        if (self.acq_mode() == "DUAL") :
-            assert (num_samples % 48) == 0, \
-                "In DUAL mode, number of samples must be an integer multiple of 48"
-        else :
-            assert (num_samples % 96) == 0, \
-                "In SINGLE mode, number of samples must be an integer multiple of 96"
+        if not final_dsp_order['dsp_active']:
+            if (self.acq_mode() == "DUAL") :
+                assert (num_samples % 48) == 0, \
+                    "In DUAL mode, number of samples must be an integer multiple of 48"
+            else :
+                assert (num_samples % 96) == 0, \
+                    "In SINGLE mode, number of samples must be an integer multiple of 96"
         #Allocate four frames of self.NumSample (defaults to 48000) 
         cmd = ':DIG:ACQuire:FRAM:DEF {0},{1}'.format(num_frames, num_samples)
         self._parent._send_cmd(cmd)
@@ -1540,9 +1541,11 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
         blocksize = min(self.blocksize(), self.NumRepetitions)
 
-        assert self.NumSamples % 48 == 0, "The number of samples must be divisible by 48 if in DUAL mode."
 
         cur_processor = kwargs.get('data_processor', None)
+        if not isinstance(cur_processor, ProcessorFPGA):
+            assert self.NumSamples % 48 == 0, "The number of samples must be divisible by 48 if in DUAL mode."
+
         final_dsp_order = self.settle_dsp_processors(cur_processor)
 
         self._allocate_frame_memory(final_dsp_order)
@@ -1555,7 +1558,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
         num_ch_divs = []
         if final_dsp_order['dsp_active']:
             assert self.ChannelStates[0]==1 and self.ChannelStates[1]==1, "Must be in DUAL-mode (i.e. both channels active) to use DSP."
-            assert self.NumSamples % 360 == 0, "If using FPGA DSP blocks, the number of samples must be divisible by 360. Note that it is 10x decimated."
+            assert (self.NumSamples) % 360 == 0, "If using FPGA DSP blocks, the number of samples must be divisible by 360. Note that it is 10x decimated."
             assert self.NumSamples <= 10240, "If using FPGA DSP blocks, the number of samples must be limited to 10240."
 
             #It's DSP time

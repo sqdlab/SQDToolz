@@ -17,6 +17,7 @@ try:
     from sqdtoolz.HAL.Processors.ProcessorGPU import*
 except ModuleNotFoundError:
     pass
+from sqdtoolz.HAL.Processors.ProcessorFPGA import*
 from datetime import datetime
 from pathlib import Path
 import json

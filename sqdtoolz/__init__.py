@@ -28,6 +28,7 @@ try:
     from sqdtoolz.HAL.Processors.ProcessorGPU import*
 except ModuleNotFoundError:
     pass
+from sqdtoolz.HAL.Processors.ProcessorFPGA import*
 
 
 # print('hi')

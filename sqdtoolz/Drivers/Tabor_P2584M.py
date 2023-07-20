@@ -713,7 +713,9 @@ class TaborP2584M_ACQ(InstrumentChannel):
         self._num_segs = 4 # Number of frames per repetition
         self._num_repetitions = 1 
         self._last_mem_frames_segs_samples_avg = (-1,-1,-1, False)
+        #
         self._last_dsp_state = {}
+        self._last_dsp_order = None
 
         self._dsp_kernel_coefs = [None]*10
 
@@ -1546,11 +1548,13 @@ class TaborP2584M_ACQ(InstrumentChannel):
         cur_processor = kwargs.get('data_processor', None)
         if not isinstance(cur_processor, ProcessorFPGA):
             assert self.NumSamples % 48 == 0, "The number of samples must be divisible by 48 if in DUAL mode."
+            final_dsp_order = self.settle_dsp_processors(cur_processor)
         else:
             if not cur_processor.compare_pipeline_state(self._last_dsp_state) or self.ddr_store() != 'DSP': #The 2nd one is perhaps a harsh condition?
                 final_dsp_order = self.settle_dsp_processors(cur_processor)
                 reprogram_dsps = True
             else:
+                final_dsp_order = self._last_dsp_order
                 reprogram_dsps = False
 
         self._allocate_frame_memory(final_dsp_order)
@@ -1586,6 +1590,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
                 self.averageEnable(False)
 
             self._last_dsp_state = cur_processor.get_pipeline_state()
+            self._last_dsp_order = final_dsp_order
 
         self._perform_data_capture(cur_processor, final_dsp_order, blocksize)
 

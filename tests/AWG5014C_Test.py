@@ -6,23 +6,41 @@ from sqdtoolz.HAL.ACQ import*
 from sqdtoolz.ExperimentConfiguration import*
 from sqdtoolz.HAL.WaveformSegments import*
 from sqdtoolz.HAL.WaveformTransformations import*
+from sqdtoolz.HAL.GENvoltSource import GENvoltSource
+
+lab = Laboratory(instr_config_file = "tests\\AWG5014C_Test.yaml", save_dir = "mySaves\\")
 
 
-new_lab = Laboratory(instr_config_file = "tests\\AWG5014C_Test.yaml", save_dir = "mySaves\\")
+lab.load_instrument('awg5014C')
 
-instrAWG = new_lab._station.load_awg5014C()
-# ch1 = instrAWG.get_output_channel('CH1')
-# ch1.output
+WFMT_ModulationIQ('QubitFreqGE', lab, 100e6)
 
-mod_freq_qubit = WM_SinusoidalIQ("QubitFreqMod", 100e6)
+# WaveformAWG("wfm_test", lab, [('awg5014C', 'CH1'), ('awg5014C', 'CH2')], 1.2e9)
+# lab.HAL("wfm_test").add_waveform_segment(WFS_Constant("pulse", lab.WFMT('QubitFreqGE').apply(), 2**20 * 2e-9, 0.5)) #0.005 #0.0025
+# lab.HAL("wfm_test").add_waveform_segment(WFS_Constant("pad", None, 64e-9, 0.0))
+# lab.HAL("wfm_test").get_output_channel(0).marker(0).set_markers_to_segments(['pulse'])
+# lab.HAL("wfm_test").AutoCompression = 'None'
 
-awg_wfm_q = WaveformAWG("Waveform 2 CH", [(instrAWG, 'CH2'),(instrAWG, 'CH3')], 1e9)
-awg_wfm_q.add_waveform_segment(WFS_Gaussian("init", mod_freq_qubit, 512e-9, 0.5))
-awg_wfm_q.add_waveform_segment(WFS_Constant("zero1", None, 512e-9, 0.25))
-awg_wfm_q.add_waveform_segment(WFS_Gaussian("init2", mod_freq_qubit, 512e-9, 0.5))
-awg_wfm_q.add_waveform_segment(WFS_Constant("zero2", None, 512e-9, 0.0))
-awg_wfm_q.get_output_channel(0).marker(0).set_markers_to_segments(["init","init2"])
-awg_wfm_q.program_AWG()
+WaveformAWG("WfmConMixer", lab, [('awg5014C', 'CH1'), ('awg5014C', 'CH2')], 1.2e9, total_time=1.024e-3)
+lab.HAL("WfmConMixer").clear_segments()
+lab.HAL("WfmConMixer").add_waveform_segment(WFS_Constant("pad", None, -1, 0.0)) # 64e-9, 
+lab.HAL("WfmConMixer").add_waveform_segment(WFS_Constant("pulse", lab.WFMT('QubitFreqGE').apply(), 2**17 * 2e-9, 0.5)) #0.005 #0.0025
 
-awg_wfm_q.plot_waveforms().show()
+lab.HAL("WfmConMixer").get_output_channel(0).marker(0).set_markers_to_segments(['pulse'])
+
+
+lab.HAL("WfmConMixer").prepare_initial()
+lab.HAL("WfmConMixer").prepare_final()
+
+ExperimentConfiguration('testConfig', lab, 2.5e-3, ['WfmConMixer'], None)
+
+lab.CONFIG('testConfig').init_instruments()
+lab.CONFIG('testConfig').prepare_instruments()
+
+
+#Test DC Outputs...
+GENvoltSource('vTest', lab, ['awg5014C', 'DC1'])
+lab.HAL('vTest').Voltage = 0.1
+
+# awg_wfm_q.plot_waveforms().show()
 input('press <ENTER> to continue')

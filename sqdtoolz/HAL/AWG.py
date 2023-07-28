@@ -225,7 +225,7 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
                 elastic_segs += [ind_wfm]
         assert len(elastic_segs) <= 1, "There are too many elastic waveform segments (cannot be above 1)."
         if self._total_time == -1:
-            assert len(elastic_segs) == 0, "If the total waveform length is unbound, the number of elastic segments must be zero."
+            assert len(elastic_segs) == 0, f"If the total waveform length for \"{self.Name}\" is unbound, the number of elastic segments must be zero."
         if self._total_time > 0 and len(elastic_segs) == 0:
             assert np.abs(sum([x.Duration for x in self._wfm_segment_list])-self._total_time) < 5e-15, "Sum of waveform segment durations do not match the total specified waveform group time. Consider making one of the segments elastic by setting its duration to be -1."
         #Get the elastic segment index

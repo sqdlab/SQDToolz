@@ -151,9 +151,9 @@ class ETHFPGA(Instrument):
 
             self._set('mem_hold', False),
             self._set('ddc_adc1', 'ADC1')
-            self._set('ddc_if1', '25MHz')
-            self._set('ddc_adc2', 'ADC2')
-            self._set('ddc_if2', '25MHz')
+            self._set('ddc_if1', '25MHz') ### Eric changed to 10 MHz
+            self._set('ddc_adc2', 'ADC2') 
+            self._set('ddc_if2', '25MHz') ### Eric changed to 10 MHz
             # default math: measure complex voltage
             self._set('math_f1', '1(a*b)')
             self._set('math_a1', 'I1 + iQ1')
@@ -166,7 +166,7 @@ class ETHFPGA(Instrument):
             self._set('fir_integration', 'none')
             self._set('fir_post_filtering', False)
             # tv mode: 248 samples, 40ns per sample, <~ 10us per trace
-            self._set('tv_decimation', 4)
+            self._set('tv_decimation', 4) 
             self._set('tv_samples', 4096)
             self._set('tv_averages', 1)
             # tv mode: one segment, one channel
@@ -280,7 +280,7 @@ class ETHFPGA(Instrument):
             self._set('tv_use_seq_start',False)
             self._set('trigger_src_seq_start', 0)
 
-        total_frames = self.NumRepetitions*self.NumSegments
+        total_frames = self._cur_reps*self.NumSegments
         self._set('tv_segments', total_frames)
 
     def _acquire(self):
@@ -292,15 +292,15 @@ class ETHFPGA(Instrument):
         channels, segments, samples = final_data.shape
         
         if channels == 1:
-            ch1_data = final_data[0].reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)
+            ch1_data = final_data[0].reshape(self._cur_reps, self.NumSegments, self.NumSamples)
             data_pkt = {
                 'parameters' : ['repetition', 'segment', 'sample'],
                 'data' : { 'ch1_I' : np.real(ch1_data), 'ch1_Q' : np.imag(ch1_data) },
                 'misc' : {'SampleRates' : [self.SampleRate]*2}
             }
         else:
-            ch1_data = final_data[0].reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)
-            ch2_data = final_data[1].reshape(self.NumRepetitions, self.NumSegments, self.NumSamples)
+            ch1_data = final_data[0].reshape(self._cur_reps, self.NumSegments, self.NumSamples)
+            ch2_data = final_data[1].reshape(self._cur_reps, self.NumSegments, self.NumSamples)
             data_pkt = {
                 'parameters' : ['repetition', 'segment', 'sample'],
                 'data' : { 'ch1_I' : np.real(ch1_data), 'ch1_Q' : np.imag(ch1_data),
@@ -312,12 +312,39 @@ class ETHFPGA(Instrument):
             return data_pkt
         else:
             cur_processor.push_data(data_pkt)
-            return cur_processor.get_all_data()
+            return None
     
     def get_data(self, **kwargs):
-        self._start(**kwargs)
+        max_memory = 2**19
 
-        #channels, segments, samples
-        final_data = self._acquire()
-
-        return self._stop(final_data, **kwargs)
+        cur_processor = kwargs.get('data_processor', None)
+        total_samples = self.NumSamples * self.NumSegments * self.NumRepetitions
+        if total_samples > max_memory:
+            max_rep = int(max_memory / (self.NumSamples * self.NumSegments))
+            assert max_rep > 0, "Too many samples to capture in a single shot."
+            
+            cur_reps = 0
+            # data_pkts = []
+            while cur_reps < self.NumRepetitions:
+                self._cur_reps = min(max_rep, self.NumRepetitions - cur_reps)
+                cur_reps += self._cur_reps
+                
+                self._start(**kwargs)
+                #channels, segments, samples
+                final_data = self._acquire()
+                self._stop(final_data, **kwargs)
+            if cur_processor is None:
+                assert False, "NumRepetitions exceeds memory. Multiple capture method has only been implemented for the case where a data_processor is supplied."
+                # return data_pkt
+            else:
+                return cur_processor.get_all_data()
+        else:
+            self._cur_reps = self.NumRepetitions
+            self._start(**kwargs)
+            #channels, segments, samples
+            final_data = self._acquire()
+            data_pkt = self._stop(final_data, **kwargs)
+            if cur_processor is None:
+                return data_pkt
+            else:
+                return cur_processor.get_all_data()

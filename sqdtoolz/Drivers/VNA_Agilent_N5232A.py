@@ -79,10 +79,10 @@ class VNA_Agilent_N5232A(VisaInstrument):
             get_cmd = 'SENS:AVER?',
             set_cmd = 'SENS:AVER {}', val_mapping = {True: 1, False: 0})
 
-        # self.add_parameter(
-        #     'elec_delay_time', label = 'Electrical Delay Time', unit = 's',
-        #     get_cmd = ':CALC:CORR:EDEL:TIME?', get_parser = float,
-        #     set_cmd = ':CALC:CORR:EDEL:TIME {}')    #{:f}', set_parser=float, vals = vals.Numbers(-10.00, 10.00)
+        self.add_parameter(
+            'elec_delay_time', label = 'Electrical Delay Time', unit = 's',
+            get_cmd = ':CALC1:CORR:EDEL:TIME?', get_parser = float,
+            set_cmd = ':CALC1:CORR:EDEL:TIME {}')    #{:f}', set_parser=float, vals = vals.Numbers(-10.00, 10.00)
         #TODO: Find out why putting that vals breaks it when using test input 42e-9
             
         self.add_parameter(

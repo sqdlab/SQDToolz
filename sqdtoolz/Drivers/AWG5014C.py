@@ -66,8 +66,80 @@ class AWG5014Cchannel(InstrumentChannel):
     def Output(self, boolVal):
         if boolVal:
             self.output('ON')
+            self._parent.run()
         else:
             self.output('OFF')
+
+class AWG5014CdcChannel(InstrumentChannel):
+    def __init__(self, parent:Instrument, name:str, channel:int) -> None:
+        super().__init__(parent, name)
+        self.channel = channel
+        self._parent = parent
+
+        #!!!
+        #The output state is common for all DC outputs. Therefore, irrespective of the
+        #value used for ‘n’ in the command, all DC outputs are switched on or switched off
+        #at once
+        self.add_parameter('output', label='Output DC voltage state',
+                           docstring='State of the DC voltage output (ON or OFF).', 
+                           get_cmd=f'AWGC:DC{self.channel}:STATE?',
+                           set_cmd='AWGC:DC'+str(self.channel)+':STATE {}',
+                           set_parser=int,
+                           val_mapping={'ON':  1, 'OFF': 0})
+        self.add_parameter('voltage', label='Output DC voltage offset', unit='V',
+                           docstring='Output DC voltage offset.', 
+                           get_cmd='AWGC:DC'+str(channel)+':VOLTAGE:OFFSET?',
+                           set_cmd='AWGC:DC'+str(channel)+':VOLTAGE:OFFSET {}',
+                           get_parser=float, set_parser=float,
+                           vals=vals.Numbers(-3, 5))
+        self.add_parameter('voltage_ramp_rate', unit='V/s',
+                            label="Output voltage ramp-rate",
+                            initial_value=2.5e-3/0.05,
+                            vals=vals.Numbers(0.001, 1),
+                            get_cmd=lambda : self.voltage.step/self.voltage.inter_delay,
+                            set_cmd=self._set_ramp_rate)
+
+    def _set_ramp_rate(self, ramp_rate):
+        if ramp_rate < 0.01:
+            self.voltage.step = 0.001
+        elif ramp_rate < 0.1:
+            self.voltage.step = 0.010
+        elif ramp_rate < 1.0:
+            self.voltage.step = 0.100
+        else:
+            self.voltage.step = 1.0
+        self.voltage.inter_delay = self.voltage.step / ramp_rate
+
+    @property
+    def Output(self):
+        return self.output() == 'ON'
+    @Output.setter
+    def Output(self, boolVal):
+        if boolVal:
+            self.output('ON')
+        else:
+            self.output('OFF')
+        
+    @property
+    def Voltage(self):
+        while(True):
+            try:
+                ret_val = self.voltage()
+                break
+            except:
+                continue
+        return ret_val
+    @Voltage.setter
+    def Voltage(self, val):
+        self.voltage(val)
+        
+    @property
+    def RampRate(self):
+        return self.voltage_ramp_rate()
+    
+    @RampRate.setter
+    def RampRate(self, val):
+        self.voltage_ramp_rate(val)
 
 class AWG5014C(VisaInstrument):
     '''
@@ -105,11 +177,21 @@ class AWG5014C(VisaInstrument):
                            get_cmd='SOURce1:ROSCillator:SOURce?',
                            set_cmd='SOURce1:ROSCillator:SOURce ' + '{}',
                            vals=vals.Enum('INT', 'EXT'))
+        self.add_parameter('DC_Offset_Status',
+                           label='Reference clock source',
+                           get_cmd='AWGC:DC:STATE?',
+                           set_cmd='AWGC:DC:STATE ' + '{}',
+                           vals=vals.Enum('INT', 'EXT'))
 
         # Output channels added to both the module for snapshots and internal Trigger Sources for the DDG HAL...
         self._ch_list = ['CH1', 'CH2', 'CH3', 'CH4']
         for ch_ind, ch_name in enumerate(self._ch_list):
             cur_channel = AWG5014Cchannel(self, ch_name, ch_ind+1)
+            self.add_submodule(ch_name, cur_channel)
+
+        self._dc_ch_list = ['DC1', 'DC2', 'DC3', 'DC4']
+        for ch_ind, ch_name in enumerate(self._dc_ch_list):
+            cur_channel = AWG5014CdcChannel(self, ch_name, ch_ind+1)
             self.add_submodule(ch_name, cur_channel)
 
     @property
@@ -129,6 +211,14 @@ class AWG5014C(VisaInstrument):
     def num_supported_markers(self, channel_name):
         return 2
 
+    @property
+    def AutoCompressionSupport(self):
+        return {'Supported' : False, 'MinSize' : 1024, 'Multiple' : 32}
+
+    @property
+    def MemoryRequirements(self):
+        return {'MinSize' : 1, 'Multiple' : 1}
+
     def _get_channel_output(self, identifier):
         if identifier in self.submodules:
             return self.submodules[identifier]
@@ -140,7 +230,11 @@ class AWG5014C(VisaInstrument):
     def stop(self):
         self.write('AWGC:STOP:IMM')
 
-    def program_channel(self, chan_id, wfm_data, mkr_data = np.array([])):
+    def prepare_waveform_memory(self, chan_id, seg_lens, **kwargs):
+        pass
+        #TODO: Actually implement this...
+
+    def program_channel(self, chan_id, dict_wfm_data):
         assert chan_id in self._ch_list, chan_id + " is an invalid channel ID for the AWG5014C."
         chan_ind = self._ch_list.index(chan_id)
         cur_chnl = self._get_channel_output(chan_id)
@@ -157,8 +251,11 @@ class AWG5014C(VisaInstrument):
         if prev_on:
             cur_chnl.Output = False
 
+        mkr_data = dict_wfm_data['markers'][0]
+        #TODO: Setup sequence compression etc...
+
         #Condition data
-        cur_data = wfm_data
+        cur_data = dict_wfm_data['waveforms'][0]
         cur_amp = cur_chnl.Amplitude/2
         cur_off = cur_chnl.Offset
         cur_data = (cur_data - cur_off)/cur_amp
@@ -183,12 +280,13 @@ class AWG5014C(VisaInstrument):
         self.write(f'WLIST:WAVEFORM:NEW \"{wfm_name}\", {wfm_data_normalised.size}, INTEGER')
 
         #Convert the waveform array into 14-bit format (see User Online Help in AWG5014C unit under: AWG Reference > Waveform General Information)
-        data_ints = (wfm_data_normalised * 8191 + 8191).astype(np.int16)
+        data_ints = (wfm_data_normalised * 8191 + 8191).astype(np.ushort)
+        data_ints = np.clip(data_ints, 0, 8191 + 8191)  #TODO: Check this arithmetic - shouldn't it be one more than this? Check actual zero value in manual
         
         if mkr_data[0].size > 0:
-            data_ints += mkr_data[0] * 2**14
+            data_ints += mkr_data[0].astype(np.ushort) * 2**14
         if mkr_data[1].size > 0:
-            data_ints += mkr_data[1] * 2**15
+            data_ints += mkr_data[1].astype(np.ushort) * 2**15
 
         #TODO: Write multi-block for mega waveforms
         self.visa_handle.write_binary_values(f"WLIST:WAVEFORM:DATA \"{wfm_name}\",{0},{data_ints.size},", data_ints, datatype='H')

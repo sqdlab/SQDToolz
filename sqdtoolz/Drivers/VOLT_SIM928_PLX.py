@@ -85,6 +85,9 @@ class SIM928_ChannelModule(InstrumentChannel):
     def RampRate(self, val):
         self.voltage_ramp_rate(val)
 
+    def ask(self, cmd):
+        return self.parent.ask(cmd)
+
 
 class VOLT_SIM928_PLX(PrologixGPIBEthernet, Instrument):
     """
@@ -348,6 +351,9 @@ class VOLT_SIM928_PLX(PrologixGPIBEthernet, Instrument):
 
     def __del__(self):
         self.close()
+
+    def ask(self, cmd):
+        return super().ask(cmd).rstrip('\x00').strip()
 
 def runme():
     mySim = SIM928_PLX("bob", '192.168.1.208', 2)

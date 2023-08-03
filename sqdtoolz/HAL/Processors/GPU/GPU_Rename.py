@@ -12,8 +12,11 @@ class GPU_Rename(ProcNodeGPU):
         #duplicate data on a per-channel basis
         init_keys = [x for x in data_pkt['data'].keys()]
         assert len(self.names) == len(init_keys), 'The number of new channel names must be the same'
-        for ch_ind, cur_ch in enumerate(init_keys):
-            data_pkt['data'][self.names[ch_ind]] = data_pkt['data'].pop(cur_ch)
+        prev_data = []
+        for cur_ch in init_keys:
+            prev_data.append(data_pkt['data'].pop(cur_ch))
+        for m in range(len(init_keys)):
+            data_pkt['data'][self.names[m]] = prev_data[m]
 
         return data_pkt
 

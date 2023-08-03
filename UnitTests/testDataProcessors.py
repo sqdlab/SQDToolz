@@ -1161,6 +1161,30 @@ class TestCPU(unittest.TestCase):
         fin_data['data'].pop('space')
         assert len(fin_data['data'].keys()) == 0, "CPU Rename has left superfluous data keys."
 
+        data_size = 1024#*1024*4
+        num_reps = 10   #keep greater than 2
+        num_segs = 5
+        #
+        #Test with permutation of names case:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : {  'ch1' : np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]),
+                        'ch2' : np.array([[[(s+4*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+            'misc' : {'SampleRates' : [1,3]}
+        }
+        new_proc = ProcessorCPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_Rename(['ch2', 'ch1']))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality(fin_data['data']['ch2'], expected_ans), "CPU Rename does not yield expected result."
+        expected_ans = np.array([[[(s+4*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality(fin_data['data']['ch1'], expected_ans), "CPU Rename does not yield expected result."
+        fin_data['data'].pop('ch2')
+        fin_data['data'].pop('ch1')
+        assert len(fin_data['data'].keys()) == 0, "CPU Rename has left superfluous data keys."
+
         self.cleanup()
 
 
@@ -2282,6 +2306,30 @@ class TestGPU(unittest.TestCase):
         fin_data['data'].pop('ch2_0')
         fin_data['data'].pop('ch2_1')
         assert len(fin_data['data'].keys()) == 0, "GPU Duplicate has left superfluous data keys."
+
+        data_size = 1024#*1024*4
+        num_reps = 10   #keep greater than 2
+        num_segs = 5
+        #
+        #Test with permutation of names case:
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            'data' : {  'ch1' : np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]),
+                        'ch2' : np.array([[[(s+4*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+            'misc' : {'SampleRates' : [1,3]}
+        }
+        new_proc = ProcessorGPU('gpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(GPU_Rename(['ch2', 'ch1']))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ans = np.array([[[(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality(fin_data['data']['ch2'], expected_ans), "CPU Rename does not yield expected result."
+        expected_ans = np.array([[[(s+4*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])
+        assert self.arr_equality(fin_data['data']['ch1'], expected_ans), "CPU Rename does not yield expected result."
+        fin_data['data'].pop('ch2')
+        fin_data['data'].pop('ch1')
+        assert len(fin_data['data'].keys()) == 0, "CPU Rename has left superfluous data keys."
 
         self.cleanup()
 

@@ -15,6 +15,7 @@ from sqdtoolz.HAL.Processors.FPGA.FPGA_DDC import*
 from sqdtoolz.HAL.Processors.FPGA.FPGA_DDCFIR import*
 from sqdtoolz.HAL.Processors.FPGA.FPGA_Integrate import*
 from sqdtoolz.HAL.Processors.FPGA.FPGA_Decimation import*
+from sqdtoolz.HAL.Processors.FPGA.FPGA_FFT import*
 
 class ProcessorFPGA(DataProcessor):
     def __init__(self, proc_name, lab, pipeline_main = []):

@@ -21,6 +21,7 @@ from sqdtoolz.HAL.Processors.FPGA.FPGA_DDCFIR import FPGA_DDCFIR
 from sqdtoolz.HAL.Processors.FPGA.FPGA_DDC import FPGA_DDC
 from sqdtoolz.HAL.Processors.FPGA.FPGA_Decimation import FPGA_Decimation
 from sqdtoolz.HAL.Processors.FPGA.FPGA_Integrate import FPGA_Integrate
+from sqdtoolz.HAL.Processors.FPGA.FPGA_FFT import FPGA_FFT
 
 import time
 import unittest
@@ -40,7 +41,7 @@ lab = Laboratory(instr_config_file = "tests\\AWG_Tabor_Test_ADCDSP.yaml", save_d
 # Load the Tabor into the lab class to use
 lab.load_instrument('TaborAWG')
 
-WFMT_ModulationIQ("OscMod", lab, 100e6)
+WFMT_ModulationIQ("OscMod", lab, 400e6)
 lab.WFMT("OscMod").IQUpperSideband = False
 
 pt_centre = np.array([0,0])
@@ -108,7 +109,7 @@ leData2 = acq_module.get_data()
 fig, ax = plt.subplots(nrows=2)
 for r in range(acq_module.NumRepetitions) :
     for s in range(acq_module.NumSegments) :
-        times = np.arange(acq_module.NumSamples/10)/acq_module.SampleRate * 1e9
+        times = np.arange(acq_module.NumSamples/10)/(acq_module.SampleRate/10) * 1e9
         ax[0].plot(times, leData['data']['CH1_0_I'][r][s])
         ax[1].plot(times, leData['data']['CH1_0_Q'][r][s])
         # ax[0].plot(leData['data']['CH1_1_I'][r][s])
@@ -118,6 +119,43 @@ for s in range(acq_module.NumSegments):
     ax[0].plot(times, leData2['data']['CH1_0_I'][s]/acq_module.NumRepetitions)
     ax[1].plot(times, leData2['data']['CH1_0_Q'][s]/acq_module.NumRepetitions)
 
+###########
+#FFT TESTS#
+###########
+acq_module.NumRepetitions = 3
+awg_wfm.clear_segments()
+awg_wfm.add_waveform_segment(WFS_Constant(f"init", lab.WFMT("OscMod").apply(phase=0), 2048e-9, 0.25))
+awg_wfm.add_waveform_segment(WFS_Constant(f"pad", None, -1, 0.0))
+# Setup trigger 
+awg_wfm.get_output_channel(0).marker(2).set_markers_to_segments(['init'])
+# Prepare waveforms and output them
+awg_wfm.prepare_initial()
+awg_wfm.prepare_final()
+# Set output channel to true
+awg_wfm.get_output_channel(0).Output = True
+awg_wfm.get_output_channel(1).Output = True
+#
+lab.PROC('fpga_dsp').reset_pipeline()
+lab.PROC('fpga_dsp').add_stage(FPGA_DDC([[330e6],[]]))
+lab.PROC('fpga_dsp').add_stage(FPGA_Decimation('sample', 10))
+lab.PROC('fpga_dsp').add_stage(FPGA_FFT())
+acq_module.set_data_processor(lab.PROC('fpga_dsp'))
+acq_module.NumSamples = 10080
+leData = acq_module.get_data()
+#
+fig, ax = plt.subplots(nrows=2)
+for r in range(acq_module.NumRepetitions) :
+    for s in range(acq_module.NumSegments) :
+        freqs = np.linspace(0, acq_module.SampleRate/10, 1024,endpoint=False)[:int(acq_module.NumSamples/10)]
+        ax[0].plot(freqs, np.abs(leData['data']['fft_real'][r][s] + 1j*leData['data']['fft_imag'][r][s]))
+        ax[1].plot(leData['data']['debug_time_I'][r][s])
+        ax[1].plot(leData['data']['debug_time_Q'][r][s])
+
+plt.show()
+
+#################
+#AVERAGING TESTS#
+#################
 acq_module.NumRepetitions = int(num_corners*3)
 fig, ax = plt.subplots(1)
 for s in range(4):

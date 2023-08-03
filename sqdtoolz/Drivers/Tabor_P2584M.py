@@ -7,6 +7,7 @@ from sqdtoolz.HAL.Processors.FPGA.FPGA_DDCFIR import FPGA_DDCFIR
 from sqdtoolz.HAL.Processors.FPGA.FPGA_DDC import FPGA_DDC
 from sqdtoolz.HAL.Processors.FPGA.FPGA_Integrate import FPGA_Integrate
 from sqdtoolz.HAL.Processors.FPGA.FPGA_Decimation import FPGA_Decimation
+from sqdtoolz.HAL.Processors.FPGA.FPGA_FFT import FPGA_FFT
 
 import numpy as np
 import math
@@ -625,12 +626,17 @@ class TaborP2584M_ACQ(InstrumentChannel):
             initial_value = "REAL")
 
         self.add_parameter(
+            'fft_input', label='FFT input in the DSP chain',
+            get_cmd=partial(self._parent._get_cmd, ':DSP:FFT:INPut?'),
+            set_cmd=partial(self._parent._set_cmd, ':DSP:FFT:INPut'),
+            val_mapping = {"IQ1" : "IQ1", "COMP" : "COMP", "DBUG" : "DBUG", "DSP1" : "DSP1", "DEBUG" : "DEBUG"}, #TODO: Check again after firmware update
+            initial_value = "DBUG")
+
+        self.add_parameter(
             'ddr_store', label='Data path to be stored in DDR1',
             get_cmd=lambda : self._parent._get_cmd(':DSP:STOR?').split(',')[0],
             set_cmd=partial(self._parent._set_cmd, ':DSP:STOR'),
-            val_mapping = {"DIR" : "DIR", "DSP":"DSP",\
-                "DSP2":"DSP2", "DSP3":"DSP3", "DSP4":"DSP4", "FFTI":"FFTI",\
-                "FFTO":"FFTO"},
+            val_mapping = {"DIR" : "DIR", "DSP":"DSP", "FFT":"FFT"},
             initial_value = "DIR")
 
         self.add_parameter(
@@ -705,7 +711,9 @@ class TaborP2584M_ACQ(InstrumentChannel):
         # self.trigger1Source("TASK1")
         # self.trigger2Source("TASK1")
         self.extTriggerType("EDGE")
-        self.setup_data_path(default = True)
+        self.acq_mode("DUAL")
+        self.ddc_mode("REAL")
+        self.ddr_store("DIR")
         self._dsp_channels = {"DDC1" : "OFF", "DDC2" : "OFF"}
 
 
@@ -790,6 +798,8 @@ class TaborP2584M_ACQ(InstrumentChannel):
         self.activeChannel(ch) #self._parent._send_cmd(f':DIG:CHAN {self._active_channel}')
         #Perform command
         self._parent._send_cmd(f'{cmd} {value}')
+
+
 
     def _allocate_frame_memory(self, final_dsp_order):
         """
@@ -1145,46 +1155,6 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
         return kernel_data
 
-    def setup_data_path(self, **kwargs) :
-        """
-        Method to setup datapath of the acquisition
-        takes in kwargs to setu data path
-        default input resets all variables to their defaults
-        @arg ddc_mode: "COMP" or "REAL" (Default "")
-        @arg acq_mode: "SING" or "DUAL" (Default "")
-        @arg default: true or false (Default false)
-        @arg ddr1_store: "DIR<N>"{1,2} or "DSP<N>"{1,2,3,4} or "FFTI" or "FFTO" (Default "DIR1")
-        @arg ddr2_store: "DIR<N>"{1,2} or "DSP<N>"{1,2,3,4} or "FFTI" or "FFTO" (Default "DIR1")
-        """
-        # Check if default is set
-        # TODO: Better way to handle kwargs so there is no need to use nested ifs
-        if "default" in kwargs :
-            if kwargs["default"] == True :
-                # Set Default Values
-                self.acq_mode("DUAL")
-                self.ddc_mode("REAL")
-                self.ddr_store("DIR")
-                # self._parent._send_cmd(':DIG:DDC:CLKS AWG')
-                return
-
-        # Assign variables
-        self.acq_mode(kwargs.get("acq_mode", self.acq_mode()))
-        self.ddc_mode(kwargs.get("ddc_mode", self.ddc_mode()))
-        self.ddr_store(kwargs.get("ddr_store", self.ddr_store()))
-        if self.ddr_store() == "DSP":
-            DSP_DEC_LEN = int(self.NumSamples / 12 - 10)
-            self._parent._send_cmd(':DSP:DEC:FRAM {0}'.format(DSP_DEC_LEN))
-        # self.ddc_mode("COMP")
-        # self.ddc_mode("REAL")
-        # If in Complex mode, storage options are limited 
-        # TODO: confirm if it will set to something allowed automatically
-        # if (self.ddc_mode() == "COMP") :
-        #     self.ddr1_store(kwargs.get("ddr1_store", self.ddr1_store()))
-        #     self.ddr2_store(kwargs.get("ddr2_store", self.ddr2_store()))
-        # else :
-        #     self.ddr1_store(kwargs.get("ddr1_store", self.ddr1_store()))
-        #     self.ddr2_store(kwargs.get("ddr2_store", self.ddr2_store()))
-
     def setup_filter(self, filter_channel, filter_array, **kwargs) :
         """
         Method to set coefficients for specific FIR filter on Tabor
@@ -1234,6 +1204,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
             'dsp_active' : False,
             'kernels' : [],
             'read_IQ': True,
+            'doFFT': False,
             'final_scale_factor' : 1
         }
 
@@ -1262,8 +1233,17 @@ class TaborP2584M_ACQ(InstrumentChannel):
                 assert param == 'sample', "The P2584M only supports mandatory 10x decimation on the samples."
                 assert fac == 10, "The P2584M only supports mandatory 10x decimation on the samples."
                 decimation = True
+            elif isinstance(cur_node, FPGA_FFT):
+                assert not final_dsp_order['avSamples'], "The P2584M only supports FFT before averaging."
+                assert not final_dsp_order['avRepetitions'], "The P2584M only supports FFT before averaging."
+                assert decimation, "The P2584M only supports FFT after a 10x mandatory decimation (do it via an \'FPGA_Decimation\' stage)."
+                assert len(final_dsp_order['kernels'][0]) == 1 and len(final_dsp_order['kernels'][1]) == 0, "The P2584M only supports FFT when using 1 DDC channel and that only on channel 1."
+                param = cur_node.get_params()
+                assert param[0] == 0 and param[1] == 1, "The FFT IQ indices must be 0 and 1 for the P2584M."
+                assert self.NumSamples == 10080, "NumSamples must be 10080 when using FFT processing on the P2584M."
+                final_dsp_order['doFFT'] = True
             elif isinstance(cur_node, FPGA_Integrate):
-                assert decimation, "The P2584M only supports averaging after a 10x mandatory decimation (do it via an \'FPGA_Integrate\' stage)."
+                assert decimation, "The P2584M only supports averaging after a 10x mandatory decimation (do it via an \'FPGA_Decimation\' stage)."
                 param = cur_node.get_params()
                 if param == 'sample':
                     assert not final_dsp_order['avSamples'], "There is already a sample averaging stage."
@@ -1291,7 +1271,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
                 
 
-    def process_dsp_kernel(self, kernelIQs):
+    def process_dsp_kernel(self, kernelIQs, is_DBUG_line = False):
         if len(kernelIQs) == 2:
             assert len(kernelIQs[0]) <= 5, "The Tabor P2584M does not support more than 5 demodulations per channel when demodulating across 2 channels."
             assert len(kernelIQs[1]) <= 5, "The Tabor P2584M does not support more than 5 demodulations per channel when demodulating across 2 channels."
@@ -1305,7 +1285,10 @@ class TaborP2584M_ACQ(InstrumentChannel):
             for k, cur_kernel_IQ in enumerate(cur_ch):
                 kI, kQ = cur_kernel_IQ
                 mem = self.pack_kernel_data(kI, kQ)
-                self._parent._set_cmd(':DSP:IQD:SEL', f"IQ{curIQpath}")
+                if is_DBUG_line:
+                    self._parent._set_cmd(':DSP:IQD:SEL', 'DBUG')
+                else:
+                    self._parent._set_cmd(':DSP:IQD:SEL', f"IQ{curIQpath}")
                 self._parent._chk_err("after trying to setup the IQ path.")
                 self._parent._inst.write_binary_data(':DSP:IQD:KER:DATA', mem)
                 self._parent._chk_err("after trying to setup the IQ kernel.")
@@ -1454,9 +1437,9 @@ class TaborP2584M_ACQ(InstrumentChannel):
                     'misc' : {}
                 }
         if final_dsp_order['avRepetitions']:
-            ret_val['parameters'] = ['segment', 'sample']
+            ret_val['parameters'] = ['sample']
         else:
-            ret_val['parameters'] = ['repetition', 'segment', 'sample']
+            ret_val['parameters'] = ['repetition', 'sample']
         #TODO: Change after new firmware release...
         ret_val['parameters'].pop(-1)        
         leSampleRates = []
@@ -1474,40 +1457,48 @@ class TaborP2584M_ACQ(InstrumentChannel):
         else:
             if num_ch_divs[0] > 0:
                 wav1 = self.conv_data(wav1, final_dsp_order)
-            offset = 0
-            for m in range(num_ch_divs[0]):
-                if final_dsp_order['avRepetitions']:
-                    ret_val['data'][f'CH1_{m}_I'] = wav1[0,:,int(2*(m+offset)+1)::2][:,:int(self.NumSamples/10)] * final_scale*self.NumRepetitions  #TODO: Review after new firmware release
-                    ret_val['data'][f'CH1_{m}_Q'] = wav1[0,:,int(2*(m+offset))::2][:,:int(self.NumSamples/10)] * final_scale*self.NumRepetitions    #TODO: Review after new firmware release
-                    #TODO: Change after new firmware release...
-                    if final_dsp_order['avSamples']:
-                        ret_val['data'][f'CH1_{m}_I'] = np.array([np.sum(ret_val['data'][f'CH1_{m}_I'])])*2.0
-                        ret_val['data'][f'CH1_{m}_Q'] = np.array([np.sum(ret_val['data'][f'CH1_{m}_Q'])])*2.0
-                    #TODO: Change after new firmware release...
-                    wav1 =self.conv_data(wav2, final_dsp_order)
-                    offset = -1
-                else:
-                    ret_val['data'][f'CH1_{m}_I'] = wav1[:,:,int(2*(m+offset)+1)::12] * final_scale
-                    ret_val['data'][f'CH1_{m}_Q'] = wav1[:,:,int(2*(m+offset))::12] * final_scale
-                leSampleRates += [self.SampleRate / 10]*2
-                if m == 4:
-                    wav1 = self.conv_data(wav2, final_dsp_order)    #This is relevant in the BIND mode...
-                    offset = -5
-            if num_ch_divs[1] > 0:
-                wav2 =self.conv_data(wav2, final_dsp_order)
-            for m in range(num_ch_divs[1]):
-                if final_dsp_order['avRepetitions']:
-                    ret_val['data'][f'CH2_{m}_I'] = wav2[0,:,int(2*m+1)::10] * final_scale*self.NumRepetitions
-                    ret_val['data'][f'CH2_{m}_Q'] = wav2[0,:,int(2*m)::10] * final_scale*self.NumRepetitions
-                    #TODO: Change after new firmware release...
-                    if final_dsp_order['avSamples']:
-                        ret_val['data'][f'CH2_{m}_I'] = np.array([np.sum(ret_val['data'][f'CH2_{m}_I'])])*2.0
-                        ret_val['data'][f'CH2_{m}_Q'] = np.array([np.sum(ret_val['data'][f'CH2_{m}_Q'])])*2.0
-                else:
-                    ret_val['data'][f'CH2_{m}_I'] = wav2[:,:,int(2*m+1)::12] * final_scale
-                    ret_val['data'][f'CH2_{m}_Q'] = wav2[:,:,int(2*m)::12] * final_scale
-                leSampleRates += [self.SampleRate / 10]*2
-            ret_val['misc']['SampleRates'] = leSampleRates
+            if final_dsp_order['doFFT']:
+                ret_val['data']['fft_real'] = wav1[:,:,int(2*5+1)::12] * final_scale
+                ret_val['data']['fft_imag'] = wav1[:,:,int(2*5)::12] * final_scale
+                #
+                wav2 = self.conv_data(wav2, final_dsp_order)
+                ret_val['data']['debug_time_I'] = wav2[:,:,int(2*5+1)::12] * final_scale
+                ret_val['data']['debug_time_Q'] = wav2[:,:,int(2*5)::12] * final_scale
+            else:
+                offset = 0
+                for m in range(num_ch_divs[0]):
+                    if final_dsp_order['avRepetitions']:
+                        ret_val['data'][f'CH1_{m}_I'] = wav1[0,:,int(2*(m+offset)+1)::2][:,:int(self.NumSamples/10)] * final_scale*self.NumRepetitions  #TODO: Review after new firmware release
+                        ret_val['data'][f'CH1_{m}_Q'] = wav1[0,:,int(2*(m+offset))::2][:,:int(self.NumSamples/10)] * final_scale*self.NumRepetitions    #TODO: Review after new firmware release
+                        #TODO: Change after new firmware release...
+                        if final_dsp_order['avSamples']:
+                            ret_val['data'][f'CH1_{m}_I'] = np.array([np.sum(ret_val['data'][f'CH1_{m}_I'])])*2.0
+                            ret_val['data'][f'CH1_{m}_Q'] = np.array([np.sum(ret_val['data'][f'CH1_{m}_Q'])])*2.0
+                        #TODO: Change after new firmware release...
+                        wav1 =self.conv_data(wav2, final_dsp_order)
+                        offset = -1
+                    else:
+                        ret_val['data'][f'CH1_{m}_I'] = wav1[:,:,int(2*(m+offset)+1)::12] * final_scale
+                        ret_val['data'][f'CH1_{m}_Q'] = wav1[:,:,int(2*(m+offset))::12] * final_scale
+                    leSampleRates += [self.SampleRate / 10]*2
+                    if m == 4:
+                        wav1 = self.conv_data(wav2, final_dsp_order)    #This is relevant in the BIND mode...
+                        offset = -5
+                if num_ch_divs[1] > 0:
+                    wav2 =self.conv_data(wav2, final_dsp_order)
+                for m in range(num_ch_divs[1]):
+                    if final_dsp_order['avRepetitions']:
+                        ret_val['data'][f'CH2_{m}_I'] = wav2[0,:,int(2*m+1)::10] * final_scale*self.NumRepetitions
+                        ret_val['data'][f'CH2_{m}_Q'] = wav2[0,:,int(2*m)::10] * final_scale*self.NumRepetitions
+                        #TODO: Change after new firmware release...
+                        if final_dsp_order['avSamples']:
+                            ret_val['data'][f'CH2_{m}_I'] = np.array([np.sum(ret_val['data'][f'CH2_{m}_I'])])*2.0
+                            ret_val['data'][f'CH2_{m}_Q'] = np.array([np.sum(ret_val['data'][f'CH2_{m}_Q'])])*2.0
+                    else:
+                        ret_val['data'][f'CH2_{m}_I'] = wav2[:,:,int(2*m+1)::12] * final_scale
+                        ret_val['data'][f'CH2_{m}_Q'] = wav2[:,:,int(2*m)::12] * final_scale
+                    leSampleRates += [self.SampleRate / 10]*2
+                ret_val['misc']['SampleRates'] = leSampleRates
         return ret_val
 
     def get_data(self, **kwargs):
@@ -1550,7 +1541,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
             assert self.NumSamples % 48 == 0, "The number of samples must be divisible by 48 if in DUAL mode."
             final_dsp_order = self.settle_dsp_processors(cur_processor)
         else:
-            if not cur_processor.compare_pipeline_state(self._last_dsp_state) or self.ddr_store() != 'DSP': #The 2nd one is perhaps a harsh condition?
+            if not cur_processor.compare_pipeline_state(self._last_dsp_state):
                 final_dsp_order = self.settle_dsp_processors(cur_processor)
                 reprogram_dsps = True
             else:
@@ -1572,16 +1563,28 @@ class TaborP2584M_ACQ(InstrumentChannel):
             assert self.NumSamples <= 10240, "If using FPGA DSP blocks, the number of samples must be limited to 10240."
 
             #It's DSP time
-            self.ddr_store('DSP')
-            self._parent._chk_err('after setting to DSP.')
-            Frame_len = self.NumSamples
-            DSP_DEC_LEN = Frame_len / 10# - 10
-            self._parent._set_cmd(f':DSP:DEC:FRAM', f'{int(DSP_DEC_LEN)}')
-            self._parent._set_cmd(':DSP:STOR', 'DSP')
-            self._parent._chk_err('after setting up DSP.')
+            if final_dsp_order['doFFT']:
+                filt_coeffs = scipy.signal.firwin(51, 100e6, fs=2.5e9)
+                self.ddr_store('FFT')
+                self.fft_input('DBUG')
+                self.fir_block('DBUGI')
+                self._parent._set_cmd(':DSP:FIR:BYPass','OFF')
+                self._parent._inst.write_binary_data(':DSP:FIR:DATA', filt_coeffs)       
+                self.fir_block('DBUGQ')
+                self._parent._set_cmd(':DSP:FIR:BYPass','OFF') 
+                self._parent._inst.write_binary_data(':DSP:FIR:DATA', filt_coeffs)
+                final_dsp_order['num_ch_divs'] = self.process_dsp_kernel(final_dsp_order['kernels'], True)
+            else:
+                self.ddr_store('DSP')
+                self._parent._chk_err('after setting to DSP.')
+                Frame_len = self.NumSamples
+                DSP_DEC_LEN = Frame_len / 10# - 10
+                self._parent._set_cmd(f':DSP:DEC:FRAM', f'{int(DSP_DEC_LEN)}')
+                self._parent._set_cmd(':DSP:STOR', 'DSP')
+                self._parent._chk_err('after setting up DSP.')
+                #Setup kernel block
+                final_dsp_order['num_ch_divs'] = self.process_dsp_kernel(final_dsp_order['kernels'])
 
-            #Setup kernel block
-            final_dsp_order['num_ch_divs'] = self.process_dsp_kernel(final_dsp_order['kernels'])
             #Setup repetition averaging if requested
             if final_dsp_order['avRepetitions']:
                 self.averageEnable(True)
@@ -1596,7 +1599,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
         if final_dsp_order['avSamples'] and not final_dsp_order['avRepetitions']:   #TODO: Change after firmware update (i.e. read header for average)
             ret_val = {
-                    'parameters' : ['repetition', 'segment'],
+                    'parameters' : ['repetition'],
                     'data' : {},
                     'misc' : {}
                 }

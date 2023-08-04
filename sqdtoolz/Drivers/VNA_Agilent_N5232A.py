@@ -353,6 +353,8 @@ class VNA_Agilent_N5232A(VisaInstrument):
             self.write('TRIG:CHAN:AUX:IPOL POS')
             self.write('TRIG:CHAN:AUX ON')
             self.write('CONTrol:SIGNal:TRIGger:ATBA 1') #Accept Trigger before Armed! 
+        else:
+            self.write('TRIG:CHAN:AUX OFF')
 
     def ask(self, *args, **kwargs):
         got_data_without_errors = False

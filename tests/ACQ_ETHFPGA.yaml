@@ -1,0 +1,220 @@
+instruments:
+  vna:
+    driver: sqdtoolz.Drivers.VNA_Keysight_P9373A #sqdtoolz.Drivers.VNA_Keysight_P9373A
+    type: VNA_Keysight_P9373A
+    #address: 'TCPIP0::SMP-U6M3K63::hislip_PXI10_CHASSIS2_SLOT1_INDEX0::INSTR'
+    address: 'TCPIP0::SMP-U6M3K63::hislip1,4880::INSTR'
+    enable_forced_reconnect: true
+  sim_rack928:
+    driver: sqdtoolz.Drivers.VOLT_SIM928_PLX
+    type: VOLT_SIM928_PLX
+    address: '192.168.1.130'
+    enable_forced_reconnect: true
+    init:
+      gpib_slot: 2
+  smu:
+    driver: sqdtoolz.Drivers.SMU_B2901A
+    type: SMU_B2901A
+    address: 'TCPIP::192.168.1.201::INSTR'
+    enable_forced_reconnect: true    
+  fpga1:
+    driver: sqdtoolz.Drivers.ACQ_ETH_FPGA
+    type: ETHFPGA
+    init:
+      uri: 'Z:/DataAnalysis/Notebooks/qcodes/FPGA_Rack1_URI.txt'
+
+  pulser:
+    driver: sqdtoolz.Drivers.DDG_DG645
+    type: DG645
+    address: 'TCPIP::192.168.1.120'
+    enable_forced_reconnect: true
+    parameters:
+      trigger_source:
+        initial_value: 'Internal'   #Connected to the 5MHz output from the Rb oven
+      trigger_inhibit:
+        initial_value: 'AB, CD, EF, GH'
+      trigger_holdoff:
+        initial_value: 0.0
+      advanced_trigger:
+        initial_value: False
+      burst_mode:
+        initial_value: False
+      CD.trigPulseLength:
+        initial_value: 10.0e-9
+      CD.trigPulseDelay:
+        initial_value: 10.0e-9
+      EF.trigPulseLength:
+        initial_value: 10.0e-9
+      EF.trigPulseDelay:
+        initial_value: 10.0e-9
+      GH.trigPulseLength:
+        initial_value: 10.0e-9
+      GH.trigPulseDelay:
+        initial_value: 10.0e-9
+  
+  sgs_qubit:
+    driver: sqdtoolz.Drivers.MWS_SGS100A
+    type: MWS_SGS100A
+    address: TCPIP::192.168.1.118
+    enable_forced_reconnect: true
+    parameters:
+      ref_osc_source:
+        initial_value: 'EXT' #Can be INT or EXT
+      ref_osc_output_freq:
+        initial_value: '1000MHz'  #Can be '10MHz', '100MHz', '1000MHz'
+      ref_osc_external_freq:
+        initial_value: '10MHz'  #Can be '10MHz', '100MHz', '1000MHz'
+      alc:
+        initial_value: 'OFF'  #Can be ON, OFF, AUTO
+      trigger_impedance:
+        initial_value: 'G10K'
+      #Output Channel Parameters
+      RFOUT.output:
+        initial_value: 'OFF'
+      RFOUT.frequency:
+        initial_value: 1.0e9
+      RFOUT.phase:
+        initial_value: 0.0
+      RFOUT.power:
+        initial_value: -60
+      RFOUT.pulsemod_state:
+        initial_value: 'ON'
+      RFOUT.pulsemod_source:
+        initial_value: 'EXT'
+  
+  sgs_resonator:
+    driver: sqdtoolz.Drivers.MWS_SGS100A
+    type: MWS_SGS100A
+    address: TCPIP::192.168.1.110
+    enable_forced_reconnect: true
+    parameters:
+      ref_osc_source:
+        initial_value: 'EXT' #Can be INT or EXT
+      ref_osc_output_freq:
+        initial_value: '1000MHz'  #Can be '10MHz', '100MHz', '1000MHz'
+      ref_osc_external_freq:
+        initial_value: '1000MHz'  #Can be '10MHz', '100MHz', '1000MHz'
+      alc:
+        initial_value: 'OFF'  #Can be ON, OFF, AUTO
+      trigger_impedance:
+        initial_value: 'G10K'
+      #Output Channel Parameters
+      RFOUT.output:
+        initial_value: 'OFF'
+      RFOUT.frequency:
+        initial_value: 1.0e9
+      RFOUT.phase:
+        initial_value: 0.0
+      RFOUT.power:
+        initial_value: -60
+      RFOUT.pulsemod_state:
+        initial_value: 'ON'
+      RFOUT.pulsemod_source:
+        initial_value: 'EXT'
+  
+
+  sgs_dnc:
+    driver: sqdtoolz.Drivers.MWS_SGS100A
+    type: MWS_SGS100A
+    address: TCPIP::192.168.1.112
+    enable_forced_reconnect: true
+    parameters:
+      ref_osc_source:
+        initial_value: 'EXT' #Can be INT or EXT
+      ref_osc_output_freq:
+        initial_value: '1000MHz'  #Can be '10MHz', '100MHz', '1000MHz'
+      ref_osc_external_freq:
+        initial_value: '1000MHz'  #Can be '10MHz', '100MHz', '1000MHz'
+      alc:
+        initial_value: 'OFF'  #Can be ON, OFF, AUTO
+      trigger_impedance:
+        initial_value: 'G10K'
+      #Output Channel Parameters
+      RFOUT.output:
+        initial_value: 'OFF'
+      RFOUT.frequency:
+        initial_value: 1.0e9
+      RFOUT.phase:
+        initial_value: 0.0
+      RFOUT.power:
+        initial_value: -60
+      RFOUT.pulsemod_state:
+        initial_value: 'ON'
+      RFOUT.pulsemod_source:
+        initial_value: 'EXT'
+
+
+
+  awg5014C:
+      driver: sqdtoolz.Drivers.AWG5014C
+      type: AWG5014C
+      address: 'TCPIP::192.168.1.100::INSTR'
+      enable_forced_reconnect: true
+      parameters:
+        run_mode:
+          initial_value: 'TRIG' #Can be TRIG for triggered mode
+        clock_source:
+          initial_value: 'INT'  #Can be EXT clock
+        ref_clock_source:
+          initial_value: 'EXT'  #Can be INT for internally referenced
+        #Channel 1 Parameters
+        CH1.output:
+          initial_value: 'OFF'
+        CH1.amplitude: 
+          initial_value: 1.0
+        CH1.offset: 
+          initial_value: 0.0
+        CH1.marker1_low:
+          initial_value: 0.0
+        CH1.marker1_high:
+          initial_value: 2.0 # trigger level for fpga
+        CH1.marker2_low:
+          initial_value: 0.0
+        CH1.marker2_high:
+          initial_value: 1.2 # trigger level for cavity source
+        #Channel 2 Parameters
+        CH2.output:
+          initial_value: 'OFF'
+        CH2.amplitude: 
+          initial_value: 1.0
+        CH2.offset: 
+          initial_value: 0.0
+        CH2.marker1_low:
+          initial_value: 0.0
+        CH2.marker1_high:
+          initial_value: 2.0
+        CH2.marker2_low:
+          initial_value: 0.0
+        CH2.marker2_high:
+          initial_value: 2.0
+        #Channel 3 Parameters
+        CH3.output:
+          initial_value: 'OFF'
+        CH3.amplitude: 
+          initial_value: 1.0
+        CH3.offset: 
+          initial_value: 0.0
+        CH3.marker1_low:
+          initial_value: 0.0
+        CH3.marker1_high:
+          initial_value: 2.0
+        CH3.marker2_low:
+          initial_value: 0.0
+        CH3.marker2_high:
+          initial_value: 2.0
+        #Channel 4 Parameters
+        CH4.output:
+          initial_value: 'OFF'
+        CH4.amplitude: 
+          initial_value: 1.0
+        CH4.offset: 
+          initial_value: 0.0
+        CH4.marker1_low:
+          initial_value: 0.0
+        CH4.marker1_high:
+          initial_value: 2.0
+        CH4.marker2_low:
+          initial_value: 0.0
+        CH4.marker2_high:
+          initial_value: 2.0
+    

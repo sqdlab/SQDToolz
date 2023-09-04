@@ -274,7 +274,7 @@ class AWG5014C(VisaInstrument):
     def _send_wfm_to_memory(self, wfm_name, wfm_data_normalised, mkr_data):
         #Delete the waveform (by name) if it already exists...
         # if self.ask(f'WLIST:WAVEFORM:PREDEFINED? \"{wfm_name}\"') == 0:
-        self.write(f'WLISt:WAVeform:DELete {wfm_name}')
+        self.write(f'WLISt:WAVeform:DELete \"{wfm_name}\"')
         #Allocate memory for the waveform
         #TODO: Could optimise this by checking waveform size and then not allocating... 
         self.write(f'WLIST:WAVEFORM:NEW \"{wfm_name}\", {wfm_data_normalised.size}, INTEGER')

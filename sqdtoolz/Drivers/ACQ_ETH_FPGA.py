@@ -282,6 +282,8 @@ class ETHFPGA(Instrument):
 
         total_frames = self._cur_reps*self.NumSegments
         self._set('tv_segments', total_frames)
+        self._call('stop')
+        self._call('mem_clear')
 
     def _acquire(self):
         #channels, segments, samples

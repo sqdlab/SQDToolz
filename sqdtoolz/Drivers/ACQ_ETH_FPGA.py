@@ -2,6 +2,13 @@ import numpy as np
 from qcodes import Instrument, InstrumentChannel, VisaInstrument
 import qcodes.utils.validators as valids
 
+from sqdtoolz.HAL.Processors.ProcessorFPGA import ProcessorFPGA
+from sqdtoolz.HAL.Processors.FPGA.FPGA_DDC import FPGA_DDC
+from sqdtoolz.HAL.Processors.FPGA.FPGA_FIR import FPGA_FIR
+from sqdtoolz.HAL.Processors.FPGA.FPGA_Decimation import FPGA_Decimation
+from sqdtoolz.HAL.Processors.FPGA.FPGA_Mean import FPGA_Mean
+from sqdtoolz.HAL.Processors.FPGA.FPGA_Integrate import FPGA_Integrate
+
 import time
 
 import Pyro4
@@ -110,6 +117,16 @@ class ETHFPGA(Instrument):
                            get_cmd=lambda : self._get('tv_two_channel_mode'), vals=valids.Bool(),
                            set_cmd=lambda x : self._set('tv_two_channel_mode', x), initial_value=False)
 
+        self._set_default(app_name)
+
+        self._ch_states = (True, False)
+        self._num_segs = 1
+        self._num_reps = 1
+        self._trigger_edge = 1
+        self._num_samples = 1
+        self._last_dsp_state = None
+
+    def _set_default(self,  app_name = 'TVMODEV02'):
         self._set_app(app_name)
 
         ''' program a chebychev low-pass filter with a given bandwidth and gain '''
@@ -124,11 +141,6 @@ class ETHFPGA(Instrument):
         self._set('fir_filter', 'lp fs={0:g} 40tap cheb(g=2.5)'.format(bandwidth))
         self._set('fir_gain1', gain)
         self._set('fir_gain2', gain)
-
-        self._ch_states = (True, False)
-        self._num_segs = 1
-        self._num_reps = 1
-        self._trigger_edge = 1
 
     def _set_fir(self, gain=1.0, bandwidth=0.1):
         ''' program a chebychev low-pass filter with a given bandwidth and gain '''
@@ -218,17 +230,17 @@ class ETHFPGA(Instrument):
 
     @property
     def SampleRate(self):
-        return self._call('get_sample_rate') / self.tv_decimation() #Decimation can't be zero :P
+        return 100e6
     @SampleRate.setter
     def SampleRate(self, frequency_hertz):
-        return  #Does nothing...
+        assert frequency_hertz == 100e6, "ETH FPGA Card only supports 100MSPS sample rate."
 
     @property
     def NumSamples(self):
-        return self._get('tv_samples')
+        return self._num_samples
     @NumSamples.setter
     def NumSamples(self, num_samples):
-        self._set('tv_samples', num_samples)
+        self._num_samples = num_samples
 
     @property
     def NumSegments(self):
@@ -291,26 +303,29 @@ class ETHFPGA(Instrument):
 
     def _stop(self, final_data, **kwargs):
         cur_processor = kwargs.get('data_processor', None)
+        cap_samples = kwargs.get('cap_samples')
         channels, segments, samples = final_data.shape
         
+        leSampleRate = self._call('get_sample_rate') / self.tv_decimation()
+
         if channels == 1:
-            ch1_data = final_data[0].reshape(self._cur_reps, self.NumSegments, self.NumSamples)
+            ch1_data = final_data[0].reshape(self._cur_reps, self.NumSegments, cap_samples)
             data_pkt = {
                 'parameters' : ['repetition', 'segment', 'sample'],
                 'data' : { 'ch1_I' : np.real(ch1_data), 'ch1_Q' : np.imag(ch1_data) },
-                'misc' : {'SampleRates' : [self.SampleRate]*2}
+                'misc' : {'SampleRates' : [leSampleRate]*2}
             }
         else:
-            ch1_data = final_data[0].reshape(self._cur_reps, self.NumSegments, self.NumSamples)
-            ch2_data = final_data[1].reshape(self._cur_reps, self.NumSegments, self.NumSamples)
+            ch1_data = final_data[0].reshape(self._cur_reps, self.NumSegments, cap_samples)
+            ch2_data = final_data[1].reshape(self._cur_reps, self.NumSegments, cap_samples)
             data_pkt = {
                 'parameters' : ['repetition', 'segment', 'sample'],
                 'data' : { 'ch1_I' : np.real(ch1_data), 'ch1_Q' : np.imag(ch1_data),
                            'ch2_I' : np.real(ch2_data), 'ch2_Q' : np.imag(ch2_data) },
-                'misc' : {'SampleRates' : [self.SampleRate]*4}
+                'misc' : {'SampleRates' : [leSampleRate]*4}
             }
         
-        if cur_processor is None:
+        if cur_processor is None or isinstance(cur_processor, ProcessorFPGA):
             return data_pkt
         else:
             cur_processor.push_data(data_pkt)
@@ -320,15 +335,117 @@ class ETHFPGA(Instrument):
         max_memory = 2**19
 
         cur_processor = kwargs.get('data_processor', None)
-        total_samples = self.NumSamples * self.NumSegments * self.NumRepetitions
-        if total_samples > max_memory:
-            max_rep = int(max_memory / (self.NumSamples * self.NumSegments))
+
+        hw_avg = False
+        hw_int = False
+        if isinstance(cur_processor, ProcessorFPGA) and not cur_processor.compare_pipeline_state(self._last_dsp_state):
+            ddc_done = False
+            fir_done = False
+            deci_done = False
+            avg_done = False
+            int_done = False
+            for m, cur_node in enumerate(cur_processor.pipeline):
+                if isinstance(cur_node, FPGA_DDC):
+                    assert not ddc_done, "Cannot run multiple DDC stages on the ETH FPGA card."
+                    assert not fir_done, "Cannot run DDC after FIR stage on the ETH FPGA card."
+                    assert not deci_done, "Cannot run DDC after Decimation stage on the ETH FPGA card."
+                    assert not avg_done, "Cannot run DDC after Averaging stage on the ETH FPGA card."
+                    assert not int_done, "Cannot run DDC after Integration stage on the ETH FPGA card."
+                    ddc_specs = cur_node.get_params(sample_rate = [100e6]*2, only_params=True)
+                    assert len(ddc_specs) > 0, "Cannot run DDC without any frequencies"
+                    assert len(ddc_specs[0]) <= 1, "ETH FPGA can only demodulate one tone per channel."
+                    if len(ddc_specs[0]) == 1:
+                        assert ddc_specs[0][0] == 25e6 or ddc_specs[0][0] == 10e6, "ETH FPGA can only demodulate 10MHz or 25MHz tones."
+                        #Program 1st channel DDC
+                        self._set('ddc_adc1', 'ADC1')
+                        self._set('ddc_if1', f'{int(ddc_specs[0][0]/1e6)}MHz')
+                    if len(ddc_specs) == 2:
+                        assert len(ddc_specs[1]) == 1, "ETH FPGA can only demodulate one tone per channel."
+                        assert ddc_specs[1][0] == 25e6 or ddc_specs[1][0] == 10e6, "ETH FPGA can only demodulate 10MHz or 25MHz tones."
+                        self._set('ddc_adc2', 'ADC2')
+                        self._set('ddc_if2', f'{int(ddc_specs[1][0]/1e6)}MHz')
+                    ddc_done = True
+                elif isinstance(cur_node, FPGA_FIR):
+                    assert not fir_done, "Cannot run multiple FIR stages on the ETH FPGA card."
+                    assert not deci_done, "Cannot run FIR after Decimation stage on the ETH FPGA card."
+                    assert not avg_done, "Cannot run FIR after Averaging stage on the ETH FPGA card."
+                    assert not int_done, "Cannot run FIR after Integration stage on the ETH FPGA card."
+                    fir_specs = cur_node.get_params(sample_rate = [100e6]*2)
+                    assert len(fir_specs) > 0, "FIR list invalid"
+                    assert len(fir_specs[0]) <= 1, "ETH FPGA can only filter one tone per channel."
+                    if len(fir_specs[0]) == 1:
+                        num_taps = fir_specs[0][0].size
+                        assert num_taps == 7 or num_taps == 29 or num_taps == 40, "FIR filter taps must be either 7, 29 or 4"
+                        self._call('set_fir_coeffs', fir_specs[0][0].tolist())
+                    if len(fir_specs) == 2:
+                        assert len(fir_specs[1]) == 1, "ETH FPGA can only filter one tone per channel."
+                        num_taps2 = fir_specs[0][1].size
+                        assert num_taps2 == 7 or num_taps2 == 29 or num_taps2 == 40, "FIR filter taps must be either 7, 29 or 4"
+                        if len(fir_specs[0]) == 1:
+                            assert num_taps == num_taps2, "The ETH FPGA must use the same FIR filter on both channels."
+                            assert np.sum(np.abs(fir_specs[0][0] - fir_specs[0][1])) < 1e-9, "The ETH FPGA must use the same FIR filter coefficients on both channels."
+                        else:
+                            self._call('set_fir_coeffs', fir_specs[0][1].tolist())
+                    fir_done = True
+                elif isinstance(cur_node, FPGA_Decimation):
+                    assert not deci_done, "Cannot run Decimation FIR stages on the ETH FPGA card."
+                    assert not avg_done, "Cannot run Decimation after Averaging stage on the ETH FPGA card."
+                    assert not int_done, "Cannot run Decimation after Integration stage on the ETH FPGA card."
+                    param, fac = cur_node.get_params()
+                    assert param == 'sample', "The ETH FPGA only supports decimation samples."
+                    assert fac <= 128 and fac >= 1, "The ETH FPGA only supports decimation of up to 128 points."
+                    self._set('tv_decimation', fac)
+                    deci_done = True
+                elif isinstance(cur_node, FPGA_Mean):
+                    assert not avg_done, "Cannot run multiple averaging stages on the ETH FPGA card."
+                    param = cur_node.get_params()
+                    assert param == 'repetition', "Currently the ETH FPGA card only supports averaging across repetitions."
+                    self._set('tv_averages', self.NumRepetitions)
+                    hw_avg = True
+                    avg_done = True
+                elif isinstance(cur_node, FPGA_Integrate):
+                    assert not int_done, "Cannot run multiple integration stages on the ETH FPGA card."
+                    param = cur_node.get_params()
+                    assert param == 'sample', "Currently the ETH FPGA card only supports integration across samples."
+                    hw_int = True
+                    int_done = True
+
+            if not ddc_done:
+                self._set('ddc_adc1', 'ADC1')
+                self._set('ddc_if1', 'DC')
+                self._set('ddc_adc2', 'ADC2')
+                self._set('ddc_if2', 'DC')
+            if not fir_specs:
+                self._call('set_fir_coeffs', [])
+            if not deci_done:
+                self._set('tv_decimation', 1)
+            if not avg_done:
+                self._set('tv_averages',1)
+            self._last_dsp_state = cur_processor.get_pipeline_state()
+            time.sleep(1)
+
+        #The ETH FPGA Card expects the tv_samples to be the number AFTER decimation.
+        actual_samples = self.NumSamples
+        deci_fac = self._get('tv_decimation')
+        cap_samples = int(self.NumSamples / deci_fac)
+        self._set('tv_samples', cap_samples)
+        kwargs['cap_samples'] = cap_samples
+        #
+        if hw_avg:
+            actual_reps = 1
+        else:
+            actual_reps = self.NumRepetitions
+
+        total_samples_captured = cap_samples * self.NumSegments * actual_reps
+        if total_samples_captured > max_memory:
+            assert isinstance(cur_processor, ProcessorFPGA), "Exceeded ETH FPGA memory - check the FPGA processing and ACQ capture parameters."
+            max_rep = int(max_memory / (cap_samples * self.NumSegments))
             assert max_rep > 0, "Too many samples to capture in a single shot."
             
             cur_reps = 0
             # data_pkts = []
-            while cur_reps < self.NumRepetitions:
-                self._cur_reps = min(max_rep, self.NumRepetitions - cur_reps)
+            while cur_reps < actual_reps:
+                self._cur_reps = min(max_rep, actual_reps - cur_reps)
                 cur_reps += self._cur_reps
                 
                 self._start(**kwargs)
@@ -341,12 +458,22 @@ class ETHFPGA(Instrument):
             else:
                 return cur_processor.get_all_data()
         else:
-            self._cur_reps = self.NumRepetitions
+            self._cur_reps = actual_reps
             self._start(**kwargs)
             #channels, segments, samples
             final_data = self._acquire()
             data_pkt = self._stop(final_data, **kwargs)
-            if cur_processor is None:
+            if cur_processor is None or isinstance(cur_processor, ProcessorFPGA):
+                #Contract out the repetition index if hardware averaging...
+                if hw_avg:
+                    data_pkt['parameters'].pop(0)
+                    for cur_ch in data_pkt['data']:
+                        data_pkt['data'][cur_ch] = data_pkt['data'][cur_ch][0]
+                #TODO: SUPPORT HARDWARE INTEGRATION. Apparently it is present. c.f. mod_fir in the QT Lab stuff.
+                if hw_int:
+                    data_pkt['parameters'].pop(-1)
+                    for cur_ch in data_pkt['data']:
+                        data_pkt['data'][cur_ch] = np.sum(data_pkt['data'][cur_ch], axis=-1)
                 return data_pkt
             else:
                 return cur_processor.get_all_data()

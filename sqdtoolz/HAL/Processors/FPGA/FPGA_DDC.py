@@ -24,6 +24,10 @@ class FPGA_DDC(ProcNodeFPGA):
     def get_params(self, **kwargs):
         assert 'sample_rate' in kwargs, "FPGA_DDC requires a \'sample_rate\' parameter."
         sample_rates = kwargs['sample_rate']
+        
+        if kwargs.get('only_params', False):
+            return self._ddc_specs
+
         assert 'num_samples' in kwargs, "FPGA_DDC requires a \'num_samples\' parameter."
         num_samples = kwargs['num_samples']
         

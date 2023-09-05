@@ -13,7 +13,9 @@ class ProcNodeFPGA:
 
 from sqdtoolz.HAL.Processors.FPGA.FPGA_DDC import*
 from sqdtoolz.HAL.Processors.FPGA.FPGA_DDCFIR import*
+from sqdtoolz.HAL.Processors.FPGA.FPGA_FIR import*
 from sqdtoolz.HAL.Processors.FPGA.FPGA_Integrate import*
+from sqdtoolz.HAL.Processors.FPGA.FPGA_Mean import*
 from sqdtoolz.HAL.Processors.FPGA.FPGA_Decimation import*
 from sqdtoolz.HAL.Processors.FPGA.FPGA_FFT import*
 

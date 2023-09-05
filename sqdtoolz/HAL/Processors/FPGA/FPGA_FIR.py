@@ -2,13 +2,13 @@ from sqdtoolz.HAL.Processors.ProcessorFPGA import*
 import numpy as np
 import scipy.signal
 
-class FPGA_DDCFIR(ProcNodeFPGA):
-    def __init__(self, fir_specs = [[{'fLO' : 25e6, 'fc' : 10e6, 'Taps' : 40, 'Win' : 'hamming'}]]):
+class FPGA_FIR(ProcNodeFPGA):
+    def __init__(self, fir_specs = [[{'Type' : 'low', 'fc' : 10e6, 'Taps' : 40, 'Win' : 'hamming'}]]):
         '''
         A general FIR filter applied across different channels in the input dataset.
 
         The input fir_specs is a per-channel list of lists specifying the parameters in a DICTIONARY with the keys:
-            - fLO  - The demodulation/downconversion frequency
+            - Type - Specifying whether it is a low or high pass filter via the strings: 'low' or 'high'
             - fc   - Cutoff frequency of the filter
             - Taps - Number of taps to use in the FIR filter
             - Win  - (defaults to 'hamming') filter window (e.g. 'hamming') as fed into the function scipy.signal.firwin
@@ -30,10 +30,8 @@ class FPGA_DDCFIR(ProcNodeFPGA):
         return cls(config_dict['FIRspecs'])
 
     def get_params(self, **kwargs):
-        assert 'sample_rate' in kwargs, "FPGA_DDCFIR requires a \'sample_rate\' parameter."
+        assert 'sample_rate' in kwargs, "FPGA_FIR requires a \'sample_rate\' parameter."
         sample_rates = kwargs['sample_rate']
-        assert 'num_samples' in kwargs, "FPGA_DDCFIR requires a \'num_samples\' parameter."
-        num_samples = kwargs['num_samples']
         
         #Given as a list of (kI,kQ) pairs
         ret_channels = []
@@ -43,15 +41,12 @@ class FPGA_DDCFIR(ProcNodeFPGA):
                 nyq_rate = sample_rates[c]*0.5
                 freq_cutoff_norm = cur_spec['fc']/nyq_rate
                 cur_filts = scipy.signal.firwin(cur_spec['Taps'], freq_cutoff_norm, window=cur_spec['Win'])
-                fLOonFs = cur_spec['fLO']/sample_rates[c]
-                ret_kernels += [(
-                    np.array([np.cos(2*np.pi*fLOonFs*n) * np.sum(cur_filts[:num_samples-n]) for n in range(num_samples)]),
-                    np.array([-np.sin(2*np.pi*fLOonFs*n) * np.sum(cur_filts[:num_samples-n]) for n in range(num_samples)])
-                )]
+                if cur_spec['Type'] == 'high':
+                    cur_filts = 1.0 - cur_filts
+                ret_kernels += [cur_filts]
             ret_channels += [ret_kernels]
 
-        post_fac = 2
-        return ret_channels, post_fac
+        return ret_channels
 
     def _get_current_config(self):
         return {

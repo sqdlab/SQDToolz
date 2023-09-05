@@ -4,6 +4,14 @@ from sqdtoolz.HAL.ACQ import*
 from sqdtoolz.ExperimentConfiguration import*
 from sqdtoolz.HAL.WaveformSegments import*
 from sqdtoolz.HAL.WaveformTransformations import*
+
+from sqdtoolz.HAL.Processors.ProcessorFPGA import*
+from sqdtoolz.HAL.Processors.FPGA.FPGA_DDC import FPGA_DDC
+from sqdtoolz.HAL.Processors.FPGA.FPGA_FIR import FPGA_FIR
+from sqdtoolz.HAL.Processors.FPGA.FPGA_Decimation import FPGA_Decimation
+from sqdtoolz.HAL.Processors.FPGA.FPGA_Mean import FPGA_Mean
+from sqdtoolz.HAL.Processors.FPGA.FPGA_Integrate import FPGA_Integrate
+
 import numpy as np
 import scipy.signal
 from sqdtoolz.Variable import*
@@ -55,26 +63,22 @@ lab.HAL("WfmConRes").get_output_channel(1).Output = True
 
 time.sleep(3)
 
-# lab.HAL("ETHFPGA").set_data_processor(myProc)
 
 lab.HAL("DDG").RepetitionTime = 500e-6#1.1e-3 1e-6
 
-lab.HAL("ETHFPGA").set_acq_params(reps=5, segs=1, samples=1024)
+lab.HAL("ETHFPGA").set_acq_params(reps=6, segs=1, samples=4096)
 lab.HAL("ETHFPGA").ChannelStates = (True, False)
 
-lab.HAL("ETHFPGA")._instr_acq._set('ddc_adc1', 'ADC1')
-lab.HAL("ETHFPGA")._instr_acq._set('ddc_if1', '25MHz')
-lab.HAL("ETHFPGA")._instr_acq._set('tv_decimation', 4)
+ProcessorFPGA('fpga_dsp', lab)
+lab.PROC('fpga_dsp').reset_pipeline()
+lab.PROC('fpga_dsp').add_stage(FPGA_DDC([[25e6]]))
+lab.PROC('fpga_dsp').add_stage(FPGA_FIR([[{'Type' : 'low', 'fc' : 10e6, 'Taps' : 40, 'Win' : 'hamming'}]]))
+lab.PROC('fpga_dsp').add_stage(FPGA_Decimation('sample', 4))
 
-nyq_rate = 100e6*0.5
-freq_cutoff_norm = 1e6/nyq_rate
-cur_filts = scipy.signal.firwin(40, freq_cutoff_norm, window='hamming')*2
-lab.HAL("ETHFPGA")._instr_acq._call('set_fir_coeffs', cur_filts.tolist())
-# lab.HAL("ETHFPGA")._instr_acq._call('set_fir_coeffs', [])
+lab.HAL("ETHFPGA").set_data_processor(lab.PROC('fpga_dsp'))
 
-
-lab.HAL("ETHFPGA")._instr_acq._set('tv_averages', 1)
 leData = lab.HAL("ETHFPGA").get_data()
+
 
 fig, ax = plt.subplots(nrows=2)
 for r in range(lab.HAL("ETHFPGA").NumRepetitions) :
@@ -82,14 +86,25 @@ for r in range(lab.HAL("ETHFPGA").NumRepetitions) :
         ax[0].plot(leData['data']['ch1_I'][r][s])
         ax[1].plot(leData['data']['ch1_Q'][r][s])
 
-lab.HAL("ETHFPGA")._instr_acq._set('tv_averages', 4)
+#TEST AVERAGING ACROSS REPETITIONS
+
+ProcessorFPGA('fpga_dsp', lab)
+lab.PROC('fpga_dsp').reset_pipeline()
+lab.PROC('fpga_dsp').add_stage(FPGA_DDC([[25e6]]))
+lab.PROC('fpga_dsp').add_stage(FPGA_FIR([[{'Type' : 'low', 'fc' : 10e6, 'Taps' : 40, 'Win' : 'hamming'}]]))
+lab.PROC('fpga_dsp').add_stage(FPGA_Decimation('sample', 4))
+lab.PROC('fpga_dsp').add_stage(FPGA_Mean('repetition'))
+
+lab.HAL("ETHFPGA").set_data_processor(lab.PROC('fpga_dsp'))
+
 leData = lab.HAL("ETHFPGA").get_data()
 fig, ax = plt.subplots(nrows=2)
-for r in range(lab.HAL("ETHFPGA").NumRepetitions) :
-    for s in range(lab.HAL("ETHFPGA").NumSegments) :
-        ax[0].plot(leData['data']['ch1_I'][r][s])
-        ax[1].plot(leData['data']['ch1_Q'][r][s])
+for s in range(lab.HAL("ETHFPGA").NumSegments) :
+    ax[0].plot(leData['data']['ch1_I'][s])
+    ax[1].plot(leData['data']['ch1_Q'][s])
 
+
+#Try constellations
 
 WFMT_ModulationIQ("OscMod", lab, 25e6)
 lab.WFMT("OscMod").IQUpperSideband = False
@@ -122,7 +137,14 @@ lab.HAL("ETHFPGA").set_acq_params(reps=int(num_corners*5), segs=1, samples=512)
 #
 time.sleep(3)
 #
-lab.HAL("ETHFPGA")._instr_acq._set('tv_averages', 1)
+ProcessorFPGA('fpga_dsp', lab)
+lab.PROC('fpga_dsp').reset_pipeline()
+lab.PROC('fpga_dsp').add_stage(FPGA_DDC([[25e6]]))
+lab.PROC('fpga_dsp').add_stage(FPGA_FIR([[{'Type' : 'low', 'fc' : 10e6, 'Taps' : 40, 'Win' : 'hamming'}]]))
+lab.PROC('fpga_dsp').add_stage(FPGA_Decimation('sample', 4))
+lab.PROC('fpga_dsp').add_stage(FPGA_Integrate('sample'))
+lab.HAL("ETHFPGA").set_data_processor(lab.PROC('fpga_dsp'))
+#
 leData = lab.HAL("ETHFPGA").get_data()
 fig, ax = plt.subplots(1)
 # for r in range(lab.HAL("ETHFPGA").NumRepetitions) :
@@ -130,13 +152,21 @@ fig, ax = plt.subplots(1)
 #         ax.plot([np.sum(leData['data']['ch1_I'][r][s], axis=-1)], [np.sum(leData['data']['ch1_Q'][r][s], axis=-1)], '*')
 for r in range(num_corners):
     for s in range(lab.HAL("ETHFPGA").NumSegments):
-        ax.plot(np.sum(leData['data']['ch1_I'][r::num_corners,s,:], axis=-1), np.sum(leData['data']['ch1_Q'][r::num_corners,s,:], axis=-1), '*')
+        ax.plot(leData['data']['ch1_I'][r::num_corners,s], leData['data']['ch1_Q'][r::num_corners,s], '*')
 
-lab.HAL("ETHFPGA").NumRepetitions=1
-lab.HAL("ETHFPGA")._instr_acq._set('tv_averages', num_corners)
+lab.HAL("ETHFPGA").NumRepetitions = num_corners
+#
+ProcessorFPGA('fpga_dsp', lab)
+lab.PROC('fpga_dsp').reset_pipeline()
+lab.PROC('fpga_dsp').add_stage(FPGA_DDC([[25e6]]))
+lab.PROC('fpga_dsp').add_stage(FPGA_FIR([[{'Type' : 'low', 'fc' : 10e6, 'Taps' : 40, 'Win' : 'hamming'}]]))
+lab.PROC('fpga_dsp').add_stage(FPGA_Decimation('sample', 4))
+lab.PROC('fpga_dsp').add_stage(FPGA_Mean('repetition'))
+lab.HAL("ETHFPGA").set_data_processor(lab.PROC('fpga_dsp'))
+#
 leData = lab.HAL("ETHFPGA").get_data()
 for s in range(lab.HAL("ETHFPGA").NumSegments):
-    ax.plot(np.sum(leData['data']['ch1_I'][:,s,:], axis=-1), np.sum(leData['data']['ch1_Q'][:,s,:], axis=-1), 'k*')
+    ax.plot(np.sum(leData['data']['ch1_I'][s], axis=-1), np.sum(leData['data']['ch1_Q'][s], axis=-1), 'k*')
 
 # lab.HAL("ETHFPGA")._instr_acq._set('fir_integration')
 

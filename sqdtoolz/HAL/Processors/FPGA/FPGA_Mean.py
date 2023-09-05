@@ -2,10 +2,10 @@ from sqdtoolz.HAL.Processors.ProcessorFPGA import*
 import numpy as np
 import scipy.signal
 
-class FPGA_Integrate(ProcNodeFPGA):
+class FPGA_Mean(ProcNodeFPGA):
     def __init__(self, index_parameter_name):
         '''
-        General function that integrates each channel across some parameter - e.g. over repetition or over all the samples. 
+        General function that averages each channel across some parameter - e.g. over repetition or over all the samples. 
 
         Inputs:
             - index_parameter_name - Name of the parameter in which to average across.

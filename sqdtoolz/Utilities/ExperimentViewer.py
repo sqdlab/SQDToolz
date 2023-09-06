@@ -354,6 +354,12 @@ class ExperimentViewer:
         self.dash_MWs = ExperimentViewer.DashboardGroup(frame_grp0, "Microwave Sources")
         self.dash_MWs.frame.pack(side=LEFT, fill=Y)
 
+        frame_grp0a = Frame(master=frame_dash_right)
+        self.dash_ACQs = ExperimentViewer.DashboardGroup(frame_grp0a, "Acquisition")
+        self.dash_ACQs.frame.pack(side=LEFT, fill=Y)
+        self.dash_PROCs = ExperimentViewer.DashboardGroup(frame_grp0a, "Processors")
+        self.dash_PROCs.frame.pack(side=LEFT, fill=Y)
+        
         frame_grp1 = LabelFrame(master=frame_dash_right, text="Waveforms")
         self.dash_WFMs = ExperimentViewer.DashboardGroup(frame_grp1, "", True)
         self.dash_WFMs.frame.pack(expand = 1, fill =X)
@@ -373,6 +379,7 @@ class ExperimentViewer:
         self.dash_WFMTs.frame.pack(side=LEFT)
         
         frame_grp0.pack(side=TOP, fill=X)
+        frame_grp0a.pack(side=TOP, fill=X)
         frame_grp1.pack(side=TOP, fill=X)
         frame_grp2.pack(side=TOP, fill=X)
         frame_grp3.pack(side=TOP, fill=X)
@@ -482,6 +489,13 @@ class ExperimentViewer:
         self.parent_expt_comp.columnconfigure(0, weight=0)
         self.parent_expt_comp.columnconfigure(1, weight=1)
             
+    def _whittle_dict(self, leDict):
+        if isinstance(leDict, dict):
+            return ','.join([self._whittle_dict(leDict[x]) for x in leDict]).replace('\'','')
+        elif isinstance(leDict, list):
+            return ','.join([self._whittle_dict(x) for x in leDict]).replace('\'','')
+        else:
+            return str(self._get_units(leDict))
 
     def main_loop(self):
         self.pw_main_LR_UI.update()
@@ -519,6 +533,7 @@ class ExperimentViewer:
 
             #Process the HALs...
             cur_ddgs = []
+            cur_acqs = []
             cur_mws = []
             cur_sws = []
             cur_volts = []
@@ -579,6 +594,8 @@ class ExperimentViewer:
 
                 if cur_hal['Type'] == 'DDG':
                     cur_ddgs += [(cur_str[:-1], col, cur_list)]    #:-1 is to remove the last \n
+                if cur_hal['Type'] == 'ACQ':
+                    cur_acqs += [(cur_str[:-1], col, cur_list)]    #:-1 is to remove the last \n
                 if cur_hal['Type'] == 'GENmwSource':
                     cur_mws += [(cur_str[:-1], col)]    #:-1 is to remove the last \n
                 if cur_hal['Type'] == 'GENswitch':
@@ -590,12 +607,27 @@ class ExperimentViewer:
                 if cur_hal['Type'] == 'WaveformAWG':
                     cur_wfms += [(cur_str[:-1], col, cur_list)]    #:-1 is to remove the last \n
 
+            cur_procs = []
+            for cur_proc in data['PROCs']:
+                cur_str = ""
+                cur_list = []
+                for cur_key in cur_proc:
+                    if isinstance(cur_proc[cur_key], str):
+                        cur_str += f"{cur_key}: {self._get_units(cur_proc[cur_key])}\n"
+                    elif isinstance(cur_proc[cur_key], list):
+                        cur_list.append((cur_key + ":", 'white'))
+                        for cur_pipe in cur_proc[cur_key]:
+                            #Basically it'll show the type and the parameter values... Taking name out first as the module could randomly place Type somewhere else...
+                            leName = cur_pipe.pop('Type')
+                            cur_list.append(("   " + leName + ", " + self._whittle_dict(cur_pipe), 'white'))
+                cur_procs += [(cur_str[:-1], 'white', cur_list)]
+
             cur_wfmts = []
             for cur_wfmt in data['WFMTs']:
                 cur_str = ""
                 for cur_key in cur_wfmt:
                     if isinstance(cur_wfmt[cur_key], str) or isinstance(cur_wfmt[cur_key], float) or isinstance(cur_wfmt[cur_key], int) or isinstance(cur_wfmt[cur_key], bool):
-                        cur_str += f"{cur_key}: {cur_wfmt[cur_key]}\n"
+                        cur_str += f"{cur_key}: {self._get_units(cur_wfmt[cur_key])}\n"
                 col = 'white'
                 cur_wfmts += [(cur_str[:-1], col)]
 
@@ -623,6 +655,8 @@ class ExperimentViewer:
             #Setup the dashboard of labels...
             self.dash_DDGs.set_simple_label_list(cur_ddgs)
             self.dash_MWs.set_simple_labels(cur_mws)
+            self.dash_ACQs.set_simple_labels(cur_acqs)
+            self.dash_PROCs.set_simple_label_list(cur_procs)
             self.dash_VOLTs.set_simple_labels(cur_volts)
             self.dash_SWs.set_simple_labels(cur_sws)
             self.dash_ATTENs.set_simple_labels(cur_attens)
@@ -655,7 +689,7 @@ class ExperimentViewer:
 
 
     def _get_units(self, val):
-        if isinstance(val, float):
+        if isinstance(val, float) or isinstance(val, int):
             if val <= 0.0:
                 return val
 
@@ -763,7 +797,11 @@ class ExperimentViewer:
                     break
             
             #Don't need to pop 'Name' as it won't flag as a comparison anyway...
-            vals = self._compare_dict(cur_dict, right_comp, level + 1)
+            if right_comp == None:
+                list_vals += [level_header+f"Killed {cur_dict['Name']}"]
+                vals = []
+            else:
+                vals = self._compare_dict(cur_dict, right_comp, level + 1)
             if len(vals) > 0:
                 list_vals += [level_header+cur_dict['Name']]
                 list_vals += vals

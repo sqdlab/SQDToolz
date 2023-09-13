@@ -1,5 +1,6 @@
 from qcodes import Instrument, InstrumentChannel, VisaInstrument, validators as vals
 import numpy as np
+import time
 
 class AWG5014Cchannel(InstrumentChannel):
     def __init__(self, parent:Instrument, name:str, channel:int) -> None:
@@ -61,7 +62,7 @@ class AWG5014Cchannel(InstrumentChannel):
         
     @property
     def Output(self):
-        return self.output() == 1
+        return self.output() == 'ON'
     @Output.setter
     def Output(self, boolVal):
         if boolVal:
@@ -193,6 +194,10 @@ class AWG5014C(VisaInstrument):
         for ch_ind, ch_name in enumerate(self._dc_ch_list):
             cur_channel = AWG5014CdcChannel(self, ch_name, ch_ind+1)
             self.add_submodule(ch_name, cur_channel)
+        
+        self._prep_wfms = {}
+        self._banks_programmed = False
+        self._default_mem_names = ['ch1_wfm','ch2_wfm','ch3_wfm','ch4_wfm','ch5_wfm','ch6_wfm','ch7_wfm','ch8_wfm']
 
     @property
     def SampleRate(self):
@@ -231,45 +236,39 @@ class AWG5014C(VisaInstrument):
         self.write('AWGC:STOP:IMM')
 
     def prepare_waveform_memory(self, chan_id, seg_lens, **kwargs):
-        pass
-        #TODO: Actually implement this...
+        self._prep_wfms[chan_id] = kwargs['raw_data']
+        self._banks_programmed = False
 
     def program_channel(self, chan_id, dict_wfm_data):
-        assert chan_id in self._ch_list, chan_id + " is an invalid channel ID for the AWG5014C."
-        chan_ind = self._ch_list.index(chan_id)
-        cur_chnl = self._get_channel_output(chan_id)
-
-        default_mem_names = ['ch1_wfm','ch2_wfm','ch3_wfm','ch4_wfm','ch5_wfm','ch6_wfm','ch7_wfm','ch8_wfm']
-
-        #Stop the AWG if it's running
-        isRunning = self.AWG_run_state()
-        if (isRunning != 0):
+        #Program all channels in one go...
+        if not self._banks_programmed:
             self.stop()
-        
-        #Turn off the channel output if it is on
-        prev_on = cur_chnl.Output
-        if prev_on:
-            cur_chnl.Output = False
+    
+            for chl_id in self._prep_wfms:
+                chan_ind = self._ch_list.index(chl_id)
+                cur_chnl = self._get_channel_output(chl_id)
+                cur_chnl.Output = False
 
-        mkr_data = dict_wfm_data['markers'][0]
-        #TODO: Setup sequence compression etc...
+                cur_dict_wfm_data = self._prep_wfms[chl_id]
 
-        #Condition data
-        cur_data = dict_wfm_data['waveforms'][0]
-        cur_amp = cur_chnl.Amplitude/2
-        cur_off = cur_chnl.Offset
-        cur_data = (cur_data - cur_off)/cur_amp
+                mkr_data = cur_dict_wfm_data['markers'][0]
+                #TODO: Setup sequence compression etc...
 
-        self._send_wfm_to_memory(default_mem_names[chan_ind], cur_data, mkr_data)
-        self.write(f'SOURce{chan_ind+1}:WAVeform \"{default_mem_names[chan_ind]}\"')
+                #Condition data
+                cur_data = cur_dict_wfm_data['waveforms'][0]
+                cur_amp = cur_chnl.Amplitude/2
+                cur_off = cur_chnl.Offset
+                cur_data = (cur_data - cur_off)/cur_amp
 
-        #Turn on the channel output if it was previous on
-        if prev_on:
-            cur_chnl.Output = prev_on
+                self._send_wfm_to_memory(self._default_mem_names[chan_ind], cur_data, mkr_data)
+                self.write(f'SOURce{chan_ind+1}:WAVeform \"{self._default_mem_names[chan_ind]}\"')
 
-        #Run AWG if it was previously running
-        if (isRunning != 0):
+            for chl_id in self._prep_wfms:
+                self._get_channel_output(chl_id).Output = True
+            self._prep_wfms = {}
             self.run()
+            time.sleep(1)
+        self._banks_programmed = True
     
     def _send_wfm_to_memory(self, wfm_name, wfm_data_normalised, mkr_data):
         #Delete the waveform (by name) if it already exists...

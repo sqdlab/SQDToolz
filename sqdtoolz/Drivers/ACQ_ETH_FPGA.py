@@ -336,14 +336,18 @@ class ETHFPGA(Instrument):
 
         cur_processor = kwargs.get('data_processor', None)
 
-        hw_avg = False
-        hw_int = False
+        if not isinstance(cur_processor, ProcessorFPGA) or not cur_processor.compare_pipeline_state(self._last_dsp_state):
+            self._hw_avg = False
+            self._hw_int = False
+            self._hw_intSg = False
+            self._last_dsp_state = {}
         if isinstance(cur_processor, ProcessorFPGA) and not cur_processor.compare_pipeline_state(self._last_dsp_state):
             ddc_done = False
             fir_done = False
             deci_done = False
             avg_done = False
             int_done = False
+            intSg_done = False
             for m, cur_node in enumerate(cur_processor.pipeline):
                 if isinstance(cur_node, FPGA_DDC):
                     assert not ddc_done, "Cannot run multiple DDC stages on the ETH FPGA card."
@@ -351,6 +355,7 @@ class ETHFPGA(Instrument):
                     assert not deci_done, "Cannot run DDC after Decimation stage on the ETH FPGA card."
                     assert not avg_done, "Cannot run DDC after Averaging stage on the ETH FPGA card."
                     assert not int_done, "Cannot run DDC after Integration stage on the ETH FPGA card."
+                    assert not intSg_done, "Cannot run DDC after Integration stage on the ETH FPGA card."
                     ddc_specs = cur_node.get_params(sample_rate = [100e6]*2, only_params=True)
                     assert len(ddc_specs) > 0, "Cannot run DDC without any frequencies"
                     assert len(ddc_specs[0]) <= 1, "ETH FPGA can only demodulate one tone per channel."
@@ -370,6 +375,7 @@ class ETHFPGA(Instrument):
                     assert not deci_done, "Cannot run FIR after Decimation stage on the ETH FPGA card."
                     assert not avg_done, "Cannot run FIR after Averaging stage on the ETH FPGA card."
                     assert not int_done, "Cannot run FIR after Integration stage on the ETH FPGA card."
+                    assert not intSg_done, "Cannot run FIR after Integration stage on the ETH FPGA card."
                     fir_specs = cur_node.get_params(sample_rate = [100e6]*2)
                     assert len(fir_specs) > 0, "FIR list invalid"
                     assert len(fir_specs[0]) <= 1, "ETH FPGA can only filter one tone per channel."
@@ -391,6 +397,7 @@ class ETHFPGA(Instrument):
                     assert not deci_done, "Cannot run Decimation FIR stages on the ETH FPGA card."
                     assert not avg_done, "Cannot run Decimation after Averaging stage on the ETH FPGA card."
                     assert not int_done, "Cannot run Decimation after Integration stage on the ETH FPGA card."
+                    assert not intSg_done, "Cannot run Decimation after Integration stage on the ETH FPGA card."
                     param, fac = cur_node.get_params()
                     assert param == 'sample', "The ETH FPGA only supports decimation samples."
                     assert fac <= 128 and fac >= 1, "The ETH FPGA only supports decimation of up to 128 points."
@@ -401,13 +408,16 @@ class ETHFPGA(Instrument):
                     param = cur_node.get_params()
                     assert param == 'repetition', "Currently the ETH FPGA card only supports averaging across repetitions."
                     self._set('tv_averages', self.NumRepetitions)
-                    hw_avg = True
+                    self._hw_avg = True
                     avg_done = True
                 elif isinstance(cur_node, FPGA_Integrate):
-                    assert not int_done, "Cannot run multiple integration stages on the ETH FPGA card."
+                    assert not int_done or not intSg_done, "Cannot run multiple integration stages on the ETH FPGA card."
                     param = cur_node.get_params()
-                    assert param == 'sample', "Currently the ETH FPGA card only supports integration across samples."
-                    hw_int = True
+                    assert param == 'sample' or param == 'segment', "Currently the ETH FPGA card only supports integration across samples or segments (albeit, not in hardware for segments)."
+                    if param == 'sample':
+                        self._hw_int = True
+                    else:
+                        self._hw_intSg = True
                     int_done = True
 
             if not ddc_done:
@@ -431,7 +441,7 @@ class ETHFPGA(Instrument):
         self._set('tv_samples', cap_samples)
         kwargs['cap_samples'] = cap_samples
         #
-        if hw_avg:
+        if self._hw_avg:
             actual_reps = 1
         else:
             actual_reps = self.NumRepetitions
@@ -465,15 +475,21 @@ class ETHFPGA(Instrument):
             data_pkt = self._stop(final_data, **kwargs)
             if cur_processor is None or isinstance(cur_processor, ProcessorFPGA):
                 #Contract out the repetition index if hardware averaging...
-                if hw_avg:
+                if self._hw_avg:
                     data_pkt['parameters'].pop(0)
                     for cur_ch in data_pkt['data']:
                         data_pkt['data'][cur_ch] = data_pkt['data'][cur_ch][0]
                 #TODO: SUPPORT HARDWARE INTEGRATION. Apparently it is present. c.f. mod_fir in the QT Lab stuff.
-                if hw_int:
-                    data_pkt['parameters'].pop(-1)
+                if self._hw_int:
+                    axs = data_pkt['parameters'].index('sample')
+                    data_pkt['parameters'].pop(axs)
                     for cur_ch in data_pkt['data']:
-                        data_pkt['data'][cur_ch] = np.sum(data_pkt['data'][cur_ch], axis=-1)
+                        data_pkt['data'][cur_ch] = np.sum(data_pkt['data'][cur_ch], axis=axs)
+                if self._hw_intSg:
+                    axs = data_pkt['parameters'].index('segment')
+                    data_pkt['parameters'].pop(axs)
+                    for cur_ch in data_pkt['data']:
+                        data_pkt['data'][cur_ch] = np.sum(data_pkt['data'][cur_ch], axis=axs)
                 return data_pkt
             else:
                 return cur_processor.get_all_data()

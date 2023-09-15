@@ -113,6 +113,8 @@ class ExpRamseyGE(Experiment):
         #     self._SPEC_qubit['EF X-Gate Amplitude'].Value = 0.5/self._param_rabi_frequency
         #     self._SPEC_qubit['EF X-Gate Time'].Value = self.drive_time
 
+        self._SPEC_qubit['GE T2*'].Value = 1.0 / dpkt['decay_rate']
+
         print(dpkt)
         if self.normalise_data:
             fig.show()

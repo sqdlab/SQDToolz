@@ -28,7 +28,7 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
         self.expectedModel = "236"
 
         #Reset
-        self.write('J0')
+        self.write('J0X')
 
         self.add_parameter('status_error', get_cmd='U1')
         self.add_parameter('status_machine', get_cmd='U3')
@@ -275,7 +275,7 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
 
     def get_data(self):
         '''
-        Function to handle measuring resistance only. This currently constitutes of a voltage sweep, measuring current.
+        Function to handle measuring resistance only. This currently constitutes of a voltage/current sweep, measuring current/voltage.
         While this can be done using a standard sweep and the GENsmu HAL, this one is used to speed up a sweep.
         For example the Keithley 236 is best used with a programmed sweep.
         
@@ -287,59 +287,62 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
 
               Set in YAML using sweep_safe_mode parameter...
         '''
+        assert self.SweepStartValue != self.SweepEndValue, "Must supply different values for the starting and ending values for the sweep..."
+        assert self.SweepSamplePoints > 1, "Must have more than 1 sweeping point..."
         safe = self.sweep_safe_mode()
 
         self.write('G1,2,0') # get source bias
         bias = float(self.read())
 
         start_v, stop_v = self.SweepStartValue, self.SweepEndValue
-        step = np.abs(stop_v - start_v) / self.SweepSamplePoints
+        step = np.abs(stop_v - start_v) / (self.SweepSamplePoints-1)
         delay = self._sweep_sample_time_ms
 
         if safe:
             assert bias == 0, 'The bias value is not zero. This is unsafe.'
 
+        self.ask('R0X')
+        self.ask('N0X')
+
         old_mode = self.Mode
         if old_mode == 'SrcV_MeasI':
-            self.ask('F0,1')
+            if safe:
+                self.Voltage = start_v
+            self.ask('F0,1')        #Source Voltage, Measure Current Sweep
         else:
-            self.ask('F1,1')
+            if safe:
+                self.Current = start_v
+            self.ask('F1,1')        #Source Current, Measure Voltage Sweep
 
-        # set the communication to only acquire measured values, in ascii, and get all sweep values at once.
-        # self.ask('G5,2,2')
-        # self.read()
+        #Using Range = 0 for autorange... c.f. page 216 of SMU manual
+        # if safe:
+        #     if start_v != 0:
+        #         self.ask(f'Q1,{0},{start_v},{step},0,{delay}X')
+        #         self.ask(f'Q7,{start_v},{stop_v},{step},0,{delay}X')
+        #     else:
+        #         self.ask(f'Q1,{start_v},{stop_v},{step},0,{delay}X')
+        #     if stop_v != 0:
+        #         self.ask(f'Q7,{stop_v},{0},{step},0,{delay}X')
+        # else:
+        self.ask(f'Q1,{start_v},{stop_v},{step},0,{delay}X')
 
-        if safe:
-            cmd = 'Q1'
-            if start_v != 0:
-                cmd = f'Q1,{0},{start_v},{step},0,{delay}XQ7'
-                # self.write(f'Q1,{0},{start_v},{step},0,{delay}')
-            cmd = f'{cmd},{start_v},{stop_v},{step},0,{delay}'
-                # self.write(f'{cmd},{start_v},{stop_v},{step},0,{delay}')
-            if stop_v != 0:
-                cmd += f'XQ7,{stop_v},{0},{step},0,{delay}'
-            # self.write(f'Q7,{stop_v},{0},{step},0,{delay}')
-        else:
-            cmd = f'Q1,{start_v},{stop_v},{step},0,{delay}'
-            # self.write(f'Q1,{start_v},{stop_v},{step},0,{delay}')
-        # self.write('R1')
-        # self.write('N1')
-        # self.write('H0')
-        # self.read()
+        self.ask('R1XN1XH0X')  #c.f. Page 225 of the SMU manual
 
-        self.write(cmd + 'XR1XN1')
-
-        while self.serial_poll() & 0b00000010 == 0:
-            time.sleep(delay*1e-3)
-        result = self.ask('G5,2,2')
-        while result[-2:] != '\r\n':
-            result += self._recv(1024)
-        currents = np.fromstring(result, sep=',')
+        # time.sleep(5)
+        result = self.ask('G5,2,2X')
+        currents = np.array( [float(x) for x in result.replace('\r','').replace('\n',',').split(',') if len(x) > 0] )
         voltages = currents[::2]
         currents = currents[1::2]
         self.write('N0')
 
         self.Mode = old_mode
+
+        if old_mode == 'SrcV_MeasI':
+            if safe:
+                self.Voltage = 0
+        else:
+            if safe:
+                self.Current = 0
 
         data_pkt = {
                     'parameters' : ['Points'],

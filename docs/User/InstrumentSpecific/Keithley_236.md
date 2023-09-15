@@ -7,8 +7,8 @@ The Keithley 236 SMU Can:
 Currently the driver is written so that it talks via the unit's GPIB port using the Prologix GBIB/Ethernet converter.
 
 The unit can be setup in two modes:
-- Source voltage/current, measure current/voltage in 2-probe mode
-- Source current and measure voltage in 4-probe mode
+- [Source voltage/current, measure current/voltage in 2-probe mode](#2-wire-mode)
+- [Source current and measure voltage in 4-probe mode](#4-wire-mode)
 
 ## 2-wire mode
 

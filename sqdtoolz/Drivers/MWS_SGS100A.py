@@ -1,6 +1,7 @@
 from qcodes import Instrument, InstrumentChannel, VisaInstrument, validators as vals
 
 class MWS_SGS100A_Channel(InstrumentChannel):
+    #TODO: Do an IDN Check to ensure it is the SGS100A instead of the SMB100A - i.e. throw an assertion error...
     def __init__(self, parent:Instrument, name:str) -> None:
         super().__init__(parent, name)
         self._mode = 'Continuous'   #Can be: Continuous, PulseModulated

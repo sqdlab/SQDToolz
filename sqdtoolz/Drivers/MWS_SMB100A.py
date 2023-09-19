@@ -93,11 +93,6 @@ class MWS_SMB100A_Channel(InstrumentChannel):
                             set_cmd=':SOUR:AM:STAT {}',
                             set_parser=int,
                             val_mapping={'ON':  1, 'OFF': 0})
-        self.add_parameter('amplmod_mode',
-                            get_cmd='SOUR:AM:MODE?',
-                            set_cmd='SOUR:AM:MODE {}',
-                            vals=vals.Enum('HDEViation', 'NORMal', 'LNOise'),
-                            initial_value='NORMal')
         self.add_parameter('amplmod_source',
                             get_cmd='SOUR:AM:SOUR?',
                             set_cmd='SOUR:AM:SOUR {}',

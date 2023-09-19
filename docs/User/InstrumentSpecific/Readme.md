@@ -12,7 +12,7 @@ FPGA DSP units:
 
 Microwave sources:
 - [Rohde & Schwarz SGS100A](RohdeAndSchwarz_SGS100A.md)
-- [Rohde & Schwarz SMB100A](RohdeAndSchwarz_SGS100A.md)
+- [Rohde & Schwarz SMB100A](RohdeAndSchwarz_SMB100A.md)
 
 Source-Measure-Units:
 - [Keithley 236](Keithley_236.md)

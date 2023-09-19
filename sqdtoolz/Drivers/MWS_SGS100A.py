@@ -145,6 +145,9 @@ class MWS_SGS100A(VisaInstrument):
     def __init__(self, name, address, **kwargs):
         super().__init__(name, address, **kwargs)
 
+        leIdn = self.ask('*IDN?').split(',')
+        assert len(leIdn) >= 2 and leIdn[1].lower() == 'sgs100a', f"This MW source \'{name}\' on {address} is NOT a SGS100A. Use the appropriate driver!"
+
         self.add_parameter('ref_osc_source',
                            label='Reference oscillator source',
                            get_cmd='SOUR:ROSC:SOUR?',

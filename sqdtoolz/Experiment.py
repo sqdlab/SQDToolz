@@ -113,6 +113,7 @@ class Experiment:
             sweep_vars2 = []
             sweepEx = {}
             for ind_var, cur_var in enumerate(sweep_vars):
+                assert isinstance(cur_var, tuple) or isinstance(cur_var, list), "Sweeping variables must be given as a LIST of TUPLEs: [(VAR1, range1), (VAR2, range2), ...]"
                 if len(cur_var) == 2:
                     assert isinstance(cur_var[1], np.ndarray), "The second argument in each sweeping-variable tuple must be a Numpy Array."
                     assert cur_var[1].size > 0, f"The sweeping array for sweeping-variable {ind_var} is empty. If using arange, check the bounds!"

@@ -240,6 +240,9 @@ class MWS_SMB100A(VisaInstrument):
     def __init__(self, name, address, **kwargs):
         super().__init__(name, address, **kwargs)
 
+        leIdn = self.ask('*IDN?').split(',')
+        assert len(leIdn) >= 2 and leIdn[1].lower() == 'smb100a', f"This MW source \'{name}\' on {address} is NOT a SMB100A. Use the appropriate driver!"
+
         self.add_parameter('ref_osc_source',
                            label='Reference oscillator source',
                            get_cmd='SOUR:ROSC:SOUR?',

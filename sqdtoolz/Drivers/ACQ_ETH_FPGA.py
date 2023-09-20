@@ -433,6 +433,8 @@ class ETHFPGA(Instrument):
                 self._set('tv_averages',1)
             self._last_dsp_state = cur_processor.get_pipeline_state()
             time.sleep(1)
+        if self._hw_avg:
+            self._set('tv_averages',self.NumRepetitions)
 
         #The ETH FPGA Card expects the tv_samples to be the number AFTER decimation.
         actual_samples = self.NumSamples

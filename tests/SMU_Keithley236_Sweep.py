@@ -25,8 +25,8 @@ lab.HAL('junction').ProbeType = probe_type
 #For Fast Sweep on Keithley SMU
 lab.HAL('junction').SweepSampleTime = 0.01 #0.001
 lab.HAL('junction').SweepSamplePoints = 20
-lab.HAL('junction').SweepStartValue = -5e-8
-lab.HAL('junction').SweepEndValue = 5e-8#50e-6
+lab.HAL('junction').SweepStartValue = -1e-7
+lab.HAL('junction').SweepEndValue = 1e-7
 
 ExperimentConfiguration('I_sweepFast', lab, 0, [], 'junction')
 

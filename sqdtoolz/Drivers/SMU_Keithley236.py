@@ -330,17 +330,21 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
 
         # time.sleep(5)
         result = self.ask('G5,2,2X')
-        currents = np.array( [float(x) for x in result.replace('\r','').replace('\n',',').split(',') if len(x) > 0] )
-        voltages = currents[::2]
-        currents = currents[1::2]
+        meas_vals = np.array( [float(x) for x in result.replace('\r','').replace('\n',',').split(',') if len(x) > 0] )
+        src_vals = meas_vals[::2]
+        meas_vals = meas_vals[1::2]
         self.write('N0')
 
         self.Mode = old_mode
 
         if old_mode == 'SrcV_MeasI':
+            voltages = src_vals
+            currents = meas_vals
             if safe:
                 self.Voltage = 0
         else:
+            voltages = meas_vals
+            currents = src_vals
             if safe:
                 self.Current = 0
 

@@ -126,7 +126,7 @@ stz.ProcessorGPU('test', lab)
 lab.PROC('test').add_stage( stz.GPU_Integrate('sample') )
 ```
 
-The argument for `GPU_Integrate` is the name of the dimension to which the mean is taken. For example, in a typical [ACQ HAL](ACQ.md), this would be `'sample'`, `'segment'` or `'repetition'`. Note that if one were to take the summation across the left-most/outer-most dimension (e.g. `'repetition'`), it should be done so using `add_stage_end` for the entire dataset must fully acquired to take a valid overall summation.
+The argument for `GPU_Integrate` is the name of the dimension along which to integrate. For example, in a typical [ACQ HAL](ACQ.md), this would be `'sample'`, `'segment'` or `'repetition'`. Note that if one were to take the summation across the left-most/outer-most dimension (e.g. `'repetition'`), it should be done so using `add_stage_end` for the entire dataset must fully acquired to take a valid overall summation.
 
 ## GPU ChannelArithmetic
 

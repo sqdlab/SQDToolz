@@ -100,7 +100,7 @@ class ExpHahnGE(Experiment):
             fig.set_figheight(5); fig.set_figwidth(15)
             data_y = 1 - self.norm_expt.normalise_data(data_raw_IQ, ax=axs[1])
 
-            dpkt = dfit.get_fitted_plot(data_x, data_y, 'Drive Amplitude', 'IQ Amplitude', False, fig, axs[0])
+            dpkt = dfit.get_fitted_plot(data_x, data_y, 'Drive Amplitude', 'IQ Amplitude', False, axs[0])
             axs[0].set_xlabel('Wait time'); axs[0].set_ylabel('Normalised |0> Population')
             axs[0].grid(visible=True, which='minor'); axs[0].grid(visible=True, which='major', color='k');
         else:

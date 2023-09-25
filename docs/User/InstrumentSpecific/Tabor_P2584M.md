@@ -11,7 +11,12 @@ The module comes with its own DSP blocks that can be used for onboard processing
 - Mandatory 10x decimation block that must be included via `FPGA_Decimation`.
 - Optional `'sample'` and/or `'repetition'` integration blocks accessed via `FPGA_Integrate`.
 
+This document covers:
 
+- [Initial setup notes](#initial-setup-notes)
+- [AWG with externally triggered ACQ](#acquire-via-external-triggers)
+- [AWG with internally triggered ACQ](#acquire-via-internal-triggers)
+- [Using the DSP blocks](#using-the-dsp-blocks)
 
 ## Initial setup notes
 

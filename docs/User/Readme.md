@@ -34,7 +34,7 @@ Main structure:
     - [Automated experiments](Exp_Automated.md)
 - Retrieve and analyse the data returned from an experiment:
     - [Data retrieval](Data_IO.md)
-    - Data processing
+    - [Data fitting (Basic)](Data_Fitting.md)
 
 
 Other advanced use-cases:

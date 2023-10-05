@@ -103,7 +103,7 @@ The `get_fitted_plot` function has optional arguments:
 The `DFitExponential` class fits an exponential rise/decay via the equation:
 
 $$
-f(x) = Ae^(-\tfrac{x}{\tau})+c
+f(x) = A\exp(-\tfrac{x}{\tau})+c
 $$
 
 The syntax is as follows:

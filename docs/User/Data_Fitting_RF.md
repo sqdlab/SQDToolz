@@ -1,0 +1,82 @@
+# RF resonator Fitting
+
+The following RF resonator fitting functions exist:
+
+- [RF notch resonance](#rf-notch-resonance) - used for **transmission spectra** of resonators side-coupled to a transmission line.
+- RF reflectance
+
+
+## RF notch resonance
+
+This applies to a **transmission spectra for resonators side-coupled to a transmission line**. The corresponding equation can be shown to be (c.f. [fitting paper](https://pubs.aip.org/aip/rsi/article-abstract/86/2/024706/360955/Efficient-and-robust-analysis-of-complex?redirectedFrom=fulltext)):
+
+$$
+S_{21}(f)=Ae^{j(2\pi f\tau + \alpha)}\left(1-\frac{\tfrac{Q_L}{|Q_c|}e^{j\phi}}{1+2jQ_L\left(\tfrac{f}{f_0}-1\right)}\right) + I_0+jQ_0
+$$
+
+Note that:
+- The loaded quality factor is defined in terms of the internal and coupling quality factors as $Q_L^{-1}=Q_{\textnormal{int}}^{-1}+\Re(Q_c^{-1})$
+- The complex coupling quality factor is $|Q_c|\cdot e^{-i\phi}$
+- $\omega\tau+\alpha$ represents the phase trend that occurs due to the finite cable lengths
+- The offset $I_0+jQ_0$ is due to instrumentation and/or strange mismatches in the probing instrumentation.
+
+### General usage
+
+The syntax is as follows:
+
+```python
+from sqdtoolz.Utilities.DataFitting import*
+import numpy as np
+
+from sqdtoolz.Utilities.DataFitting import DFitNotchResonance
+
+#Assuming that the data is given as freqs, i_vals, q_vals
+dFit = DFitNotchResonance()
+dpkt = dFit.get_fitted_plot(freqs, i_vals, q_vals)
+```
+
+The returned data packet `dpkt` contains the fitted parameters mapped as:
+
+- `'fres'`: $f_0$ (resonant frequency)
+- `'Qi'`: $Q_\textnormal{int}$
+- `'|Qc|'`: $|Q_c|$
+- `'Ql'`: $Q_L$
+- `'arg(Qc)'`: $\arg(Q_c)$
+- `'tau'`: $\tau$
+- `'alpha'`: $\alpha$
+- `'ampl'`: $A$
+- `'i_offset'`: $I_0$
+- `'q_offset'`: $Q_0$
+
+The `get_fitted_plot` function has optional arguments:
+
+- `phase_deriv_smooth_fac` - The number of taps in the filter used to smooth out the phase derivative when fitting the maximum phase derivative (at the resonant frequency). Defaults to `5`. Increasing it will smoothen the phase derivative prior to fitting.
+- `prop_detrend_start` - The proportion (defaults to `0.05`) of data from the beginning (lower end of the frequencies) to use in fitting the detrending line.
+- `prop_detrend_end` - The proportion (defaults to `0.05`) of data in the end (higher end of the frequencies) to use in fitting the detrending line.
+- `dont_plot_estimates` - Defaults to `False`. If `True`, the row of estimated plots is omitted and only the final amplitude, phase and IQ curves are drawn.
+
+### Methodology
+
+The fitting function requires accurate estimates of the final parameters. This section highlights the methods used to compute good initial guesses.
+
+The first step is to remove any phase trends due to the finite length of the probing cables. The idea is to fit a line to the phase trend off-resonant from the main peak. The gradient and y-intercept of the linear fit readily gives $\tau$ and $\alpha$. Now by multiplying $e^{-j(\omega\tau+\alpha)}$ to negate the phase slope, the detrended phase slope at resonance is given by:
+
+$$
+p_0=\frac{dS_{21}(f_0)}{df}=\frac{-2Q_L^2(Q_L-Q_c\cos(\phi))}{f_0(Q_L^2+Q_c^2-2Q_LQ_c\cos(\phi))}
+$$
+
+which when ignoring $\phi$ yields a simple expression:
+
+$$
+Q_c=\frac{Q_L(f_0p_0+2Q_L)}{f_0p_0}.
+$$
+
+Note that the phase slope provides an accurate estimate for $f_0$. Now fitting $|S_{21}|^2$ to a [Fano-Resonacne](Data_Fitting.md#fano-resonance) yields the peak-width which gives the other required quality factor $Q_L$.
+
+Finally, looking at the detrended raw data (calculated by multiplying $e^{-j(\omega\tau+\alpha)}$), one may fit the resulting circle to get the centre-point of the raw data $(I_R, Q_R)$ and the radius $R$. The radius relates to the amplitude as: $A=2R$. Compute $\phi$ by taking the polar angle of the vector starting from the IQ point corresponding to the resonant frequency and ending at $(I_R,Q_R)$.
+
+Now computing the fitted function (on the detrended data - so taking $I_0=Q_0=\alpha=\tau=0$), one may fit a circle to get its centre point $(I_f,Q_f)$. Now compute: $(I_0,Q_0)=(I_R-I_f, Q_R-Q_f)$.
+
+Note that the final fit is done on the detrended data (thus, setting $\alpha=\tau=0$). The fit may still readjust and find finite values for $\alpha$ and $\tau$. Simply add these fitted values to the previous values of $\alpha$ and $\tau$ found it the detrending step to get the final fitting parameters.
+
+In addition, it is noteworthy that least-squares residual used in circle fits can be easily skewed by the resonance datasets as many points tend to bunch up in a single region. To alleviate this bias, the data is first interpolated in equal arc-lengths. Then to combat the possibility of data going back and forth (due to noise), points that are close by are culled. The resulting dataset is used in the circle fitting procedures.

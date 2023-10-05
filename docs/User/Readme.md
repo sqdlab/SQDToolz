@@ -35,6 +35,7 @@ Main structure:
 - Retrieve and analyse the data returned from an experiment:
     - [Data retrieval](Data_IO.md)
     - [Data fitting (Basic)](Data_Fitting.md)
+    - [Data fitting (RF resonators)](Data_Fitting_RF.md)
 
 
 Other advanced use-cases:

@@ -342,6 +342,50 @@ class DFitNotchResonance:
         #It fits a dip according to the equation given in: https://en.wikipedia.org/wiki/Fano_resonance
         pass
 
+    @staticmethod
+    def fit_circle(leDataI, leDataQ):
+        def cost_func(params, iq_vals):
+            xc, yc, = params
+            cur_Rs = np.sqrt((iq_vals[0]-xc)**2 + (iq_vals[1]-yc)**2)
+            return np.sum((cur_Rs - np.mean(cur_Rs))**2)
+        sol = scipy.optimize.minimize(cost_func, [np.mean(leDataI), np.mean(leDataQ)], args=[leDataI, leDataQ], method='Nelder-Mead')
+        mean_r = np.mean(np.sqrt((leDataI-sol.x[0])**2 + (leDataQ-sol.x[1])**2))
+        return sol.x, mean_r
+
+    @staticmethod
+    def uniform_interpolate_complex_path(iq_vals, freqs):
+        def filter_arc(data, thresh):
+            thresh = thresh*thresh
+            result = []
+            for element in data:
+                if all((element[0]-other[0])**2+(element[1]-other[1])**2 > thresh for other in result):
+                    result.append(element)
+            return np.array(result)
+
+        leArcLengths = np.abs(np.diff(iq_vals))
+        min_dist = np.mean(leArcLengths)    #Min will make it too many...
+        leArcLengths = np.cumsum(np.concatenate([[0], leArcLengths]))
+        interpolPts = np.interp(np.arange(0, leArcLengths[-1]+min_dist, min_dist), leArcLengths, iq_vals)
+        #
+        i_vals, q_vals = np.real(interpolPts), np.imag(interpolPts)
+        freq_vals = np.interp(np.arange(0, leArcLengths[-1]+min_dist, min_dist), leArcLengths, freqs)
+        
+        leArcLengths = np.abs(np.diff(interpolPts))
+        max_dist = np.max(leArcLengths)
+
+        #Further filter the data...
+        filt_vals = filter_arc(np.array([i_vals, q_vals, freq_vals]).T, max_dist)
+
+        return filt_vals.T  #i_vals, q_vals, freq_vals
+
+    @staticmethod
+    def func_transmission(f, params):
+        a, tau, alpha, Ql, Qc, phi, f0, i0, q0 = params
+        a = np.abs(a)
+        Ql = np.abs(Ql)
+        Qc = np.abs(Qc)
+        return a*np.exp(1j*(2*np.pi*f*tau+alpha))*( 1-Ql/Qc*np.exp(1j*phi)/(1+2j*Ql*(f/f0-1)) ) + i0 + 1j*q0
+
     def get_fitted_plot(self, freq_vals, i_vals, q_vals, **kwargs):
         dont_plot_estimates = kwargs.get('dont_plot_estimates', False)
         prop_detrend_start = kwargs.get('prop_detrend_start', 0.05)
@@ -359,27 +403,30 @@ class DFitNotchResonance:
         else:
             fig = plt.figure(); fig.set_figwidth(20)#; fig.set_figheight(7)
             #
-            axWidth = plt.subplot(2, 4, 1); axWidth.set_title('Estimate Peak Width')
-            axPhaseDetrend = plt.subplot(2, 4, 2)
-            axPhaseSlopeEst = plt.subplot(2, 4, 3)
-            axPhaseSlope = plt.subplot(2, 4, 4)
+            axWidth = plt.subplot(2, 5, 1); axWidth.set_title('Estimate Peak Width')
+            axPhaseDetrend = plt.subplot(2, 5, 2)
+            axPhaseSlopeEst = plt.subplot(2, 5, 3)
+            axPhaseSlope = plt.subplot(2, 5, 4)
+            axIQDetrend = plt.subplot(2, 5, 5)
             #
             axFitAmp = plt.subplot(2, 3, 4)
             axFitPhs = plt.subplot(2, 3, 5)
             axFitIQ  = plt.subplot(2, 3, 6)
             #
-            axWidth.grid(); axPhaseDetrend.grid(); axPhaseSlopeEst.grid(); axPhaseSlope.grid(); axFitAmp.grid(); axFitPhs.grid(); axFitIQ.grid()
+            fig.subplots_adjust(wspace=.4)
+            #
+            axWidth.grid(); axPhaseDetrend.grid(); axPhaseSlopeEst.grid(); axPhaseSlope.grid(); axIQDetrend.grid(); axFitAmp.grid(); axFitPhs.grid(); axFitIQ.grid()
 
         #Width estimation
         data_x, data_y = freq_vals, np.abs(i_vals + 1j*q_vals)
         if dont_plot_estimates:
-            dpkt = DFitFanoResonance().get_fitted_plot(data_x, data_y**2, xLabel='Frequency (Hz)', yLabel='|IQ|^2', dontplot=True)
+            dpktAmpl = DFitFanoResonance().get_fitted_plot(data_x, data_y**2, xLabel='Frequency (Hz)', yLabel='|IQ|^2', dontplot=True)
         else:
-            dpkt = DFitFanoResonance().get_fitted_plot(data_x, data_y**2, xLabel='Frequency (Hz)', yLabel='|IQ|^2', axs=axWidth)
+            dpktAmpl = DFitFanoResonance().get_fitted_plot(data_x, data_y**2, xLabel='Frequency (Hz)', yLabel='|IQ|^2', axs=axWidth)
         #
-        f0 = dpkt['xMinimum']
-        Ql0 = f0/dpkt['width']
-        a0 = np.sqrt(dpkt['offset'])
+        # f0 = dpkt['xMinimum']         #Use Phase slope instead...
+        # Ql0 = f0/dpkt['width']
+        # a0 = np.sqrt(dpktAmpl['offset'])
 
         #Phase detrending estimation
         phase_vals = np.unwrap(np.angle(i_vals + 1j*q_vals))
@@ -411,13 +458,18 @@ class DFitNotchResonance:
             box = np.ones(box_pts)/box_pts
             y_smooth = np.convolve(y, box, mode='same')
             return y_smooth
-        phase_derivs = np.diff(smooth(detrended_phase,5)) / np.diff(freq_vals)
+        phase_deriv_smooth_fac = kwargs.get('phase_deriv_smooth_fac', 5)
+        phase_derivs = np.diff(smooth(detrended_phase, phase_deriv_smooth_fac)) / np.diff(freq_vals)
         dfit = DFitPeakLorentzian()
         if dont_plot_estimates:
             dpkt = dfit.get_fitted_plot(freq_vals[:-1], phase_derivs, xLabel='Frequency (Hz)', yLabel='Phase Slope (rad/Hz)', dip=False, dontplot=True)
         else:
             dpkt = dfit.get_fitted_plot(freq_vals[:-1], phase_derivs, xLabel='Frequency (Hz)', yLabel='Phase Slope (rad/Hz)', dip=False, axs=axPhaseSlopeEst)
         ps = dpkt['amplitude']
+        #
+        f0 = dpkt['centre']
+        Ql0 = f0/dpktAmpl['width']
+        #
         #Plot the Detrended+Slope Estimate...
         if not dont_plot_estimates:
             axPhaseSlopeEst.set_title('Estimate Phase Slope')
@@ -431,77 +483,112 @@ class DFitNotchResonance:
         #
         Qc0 = Ql0*(f0*ps+2*Ql0)/(f0*ps)
 
-        #Estimate phi
-        # f0_ind = np.argmin(np.abs(freq_vals - f0))
-        # tan_arg_res = q_vals[f0_ind] / i_vals[f0_ind]
-        # #
-        # func_phi = lambda phi: (tan_arg_res-2*np.pi*f0*tau0-alpha0) * (Qc0-Ql0*np.cos(phi)) + Ql0*np.sin(phi)
-        # phi0 = scipy.optimize.fsolve(func_phi, 0)[0]
-        phi0 = 0.0
+        iq_vals_detrended = (i_vals + 1j*q_vals) * np.exp(-1j*(2*np.pi*freq_vals*tau0 + alpha0))
+        res_iq_detrended = np.interp(f0, freq_vals, iq_vals_detrended)
+        i_vals_detrended, q_vals_detrended, freq_vals_detrended = DFitNotchResonance.uniform_interpolate_complex_path(iq_vals_detrended, freq_vals)
+        iq_vals_detrended_centre, iq_vals_detrended_R = DFitNotchResonance.fit_circle(i_vals_detrended, q_vals_detrended)
+        #
+        a0 = iq_vals_detrended_R*2.0
+        #
+        i0, q0 = 0,0
+        phi0 = np.arctan2(iq_vals_detrended_centre[1]-np.imag(res_iq_detrended), iq_vals_detrended_centre[0]-np.real(res_iq_detrended))
+        init_conds = [a0, 0, 0, Ql0, Qc0, phi0, f0, i0, q0]
+        init_fit_detrended = DFitNotchResonance.func_transmission(freq_vals_detrended, init_conds)
+        fit_i_vals_detrended, fit_q_vals_detrended, fit_freq_vals_detrended = DFitNotchResonance.uniform_interpolate_complex_path(init_fit_detrended, freq_vals_detrended)
+        fit_iq_vals_detrended_centre, fit_iq_vals_detrended_R = DFitNotchResonance.fit_circle(fit_i_vals_detrended, fit_q_vals_detrended)
+        #
+        i0, q0 = iq_vals_detrended_centre - fit_iq_vals_detrended_centre
+        init_conds = [a0, 0, 0, Ql0, Qc0, phi0, f0, i0, q0]
+        init_fit_detrended = DFitNotchResonance.func_transmission(freq_vals_detrended, init_conds)
+        res_iq_detrended_fit = np.interp(f0, freq_vals_detrended, init_fit_detrended)
+        #
+        if not dont_plot_estimates:
+            axIQDetrend.plot(np.real(iq_vals_detrended), np.imag(iq_vals_detrended), alpha=0.5)
+            axIQDetrend.plot([iq_vals_detrended_centre[0]], [iq_vals_detrended_centre[1]], 'bx', alpha=0.5)
+            axIQDetrend.plot([np.real(res_iq_detrended)], np.imag(res_iq_detrended), 'bo', alpha=0.5)
+            #
+            axIQDetrend.plot(np.real(init_fit_detrended), np.imag(init_fit_detrended), alpha=0.5)
+            axIQDetrend.plot([np.real(res_iq_detrended_fit)], np.imag(res_iq_detrended_fit), 'ro', alpha=0.5)
+            #
+            axIQDetrend.set_xlabel('I-Channel')
+            axIQDetrend.set_ylabel('Q-Channel')
+            axIQDetrend.set_title('Detrended IQ fit')
 
         #Perform actual fitting...
-        def func(f, params):
-            a, tau, alpha, Ql, Qc, phi, f0 = params
-            a = np.abs(a)
-            Ql = np.abs(Ql)
-            Qc = np.abs(Qc)
-            return a*np.exp(1j*(2*np.pi*f*tau+alpha))*( 1-Ql/Qc*np.exp(1j*phi)/(1+2j*Ql*(f/f0-1)) )
         def cost_func(params, iq_vals):
-            a, tau, alpha, Ql, Qc, phi, f0 = params
+            a, tau, alpha, Ql, Qc, phi, f0, i0, q0 = params
             iq_valsC = iq_vals[0] + 1j*iq_vals[1]
-            func_vals = func(freq_vals, params)
-            # return ( (np.abs(iq_valsC)-np.abs(func_vals))**2/np.abs(iq_valsC)**2 ).sum() + ( (np.angle(iq_valsC)-np.angle(func_vals))**2/np.angle(iq_valsC)**2 ).sum() + 1000*np.heaviside(Ql-Qc,1)
-            # return (np.abs(iq_valsC - func_vals) * np.exp(-(freq_vals-f0)**2/(f0/Ql0)**2)).sum() + 1000*np.heaviside(Ql-Qc,1)
+            func_vals = DFitNotchResonance.func_transmission(freq_vals_detrended, params)
             return (np.abs(iq_valsC - func_vals)).sum() + 1000*np.heaviside(Ql-Qc,1)
         #
         def get_min_max(val1, val2):
             return min(val1,val2), max(val1,val2)
-        #Run it once to refine the estimate for tau0 and alpha0, then run it with the same i.c.s to refine the estimate...
-        for m in range(2):
-            if m == 1:
-                tau0, alpha0 = sol.x[1], sol.x[2]
-            init_conds = [a0, tau0, alpha0, Ql0, Qc0, phi0, f0]
-            sol = scipy.optimize.minimize(cost_func, init_conds, args=[i_vals, q_vals], method='Nelder-Mead',
-                                            bounds = [
-                                                get_min_max(a0*0.5,a0*2.0),
-                                                get_min_max(tau0*0.25,tau0*4.0),
-                                                get_min_max(alpha0*0.1,alpha0*10.0),
-                                                get_min_max(Ql0*0.2,Ql0*5.0),
-                                                get_min_max(Qc0*0.2,Qc0*5.0),
-                                                get_min_max(-np.pi,np.pi),
-                                                get_min_max((freq_vals[0]+f0)/2,(freq_vals[-1]+f0)/2)
-                                            ])
+ 
+        init_conds = [a0, 0, 0, Ql0, Qc0, phi0, f0, i0, q0]
+        #
+        sol = scipy.optimize.minimize(cost_func, init_conds, args=[i_vals_detrended, q_vals_detrended], method='Nelder-Mead',
+                                        bounds = [
+                                            get_min_max(a0*0.66,a0*1.5),
+                                            get_min_max(-tau0*2.0,tau0**2.0),
+                                            get_min_max(-alpha0*2.0,alpha0*2.0),
+                                            get_min_max(Ql0*0.2,Ql0*5.0),
+                                            get_min_max(Qc0*0.2,Qc0*5.0),
+                                            get_min_max(-2*np.pi,2*np.pi),
+                                            get_min_max((freq_vals[0]+f0)/2,(freq_vals[-1]+f0)/2),
+                                            (i0-a0*0.5, i0+a0*0.5),#get_min_max(np.min(i_vals),np.max(i_vals)),
+                                            (q0-a0*0.5, q0+a0*0.5)#get_min_max(np.min(q_vals),np.max(q_vals))
+                                        ])
+        #Calculate final best-fit values
+        best_fit_iq_detrended = DFitNotchResonance.func_transmission(freq_vals, sol.x)
+        if not dont_plot_estimates:
+            axIQDetrend.plot(np.real(best_fit_iq_detrended), np.imag(best_fit_iq_detrended), alpha=0.5)
+        #
+        tau_fit =  tau0 + sol.x[1]
+        alpha_fit = alpha0 + sol.x[2]
+        best_fit_iq = best_fit_iq_detrended*np.exp(1j*(tau0*2*np.pi*freq_vals + alpha0))
+        #
+        init_conds = [a0, 0, 0, Ql0, Qc0, phi0, f0, i0, q0]
+        init_fit_detrended = DFitNotchResonance.func_transmission(freq_vals, init_conds)
+        init_fit_iq = init_fit_detrended*np.exp(1j*(tau0*2*np.pi*freq_vals + alpha0))
 
         #Plot final fits...
         axFitAmp.plot(freq_vals,np.abs(i_vals + 1j*q_vals), alpha=0.5)
-        axFitAmp.plot(freq_vals,np.abs(func(freq_vals, init_conds)))
-        axFitAmp.plot(freq_vals,np.abs(func(freq_vals, sol.x)))
+        axFitAmp.plot(freq_vals,np.abs(init_fit_iq))
+        axFitAmp.plot(freq_vals, np.abs(best_fit_iq))
         axFitAmp.set_title('Fitted Amplitude'); axFitAmp.set_xlabel('Frequency (Hz)'); axFitAmp.set_ylabel('Amplitude')
         #
+        phase_vals = np.unwrap(np.angle(i_vals + 1j*q_vals))
         axFitPhs.plot(freq_vals,phase_vals, alpha=0.5)
-        axFitPhs.plot(freq_vals,np.unwrap(np.angle(func(freq_vals, init_conds))))
-        axFitPhs.plot(freq_vals,np.unwrap(np.angle(func(freq_vals, sol.x))))
+        axFitPhs.plot(freq_vals,np.unwrap(np.angle(init_fit_iq)))
+        axFitPhs.plot(freq_vals,np.unwrap(np.angle(best_fit_iq)))
         axFitPhs.set_title('Fitted Phase'); axFitPhs.set_xlabel('Frequency (Hz)'); axFitPhs.set_ylabel('Phase (rad)')
         #
-        axFitIQ.plot(i_vals,q_vals, alpha=0.5)
-        axFitIQ.plot(np.real(func(freq_vals, init_conds)), np.imag(func(freq_vals, init_conds)))
-        axFitIQ.plot(np.real(func(freq_vals, sol.x)), np.imag(func(freq_vals, sol.x)))
+        axFitIQ.plot(i_vals,q_vals, '-', alpha=0.5)
+        axFitIQ.plot(np.real(init_fit_iq), np.imag(init_fit_iq), '-')
+        axFitIQ.plot(np.real(best_fit_iq), np.imag(best_fit_iq))
         axFitIQ.set_title('Fitted IQ'); axFitIQ.set_xlabel('I-Channel'); axFitIQ.set_ylabel('Q-Channel')
 
         if not dont_plot_estimates:
             fig.subplots_adjust(left=None, bottom=-1.1, right=None, top=None, wspace=None, hspace=None)
 
+        Qc = sol.x[4] * np.exp(-1j*sol.x[5])
+        Ql = sol.x[3]
+        #
+        Qint = 1 / (1/Ql - np.real(1/Qc))
+
         # print(init_conds)
         # print(sol.x)
         return {
             'fres' : sol.x[6],
-            'Qi' : sol.x[4]*sol.x[3]/(sol.x[4]-sol.x[3]),
-            '|Qc|' : sol.x[4],
-            'Ql' : sol.x[3],
-            'arg(Qc)' : sol.x[5],
-            'tau': sol.x[1],
-            'alpha': sol.x[2],
-            'ampl' : sol.x[0]
+            'Qi' : Qint,
+            '|Qc|' : np.abs(Qc),
+            'Ql' : Ql,
+            'arg(Qc)' : np.angle(Qc),
+            'tau': tau_fit,
+            'alpha': alpha_fit,
+            'ampl' : sol.x[0],
+            'i_offset' : sol.x[7],
+            'q_offset' : sol.x[8]
         }
 
 class DFitReflectanceResonance:

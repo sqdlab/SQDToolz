@@ -33,6 +33,7 @@ import matplotlib.pyplot as plt
 #
 #The outputs should contain:
 #   - Overlapping sine waves - i.e. raw samples and averaged samples
+#   - FFT should show ~70MHz (i.e. 400MHz input with 330MHz demodulation)
 #   - Stars with black centres denoting averages.
 
 # Create New Laboratory Class
@@ -41,7 +42,7 @@ lab = Laboratory(instr_config_file = "tests\\AWG_Tabor_Test_ADCDSP.yaml", save_d
 # Load the Tabor into the lab class to use
 lab.load_instrument('TaborAWG')
 
-WFMT_ModulationIQ("OscMod", lab, 400e6)
+WFMT_ModulationIQ("OscMod", lab, 100e6)
 lab.WFMT("OscMod").IQUpperSideband = False
 
 pt_centre = np.array([0,0])
@@ -122,6 +123,7 @@ for s in range(acq_module.NumSegments):
 ###########
 #FFT TESTS#
 ###########
+lab.WFMT("OscMod").IQFrequency = 400e6
 acq_module.NumRepetitions = 3
 awg_wfm.clear_segments()
 awg_wfm.add_waveform_segment(WFS_Constant(f"init", lab.WFMT("OscMod").apply(phase=0), 2048e-9, 0.25))
@@ -150,12 +152,15 @@ for r in range(acq_module.NumRepetitions) :
         ax[0].plot(freqs, np.abs(leData['data']['fft_real'][r][s] + 1j*leData['data']['fft_imag'][r][s]))
         ax[1].plot(leData['data']['debug_time_I'][r][s])
         ax[1].plot(leData['data']['debug_time_Q'][r][s])
+#
+lab.WFMT("OscMod").IQFrequency = 100e6
 
-plt.show()
+# plt.show()
 
 #################
 #AVERAGING TESTS#
 #################
+acq_module.NumSamples = 5040
 acq_module.NumRepetitions = int(num_corners*3)
 fig, ax = plt.subplots(1)
 for s in range(4):

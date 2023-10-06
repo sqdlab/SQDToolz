@@ -42,7 +42,8 @@ class FPGA_DDCFIR(ProcNodeFPGA):
             for m, cur_spec in enumerate(cur_ch):
                 nyq_rate = sample_rates[c]*0.5
                 freq_cutoff_norm = cur_spec['fc']/nyq_rate
-                cur_filts = scipy.signal.firwin(cur_spec['Taps'], freq_cutoff_norm, window=cur_spec['Win'])
+                cur_window = cur_spec.get('Win', 'hamming')
+                cur_filts = scipy.signal.firwin(cur_spec['Taps'], freq_cutoff_norm, window=cur_window)
                 fLOonFs = cur_spec['fLO']/sample_rates[c]
                 ret_kernels += [(
                     np.array([np.cos(2*np.pi*fLOonFs*n) * np.sum(cur_filts[:num_samples-n]) for n in range(num_samples)]),

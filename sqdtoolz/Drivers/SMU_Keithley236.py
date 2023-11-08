@@ -66,6 +66,30 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
                             vals=vals.Numbers(0.001, 100),
                             get_cmd=lambda : self.current.step/self.current.inter_delay,
                             set_cmd=self._set_ramp_rate_current)
+
+        #c.f. Page 227 of SMU Manual...
+        self.add_parameter('trigger_input_origin',
+                            label="Input Trigger Origin",
+                            get_cmd=lambda: self._get_trigger_input_origin(),
+                            set_cmd=lambda x: self._set_trigger_input_origin(x),
+                            val_mapping={'IEEE X':0,
+                                         'IEEE GET':1,
+                                         'IEEE talk':2,
+                                         'External':3,
+                                         'Immediate':4})
+        self.add_parameter('trigger_input_effect',
+                            label="Input Trigger Effect",
+                            get_cmd=lambda: self._get_trigger_input_effect(),
+                            set_cmd=lambda x: self._set_trigger_input_effect(x),
+                            val_mapping={'Continuous':0,
+                                         '^SRC DLY MSR':1,
+                                         ' SRC^DLY MSR':2,
+                                         '^SRC^DLY MSR':3,
+                                         ' SRC DLY^MSR':4,
+                                         '^SRC DLY^MSR':5,
+                                         ' SRC^DLY^MSR':6,
+                                         '^SRC^DLY^MSR':7,
+                                         'Single':8})
         
         self._sweep_safe_mode = True
         self.add_parameter('sweep_safe_mode',
@@ -250,6 +274,19 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
         self._sweep_sample_end = end_val
 
 
+    def _get_trigger_input_origin(self):
+        sm = self.status_machine()
+        return sm[23]
+    def _set_trigger_input_origin(self, origin):
+        self.ask(f"T{origin},,,")
+
+    def _get_trigger_input_effect(self):
+        sm = self.status_machine()
+        return sm[25]
+    def _set_trigger_input_effect(self, effect):
+        self.ask(f"T,{effect},,")
+
+
 
     def _set_ramp_rate_volt(self, ramp_rate):
         if ramp_rate < 0.01:
@@ -301,8 +338,8 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
         if safe:
             assert bias == 0, 'The bias value is not zero. This is unsafe.'
 
-        self.ask('R0X')
-        self.ask('N0X')
+        self.ask('R0')
+        self.ask('N0')
 
         old_mode = self.Mode
         if old_mode == 'SrcV_MeasI':
@@ -326,14 +363,17 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
         # else:
         self.ask(f'Q1,{start_v},{stop_v},{step},0,{delay}X')
 
-        self.ask('R1XN1XH0X')  #c.f. Page 225 of the SMU manual
+        self.ask('T1,0,0,0')
+        self.ask('R1N1H0X')  #c.f. Page 225 of the SMU manual
 
         # time.sleep(5)
-        result = self.ask('G5,2,2X')
+        result = self.ask('G5,2,2')
         meas_vals = np.array( [float(x) for x in result.replace('\r','').replace('\n',',').split(',') if len(x) > 0] )
         src_vals = meas_vals[::2]
         meas_vals = meas_vals[1::2]
         self.write('N0')
+
+        self.ask('T4,0,0,0')
 
         self.Mode = old_mode
 

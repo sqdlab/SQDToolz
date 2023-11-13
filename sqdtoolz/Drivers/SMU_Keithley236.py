@@ -14,9 +14,6 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
         https://codeshare.phy.cam.ac.uk/waw31/JISA/-/blob/9db4b0f103430be1458007b3f234fed3e38cc33f/src/JISA/Devices/K236.java
     """
 
-    def write(self, cmd):
-        super().write(cmd + 'H0X')
-
     def __init__(self, name, address, gpib_slot, **kwargs):
         super().__init__(address=address)
         Instrument.__init__(self, name, **kwargs)
@@ -30,12 +27,12 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
         #Reset
         self.write('J0X')
 
-        self.add_parameter('status_error', get_cmd='U1')
-        self.add_parameter('status_machine', get_cmd='U3')
-        self.add_parameter('status_measurement', get_cmd='U4')
-        self.add_parameter('status_compliance', get_cmd='U5')
-        self.add_parameter('status_suppression', get_cmd='U6')
-        self.add_parameter('src_meas', get_cmd='G5,0,0')
+        self.add_parameter('status_error', get_cmd='U1X')
+        self.add_parameter('status_machine', get_cmd='U3X')
+        self.add_parameter('status_measurement', get_cmd='U4X')
+        self.add_parameter('status_compliance', get_cmd='U5X')
+        self.add_parameter('status_suppression', get_cmd='U6X')
+        self.add_parameter('src_meas', get_cmd='H0XG5,0,0X')
 
         self.add_parameter('voltage',
                             label='Output Voltage',
@@ -120,9 +117,9 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
         pass
         #Using DC Mode by default in both cases...  #TODO: FIX THIS AS IT CASUES ERRORS...
         if mode == 'SrcV_MeasI':
-            self.ask('F0,0')
+            self.write('F0,0X')
         else:
-            self.ask('F1,0')
+            self.write('F1,0X')
 
     @property
     def Output(self):
@@ -132,9 +129,9 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
     @Output.setter
     def Output(self, val):
         if val:
-            self.write('N1')
+            self.write('N1X')
         else:
-            self.write('N0')
+            self.write('N0X')
 
     def _get_voltage(self):
         res = self.src_meas()
@@ -168,7 +165,7 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
             assert False, "COM Error when reading source-measure"
     def _set_current(self, val):
         #Use auto-range and zero delay by default...
-        self.write(f'B{val},0,0')
+        self.write(f'B{val},0,0X')
 
     @property
     def Current(self):
@@ -197,7 +194,7 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
     def ComplianceCurrent(self, val):
         if self.Mode == 'SrcV_MeasI':
             range = np.clip(10 + np.ceil(np.log10(val)), 1, 10) #Check Page 206 of manual
-            self.write(f'L{val},{int(range)}') # TODO: change this better
+            self.write(f'L{val},{int(range)}X') # TODO: change this better
     
     @property
     def ComplianceVoltage(self):
@@ -209,7 +206,7 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
     @ComplianceVoltage.setter
     def ComplianceVoltage(self, val):
         if self.Mode == 'SrcI_MeasV':
-            self.write(f'L{val},0')
+            self.write(f'L{val},0X')
 
     @property
     def RampRateVoltage(self):
@@ -227,7 +224,7 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
 
     @property
     def ProbeType(self):
-        value = self.ask('U4')
+        value = self.ask('U4X')
         if value.split('O')[1][0] == '0':
             return 'TwoWire'
         else:
@@ -236,9 +233,9 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
     def ProbeType(self, connection):
         assert connection == 'TwoWire' or connection == 'FourWire', "ProbeType must be FourWire or TwoWire"
         if connection == 'TwoWire':
-            self.write('O0')
+            self.write('O0X')
         else:
-            self.write('O1')
+            self.write('O1X')
 
     
     @property
@@ -278,13 +275,13 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
         sm = self.status_machine()
         return sm[23]
     def _set_trigger_input_origin(self, origin):
-        self.ask(f"T{origin},,,")
+        self.write(f"T{origin},,,X")
 
     def _get_trigger_input_effect(self):
         sm = self.status_machine()
         return sm[25]
     def _set_trigger_input_effect(self, effect):
-        self.ask(f"T,{effect},,")
+        self.write(f"T,{effect},,X")
 
 
 
@@ -328,7 +325,7 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
         assert self.SweepSamplePoints > 1, "Must have more than 1 sweeping point..."
         safe = self.sweep_safe_mode()
 
-        self.write('G1,2,0') # get source bias
+        self.write('G1,2,0X') # get source bias
         bias = float(self.read())
 
         start_v, stop_v = self.SweepStartValue, self.SweepEndValue
@@ -338,18 +335,17 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
         if safe:
             assert bias == 0, 'The bias value is not zero. This is unsafe.'
 
-        self.ask('R0')
-        self.ask('N0')
+        self.write('R0N0X')
 
         old_mode = self.Mode
         if old_mode == 'SrcV_MeasI':
             if safe:
                 self.Voltage = start_v
-            self.ask('F0,1')        #Source Voltage, Measure Current Sweep
+            self.write('F0,1X')        #Source Voltage, Measure Current Sweep
         else:
             if safe:
                 self.Current = start_v
-            self.ask('F1,1')        #Source Current, Measure Voltage Sweep
+            self.write('F1,1X')        #Source Current, Measure Voltage Sweep
 
         #Using Range = 0 for autorange... c.f. page 216 of SMU manual
         # if safe:
@@ -361,19 +357,19 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
         #     if stop_v != 0:
         #         self.ask(f'Q7,{stop_v},{0},{step},0,{delay}X')
         # else:
-        self.ask(f'Q1,{start_v},{stop_v},{step},0,{delay}X')
+        self.write(f'Q1,{start_v},{stop_v},{step},0,{delay}X')
 
-        self.ask('T1,0,0,0')
-        self.ask('R1N1H0X')  #c.f. Page 225 of the SMU manual
+        self.write('T4,0,0,0X')
+        self.write('R1N1H0X')  #c.f. Page 225 of the SMU manual
 
         # time.sleep(5)
-        result = self.ask('G5,2,2')
+        result = self.ask('G5,2,2X')
         meas_vals = np.array( [float(x) for x in result.replace('\r','').replace('\n',',').split(',') if len(x) > 0] )
         src_vals = meas_vals[::2]
         meas_vals = meas_vals[1::2]
-        self.write('N0')
+        self.write('N0X')
 
-        self.ask('T4,0,0,0')
+        self.write('T4,0,0,0X')
 
         self.Mode = old_mode
 

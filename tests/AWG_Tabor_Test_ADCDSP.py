@@ -79,7 +79,7 @@ filt_coeffs = scipy.signal.firwin(51, 10e6, fs=lab._get_instrument('TaborAWG').A
 
 ProcessorFPGA('fpga_dsp', lab)
 
-acq_module.NumRepetitions = 3
+acq_module.NumRepetitions = 30
 awg_wfm.clear_segments()
 awg_wfm.add_waveform_segment(WFS_Constant(f"init", lab.WFMT("OscMod").apply(phase=0), 2048e-9, 0.25))
 awg_wfm.add_waveform_segment(WFS_Constant(f"pad", None, -1, 0.0))
@@ -182,6 +182,10 @@ for s in range(4):
     acq_module.set_data_processor(lab.PROC('fpga_dsp'))
     leData = acq_module.get_data()
 
+    state_mkrs = ["o", ",", "d", "^", "s", "p", "h", "P"]
+    headers = acq_module._instr_acq.get_header_data(1)
+    headers = [state_mkrs[x['state1']] for x in headers]
+
     lab.PROC('fpga_dsp').reset_pipeline()
     lab.PROC('fpga_dsp').add_stage(FPGA_DDCFIR([[{'fLO':100e6, 'fc':10e6, 'Taps':40}, {'fLO':100e6, 'fc':10e6, 'Taps':40}]]))
     lab.PROC('fpga_dsp').add_stage(FPGA_Decimation('sample', 10))
@@ -189,6 +193,13 @@ for s in range(4):
     lab.PROC('fpga_dsp').add_stage(FPGA_Integrate('repetition'))
 
     acq_module.set_data_processor(lab.PROC('fpga_dsp'))
+
+    acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:SEL DSP1')
+    acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:OUTP SVM')
+    acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:LINE 1,1,0')
+    acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:LINE 2,-1,0')
+    acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:LINE 3,0,0')
+
     leData2 = acq_module.get_data()
 
     plt.gca().set_prop_cycle(None)
@@ -196,8 +207,70 @@ for s in range(4):
         times = np.arange(acq_module.NumSamples)/acq_module.SampleRate * 1e9
         for c in range(num_corners):
             ax.scatter(leData['data']['CH1_0_I'][sg][c::num_corners], leData['data']['CH1_0_Q'][sg][c::num_corners], marker=str(s+1))
+        for m in range(len(headers)):
+            ax.scatter([leData['data']['CH1_0_I'][sg][m]], [leData['data']['CH1_0_Q'][sg][m]], c='black', alpha=0.1, marker=headers[m])
     ax.plot(leData2['data']['CH1_0_I']/acq_module.NumRepetitions, leData2['data']['CH1_0_Q']/acq_module.NumRepetitions, 'ko')
     ax.plot(leData2['data']['CH1_0_I']/acq_module.NumRepetitions, leData2['data']['CH1_0_Q']/acq_module.NumRepetitions, marker=str(s+1))
+    x_vals = ax.get_xlim()
+    ax.plot(x_vals, np.array(x_vals), 'k-')
+    ax.plot(x_vals, -np.array(x_vals), 'k-')
+ax.set_aspect('equal', 'box')
+
+
+####################
+#SVM DECISION TESTS#
+####################
+num_pts_axis = 10
+acq_module.NumSamples = 5040
+acq_module.NumRepetitions = int(num_pts_axis * num_pts_axis * 3)
+fig, ax = plt.subplots(1)
+#
+awg_wfm.set_valid_total_time(499e-6)
+awg_wfm.clear_segments()
+awg_wfm.add_waveform_segment(WFS_Constant(f"init", lab.WFMT("OscMod").apply(phase=0), 96e-9, 0.25))
+read_segs = []
+#Form a grid in the IQ plane...
+for x in np.linspace(-0.1,0.1, num_pts_axis):
+    for y in np.linspace(-0.1,0.1, num_pts_axis):
+        ampl, phs = np.sqrt(x**2+y**2), np.arctan2(y, x)
+        awg_wfm.add_waveform_segment(WFS_Constant(f"pad{x}{y}", None, 512e-9, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Constant(f"constel{x}{y}", lab.WFMT("OscMod").apply(phase=phs), 2048e-9, ampl))
+        read_segs += [f"constel{x}{y}"]
+awg_wfm.add_waveform_segment(WFS_Constant(f"pad", None, -1, 0.0))
+awg_wfm.get_output_channel(0).marker(2).set_markers_to_segments(read_segs)
+awg_wfm.prepare_initial()
+awg_wfm.prepare_final()
+awg_wfm.get_output_channel(0).Output = True
+awg_wfm.get_output_channel(1).Output = True
+#
+lab.PROC('fpga_dsp').reset_pipeline()
+lab.PROC('fpga_dsp').add_stage(FPGA_DDCFIR([[{'fLO':100e6, 'fc':10e6, 'Taps':40}, {'fLO':100e6, 'fc':10e6, 'Taps':40}]]))
+lab.PROC('fpga_dsp').add_stage(FPGA_Decimation('sample', 10))
+lab.PROC('fpga_dsp').add_stage(FPGA_Integrate('sample'))
+#
+acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:SEL DSP1')
+acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:OUTP SVM')
+acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:LINE 1,1,0')
+acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:LINE 2,-1,0')
+acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:LINE 3,0,0')
+#
+acq_module.set_data_processor(lab.PROC('fpga_dsp'))
+leData = acq_module.get_data()
+#
+state_mkrs = ["o", ",", "d", "^", "s", "p", "h", "P"]
+headers = acq_module._instr_acq.get_header_data(1)
+headers = [state_mkrs[x['state1']] for x in headers]
+#
+plt.gca().set_prop_cycle(None)
+for sg in range(acq_module.NumSegments) :
+    times = np.arange(acq_module.NumSamples)/acq_module.SampleRate * 1e9
+    # for c in range(num_corners):
+    #     ax.scatter(leData['data']['CH1_0_I'][sg][c::num_corners], leData['data']['CH1_0_Q'][sg][c::num_corners], marker=str(s+1))
+    for m in range(len(headers)):
+        ax.scatter([leData['data']['CH1_0_I'][sg][m]], [leData['data']['CH1_0_Q'][sg][m]], c='black', alpha=0.1, marker=headers[m])
+x_vals = ax.get_xlim()
+ax.plot(x_vals, np.array(x_vals), 'k-')
+ax.plot(x_vals, -np.array(x_vals), 'k-')
 ax.set_aspect('equal', 'box')
 
 plt.show()

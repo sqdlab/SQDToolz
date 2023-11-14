@@ -299,7 +299,7 @@ class TaborP2584M_AWG(InstrumentChannel):
                 edges = np.where(diffs==-1)[0]
             if edges[0] != 0:
                 edges = np.concatenate([[0], edges])
-            if edges[-1] != edges.size-1:
+            if edges[-1] != int_mkrs.size-1:
                 edges = np.concatenate([edges, [dict_wfm_data['markers'][0][2].size]])
             self._sequence_lens[chan_ind] = np.diff(edges).tolist()
             self._cur_internal_trigs[chan_ind] = True
@@ -328,31 +328,43 @@ class TaborP2584M_AWG(InstrumentChannel):
             self._seg_off_ch4 = 0
 
         #Settle Memory Bank 1 (shared among channels 1 and 2) and Memory Bank 2 (shared among channels 3 and 4)
-        seg_id = 1
-        reset_remaining = False
-        done_reset_remaining = False
-        for cur_ch_ind in range(4):
-            if cur_ch_ind == 2:
-                seg_id = 1      #Going to the next memory bank now...
-                reset_remaining = False
-                done_reset_remaining = False
-            if self._sequence_lens[cur_ch_ind] != None:
-                #Select current channel
-                self._parent._set_cmd(':INST:CHAN', cur_ch_ind+1) #NOTE I'm assuming cur_ch_index is zero indexed adn the command is 1 indexed, hence the +1
-                for m, cur_len in enumerate(self._sequence_lens[cur_ch_ind]):
-                    assert cur_len >= 1024, f"The partitions created for the internal marker have made segments (segment index {m} in this case) that are less than 1024 samples in size."
-                    assert cur_len % 32 == 0, f"The partitions created for the internal marker have made segments (segment index {m} in this case) that are not divisible by 32 samples."
-                    self._parent._set_cmd(':TRACe:SEL', seg_id) # Select segment for clearing
-                    cur_mem_len = self._parent._get_cmd(':TRAC:DEF:LENG?') # Find length of segment
-                    if reset_remaining or cur_mem_len == '' or cur_len != int(cur_mem_len):
-                        if not done_reset_remaining:
-                            self._parent._send_cmd(':TRAC:DEL:ALL') # Clear the current segment
-                        done_reset_remaining = True
-                        reset_remaining = True #NOTE UNSURE OF THIS LOGIC
-                    self._parent._send_cmd(f':TRAC:DEF {seg_id}, {cur_len}') # Specify a segment and its corresponding length
-                    seg_id += 1
-            self._sequence_lens[cur_ch_ind] = None
+        for bank in range(2):
+            reset_banks = False
+            self._parent._set_cmd(':INST:CHAN', 2*bank+1) #CH1 and CH3 - i.e. banks 1 and 2...
+            if self._sequence_lens[bank*2] != None:
+                for m, cur_len in enumerate(self._sequence_lens[bank*2]):
+                    self._parent._set_cmd(':TRACe:SEL', m+1)
+                    cur_mem_len = self._parent._get_cmd(':TRAC:DEF:LENG?')
+                    if cur_mem_len != cur_len:
+                        reset_banks = True
+                        break
+                prev_ch_data_seq_len = len(self._sequence_lens[bank*2])
+            else:
+                prev_ch_data_seq_len = 0            
+            
+            self._parent._chk_err('after setting up memory banks.')
 
+            if self._sequence_lens[bank*2+1] != None and not reset_banks:
+                for m, cur_len in enumerate(self._sequence_lens[bank*2+1]):
+                    self._parent._set_cmd(':TRACe:SEL', m+1+prev_ch_data_seq_len)
+                    cur_mem_len = self._parent._get_cmd(':TRAC:DEF:LENG?')
+                    if cur_mem_len != cur_len:
+                        reset_banks = True
+                        break
+            
+            self._parent._chk_err('after setting up memory banks.')
+            if reset_banks:
+                self._parent._send_cmd(':TRAC:DEL:ALL')
+                if self._sequence_lens[bank*2] != None:
+                    for m, cur_len in enumerate(self._sequence_lens[bank*2]):
+                        self._parent._send_cmd(f':TRAC:DEF {m+1}, {cur_len}')
+                    self._sequence_lens[bank*2] = None
+                if self._sequence_lens[bank*2+1] != None:
+                    for m, cur_len in enumerate(self._sequence_lens[bank*2+1]):
+                        self._parent._send_cmd(f':TRAC:DEF {m+1+prev_ch_data_seq_len}, {cur_len}')
+                    self._sequence_lens[bank*2+1] = None
+
+        self._parent._chk_err('after setting up memory banks.')
         self._banks_setup = True
 
     def program_channel(self, chan_id, dict_wfm_data):

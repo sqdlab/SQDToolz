@@ -472,7 +472,7 @@ class ETHFPGA(Instrument):
                 assert False, "NumRepetitions exceeds memory. Multiple capture method has only been implemented for the case where a data_processor is supplied."
                 # return data_pkt
             else:
-                return cur_processor.get_all_data()
+                return {'data': cur_processor.get_all_data()}
         else:
             self._cur_reps = actual_reps
             self._start(**kwargs)
@@ -496,6 +496,6 @@ class ETHFPGA(Instrument):
                     data_pkt['parameters'].pop(axs)
                     for cur_ch in data_pkt['data']:
                         data_pkt['data'][cur_ch] = np.sum(data_pkt['data'][cur_ch], axis=axs)
-                return data_pkt
+                return {'data': data_pkt}
             else:
-                return cur_processor.get_all_data()
+                return {'data': cur_processor.get_all_data()}

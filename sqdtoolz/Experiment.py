@@ -27,6 +27,8 @@ class Experiment:
             data_file_name = f'{filename}{self._data_file_index}'
         else:
             data_file_name = filename
+        if data_file_name in self._cur_filewriters:
+            return
         data_file = FileIOWriter(self._file_path + data_file_name + '.h5', store_timestamps=self._store_timestamps)
         self._cur_filewriters[data_file_name] = data_file
         return data_file, data_file_name + '.h5'
@@ -99,7 +101,11 @@ class Experiment:
             if not kill_signal():
                 self._expt_config.prepare_instruments()
                 if not kill_signal():
-                    self._data = self._expt_config.get_data()
+                    cur_raw_data = self._expt_config.get_data()
+                    self._data = cur_raw_data.pop('data')
+                    for x in cur_raw_data:
+                        self._init_data_file(x)
+                        self._cur_filewriters[x].push_datapkt(cur_raw_data[x], sweep_vars)
                     data_file.push_datapkt(self._data, sweep_vars)
                     if len(rec_params) > 0:
                         rec_data_file.push_datapkt(self._prepare_rec_params(rec_params, rec_params_extra), sweep_vars)
@@ -160,7 +166,12 @@ class Experiment:
                     if kill_signal():
                         break
 
-                    self._data = self._expt_config.get_data()
+                    #TODO: Consider letting other datasets also be temporarily accessible to mid_proces?
+                    cur_raw_data = self._expt_config.get_data()
+                    self._data = cur_raw_data.pop('data')
+                    for x in cur_raw_data:
+                        self._init_data_file(x)
+                        self._cur_filewriters[x].push_datapkt(cur_raw_data, sweep_vars) #TODO: Update documentation on ACQ Data Format - i.e. for auxiliary pieces...
                     data_file.push_datapkt(self._data, sweep_vars2, sweepEx)
                     if len(rec_params) > 0:
                         rec_data_file.push_datapkt(self._prepare_rec_params(rec_params, rec_params_extra), sweep_vars2, sweepEx)

@@ -370,7 +370,7 @@ class VNA_Agilent_N5232A(VisaInstrument):
 
     def get_data(self, **kwargs):
         if self.SweepMode == 'Time-1f-SW':
-            return self._get_data_SW(**kwargs)
+            return {'data': self._get_data_SW(**kwargs)}
 
         #Set it to sweep mode just in case...
         self.write('SENS:SWE:TRIG:MODE SWE')
@@ -506,8 +506,8 @@ class VNA_Agilent_N5232A(VisaInstrument):
         leProc = kwargs.get('data_processor', None)
         if leProc is not None:
             leProc.push_data(ret_data)
-            return leProc.get_all_data()
-        return ret_data
+            return {'data': leProc.get_all_data()}
+        return {'data': ret_data}
 
     def _get_data_SW(self, **kwargs):
         assert 'trig_func' in kwargs, "Must provide a trigger function to manually trigger the VNA for time-1f-SW!"

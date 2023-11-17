@@ -126,7 +126,7 @@ class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
             }
         self.pack_properties_to_dict(['NumSamples', 'NumSegments', 'NumRepetitions', 'SampleRate', 'InputTriggerEdge', 'ChannelStates'], ret_dict)
         if len(self.decision_blocks) > 0:
-            ret_dict['DecisionBlocks'] = [x._get_current_config() for x in self.decision_blocks]
+            ret_dict['DecisionBlocks'] = [None if x == None else x._get_current_config() for x in self.decision_blocks]
         return ret_dict
 
     def _set_current_config(self, dict_config, lab):
@@ -145,6 +145,7 @@ class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
             self.decision_block = []
             for cur_dec_block in dict_config['DecisionBlocks']:
                 if cur_dec_block == None:
+                    self.decision_block.append(None)
                     continue
                 cur_dec_type = globals()[cur_dec_block['Type']]
-                self.decision_block.append( cur_dec_type.fromConfigDict(dict_config['DecisionBlock']) )
+                self.decision_block.append( cur_dec_type.fromConfigDict(cur_dec_block) )

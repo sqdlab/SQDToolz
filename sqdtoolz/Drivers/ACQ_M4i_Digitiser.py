@@ -219,11 +219,11 @@ class ACQ_M4i_Digitiser(M4i):
             #
             total_num_data = self.NumRepetitions * self.NumSegments * self.NumSamples   #The trimmed indexing is required when using SEQ trigger mode in which the data will be taken in excess...
             #TODO: Investigate the impact of multiplying by mVrange/1000/ADC_to_voltage() to get the voltage - may have a slight performance impact?
-            return {
+            return {'data': {
                 'parameters' : ['repetition', 'segment', 'sample'],
                 'data' : { f'ch{m}' : final_arrs[m][:total_num_data].reshape(self.NumRepetitions, self.NumSegments, self.NumSamples) for m in range(len(final_arrs)) },
                 'misc' : {'SampleRates' : [self.sample_rate.get()]*self.num_channels}
-            }
+            }}
         else:
             #Gather data and either pass it to the data-processor or just collate it under final_arr - note that it is sent to the processor as properly grouped under the ACQ
             #data format specification.
@@ -279,7 +279,7 @@ class ACQ_M4i_Digitiser(M4i):
                 if done:
                     break
         
-            return cur_processor.get_all_data()
+            return {'data': cur_processor.get_all_data()}
 
 from sqdtoolz.HAL.Processors.ProcessorCPU import*
 from sqdtoolz.HAL.Processors.CPU.CPU_DDC import*

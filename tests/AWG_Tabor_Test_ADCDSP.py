@@ -99,7 +99,7 @@ lab.PROC('fpga_dsp').reset_pipeline()
 lab.PROC('fpga_dsp').add_stage(FPGA_DDC([[105e6],[100e6]]))
 lab.PROC('fpga_dsp').add_stage(FPGA_Decimation('sample', 10))
 acq_module.set_data_processor(lab.PROC('fpga_dsp'))
-leData = acq_module.get_data()
+leData = acq_module.get_data()['data']
 #
 lab.PROC('fpga_dsp').reset_pipeline()
 lab.PROC('fpga_dsp').add_stage(FPGA_DDC([[105e6],[100e6]]))
@@ -107,7 +107,7 @@ lab.PROC('fpga_dsp').add_stage(FPGA_Decimation('sample', 10))
 lab.PROC('fpga_dsp').add_stage(FPGA_Integrate('repetition'))
 #
 acq_module.set_data_processor(lab.PROC('fpga_dsp'))
-leData2 = acq_module.get_data()
+leData2 = acq_module.get_data()['data']
 #
 fig, ax = plt.subplots(nrows=2)
 for r in range(acq_module.NumRepetitions) :
@@ -145,7 +145,7 @@ lab.PROC('fpga_dsp').add_stage(FPGA_Decimation('sample', 10))
 lab.PROC('fpga_dsp').add_stage(FPGA_FFT())
 acq_module.set_data_processor(lab.PROC('fpga_dsp'))
 acq_module.NumSamples = 10080
-leData = acq_module.get_data()
+leData = acq_module.get_data()['data']
 #
 fig, ax = plt.subplots(nrows=2)
 for r in range(acq_module.NumRepetitions) :
@@ -182,7 +182,7 @@ for s in range(4):
     lab.PROC('fpga_dsp').add_stage(FPGA_Integrate('sample'))
 
     acq_module.set_data_processor(lab.PROC('fpga_dsp'))
-    leData = acq_module.get_data()
+    leData = acq_module.get_data()['data']
 
     state_mkrs = ["o", ",", "d", "^", "s", "p", "h", "P"]
     headers = acq_module._instr_acq.get_header_data(1)
@@ -202,7 +202,7 @@ for s in range(4):
     # acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:LINE 2,-1,0')
     # acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:LINE 3,0,0')
 
-    leData2 = acq_module.get_data()
+    leData2 = acq_module.get_data()['data']
 
     plt.gca().set_prop_cycle(None)
     for sg in range(acq_module.NumSegments) :
@@ -258,11 +258,12 @@ lab.PROC('fpga_dsp').add_stage(FPGA_Integrate('sample'))
 acq_module.set_decision_block([DEC_SVM([(-1,1,0), (1,1,0), (0,1,0)]), None])
 #
 acq_module.set_data_processor(lab.PROC('fpga_dsp'))
-leData = acq_module.get_data()
+rawData = acq_module.get_data()
+leData = rawData['data']
 #
 state_mkrs = ["o", ",", "d", "^", "s", "p", "h", "P"]
-headers = acq_module._instr_acq.get_header_data(1)
-headers = [state_mkrs[x['state1']] for x in headers]
+headers = rawData['decisions']
+headers = [state_mkrs[x] for x in headers['data']['state1']]
 #
 plt.gca().set_prop_cycle(None)
 for sg in range(acq_module.NumSegments) :
@@ -277,8 +278,14 @@ ax.plot(x_vals, -np.array(x_vals), 'k-')
 ax.plot(x_vals, 0*np.array(x_vals), 'k-')
 ax.set_aspect('equal', 'box')
 
+ExperimentConfiguration("test", lab, 1e-3, ['Waveform'], 'TaborACQ')
+exp = Experiment('test', lab.CONFIG('test'))
+leData = lab.run_single(exp)
+
 plt.show()
 awg_wfm.get_output_channel(0).Output = False
 awg_wfm.get_output_channel(1).Output = False
+
+
 input('Press ENTER to finish test.')
 

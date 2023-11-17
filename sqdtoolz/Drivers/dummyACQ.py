@@ -73,6 +73,10 @@ class DummyACQ(Instrument):
     @property
     def AvailableChannels(self):
         return 2
+    
+    @property
+    def SupportedDecisionBlocks(self):
+        return []   #TODO: Add in some support to unit-test DecisionBlocks
 
     def get_data(self, **kwargs):
         cur_processor = kwargs.get('data_processor', None)
@@ -90,8 +94,8 @@ class DummyACQ(Instrument):
         }
         if cur_processor:
             cur_processor.push_data(ret_val)
-            return cur_processor.get_all_data()
+            return {'data': cur_processor.get_all_data()}
         else:
-            return ret_val
+            return {'data': ret_val}
 
         return np.array([[np.random.rand(self.NumSamples)]*self.NumSegments])

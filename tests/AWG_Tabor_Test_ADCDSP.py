@@ -23,6 +23,8 @@ from sqdtoolz.HAL.Processors.FPGA.FPGA_Decimation import FPGA_Decimation
 from sqdtoolz.HAL.Processors.FPGA.FPGA_Integrate import FPGA_Integrate
 from sqdtoolz.HAL.Processors.FPGA.FPGA_FFT import FPGA_FFT
 
+from sqdtoolz.HAL.Decisions.DEC_SVM import DEC_SVM
+
 import time
 import unittest
 import matplotlib.pyplot as plt
@@ -194,11 +196,11 @@ for s in range(4):
 
     acq_module.set_data_processor(lab.PROC('fpga_dsp'))
 
-    acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:SEL DSP1')
-    acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:OUTP SVM')
-    acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:LINE 1,1,0')
-    acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:LINE 2,-1,0')
-    acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:LINE 3,0,0')
+    # acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:SEL DSP1')
+    # acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:OUTP SVM')
+    # acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:LINE 1,1,0')
+    # acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:LINE 2,-1,0')
+    # acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:LINE 3,0,0')
 
     leData2 = acq_module.get_data()
 
@@ -248,11 +250,12 @@ lab.PROC('fpga_dsp').add_stage(FPGA_DDCFIR([[{'fLO':100e6, 'fc':10e6, 'Taps':40}
 lab.PROC('fpga_dsp').add_stage(FPGA_Decimation('sample', 10))
 lab.PROC('fpga_dsp').add_stage(FPGA_Integrate('sample'))
 #
-acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:SEL DSP1')
-acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:OUTP SVM')
-acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:LINE 1,1,0')
-acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:LINE 2,-1,0')
-acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:LINE 3,0,0')
+# acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:SEL DSP1')
+# acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:OUTP SVM')
+# acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:LINE 1,1,0')
+# acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:LINE 2,-1,0')
+# acq_module._instr_acq._parent._send_cmd(':DSP:DEC:IQP:LINE 3,0,0')
+acq_module.set_decision_block([DEC_SVM([(-1,1,0), (1,1,0), (0,1,0)]), None])
 #
 acq_module.set_data_processor(lab.PROC('fpga_dsp'))
 leData = acq_module.get_data()
@@ -271,6 +274,7 @@ for sg in range(acq_module.NumSegments) :
 x_vals = ax.get_xlim()
 ax.plot(x_vals, np.array(x_vals), 'k-')
 ax.plot(x_vals, -np.array(x_vals), 'k-')
+ax.plot(x_vals, 0*np.array(x_vals), 'k-')
 ax.set_aspect('equal', 'box')
 
 plt.show()

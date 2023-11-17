@@ -148,6 +148,10 @@ class ACQ_M4i_Digitiser(M4i):
         else:
             self.set_ext0_OR_trigger_settings(spcm.SPC_TM_NEG, termination=0, coupling=0, level0=500)
 
+    @property
+    def SupportedDecisionBlocks(self):
+        return []
+
     def _set_segments(self, segments):
         if segments == 0:
             # use autosegmentation. Assuming X0 is the sequence start trigger.

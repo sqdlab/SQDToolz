@@ -8,11 +8,11 @@ There are currently two processor classes given in `ProcCPU` and `ProcGPU` in wh
 
 To enable a list of post-processing nodes (for example, DDC, FIR etc.), the implementations are divided into their appropriate folders; being CPU and GPU at the moment inside the directory sqdtoolz/HAL/Processors. These nodes are child classes of the archetype prescribed in the associated files in `ProcCPU.py` and `ProcGPU.py` (being `ProcNodeCPU` and `ProcNodeGPU`). The node classes in general must implement:
 
-- `input_format` - Returns a list of the indexing parameters expected in the last few indices in the input dataset
-- `output_format` - Returns a list of the indexing parameters that will be output by the last few indices in this node
+- `input_format` - Returns a list of the indexing parameters expected in the last few indices in the input dataset (CHECK THIS)
+- `output_format` - Returns a list of the indexing parameters that will be output by the last few indices in this node (CHECK THIS)
 - `process_data` - Actual function to run the processing
 
-Note that the error handling in the `process_data` function should be written in mind that the formats may change and one may wish to interchange the order of operations. Thus, unless it is explicitly required, the error-handling and subsequent operations should simply operate on the last few indices like 'sample' and 'segment'. In addition, note that in the future, the GPU processing structure may have an overhaul in which the individual nodes are no longer processed individually (that is, CPU-bound) and instead processed as a dynamically compiled pipeline such that any data fed into it automatically processes through the GPU pipeline without any CPU intervention (for example, with Nvidia CUDA, this pipeliningmay be achieved with DALI).
+Note that the error handling in the `process_data` function should be written in mind that the formats may change and one may wish to interchange the order of operations. Thus, unless it is explicitly required, the error-handling and subsequent operations should simply operate on the last few indices like 'sample' and 'segment'. In addition, note that in the future, the GPU processing structure may have an overhaul in which the individual nodes are no longer processed individually (that is, CPU-bound) and instead processed as a dynamically compiled pipeline such that any data fed into it automatically processes through the GPU pipeline without any CPU intervention (for example, with Nvidia CUDA, this pipelining may be achieved with DALI).
 
 
 ## Data passing

@@ -1,6 +1,8 @@
 from sqdtoolz.HAL.TriggerPulse import*
 from sqdtoolz.HAL.HALbase import*
 
+from sqdtoolz.HAL.Decisions.DEC_SVM import DEC_SVM  #TODO: Automate this...
+
 class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
     def __init__(self, hal_name, lab, instr_acq_name):
         HALbase.__init__(self, hal_name)
@@ -10,6 +12,7 @@ class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
             #
             self._trig_src_obj = None
             self.data_processor = None
+            self.decision_blocks = []
 
     @classmethod
     def fromConfigDict(cls, config_dict, lab):
@@ -60,6 +63,10 @@ class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
     @InputTriggerEdge.setter
     def InputTriggerEdge(self, pol):
         self._instr_acq.TriggerInputEdge = pol
+    
+    @property
+    def SupportedDecisionBlocks(self):
+        return self._instr_acq.SupportedDecisionBlocks
 
     def _get_all_trigger_inputs(self):
         return [self]
@@ -72,11 +79,20 @@ class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
     def _get_parent_HAL(self):
         return self
 
+    def set_decision_block(self, DEC_objs):
+        assert isinstance(DEC_objs, list), "DEC_objs must be a list of DEC-objects - i.e. corresponding to ALL the outputs of the processing pipeline on the acquired data."
+        for DEC_obj in DEC_objs:
+            if DEC_obj == None:
+                continue
+            cur_dec_type = DEC_obj.__class__.__name__
+            assert cur_dec_type in self.SupportedDecisionBlocks, f"This ACQ instrument does not support {cur_dec_type}."
+        self.decision_blocks = DEC_objs
+
     def set_data_processor(self, proc_obj):
         self.data_processor = proc_obj
 
     def get_data(self):
-        return self._instr_acq.get_data(data_processor = self.data_processor)
+        return self._instr_acq.get_data(data_processor = self.data_processor, decision_blocks = self.decision_blocks)
 
     def set_trigger_source(self, trig_src_obj):
         assert isinstance(trig_src_obj, TriggerOutput) or trig_src_obj == None, "Must supply a valid Trigger Output object (i.e. digital trigger output like a marker)."
@@ -109,6 +125,8 @@ class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
             'Processor' : proc_name
             }
         self.pack_properties_to_dict(['NumSamples', 'NumSegments', 'NumRepetitions', 'SampleRate', 'InputTriggerEdge', 'ChannelStates'], ret_dict)
+        if len(self.decision_blocks) > 0:
+            ret_dict['DecisionBlocks'] = [x._get_current_config() for x in self.decision_blocks]
         return ret_dict
 
     def _set_current_config(self, dict_config, lab):
@@ -123,3 +141,10 @@ class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
         self.set_trigger_source(trig_src_obj)
         if dict_config['Processor'] != '':
             self.data_processor = lab.PROC(dict_config['Processor'])
+        if 'DecisionBlocks' in dict_config:
+            self.decision_block = []
+            for cur_dec_block in dict_config['DecisionBlocks']:
+                if cur_dec_block == None:
+                    continue
+                cur_dec_type = globals()[cur_dec_block['Type']]
+                self.decision_block.append( cur_dec_type.fromConfigDict(dict_config['DecisionBlock']) )

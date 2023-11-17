@@ -779,6 +779,10 @@ class TaborP2584M_ACQ(InstrumentChannel):
         return 2
 
     @property
+    def SupportedDecisionBlocks(self):
+        return ["DEC_SVM"]
+
+    @property
     def ChannelStates(self):
         return self._ch_states
     @ChannelStates.setter
@@ -1283,7 +1287,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
                 
 
-    def process_dsp_kernel(self, kernelIQs, is_DBUG_line = False):
+    def process_dsp_kernel(self, kernelIQs, is_DBUG_line = False, decision_blocks = []):
         if len(kernelIQs) == 2:
             assert len(kernelIQs[0]) <= 5, "The Tabor P2584M does not support more than 5 demodulations per channel when demodulating across 2 channels."
             assert len(kernelIQs[1]) <= 5, "The Tabor P2584M does not support more than 5 demodulations per channel when demodulating across 2 channels."
@@ -1291,7 +1295,15 @@ class TaborP2584M_ACQ(InstrumentChannel):
             num_ch_divs = (len(kernelIQs[0]), len(kernelIQs[1]))
         else:
             self.ddcBindChannels(True)
-            num_ch_divs = (len(kernelIQs[0]), 0)                    
+            num_ch_divs = (len(kernelIQs[0]), 0)
+        #
+        if len(decision_blocks) == 0:
+            decision_blocks = [None]*(sum([len(x) for x in kernelIQs]))
+        else:
+            assert sum([len(x) for x in kernelIQs]) == len(decision_blocks), "The number of Decision Blocks must match the number of IQ pairs in the final processed output (can be None in the list)."
+        cur_dsp_path = 1
+        dec_blk_ind = 0
+        #
         curIQpath = 4
         for cur_ch in kernelIQs:
             for k, cur_kernel_IQ in enumerate(cur_ch):
@@ -1305,6 +1317,32 @@ class TaborP2584M_ACQ(InstrumentChannel):
                 self._parent._inst.write_binary_data(':DSP:IQD:KER:DATA', mem)
                 self._parent._chk_err("after trying to setup the IQ kernel.")
                 curIQpath += 1
+
+                if decision_blocks[dec_blk_ind] != None:
+                    leDBlk = decision_blocks[dec_blk_ind].get_params()
+                    if leDBlk['Type'] == 'DEC_SVM':
+                        self._parent._send_cmd(f':DSP:DEC:IQP:SEL DSP{cur_dsp_path}')
+                        self._parent._send_cmd(':DSP:DEC:IQP:OUTP SVM')
+                        assert len(leDBlk['Equations']) <= 3, "The Tabor P2584M only supports 3 line inequalities in its SVM per demodulated IQ-pair."
+                        for ind, cur_eqn in enumerate(leDBlk['Equations']):
+                            a,b,c = cur_eqn
+                            if b == 0:
+                                m = -256
+                                assert c == 0, "The Tabor P2584M cannot do pure x=c for c!=0."
+                            else:
+                                c = -c/b
+                                m = -a/b
+                                if m < -256 or m > 255:
+                                    print(f"Warning: gradient for equation {ind} is {m}; this is outside [-256,255]")
+                                if c < -128 or c > 127:
+                                    print(f"Warning: y-intercept for equation {ind} is {c}; this is outside [-128,127]")
+                                m = np.clip(m, -256, 255)
+                                c = np.clip(c, -128, 127)
+                            
+                            self._parent._send_cmd(f":DSP:DEC:IQP:LINE {ind+1},{m},{c}")
+                cur_dsp_path += 1
+                dec_blk_ind += 1
+            cur_dsp_path = 6
             curIQpath = 9   #CH2 starts from IQ9 onwards
         return num_ch_divs
 
@@ -1559,6 +1597,8 @@ class TaborP2584M_ACQ(InstrumentChannel):
             else:
                 final_dsp_order = self._last_dsp_order
                 reprogram_dsps = False
+        
+        decision_blocks = kwargs.get('decision_blocks', [])
 
         self._allocate_frame_memory(final_dsp_order)
 
@@ -1585,7 +1625,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
                 self.fir_block('DBUGQ')
                 self._parent._set_cmd(':DSP:FIR:BYPass','OFF') 
                 self._parent._inst.write_binary_data(':DSP:FIR:DATA', filt_coeffs)
-                final_dsp_order['num_ch_divs'] = self.process_dsp_kernel(final_dsp_order['kernels'], True)
+                final_dsp_order['num_ch_divs'] = self.process_dsp_kernel(final_dsp_order['kernels'], True, decision_blocks)
             else:
                 self.ddr_store('DSP')
                 self._parent._chk_err('after setting to DSP.')
@@ -1595,7 +1635,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
                 self._parent._set_cmd(':DSP:STOR', 'DSP')
                 self._parent._chk_err('after setting up DSP.')
                 #Setup kernel block
-                final_dsp_order['num_ch_divs'] = self.process_dsp_kernel(final_dsp_order['kernels'])
+                final_dsp_order['num_ch_divs'] = self.process_dsp_kernel(final_dsp_order['kernels'], False, decision_blocks)
 
             #Setup repetition averaging if requested
             if final_dsp_order['avRepetitions']:

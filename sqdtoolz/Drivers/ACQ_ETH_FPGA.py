@@ -264,6 +264,10 @@ class ETHFPGA(Instrument):
         self._trigger_edge = 1  #Always setting to positive edge...
         #self._trigger_edge = pol   #TODO: Check if input trigger polarity can be set on this instrument
 
+    @property
+    def SupportedDecisionBlocks(self):
+        return []
+
     #TODO: WRITE A DDC PROPERTY - look up ddc_if2 and ddc_adc1 as well...
     # @property
     # def DdcIfFrequency(self):

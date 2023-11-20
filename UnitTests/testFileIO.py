@@ -214,7 +214,7 @@ class TestExpFileIO(unittest.TestCase):
         wrtr = FileIOWriter('test_save_dir/test.h5', store_timestamps=False)    
         for m in range(1,10):
             sweep_arr = [(self.lab.VAR('test_var'), np.arange(m)), (self.lab.VAR("myFreq"), np.arange(3))]
-            data_pkt = self.lab.HAL("dum_acq").get_data()
+            data_pkt = self.lab.HAL("dum_acq").get_data()['data']
             for n in range(3):
                 wrtr.push_datapkt(data_pkt, sweep_arr)
         wrtr.close()
@@ -230,7 +230,7 @@ class TestExpFileIO(unittest.TestCase):
         wrtr = FileIOWriter('test_save_dir/test2.h5', store_timestamps=True)    
         for m in range(1,10):
             sweep_arr = [(self.lab.VAR('test_var'), np.arange(m)), (self.lab.VAR("myFreq"), np.arange(3))]
-            data_pkt = self.lab.HAL("dum_acq").get_data()
+            data_pkt = self.lab.HAL("dum_acq").get_data()['data']
             for n in range(3):
                 wrtr.push_datapkt(data_pkt, sweep_arr)
         wrtr.close()

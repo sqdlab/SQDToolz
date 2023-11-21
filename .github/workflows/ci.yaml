@@ -22,10 +22,15 @@ jobs:
           python-version: ${{ matrix.python-version }}
           architecture: x64
 
+      - uses: Jimver/cuda-toolkit@v0.2.11
+        id: cuda-toolkit
+        with:
+          cuda: '10.2.0'
+
       - name: Install
         run: |
           pip install -e .
-          pip install cupy
+          pip install cupy-cuda102
         #pip install -r requirements_test.txt          
 
       - name: Run tests

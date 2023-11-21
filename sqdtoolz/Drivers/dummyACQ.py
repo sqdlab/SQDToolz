@@ -99,3 +99,11 @@ class DummyACQ(Instrument):
             return {'data': ret_val}
 
         return np.array([[np.random.rand(self.NumSamples)]*self.NumSegments])
+
+    def get_idn(self):
+        return {
+            "vendor": "QCoDeS",
+            "model": str(self.__class__),
+            "seral": "NA",
+            "firmware": "NA",
+        }

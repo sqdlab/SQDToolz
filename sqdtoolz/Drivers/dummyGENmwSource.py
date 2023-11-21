@@ -115,3 +115,11 @@ class DummyGENmwSrc(Instrument):
     def get_all_outputs(self):
         return [(x,self._source_outputs[x]) for x in self._source_outputs]
 
+
+    def get_idn(self):
+        return {
+            "vendor": "QCoDeS",
+            "model": str(self.__class__),
+            "seral": "NA",
+            "firmware": "NA",
+        }

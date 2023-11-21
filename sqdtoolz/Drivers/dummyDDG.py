@@ -106,3 +106,11 @@ class DummyDDG(Instrument):
     @TriggerSource.setter
     def TriggerSource(self, val):
         self.trigger_source(val)
+
+    def get_idn(self):
+        return {
+            "vendor": "QCoDeS",
+            "model": str(self.__class__),
+            "seral": "NA",
+            "firmware": "NA",
+        }

@@ -1163,7 +1163,8 @@ class TestExpFeatures(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    # temp = TestColdReload()
+    temp = TestColdReload()
+    temp.initialise()
     # temp.test_LabAndExpConfigs() #test_SPECs()
     temp = TestExpFeatures()
     temp.test_MidProcess()

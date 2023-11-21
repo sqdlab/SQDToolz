@@ -111,3 +111,11 @@ class DummyAWG(Instrument):
         # print(dict_wfm_data['waveforms'][0])
         print("Programmed Dummy AWG!")
         pass
+
+    def get_idn(self):
+        return {
+            "vendor": "QCoDeS",
+            "model": str(self.__class__),
+            "seral": "NA",
+            "firmware": "NA",
+        }

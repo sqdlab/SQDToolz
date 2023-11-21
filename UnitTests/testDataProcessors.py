@@ -2433,6 +2433,6 @@ class TestFPGA(unittest.TestCase):
         self.cleanup()
 
 if __name__ == '__main__':
-    # TestGPU().test_ESD()
-    TestFPGA().test_reprogram()
+    TestGPU().test_ESD()
+    # TestFPGA().test_reprogram()
     unittest.main()

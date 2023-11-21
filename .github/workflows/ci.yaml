@@ -11,7 +11,10 @@ jobs:
         os: ["windows-latest"]
         #os: ["ubuntu-latest", "windows-latest", "macos-latest"]
         python-version: ["3.9"]
-
+    # XXX Workaround for Windows runners redirecting the output of commands to files.
+    # See: https://github.com/databrickslabs/dbx/issues/455#issuecomment-1312770919
+    env:
+      PYTHONIOENCODING: "utf8"
     steps:
       - name: Checkout source
         uses: actions/checkout@v2

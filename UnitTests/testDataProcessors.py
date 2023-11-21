@@ -21,6 +21,7 @@ try:
     from sqdtoolz.HAL.Processors.GPU.GPU_ChannelArithmetic import*
     TEST_GPU = True
 except ModuleNotFoundError:
+    TEST_GPU = False
     pass
 
 from sqdtoolz.HAL.Processors.ProcessorFPGA import*
@@ -1212,6 +1213,9 @@ class TestGPU(unittest.TestCase):
         return np.max(np.abs(arr1 - arr2)/np.abs(arr2 + 2*self.ERR_TOL)) < self.ERR_TOL
     
     def test_IQdemod(self):
+        if not TEST_GPU:
+            return
+
         self.initialise()
         try:
             test_proc = ProcessorGPU('test',self.lab)
@@ -1270,6 +1274,9 @@ class TestGPU(unittest.TestCase):
 
 
     def test_IQddc(self):
+        if not TEST_GPU:
+            return
+
         self.initialise()
         try:
             test_proc = ProcessorGPU('test',self.lab)
@@ -1405,6 +1412,9 @@ class TestGPU(unittest.TestCase):
         self.cleanup()
 
     def test_Mean(self):
+        if not TEST_GPU:
+            return
+
         self.initialise()
         try:
             test_proc = ProcessorGPU('test',self.lab)
@@ -1496,6 +1506,9 @@ class TestGPU(unittest.TestCase):
         self.cleanup()
 
     def test_MeanBlock(self):
+        if not TEST_GPU:
+            return
+
         self.initialise()
         try:
             test_proc = ProcessorGPU('test',self.lab)
@@ -1640,6 +1653,9 @@ class TestGPU(unittest.TestCase):
         self.cleanup()
 
     def test_Integrate(self):
+        if not TEST_GPU:
+            return
+
         self.initialise()
         try:
             test_proc = ProcessorGPU('test',self.lab)
@@ -1714,6 +1730,9 @@ class TestGPU(unittest.TestCase):
         self.cleanup()
 
     def test_Max(self):
+        if not TEST_GPU:
+            return
+
         self.initialise()
         try:
             test_proc = ProcessorGPU('test',self.lab)
@@ -1769,6 +1788,9 @@ class TestGPU(unittest.TestCase):
         self.cleanup()
 
     def test_ConstantArithmetic(self):
+        if not TEST_GPU:
+            return
+
         self.initialise()
         try:
             test_proc = ProcessorGPU('test',self.lab)
@@ -1866,6 +1888,9 @@ class TestGPU(unittest.TestCase):
         self.cleanup()
 
     def test_ChannelArithmetic(self):
+        if not TEST_GPU:
+            return
+
         self.initialise()
         try:
             test_proc = ProcessorGPU('test',self.lab)
@@ -2073,6 +2098,9 @@ class TestGPU(unittest.TestCase):
         self.cleanup()
 
     def test_FFT(self):
+        if not TEST_GPU:
+            return
+
         self.initialise()
         try:
             test_proc = ProcessorGPU('test',self.lab)
@@ -2146,6 +2174,9 @@ class TestGPU(unittest.TestCase):
         self.cleanup()
 
     def test_ESD(self):
+        if not TEST_GPU:
+            return
+
         self.initialise()
         try:
             test_proc = ProcessorGPU('test',self.lab)
@@ -2216,6 +2247,9 @@ class TestGPU(unittest.TestCase):
         self.cleanup()
 
     def test_Duplicate(self):
+        if not TEST_GPU:
+            return
+
         self.initialise()
         try:
             test_proc = ProcessorGPU('test',self.lab)
@@ -2334,6 +2368,9 @@ class TestGPU(unittest.TestCase):
         self.cleanup()
 
     def test_Rename(self):
+        if not TEST_GPU:
+            return
+
         self.initialise()
         try:
             test_proc = ProcessorGPU('test',self.lab)

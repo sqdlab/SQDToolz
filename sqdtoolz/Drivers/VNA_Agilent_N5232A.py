@@ -144,6 +144,7 @@ class VNA_Agilent_N5232A(VisaInstrument):
 
         self._num_repetitions = 1
         self._segment_freqs = []
+        self._num_output_ports = 1
 
         # *IDN?
         self.connect_message()
@@ -325,6 +326,8 @@ class VNA_Agilent_N5232A(VisaInstrument):
             cur_name = f'ch1_{cur_s_str}'
             self.write(f'CALC:PAR:EXT {cur_name}, {cur_s_str}')
             self.write(f'DISP:WIND:TRAC{i+1}:FEED {cur_name}')
+        self._num_output_ports = np.unique([x[1] for x in ports_meas_src_tuples]).size
+
         # self.ElecDelayTime = prev_elec_delay
 
         if self.SweepMode == 'Time-1f-SW':
@@ -422,8 +425,10 @@ class VNA_Agilent_N5232A(VisaInstrument):
                         self._set_visa_timeout(len(cur_meas_traces)*self.sweep_time.get() + 5)
                     except AttributeError:
                         self._set_visa_timeout(self.sweep_time.get() + 5)
-                    self.write('ABORT; :INIT:IMM')
-                    self.ask('*OPC?')
+                    self.write('ABORT;')
+                    for swpInd in range(self._num_output_ports):
+                        self.write(':INIT:IMM')
+                        self.ask('*OPC?')
                 for cur_meas_name, cur_meas in cur_meas_traces:
                     self.write(f'CALC:PAR:SEL \'{cur_meas_name}\'')
                     #Note that SDATA just means complex-valued...
@@ -456,8 +461,10 @@ class VNA_Agilent_N5232A(VisaInstrument):
                         self._set_visa_timeout(len(cur_meas_traces)*self.sweep_time.get() + 5)
                     except AttributeError:
                         self._set_visa_timeout(self.sweep_time.get() + 5)
-                    self.write('ABORT; :INIT:IMM')
-                    self.ask('*OPC?')
+                    self.write('ABORT;')
+                    for swpInd in range(self._num_output_ports):
+                        self.write(':INIT:IMM')
+                        self.ask('*OPC?')
                 for cur_meas_name, cur_meas in cur_meas_traces:
                     self.write(f'CALC:PAR:SEL \'{cur_meas_name}\'')
                     #Note that SDATA just means complex-valued...
@@ -489,8 +496,10 @@ class VNA_Agilent_N5232A(VisaInstrument):
                         self._set_visa_timeout(len(cur_meas_traces)*self.sweep_time.get() + 5)
                     except AttributeError:
                         self._set_visa_timeout(self.sweep_time.get() + 5)
-                    self.write('ABORT; :INIT:IMM')
-                    self.ask('*OPC?')
+                    self.write('ABORT;')
+                    for swpInd in range(self._num_output_ports):
+                        self.write(':INIT:IMM')
+                        self.ask('*OPC?')
                 for cur_meas_name, cur_meas in cur_meas_traces:
                     self.write(f'CALC:PAR:SEL \'{cur_meas_name}\'')
                     #Note that SDATA just means complex-valued...

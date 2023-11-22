@@ -8,5 +8,6 @@ instruments:
   vna:
     driver: sqdtoolz.Drivers.VNA_Agilent_N5232A
     type: VNA_Agilent_N5232A
-    address: 'TCPIP0::SMP-U6M3K63::hislip_PXI10_CHASSIS2_SLOT1_INDEX0::INSTR'
+    address: 'TCPIP::192.168.1.202::INSTR'
+    #address: 'TCPIP0::SMP-U6M3K63::hislip_PXI10_CHASSIS2_SLOT1_INDEX0::INSTR'
     enable_forced_reconnect: true

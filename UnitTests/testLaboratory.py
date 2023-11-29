@@ -18,6 +18,8 @@ from sqdtoolz.HAL.Processors.CPU.CPU_DDC import*
 from sqdtoolz.HAL.Processors.CPU.CPU_FIR import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Mean import*
 
+from sqdtoolz.ExperimentSweeps import*
+
 import numpy as np
 import shutil
 import os.path
@@ -1161,11 +1163,35 @@ class TestExpFeatures(unittest.TestCase):
         shutil.rmtree('test_save_dir')
         self.cleanup()
 
+class TestExpSweeps(unittest.TestCase):
+    def arr_equality(self, arr1, arr2):
+        if arr1.size != arr2.size:
+            return False
+        return np.sum(np.abs(arr1 - arr2)) < 1e-12
+
+    def test_Snake(self):
+        def _test(cur_shape, cur_ind):
+            cur_inds = ExSwpSnake(cur_ind).get_sweep_indices(1+2*np.arange(np.prod(cur_shape)), cur_shape)
+            inds_forward = np.arange(np.prod(cur_shape[cur_ind:]))
+            num_inner = np.prod(cur_shape[cur_ind+1:])
+            inds_reverse = np.concatenate([np.arange(x*num_inner, (x+1)*num_inner) for x in range(cur_shape[cur_ind]-1,-1,-1)])
+            num_outer = int(np.prod(cur_shape[:cur_ind]))
+            num_outer_offset = int(cur_shape[cur_ind]*num_inner)
+            fin_arr = []
+            for m in range(num_outer):
+                if m % 2 == 1:
+                    fin_arr.append(inds_reverse+m*num_outer_offset)
+                else:
+                    fin_arr.append(inds_forward+m*num_outer_offset)
+            fin_arr = np.concatenate(fin_arr)
+            assert self.arr_equality(cur_inds, 1+2*fin_arr), "ExSwpSnake did not permute the indices correctly."
+
+        _test((5,10,5),1)
+        _test((5,10,5),0)
+        _test((5,10,5),2)
+        _test((5,7,10,5),1)
 
 if __name__ == '__main__':
-    temp = TestColdReload()
-    temp.initialise()
-    # temp.test_LabAndExpConfigs() #test_SPECs()
-    temp = TestExpFeatures()
-    temp.test_MidProcess()
+    temp = TestExpSweeps()
+    temp.test_Snake()
     unittest.main()

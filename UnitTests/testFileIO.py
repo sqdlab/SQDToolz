@@ -19,6 +19,7 @@ from sqdtoolz.HAL.Processors.CPU.CPU_FIR import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Mean import*
 
 from pathlib import Path
+import time
 
 import numpy as np
 import shutil
@@ -276,6 +277,7 @@ class TestExpFileIO(unittest.TestCase):
                                     'ch2' : np.array([[[swp_val1+2*swp_val2+(s+4*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
                         'misc' : {'SampleRates' : [1,3]}
                     }
+                    time.sleep(0.001)
                     if isinstance(swp_1_order, np.ndarray):
                         leFileW.push_datapkt(cur_data, [(self.lab.VAR('test_var1'), swp_1_vals), (self.lab.VAR('test_var2'), swp_2_vals)], dset_ind=swp_1_order[m1]*swp_2_order.size+swp_2_order[m2])
                     else:

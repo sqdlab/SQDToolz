@@ -1164,6 +1164,64 @@ class TestExpFeatures(unittest.TestCase):
         self.cleanup()
 
 class TestExpSweeps(unittest.TestCase):
+    def initialise(self):
+        self.lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir/')
+
+        self.lab.load_instrument('virACQ')
+        self.lab.load_instrument('virDDG')
+        self.lab.load_instrument('virAWG')
+        self.lab.load_instrument('virMWS')
+        self.lab.load_instrument('virMWS2')
+
+        #Initialise test-modules
+        hal_acq = ACQ("dum_acq", self.lab, 'virACQ')
+        hal_ddg = DDG("ddg", self.lab, 'virDDG', )
+        awg_wfm = WaveformAWG("Wfm1", self.lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9)
+        hal_mw = GENmwSource("MW-Src", self.lab, 'virMWS', 'CH1')
+        hal_mw2 = GENmwSource("MW-Src2", self.lab, 'virMWS2', 'CH1')
+
+        #Reinitialise the waveform
+        read_segs = []
+        read_segs2 = []
+        awg_wfm.clear_segments()
+        awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, 10e-9, 0.0))
+        for m in range(4):
+            awg_wfm.add_waveform_segment(WFS_Gaussian(f"init{m}", None, 20e-9, 0.5-0.1*m))
+            awg_wfm.add_waveform_segment(WFS_Constant(f"zero1{m}", None, 30e-9, 0.1*m))
+            awg_wfm.add_waveform_segment(WFS_Gaussian(f"init2{m}", None, 45e-9, 0.5-0.1*m))
+            awg_wfm.add_waveform_segment(WFS_Constant(f"zero2{m}", None, 77e-9*(m+1), 0.0))
+            read_segs += [f"init{m}"]
+            read_segs2 += [f"zero2{m}"]
+        awg_wfm.get_output_channel(0).marker(1).set_markers_to_segments(read_segs)
+        awg_wfm.get_output_channel(1).marker(0).set_markers_to_segments(read_segs2)
+        awg_wfm.AutoCompression = 'None'#'Basic'
+
+        expConfig = ExperimentConfiguration('testConf', self.lab, 1.0, ['ddg', 'Wfm1', 'MW-Src'], 'dum_acq')
+        expConfig = ExperimentConfiguration('testConf2', self.lab, 1.0, ['ddg', 'MW-Src'], 'dum_acq')
+
+        VariableInternal('myFreq', self.lab)
+        VariableProperty('testAmpl', self.lab, self.lab.HAL("Wfm1").get_waveform_segment('init0'), 'Amplitude')
+        self.lab.VAR('testAmpl').Value = 86
+        VariableProperty('test RepTime', self.lab, self.lab.HAL("ddg"), 'RepetitionTime')
+        self.lab.VAR('test RepTime').Value = 99
+        VariableInternal('myDura1', self.lab)
+        self.lab.VAR('myDura1').Value = 2016
+        VariableProperty('myDura2', self.lab, self.lab.HAL("Wfm1").get_waveform_segment('init2'), 'Duration')
+        VariableSpaced('testSpace', self.lab, 'myDura1', 'myDura2', 3.1415926)
+        self.lab.VAR('testSpace').Value = 2016
+
+        WFMT_ModulationIQ("IQmod", self.lab, 49e6)
+        self.lab.WFMT("IQmod").IQFrequency = 84e7
+        self.lab.WFMT("IQmod").IQAmplitude = 9.4
+        self.lab.WFMT("IQmod").IQAmplitudeFactor = 78.1
+        self.lab.WFMT("IQmod").IQPhaseOffset = 54.3
+        self.lab.WFMT("IQmod").IQdcOffset = (9,1)
+        self.lab.WFMT("IQmod").IQUpperSideband = False
+
+    def cleanup(self):
+        self.lab.release_all_instruments()
+        self.lab = None
+
     def arr_equality(self, arr1, arr2):
         if arr1.size != arr2.size:
             return False
@@ -1190,8 +1248,32 @@ class TestExpSweeps(unittest.TestCase):
         _test((5,10,5),0)
         _test((5,10,5),2)
         _test((5,7,10,5),1)
+    
+    def test_SnakeExp(self):
+        self.initialise()
+        
+        #Check out recorded parameter storage
+        #
+        #Check permutations do not change result...
+        exp = Experiment("test", self.lab.CONFIG('testConf'))
+        self.lab.VAR('myFreq').Value = 5
+        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1)), (self.lab.VAR('test RepTime'), np.linspace(9,12,4))], rec_params=[(self.lab.WFMT("IQmod"), 'IQFrequency'), (self.lab.HAL("MW-Src"), 'Power')],
+                                  sweep_orders=[ExSwpSnake(1)])
+        assert hasattr(exp, 'last_rec_params'), "Running an experiment with rec_params did not create an attribute \'last_rec_params\'."
+        assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array().shape), np.array([3,4,2]))
+        val = self.lab.WFMT("IQmod").IQFrequency
+        val2 = self.lab.HAL("MW-Src").Power
+        assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array()), np.array([[[val,val2]]*4]*3))
+        assert self.arr_equality(np.array(exp.last_rec_params.param_vals[0]), np.arange(0,3,1))
+        assert self.arr_equality(np.array(exp.last_rec_params.param_vals[1]), np.linspace(9,12,4))
+        res.release()
+        #
+        exp = None
+
+        shutil.rmtree('test_save_dir')
+        self.cleanup()
 
 if __name__ == '__main__':
     temp = TestExpSweeps()
-    temp.test_Snake()
+    temp.test_SnakeExp()
     unittest.main()

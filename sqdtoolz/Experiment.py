@@ -3,6 +3,7 @@ import numpy as np
 import time
 import json
 from sqdtoolz.Variable import VariablePropertyOneManyTransient
+from sqdtoolz.ExperimentSweeps import ExperimentSweepBase
 
 import matplotlib.pyplot as plt
 
@@ -148,8 +149,18 @@ class Experiment:
                     pass
                 self._sweep_grids = np.transpose(self._sweep_grids, axes=axes).reshape(len(sweep_arrays),-1).T
                 
+                #Setup permutations on the sweeping orders:        
+                sweep_orders = kwargs.get('sweep_orders', [])
+                swp_order = np.arange(self._sweep_grids.shape[0])
+                for cur_order in sweep_orders:
+                    assert isinstance(cur_order, ExperimentSweepBase), "The argument sweep_orders must be specified as a list of ExpSwp* (i.e. ExperimentSweepBase) objects."
+                    swp_order = cur_order.get_sweep_indices(swp_order, self._sweep_shape)
+
                 #sweep_vars2 is given as a list of tuples formatted as (parameter, sweep-values in an numpy-array)
-                for ind_coord, cur_coord in enumerate(self._sweep_grids):
+                for m in range(self._sweep_grids.shape[0]):
+                    ind_coord = swp_order[m]
+                    cur_coord = self._sweep_grids[swp_order[m]]
+
                     self._cur_ind_coord = ind_coord
                     #Set the values
                     for ind, cur_val in enumerate(cur_coord):
@@ -171,10 +182,10 @@ class Experiment:
                     self._data = cur_raw_data.pop('data')
                     for x in cur_raw_data:
                         self._init_data_file(x)
-                        self._cur_filewriters[x].push_datapkt(cur_raw_data, sweep_vars) #TODO: Update documentation on ACQ Data Format - i.e. for auxiliary pieces...
-                    data_file.push_datapkt(self._data, sweep_vars2, sweepEx)
+                        self._cur_filewriters[x].push_datapkt(cur_raw_data, sweep_vars, dset_ind=ind_coord) #TODO: Update documentation on ACQ Data Format - i.e. for auxiliary pieces...
+                    data_file.push_datapkt(self._data, sweep_vars2, sweepEx, dset_ind=ind_coord)
                     if len(rec_params) > 0:
-                        rec_data_file.push_datapkt(self._prepare_rec_params(rec_params, rec_params_extra), sweep_vars2, sweepEx)
+                        rec_data_file.push_datapkt(self._prepare_rec_params(rec_params, rec_params_extra), sweep_vars2, sweepEx, dset_ind=ind_coord)
                     self._sweep_vars = sweep_vars2
                     self._mid_process()
                     self._data = None

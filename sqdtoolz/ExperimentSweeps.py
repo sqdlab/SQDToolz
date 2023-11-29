@@ -12,6 +12,7 @@ class ExSwpSnake(ExperimentSweepBase):
     def get_sweep_indices(self, array_indices, array_shape):
         if self._snake_ind == 0:
             return array_indices
+        assert self._snake_ind <= len(array_shape), f"Index {self._snake_ind} exceeds the number of sweeping dimensions ({len(array_shape)} in this case)."
         
         if self._snake_ind == len(array_shape)-1:
             jump = 1
@@ -40,6 +41,7 @@ class ExSwpRandom(ExperimentSweepBase):
     def get_sweep_indices(self, array_indices, array_shape):
         if self._snake_ind == 0:
             return array_indices
+        assert self._snake_ind <= len(array_shape), f"Index {self._snake_ind} exceeds the number of sweeping dimensions ({len(array_shape)} in this case)."
         
         if self._snake_ind == len(array_shape)-1:
             jump = 1

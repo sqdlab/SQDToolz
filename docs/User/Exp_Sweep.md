@@ -5,6 +5,12 @@ Experiments can be run while sweeping the value of `Variable` objects over a lis
 - The engine first sets the variable value to the first value in the list after which, data is then gathered. This sequence repeats for all values in the list.
 - Each sweeping parameter is given as a tuple of: (`Variable` object, numpy array of values) - except for the case where one wishes to sweep a one-many parametric set as discussed later below.
 
+This article covers:
+- [Basic Sweeps](#basic-sweeps)
+- [One-Many Sweeps](#one-many-sweeps)
+- [Changing the sampled order in sweeps](#changing-the-sampled-order-in-sweeps)
+
+
 ## Basic sweeps
 
 Example syntax of a sweeping experiment is shown below (assuming `lab` is the `Laboratory` object):
@@ -106,3 +112,7 @@ lab.VAR("A1").Value, lab.VAR("P1").Value, lab.VAR("A2").Value, lab.VAR("P2").Val
 lab.VAR("A1").Value, lab.VAR("P1").Value, lab.VAR("A2").Value, lab.VAR("P2").Value = (4,-3,2,-2)
 # --- Get Data --- #
 ```
+
+## Changing the sampled order in sweeps
+
+TBW

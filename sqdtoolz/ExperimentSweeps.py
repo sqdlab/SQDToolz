@@ -17,11 +17,11 @@ class ExSwpSnake(ExperimentSweepBase):
         if self._snake_ind == len(array_shape)-1:
             jump = 1
         else:
-            jump = np.prod(array_shape[self._snake_ind+1:])
+            jump = int(np.prod(array_shape[self._snake_ind+1:]))
         
         snake_size = array_shape[self._snake_ind]
 
-        outer_sweep_offset = np.prod(array_shape[:self._snake_ind])
+        outer_sweep_offset = int(np.prod(array_shape[:self._snake_ind]))
         snake_offset = snake_size*jump
 
         ret_indices = array_indices*1
@@ -39,18 +39,16 @@ class ExSwpRandom(ExperimentSweepBase):
         self._snake_ind = snake_ind
     
     def get_sweep_indices(self, array_indices, array_shape):
-        if self._snake_ind == 0:
-            return array_indices
         assert self._snake_ind <= len(array_shape), f"Index {self._snake_ind} exceeds the number of sweeping dimensions ({len(array_shape)} in this case)."
         
         if self._snake_ind == len(array_shape)-1:
             jump = 1
         else:
-            jump = np.prod(array_shape[self._snake_ind+1:])
+            jump = int(np.prod(array_shape[self._snake_ind+1:]))
         
         snake_size = array_shape[self._snake_ind]
 
-        outer_sweep_offset = np.prod(array_shape[:self._snake_ind])
+        outer_sweep_offset = int(np.prod(array_shape[:self._snake_ind]))
         snake_offset = snake_size*jump
 
         ret_indices = array_indices*1
@@ -68,4 +66,5 @@ class ExSwpRandom(ExperimentSweepBase):
         return ret_indices
 
 if __name__ == '__main__':
-    ExSwpRandom(1).get_sweep_indices(np.arange(3*10*5), (3,10,5))
+    ExSwpRandom(0).get_sweep_indices(np.arange(10), (10,))
+    ExSwpRandom(0).get_sweep_indices(np.arange(3*10*5), (3,10,5))

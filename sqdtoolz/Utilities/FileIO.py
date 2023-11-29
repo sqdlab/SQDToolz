@@ -97,7 +97,7 @@ class FileIOWriter:
                 
                 self._hf.swmr_mode = True
 
-    def push_datapkt(self, data_pkt, sweep_vars, sweepEx = {}):
+    def push_datapkt(self, data_pkt, sweep_vars, sweepEx = {}, dset_ind = -1):
         self._init_hdf5(sweep_vars, data_pkt, sweepEx)
 
         cur_shape = self._dset.shape
@@ -117,13 +117,16 @@ class FileIOWriter:
                 ts_shape = self._dsetTS.shape
                 self._dsetTS.resize((proposed_arr_size,))
 
+        if dset_ind >= 0:
+            cur_dset_ind = dset_ind
+        else:
+            cur_dset_ind = self._dset_ind
         cur_data = np.vstack([data_pkt['data'][x].flatten() for x in self._meas_chs]).T
-        self._dset[self._dset_ind*self._datapkt_size : (self._dset_ind+1)*self._datapkt_size] = cur_data
+        self._dset[cur_dset_ind*self._datapkt_size : (cur_dset_ind+1)*self._datapkt_size] = cur_data
         if self.store_timestamps:
             #Trick taken from here: https://stackoverflow.com/questions/68443753/datetime-storing-in-hd5-database
-            cur_times = [np.datetime64(datetime.now())] * cur_data.shape[0]
-            utc_strs = np.array( [np.datetime_as_string(n,timezone='UTC').encode('utf-8') for n in cur_times] )
-            self._dsetTS[self._dset_ind*self._datapkt_size : (self._dset_ind+1)*self._datapkt_size] = utc_strs
+            utc_strs = np.repeat(np.datetime_as_string(np.datetime64(datetime.now()),timezone='UTC').encode('utf-8'), cur_data.shape[0])
+            self._dsetTS[cur_dset_ind*self._datapkt_size : (cur_dset_ind+1)*self._datapkt_size] = utc_strs
             self._dsetTS.flush()
         self._dset_ind += 1
         self._dset.flush()

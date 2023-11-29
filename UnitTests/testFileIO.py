@@ -248,6 +248,66 @@ class TestExpFileIO(unittest.TestCase):
 
         self.cleanup()
 
+    def test_WriteArbitraryIndex(self):
+        def _test(swp_1_vals, swp_2_vals, swp_1_order = None, swp_2_order = None):
+            self.initialise()
+            VariableInternal('test_var1', self.lab, 0)
+            VariableInternal('test_var2', self.lab, 0)
+
+            if os.path.exists('testFile.h5'):
+                os.remove('testFile.h5')
+            leFileW = FileIOWriter('testFile.h5')
+
+            data_size = 64#*1024*4
+            num_reps = 5   #keep greater than 2
+            num_segs = 6
+
+            if not isinstance(swp_1_order, np.ndarray):
+                swp_1_order = np.arange(swp_1_vals.size)
+                swp_2_order = np.arange(swp_2_vals.size)
+
+            for m1 in range(swp_1_vals.size):
+                for m2 in range(swp_2_vals.size):
+                    swp_val1 = swp_1_vals[swp_1_order[m1]]
+                    swp_val2 = swp_2_vals[swp_2_order[m2]]
+                    cur_data = {
+                        'parameters' : ['repetition', 'segment', 'sample'],
+                        'data' : {  'ch1' : np.array([[[swp_val1+swp_val2+(s+2*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]),
+                                    'ch2' : np.array([[[swp_val1+2*swp_val2+(s+4*r)*x for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)]) },
+                        'misc' : {'SampleRates' : [1,3]}
+                    }
+                    if isinstance(swp_1_order, np.ndarray):
+                        leFileW.push_datapkt(cur_data, [(self.lab.VAR('test_var1'), swp_1_vals), (self.lab.VAR('test_var2'), swp_2_vals)], dset_ind=swp_1_order[m1]*swp_2_order.size+swp_2_order[m2])
+                    else:
+                        leFileW.push_datapkt(cur_data, [(self.lab.VAR('test_var1'), swp_1_vals), (self.lab.VAR('test_var2'), swp_2_vals)])
+
+            tempRdr = FileIOReader('testFile.h5')
+            arr = tempRdr.get_numpy_array()
+
+            expected_ans = np.array([[[[[[swp_val1+swp_val2+(s+2*r)*x, swp_val1+2*swp_val2+(s+4*r)*x] for x in range(1,data_size+1)] for s in range(1,num_segs+1)] for r in range(1,num_reps+1)] for swp_val2 in swp_2_vals] for swp_val1 in swp_1_vals])
+            assert self.arr_equality(arr, expected_ans), "The data pushing into FileIOWriter did not yield the correct data storage."
+            ts = tempRdr.get_time_stamps()
+            leStoredOrd = np.argsort(ts[0,:,0,0,0])
+            assert self.arr_equality(leStoredOrd, swp_2_order), "The stored time-stamp does not match the actual storage order."
+            leStoredOrd = np.argsort(ts[-1,:,0,0,0])
+            assert self.arr_equality(leStoredOrd, swp_2_order), "The stored time-stamp does not match the actual storage order."
+            leStoredOrd = np.argsort(ts[:,0,0,0,0])
+            assert self.arr_equality(leStoredOrd, swp_1_order), "The stored time-stamp does not match the actual storage order."
+            leStoredOrd = np.argsort(ts[:,-1,0,0,0])
+            assert self.arr_equality(leStoredOrd, swp_1_order), "The stored time-stamp does not match the actual storage order."
+
+            leFileW.close()
+            tempRdr.release()
+
+            os.remove('testFile.h5')
+            self.cleanup()
+        
+        _test(np.array([-10,-5,0]), np.linspace(0,101,100))
+        rng = np.random.default_rng()
+        ord1 = np.arange(3); rng.shuffle(ord1)
+        ord2 = np.arange(100); rng.shuffle(ord2)
+        _test(np.array([-10,-5,0]), np.linspace(0,101,100), ord1, ord2)
+
     def test_Datalogger(self):
         self.initialise()
 
@@ -286,5 +346,5 @@ class TestExpFileIO(unittest.TestCase):
 
 if __name__ == '__main__':
     temp = TestExpFileIO()
-    temp.test_Datalogger()
-    unittest.main()
+    temp.test_WriteArbitraryIndex()
+    # unittest.main()

@@ -115,4 +115,89 @@ lab.VAR("A1").Value, lab.VAR("P1").Value, lab.VAR("A2").Value, lab.VAR("P2").Val
 
 ## Changing the sampled order in sweeps
 
-TBW
+The sweeping variables specify how multidimensional data is stored and indexed. However:
+
+- One may wish to record/sample these multidimensional data points in a different order.
+- For example, sweeping frequency from 1GHz to 9GHz in 10MHz steps, but with the sampling done out of order, while being stored in the correct order.
+- Another example is a 2D sweep for power across the range [0, 3, 6, 9] and some gate voltage across -20V to 20V. The default order is to set the power to 0, sample the points for voltage from -20V to 20V, set the power to 3, sample the points for voltage from -20V to 20V etc. However, the jump in voltage may be undesirable, so instead a snake pattern is more appropriate where in every alternate power, the voltage is sampled in reverse from 20V to -20V. Note that the stored/index order is still the same as the default sampled order.
+- Another example is also the order in which Ramsey measurements are taken. Due to drift, it may be useful to sample the wait times in a random order while storing them in the correct ascending order as requested.
+
+One specifies the sampled order via the `sweep_orders` passed onto the `run_single` function in the `Laboratory` object:
+
+```python
+from sqdtoolz.ExperimentSweeps import*
+...
+#Assuming that exp is an Experiment object and lab is a Laboratory object
+lab.run_single(exp, [(lab.VAR('power'), np.arange(-30, 10, 10)), (lab.VAR('flux'), np.arange(-20,20,0.1))], sweep_orders=[ExSwpSnake(1)])
+```
+
+In the above example **without** `sweep_orders`, it would sweep as follows:
+
+```python
+lab.VAR("power").Value = -30
+lab.VAR("flux").Value = -20
+# --- Get Data --- #
+lab.VAR("flux").Value = -19.9
+# --- Get Data --- #
+...
+lab.VAR("flux").Value = 19.8
+# --- Get Data --- #
+lab.VAR("flux").Value = 19.9
+# --- Get Data --- #
+
+lab.VAR("power").Value = -20
+lab.VAR("flux").Value = -20
+# --- Get Data --- #
+lab.VAR("flux").Value = -19.9
+# --- Get Data --- #
+...
+lab.VAR("flux").Value = 19.8
+# --- Get Data --- #
+lab.VAR("flux").Value = 19.9
+# --- Get Data --- #
+
+...
+```
+
+However, with the `sweep_orders=[ExSwpSnake(1)]` command ensures that the index 1 variable (i.e. `'flux'`) is now swept as a snake to get:
+
+```python
+lab.VAR("power").Value = -30
+lab.VAR("flux").Value = -20
+# --- Get Data --- #
+lab.VAR("flux").Value = -19.9
+# --- Get Data --- #
+...
+lab.VAR("flux").Value = 19.8
+# --- Get Data --- #
+lab.VAR("flux").Value = 19.9
+# --- Get Data --- #
+
+lab.VAR("power").Value = -20
+lab.VAR("flux").Value = 19.9
+# --- Get Data --- #
+lab.VAR("flux").Value = 19.8
+# --- Get Data --- #
+...
+lab.VAR("flux").Value = -19.9
+# --- Get Data --- #
+lab.VAR("flux").Value = -20
+# --- Get Data --- #
+
+lab.VAR("power").Value = -10
+lab.VAR("flux").Value = -20
+# --- Get Data --- #
+lab.VAR("flux").Value = -19.9
+# --- Get Data --- #
+...
+lab.VAR("flux").Value = 19.8
+# --- Get Data --- #
+lab.VAR("flux").Value = 19.9
+# --- Get Data --- #
+...
+```
+
+Note that **the order of entries in the HDF5 data file is the same, only the sampling order changes**. That is, using the [time-stamping functionality](Data_IO.md#time-stamps), one would see a different order of the data being sampled/stored. Otherwise, functionally `get_numpy_array` will return the same ordered dataset. Note:
+
+- The `sweep_orders` is given as a list of `ExSwp*` objects where it shuffles the order with the listed functions from left to right. That is, each shuffling transformatio is applied in ascending order.
+- See the [other article](Exp_SweepPerm.md) for a list of available `ExpSwp*` classes.

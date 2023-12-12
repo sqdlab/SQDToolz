@@ -389,4 +389,4 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
                     'data' : { 'Current' : currents, 'Voltage' : voltages }
                 }
 
-        return data_pkt
+        return {'data': data_pkt}

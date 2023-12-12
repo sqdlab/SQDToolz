@@ -212,7 +212,7 @@ class Experiment:
             }
         for cur_param in rec_params_extra:
             ret_data['data'][cur_param] = np.array([np.nan])
-        return {'data': ret_data}
+        return ret_data
 
 
     def save_config(self, save_dir, name_time_diag, name_expt_params, sweep_queue = [], file_index = 0):

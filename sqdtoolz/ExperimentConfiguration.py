@@ -300,8 +300,8 @@ class ExperimentConfiguration:
         if cur_acq is not None:
             return cur_acq.get_data()
         else:
-            return {'parameters':['None'],
-                    'data':{'dummy_ch': np.array([0])}}
+            return {'data': {'parameters':['None'],
+                    'data':{'dummy_ch': np.array([0])}}}
 
     def get_trigger_edges(self, obj_trigger_input):
         assert isinstance(obj_trigger_input, TriggerInput), "The argument obj_trigger_input must be a TriggerInput object; that is, a genuine digital trigger input."

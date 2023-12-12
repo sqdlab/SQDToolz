@@ -144,7 +144,7 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
             assert False, "COM Error when reading source-measure"
     def _set_voltage(self, val):
         #Use auto-range and zero delay by default...
-        self.write(f'B{val},0,0')
+        self.write(f'B{val},0,0X')
 
     @property
     def Voltage(self):

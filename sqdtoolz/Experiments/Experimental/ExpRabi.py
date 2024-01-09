@@ -1,4 +1,3 @@
-from math import pi
 from sqdtoolz.Experiment import*
 from sqdtoolz.HAL.WaveformGeneric import*
 from sqdtoolz.HAL.WaveformSegments import*

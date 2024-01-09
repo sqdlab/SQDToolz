@@ -1,3 +1,4 @@
+from math import pi
 from sqdtoolz.Experiment import*
 from sqdtoolz.HAL.WaveformGeneric import*
 from sqdtoolz.HAL.WaveformSegments import*
@@ -5,7 +6,7 @@ from sqdtoolz.Utilities.DataFitting import*
 from sqdtoolz.Experiments.Experimental.ExpCalibGE import*
 
 class ExpRabi(Experiment):
-    def __init__(self, name, expt_config, wfmt_qubit_drive, range_amps, SPEC_qubit, transition='GE', iq_indices = [0,1], **kwargs):
+    def __init__(self, name, expt_config, wfmt_qubit_drive, range_amps, SPEC_qubit, transition='GE', phase=0, iq_indices = [0,1], **kwargs):
         super().__init__(name, expt_config)
 
         self._iq_indices = iq_indices
@@ -13,6 +14,9 @@ class ExpRabi(Experiment):
 
         assert transition == 'GE' or transition == 'EF', "Transition must be either GE or EF"
         self._transition = transition
+
+        assert (phase >= 0) & (phase <= 2*np.pi), "Phase must be between 0 and 2pi"
+        self._phase = phase
         
         # self._range_amps = kwargs.get('range_amps', None)
         self._range_amps = range_amps
@@ -52,7 +56,7 @@ class ExpRabi(Experiment):
         wfm.set_waveform('qubit', [
             WFS_Constant("SEQPAD", None, -1, 0.0),
             WFS_Constant("init", None, self.load_time, 0.0),
-            WFS_Gaussian("drive", self._wfmt_qubit_drive.apply(phase=0), self.drive_time, 0.001),
+            WFS_Gaussian("drive", self._wfmt_qubit_drive.apply(phase=self._phase), self.drive_time, 0.001),
             WFS_Constant("pad", None, 5e-9, 0.0),
             WFS_Constant("read", None, self.readout_time, 0.0)
         ])
@@ -98,6 +102,20 @@ class ExpRabi(Experiment):
         if self._param_rabi_decay_time:
             self._param_rabi_decay_time.Value = 1.0 / dpkt['decay_rate']
 
+        if self._phase == 0:
+            axis = 'X'
+        elif self._phase == np.pi/2:
+            axis = 'Y'
+        elif self._phase == np.pi:
+            axis = '-X'
+        elif self._phase == 3*np.pi/2:
+            axis = '-Y'
+        else:
+            axis = None
+
+        if (not self._dont_update_values) and (axis is None):
+            assert False, 'Cannot update gate parameters if chosen phase is arbitrary (non-multiple of pi/2)'
+
         if not self._dont_update_values:
             if self._transition == 'GE':
                 if self.normalise_data:
@@ -112,15 +130,15 @@ class ExpRabi(Experiment):
                     axs[0].text(amp_Xon2, 0.5, '$\pi/2$')
                     axs[0].text(amp_X, 0.5, '$\pi$')
 
-                    self._SPEC_qubit['GE X/2-Gate Amplitude'].Value = amp_Xon2
-                    self._SPEC_qubit['GE X/2-Gate Time'].Value = self.drive_time
-                    self._SPEC_qubit['GE X-Gate Amplitude'].Value = amp_X
-                    self._SPEC_qubit['GE X-Gate Time'].Value = self.drive_time
+                    self._SPEC_qubit[f'GE {axis}/2-Gate Amplitude'].Value = amp_Xon2
+                    self._SPEC_qubit[f'GE {axis}/2-Gate Time'].Value = self.drive_time
+                    self._SPEC_qubit[f'GE {axis}-Gate Amplitude'].Value = amp_X
+                    self._SPEC_qubit[f'GE {axis}-Gate Time'].Value = self.drive_time
                 else:
-                    self._SPEC_qubit['GE X/2-Gate Amplitude'].Value = 0.25/dpkt['frequency']
-                    self._SPEC_qubit['GE X/2-Gate Time'].Value = self.drive_time
-                    self._SPEC_qubit['GE X-Gate Amplitude'].Value = 0.5/dpkt['frequency']
-                    self._SPEC_qubit['GE X-Gate Time'].Value = self.drive_time
+                    self._SPEC_qubit[f'GE {axis}/2-Gate Amplitude'].Value = 0.25/dpkt['frequency']
+                    self._SPEC_qubit[f'GE {axis}/2-Gate Time'].Value = self.drive_time
+                    self._SPEC_qubit[f'GE {axis}-Gate Amplitude'].Value = 0.5/dpkt['frequency']
+                    self._SPEC_qubit[f'GE {axis}-Gate Time'].Value = self.drive_time
             else:
                 assert False, 'Ask Developer about the EF :P'
                 self._SPEC_qubit['EF X-Gate Amplitude'].Value = 0.5/dpkt['frequency']

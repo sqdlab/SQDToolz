@@ -24,7 +24,7 @@ class OptimiseParaboloid:
         is_x = True
         frac_move = 1-step_bound_fraction
         bnd_history = []
-        for m in range(num_iters):
+        for cur_iters in range(num_iters):
             cur_xMid = 0.5*(cur_x_bounds[0] + cur_x_bounds[1])
             cur_yMid = 0.5*(cur_y_bounds[0] + cur_y_bounds[1])
             if is_x:

@@ -12,6 +12,7 @@ from sqdtoolz.HAL.Processors.FPGA.FPGA_FFT import FPGA_FFT
 import numpy as np
 import math
 import time
+import datetime
 
 from qcodes import Instrument, InstrumentChannel, validators as vals
 from qcodes.instrument.parameter import ManualParameter
@@ -202,7 +203,7 @@ class TaborP2584M_AWG(InstrumentChannel):
         for m in range(4):
             self.activeChannel(m + 1)
             #self._parent._set_cmd(':INST:CHAN', m+1)
-            self._parent._send_cmd(':TRAC:DEL:ALL')      
+            # self._parent._send_cmd(':TRAC:DEL:ALL')      
             self._parent._send_cmd(':TASK:ZERO:ALL')       #Does this need to be run per channel?!
 
         #Get the DAC mode (8 bits or 16 bits)
@@ -327,6 +328,11 @@ class TaborP2584M_AWG(InstrumentChannel):
         else:
             self._seg_off_ch4 = 0
 
+        # Ensure all previous commands have been executed
+        while not self._parent._get_cmd('*OPC?'):
+            pass
+        self._parent._chk_err('before setting up memory banks.')
+
         #Settle Memory Bank 1 (shared among channels 1 and 2) and Memory Bank 2 (shared among channels 3 and 4)
         for bank in range(2):
             reset_banks = False
@@ -351,10 +357,13 @@ class TaborP2584M_AWG(InstrumentChannel):
                     if cur_mem_len != cur_len:
                         reset_banks = True
                         break
-            
+
+            while not self._parent._get_cmd('*OPC?'):
+                pass
             self._parent._chk_err('after setting up memory banks.')
+
             if reset_banks:
-                self._parent._send_cmd(':TRAC:DEL:ALL')
+                # self._parent._send_cmd(':TRAC:DEL:ALL')
                 if self._sequence_lens[bank*2] != None:
                     for m, cur_len in enumerate(self._sequence_lens[bank*2]):
                         self._parent._send_cmd(f':TRAC:DEF {m+1}, {cur_len}')
@@ -963,7 +972,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
         wav2 = np.zeros(num_bytes, dtype=np.uint8)
         rc = self._parent._inst.read_binary_data(':DIG:DATA:READ?', wav2, num_bytes)
-        print(self._parent._get_cmd(":DIG:ACQ:STAT?")) # Perhaps check that second bit is set to 1 (all frames done)
+        # print(self._parent._get_cmd(":DIG:ACQ:STAT?")) # Perhaps check that second bit is set to 1 (all frames done)
 
         # Ensure all previous commands have been executed
         while (not self._parent._get_cmd('*OPC?')):
@@ -1181,7 +1190,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
         valid_complex_channels = ["I1", "Q1", "I2", "Q2"]
         # Check that the requested block is valid for the current ddc mode
         # NOTE: could remove this check and rely on user to know what blocks are being used when
-        print("DDC mode is: ", self.ddc_mode())
+        # print("DDC mode is: ", self.ddc_mode())
         if (self.ddc_mode() == "REAL" and filter_channel in valid_real_channels) :
             self.fir_block(filter_channel)
         elif (self.ddc_mode() == "COMP" and filter_channel in valid_complex_channels) :
@@ -1198,7 +1207,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
         # TODO: what is the frame size of the calculation
         self._parent._send_cmd(':DSP:DEC:FRAM {0}'.format(1024))
         resp = self._parent._inst.send_scpi_query(':SYST:ERR?')
-        print(resp)
+        # print(resp)
 
         # Load in filter coefficients
         for i in range(0, len(filter_array)) :
@@ -1681,7 +1690,8 @@ class TaborP2584M_ACQ(InstrumentChannel):
                     #TODO: Later make this read straight off decision block changes in their newer firmware releases
                     return np.array([np.sum(data)])*final_dsp_order['final_scale_factor']
                 else:
-                    return self.conv_data(np.array([data])*final_dsp_order['final_scale_factor'], final_dsp_order, 2**14)*2.0   #x2 as the DSP takes the 15 MSBs
+                    #self.conv_data(np.array(data)*final_dsp_order['final_scale_factor'], final_dsp_order, 2**14)*2.0
+                    return np.array(data)*final_dsp_order['final_scale_factor']/2**14   #x2 as the DSP takes the 15 MSBs
             offset = 0
             for m in range(num_ch_divs[0]):
                 ret_val['data'][f'CH1_{m}_I'] = proc_data( np.array([x[f'real{m-offset+1}_dec'] for x in headers1])*1.0, final_dsp_order, ret_val )
@@ -1739,7 +1749,7 @@ class Tabor_P2584M(Instrument):
         self._inst.default_paranoia_level = 2
 
         self._debug_logs = ''
-        self._debug = True
+        self._debug = False
 
         resp = self._inst.send_scpi_query('*IDN?')
         print('Connected to: ' + resp)
@@ -1781,7 +1791,7 @@ class Tabor_P2584M(Instrument):
 
     def _send_cmd(self, cmd):
         if self._debug:
-            self._debug_logs += cmd + '\n'
+            self._debug_logs += str(datetime.datetime.now()) + ": " + cmd + '\n'
         self._inst.send_scpi_query(cmd)
     
     def _get_cmd(self, cmd):
@@ -1790,7 +1800,7 @@ class Tabor_P2584M(Instrument):
         return self._inst.send_scpi_query(cmd)
     def _set_cmd(self, cmd, value):
         if self._debug:
-            self._debug_logs += f"{cmd} {value}\n"
+            self._debug_logs += str(datetime.datetime.now()) + ": " + f"{cmd} {value}\n"
         self._inst.send_scpi_query(f"{cmd} {value}")
     
     def _chk_err(self, msg):

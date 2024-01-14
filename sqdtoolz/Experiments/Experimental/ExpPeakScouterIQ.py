@@ -15,6 +15,7 @@ class ExpPeakScouterIQ(Experiment):
         self._param_amplitude = kwargs.get('param_amplitude', None)
         self._param_offset = kwargs.get('param_offset', None)
         self._param_fano = kwargs.get('param_fano', None)
+        self._dont_plot = kwargs.get('dont_plot', False)
     
     def _run(self, file_path, sweep_vars=[], **kwargs):
         assert len(sweep_vars) == 1, "Can only sweep one variable in this experiment."
@@ -36,7 +37,7 @@ class ExpPeakScouterIQ(Experiment):
 
         if not self._fit_res_fano:
             dfit = DFitPeakLorentzian()
-            dpkt = dfit.get_fitted_plot(data_x, data_y, xLabel=self._cur_param_name, dip=self._is_trough)
+            dpkt = dfit.get_fitted_plot(data_x, data_y, xLabel=self._cur_param_name, dip=self._is_trough, dontplot=self._dont_plot)
             #Commit to parameters...
             if self._param_centre:
                 self._param_centre.Value = dpkt['centre']
@@ -48,7 +49,7 @@ class ExpPeakScouterIQ(Experiment):
                 self._param_offset.Value = dpkt['offset']
         else:
             dfit = DFitFanoResonance()
-            dpkt = dfit.get_fitted_plot(data_x, data_y**2, xLabel=self._cur_param_name, yLabel="Squared IQ Amplitude") #, dip=self._is_trough)
+            dpkt = dfit.get_fitted_plot(data_x, data_y**2, xLabel=self._cur_param_name, yLabel="Squared IQ Amplitude", dontplot=self._dont_plot) #, dip=self._is_trough)
             #Commit to parameters...
             if self._param_centre:
                 self._param_centre.Value = dpkt['xMinimum']
@@ -61,6 +62,7 @@ class ExpPeakScouterIQ(Experiment):
             if self._param_fano:
                 self._param_offset.Value = dpkt['FanoFac']
 
-        dpkt['fig'].show()
-        dpkt['fig'].savefig(self._file_path + 'fitted_plot.png')
+        if not self._dont_plot:
+            dpkt['fig'].show()
+            dpkt['fig'].savefig(self._file_path + 'fitted_plot.png')
 

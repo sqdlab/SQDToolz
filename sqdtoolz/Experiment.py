@@ -218,8 +218,9 @@ class Experiment:
     def save_config(self, save_dir, name_time_diag, name_expt_params, sweep_queue = [], file_index = 0):
         #Save a PNG of the Timing Plot
         lePlot = self._expt_config.plot()
-        lePlot.savefig(save_dir + name_time_diag + '.png')
-        plt.close(lePlot)
+        if lePlot != None:
+            lePlot.savefig(save_dir + name_time_diag + '.png')
+            plt.close(lePlot)
 
         dict_expt_params = {
             'Name' : self.Name,

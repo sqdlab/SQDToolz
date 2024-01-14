@@ -24,11 +24,13 @@ class ExpMixerCalibrationLO(Experiment):
         self._var_DC_off_I.Value = x
         self._var_DC_off_Q.Value = y
         self._expt_config.prepare_instruments()
-        smpl_data = self._expt_config.get_data()
+        smpl_data = self._expt_config.get_data()['data']
 
         i_val, q_val = smpl_data['data'][self._ch_id + '_I'], smpl_data['data'][self._ch_id + '_Q']
 
         ampl = np.sqrt(i_val**2 + q_val**2)
+        if isinstance(ampl, np.ndarray):
+            ampl = ampl[0]
         return ampl
 
     def _run(self, file_path, sweep_vars=[], **kwargs):

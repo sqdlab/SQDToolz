@@ -16,7 +16,7 @@ The different waveform transformations available in SQDToolz are highlighted in 
 `WFMT_ModulationIQ` applies to a two-channel waveform in which the first and second channels represent the I and Q channels of an IQ-modulated waveform:
 
 $$\begin{align*}I(t)&=A\cos(2\pi f t+\phi)+I_{dc}\\
-Q(t)&=aA\cos(2\pi f t+\phi+\varphi)+Q_{dc}\end{align*}$$
+Q(t)&=aA\sin(2\pi f t+\phi+\varphi)+Q_{dc}\end{align*}$$
 
 Note that the modulation signals given above are multiplied onto the envelopes specified by the main pulse segment. The symbols and their associated `WFMT_ModulationIQ` properties are:
 

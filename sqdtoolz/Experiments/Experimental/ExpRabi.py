@@ -5,6 +5,24 @@ from sqdtoolz.Utilities.DataFitting import*
 from sqdtoolz.Experiments.Experimental.ExpCalibGE import*
 
 class ExpRabi(Experiment):
+    '''
+    An automated Rabi experiment.
+
+    Inputs
+    ---------
+    name (str): Name of experiment directory for saving purposes
+    expt_config (ExperimentConfiguration): custom experiment config
+    wfmt_qubit_drive (WaveformTransformation): Qubit drive 
+    range_amps (np.array): Range of amplitudes to sweep
+    SPEC_qubit (ExperimentSpecification): Experiment Spec for qubit of interest
+    transition (str) [default 'GE']: select transition to drive
+    phase (float) [default 0]: Axis of rotation for drive; typically a multiple of pi/2
+    iq_indices (list[int]) [default [0,1]]: Data indices for I and Q components
+
+    Outputs
+    ---------
+    Returns data, displays plotted data, saves calibrations into SPEC_qubit
+    '''
     def __init__(self, name, expt_config, wfmt_qubit_drive, range_amps, SPEC_qubit, transition='GE', phase=0, iq_indices = [0,1], **kwargs):
         super().__init__(name, expt_config)
 
@@ -101,6 +119,7 @@ class ExpRabi(Experiment):
         if self._param_rabi_decay_time:
             self._param_rabi_decay_time.Value = 1.0 / dpkt['decay_rate']
 
+        axis = None
         if self._phase == 0:
             axis = 'X'
         elif self._phase == np.pi/2:
@@ -109,11 +128,9 @@ class ExpRabi(Experiment):
             axis = '-X'
         elif self._phase == 3*np.pi/2:
             axis = '-Y'
-        else:
-            axis = None
 
         if (not self._dont_update_values) and (axis is None):
-            assert False, 'Cannot update gate parameters if chosen phase is arbitrary (non-multiple of pi/2)'
+            raise ValueError('Cannot update gate parameters if chosen phase is arbitrary (non-multiple of pi/2)')
 
         if not self._dont_update_values:
             if self._transition == 'GE':

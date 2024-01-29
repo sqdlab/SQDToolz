@@ -1,21 +1,15 @@
 instruments:
   virACQ:
-    driver: sqdtoolz.Drivers.dummyACQ
-    type: DummyACQ
+    type: sqdtoolz.Drivers.dummyACQ.DummyACQ
   virACQblowup:
-    driver: sqdtoolz.Drivers.dummyACQ
-    type: DummyACQ
+    type: sqdtoolz.Drivers.dummyACQ.DummyACQ
     init:
       blow_up_path: 'test_save_dir/blowup.txt'
   virDDG:
-    driver: sqdtoolz.Drivers.dummyDDG
-    type: DummyDDG
+    type: sqdtoolz.Drivers.dummyDDG.DummyDDG
   virAWG:
-    driver: sqdtoolz.Drivers.dummyAWG
-    type: DummyAWG
+    type: sqdtoolz.Drivers.dummyAWG.DummyAWG
   virMWS:
-    driver: sqdtoolz.Drivers.dummyGENmwSource
-    type: DummyGENmwSrc
+    type: sqdtoolz.Drivers.dummyGENmwSource.DummyGENmwSrc
   virMWS2:
-    driver: sqdtoolz.Drivers.dummyGENmwSource
-    type: DummyGENmwSrc
+    type: sqdtoolz.Drivers.dummyGENmwSource.DummyGENmwSrc

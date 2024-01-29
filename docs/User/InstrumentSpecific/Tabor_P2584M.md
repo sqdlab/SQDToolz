@@ -42,8 +42,7 @@ YAML entry:
 
 ```yaml
   TaborUnit:
-    driver: sqdtoolz.Drivers.Tabor_P2584M
-    type: Tabor_P2584M
+    type: sqdtoolz.Drivers.Tabor_P2584M.Tabor_P2584M
     init:
       pxi_chassis: 0
       pxi_slot: 3
@@ -78,8 +77,7 @@ YAML entry:
 
 ```yaml
   TaborUnit:
-    driver: sqdtoolz.Drivers.Tabor_P2584M
-    type: Tabor_P2584M
+    type: sqdtoolz.Drivers.Tabor_P2584M.Tabor_P2584M
     init:
       pxi_chassis: 0
       pxi_slot: 3

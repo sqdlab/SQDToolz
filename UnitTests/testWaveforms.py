@@ -886,5 +886,5 @@ class TestAWGChecks(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    TestSegments().test_SegmentsAndIQ()
+    TestSegments().test_SaveReload()
     unittest.main()

@@ -11,8 +11,7 @@ YAML entry:
 
 ```yaml
   src_sgs1:
-    driver: sqdtoolz.Drivers.MWS_SGS100A
-    type: MWS_SGS100A
+    type: sqdtoolz.Drivers.MWS_SGS100A.MWS_SGS100A
     address: TCPIP::192.168.1.115::INSTR
     enable_forced_reconnect: true
     parameters:
@@ -44,8 +43,7 @@ YAML entry:
 
 ```yaml
   src_sgs1:
-    driver: sqdtoolz.Drivers.MWS_SGS100A
-    type: MWS_SGS100A
+    type: sqdtoolz.Drivers.MWS_SGS100A.MWS_SGS100A
     address: TCPIP::192.168.1.119::INSTR
     enable_forced_reconnect: true
     parameters:
@@ -63,8 +61,7 @@ YAML entry:
       RFOUT.output:
         initial_value: 'OFF'
   src_sgs2:
-    driver: sqdtoolz.Drivers.MWS_SGS100A
-    type: MWS_SGS100A
+    type: sqdtoolz.Drivers.MWS_SGS100A.MWS_SGS100A
     address: TCPIP::192.168.1.8::INSTR
     enable_forced_reconnect: true
     parameters:
@@ -82,8 +79,7 @@ YAML entry:
       RFOUT.output:
         initial_value: 'OFF'
   src_sgs3:
-    driver: sqdtoolz.Drivers.MWS_SGS100A
-    type: MWS_SGS100A
+    type: sqdtoolz.Drivers.MWS_SGS100A.MWS_SGS100A
     address: TCPIP::192.168.1.8::INSTR
     enable_forced_reconnect: true
     parameters:

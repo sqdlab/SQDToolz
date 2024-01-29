@@ -17,8 +17,7 @@ YAML entry:
 
 ```yaml
   Agi1:
-    driver: sqdtoolz.Drivers.Agilent_N8241A
-    type: Agilent_N8241A
+    type: sqdtoolz.Drivers.Agilent_N8241A.Agilent_N8241A
     init:
       address: 'TCPIP::192.168.1.101::INSTR'
       ivi_dll: 'C:/Program Files/IVI Foundation/IVI/Bin/AGN6030A.dll'
@@ -46,8 +45,7 @@ Note the following:
 
 ```yaml
   Agi1:
-    driver: sqdtoolz.Drivers.Agilent_N8241A
-    type: Agilent_N8241A
+    type: sqdtoolz.Drivers.Agilent_N8241A.Agilent_N8241A
     init:
       address: 'TCPIP::192.168.1.102::INSTR'
       ivi_dll: 'C:/Program Files/IVI Foundation/IVI/Bin/AGN6030A.dll'
@@ -60,8 +58,7 @@ Note the following:
       m4.source:
         initial_value: 'Hardware Trigger 1'
   Agi2:
-    driver: sqdtoolz.Drivers.Agilent_N8241A
-    type: Agilent_N8241A
+    type: sqdtoolz.Drivers.Agilent_N8241A.Agilent_N8241A
     init:
       address: 'TCPIP::192.168.1.101::INSTR'
       ivi_dll: 'C:/Program Files/IVI Foundation/IVI/Bin/AGN6030A.dll'

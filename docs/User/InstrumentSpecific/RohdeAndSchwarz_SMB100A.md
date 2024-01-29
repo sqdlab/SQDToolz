@@ -16,8 +16,7 @@ YAML entry:
 
 ```yaml
   src_smb:
-    driver: sqdtoolz.Drivers.MWS_SMB100A
-    type: MWS_SMB100A
+    type: sqdtoolz.Drivers.MWS_SMB100A.MWS_SMB100A
     address: TCPIP::192.168.1.111::INSTR
     enable_forced_reconnect: true
     parameters:
@@ -55,8 +54,7 @@ YAML entry:
 
 ```yaml
   src_smb:
-    driver: sqdtoolz.Drivers.MWS_SMB100A
-    type: MWS_SMB100A
+    type: sqdtoolz.Drivers.MWS_SMB100A.MWS_SMB100A
     address: TCPIP::192.168.1.111::INSTR
     enable_forced_reconnect: true
     parameters:

@@ -35,8 +35,7 @@ YAML entry:
 
 ```yaml
   fpga1:
-    driver: sqdtoolz.Drivers.ACQ_ETH_FPGA
-    type: ETHFPGA
+    type: sqdtoolz.Drivers.ACQ_ETH_FPGA.ETHFPGA
     init:
       uri: 'Z:/DataAnalysis/Notebooks/qcodes/FPGA_Rack1_URI.txt'
 ```

@@ -16,8 +16,7 @@ YAML entry:
 
 ```yaml
   smu:
-    driver: sqdtoolz.Drivers.SMU_Keithley236
-    type: SMU_Keithley236
+    type: sqdtoolz.Drivers.SMU_Keithley236.SMU_Keithley236
     address: '192.168.0.200'
     init:
       gpib_slot: 19
@@ -36,8 +35,7 @@ YAML entry:
 
 ```yaml
   smu:
-    driver: sqdtoolz.Drivers.SMU_Keithley236
-    type: SMU_Keithley236
+    type: sqdtoolz.Drivers.SMU_Keithley236.SMU_Keithley236
     address: '192.168.0.200'
     init:
       gpib_slot: 19

@@ -1,7 +1,6 @@
 from sqdtoolz.ExperimentConfiguration import*
 from sqdtoolz.Laboratory import*
 
-from sqdtoolz.Drivers.dummyGENmwSource import*
 from sqdtoolz.HAL.ACQ import*
 from sqdtoolz.HAL.AWG import*
 from sqdtoolz.HAL.DDG import*

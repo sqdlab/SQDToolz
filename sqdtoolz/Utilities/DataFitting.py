@@ -176,7 +176,7 @@ class DFitExponential:
                                              bounds=([0, yMin, 0.01*tau0], [2.0*a0, yMax, tau0*10]))
 
         if not dontplot:
-            if fig == None:
+            if axs == None:
                 fig, axs = plt.subplots(1)
             else:
                 fig = axs.get_figure()

@@ -1,4 +1,4 @@
-from FileIO import FileIOReader
+from sqdtoolz.Utilities.FileIO import FileIOReader
 import os.path
 from pathlib import Path
 import sys
@@ -9,9 +9,6 @@ class FileConverter:
         self.filename = Path(filepath).stem
         self.folder_path = os.path.dirname(self.filepath)
         self.reader = FileIOReader(filepath)
-    
-    def _to_mma_array(self, conv_list):
-        return 
 
     def toMathematica(self, destName=''):
         if destName == '':
@@ -39,7 +36,7 @@ class FileConverter:
             outfile.write("},\n")
             #Parameter data array
             arr = self.reader.get_numpy_array()
-            outfile.write( str(arr.tolist()).replace('[','{').replace(']','}').replace('\n',',') )
+            outfile.write( str(arr.tolist()).replace('[','{').replace(']','}').replace('\n',',').replace('e','*^') )
             
             outfile.write("}\n")
 

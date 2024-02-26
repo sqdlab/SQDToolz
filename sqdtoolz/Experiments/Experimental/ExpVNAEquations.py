@@ -117,4 +117,4 @@ class ExpVNAEquations(Experiment):
             ret_data['data'][f'{cur_meas}_imag'] = s_data_raw[1::2]
         freq_data_raw = self._instr_vna.ask('CALC:X?').split(',')
         ret_data['parameter_values'][x_var_name] = np.array(list(map(float, freq_data_raw)))
-        return ret_data
+        return {'data': ret_data}

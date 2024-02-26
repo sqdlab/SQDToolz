@@ -9,6 +9,7 @@ from sqdtoolz.HAL.DDG import*
 from sqdtoolz.HAL.GENmwSource import*
 from sqdtoolz.HAL.GENvoltSource import*
 from sqdtoolz.HAL.GENswitch import*
+from sqdtoolz.HAL.GENswitchTrig import*
 from sqdtoolz.HAL.ACQvna import*
 from sqdtoolz.HAL.GENatten import*
 from sqdtoolz.HAL.GENsmu import*

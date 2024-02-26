@@ -600,6 +600,8 @@ class ExperimentViewer:
                     cur_mws += [(cur_str[:-1], col)]    #:-1 is to remove the last \n
                 if cur_hal['Type'] == 'GENswitch':
                     cur_sws += [(cur_str[:-1], col)]    #:-1 is to remove the last \n
+                if cur_hal['Type'] == 'GENswitchTrig':
+                    cur_sws += [(cur_str[:-1], col)]    #:-1 is to remove the last \n
                 if cur_hal['Type'] == 'GENvoltSource':
                     cur_volts += [(cur_str[:-1], col)]    #:-1 is to remove the last \n
                 if cur_hal['Type'] == 'GENatten':

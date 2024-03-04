@@ -58,7 +58,8 @@ The variable/s to sweep (e.g. for a T1 experiment, it is wait time) are then def
 where `some_var` is typically a hard-coded feature of the experiment and `some_list_of_values` was provided by the user at initialisation.
 
 The experiment is then run through the underlying Experiment class, typically following the pattern
-```
+
+```python
 kwargs['skip_init_instruments'] = True
 self._cur_param_name = some_var.Name
 self._file_path = file_path

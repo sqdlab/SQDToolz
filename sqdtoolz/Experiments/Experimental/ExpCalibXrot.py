@@ -62,7 +62,7 @@ class ExpCalibXrot(Experiment):
             WFS_Constant("read", None, self.readout_time, 0.0)
         ])
         wfm.set_digital_segments('readout', 'qubit', ['read'])
-        self._temp_vars = self._expt_config.update_waveforms(wfm, [('Num Pulses', 'qubit', 'drivePulses', 'NumRepeats')] )
+        self._temp_vars = self._expt_config.update_waveforms(wfm, [('Num Pulses', wfm.get_waveform_segment('qubit', 'drivePulses'), 'NumRepeats')] )
         
         sweep_vars = [(self._temp_vars[0], np.arange(0,self._numTotalRepeats+1))]
 

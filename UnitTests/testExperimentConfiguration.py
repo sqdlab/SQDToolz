@@ -42,6 +42,8 @@ class TestHALInstantiation(unittest.TestCase):
         awg_wfm2 = WaveformAWG("Wfm2", self.lab, [('virAWG', 'CH3'), ('virAWG', 'CH4')], 1e9)
         hal_mw = GENmwSource("MW-Src", self.lab, 'virMWS', 'CH1')
 
+        WFMT_ModulationIQ('IQmod', self.lab, 47e7)
+
     def cleanup(self):
         self.lab.release_all_instruments()
         self.lab = None
@@ -447,6 +449,38 @@ class TestHALInstantiation(unittest.TestCase):
         awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('C'))
         awg_wfm2.set_trigger_source_all(awg_wfm.get_output_channel(0).marker(1))
         hal_acq.set_trigger_source(awg_wfm2.get_output_channel(0).marker(0))
+
+        #
+        #Test waveform-update with WFMT and returned variables
+        #
+        #Try simple example
+        expConfig = ExperimentConfiguration('testConf', self.lab, 2e-6, ['ddg', 'Wfm1', 'Wfm2', 'MW-Src'], 'dum_acq')
+        waveform_mapping = WaveformMapper()
+        waveform_mapping.add_waveform('qubit', 'Wfm1')
+        waveform_mapping.add_digital('readout', awg_wfm.get_output_channel(0).marker(1))
+        waveform_mapping.add_digital('sequence', awg_wfm.get_output_channel(1).marker(0))
+        expConfig.map_waveforms(waveform_mapping)
+        wfm = WaveformGeneric(['qubit'], ['readout', 'sequence'])
+        wfm.set_waveform('qubit', [
+            WFS_Gaussian("init", self.lab.WFMT('IQmod').apply(), 20e-9, 0.5-0.1),
+            WFS_Constant("zero1", None, 30e-9, 0.1),
+            WFS_Gaussian("init2", None, 45e-9, 0.5-0.1),
+            WFS_Constant("zero2", None, 77e-9, 0.0)
+        ])
+        wfm.set_digital_segments('readout', 'qubit', ['zero2'])
+        wfm.set_digital_trigger('sequence', 50e-9)
+        leVars = expConfig.update_waveforms(wfm, [('init_phase', wfm.get_waveform_segment('qubit', 'init').get_WFMT(), 'phase'),
+                                                  ('init2_ampl', wfm.get_waveform_segment('qubit', 'init2'), 'Amplitude')])
+        arr_act, arr_act_segs = expConfig.get_trigger_edges(awg_wfm2.get_output_channel(0).marker(0))
+        arr_exp = self.round_to_samplerate(awg_wfm, np.array([20e-9+30e-9+45e-9]) + 650e-9 )
+        assert self.arr_equality(arr_act, arr_exp), "Incorrect trigger edges when using waveform mapping."
+        #Check returned variables
+        assert leVars[0].Name == 'init_phase', "Function update_waveforms did not process the requested variables correctly"
+        assert leVars[1].Name == 'init2_ampl', "Function update_waveforms did not process the requested variables correctly"
+        leVars[1].Value = 0.5
+        assert awg_wfm.get_waveform_segment('init2').Amplitude == 0.5, "Variable returned from update_waveforms did not map correctly"
+        leVars[0].Value = 0.42
+        assert awg_wfm.get_waveform_segment('init').get_WFMT().phase == 0.42, "Variable returned from update_waveforms did not map correctly"
 
         #
         #Test waveform-update and mapping
@@ -996,5 +1030,5 @@ class TestSaveLoad(unittest.TestCase):
 
 if __name__ == '__main__':
     temp = TestHALInstantiation()
-    temp.test_MWsource()
+    temp.test_AWG_Mapping()
     unittest.main()

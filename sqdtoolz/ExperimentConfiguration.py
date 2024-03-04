@@ -1,6 +1,7 @@
 from sqdtoolz.HAL.TriggerPulse import*
 from sqdtoolz.Utilities.TimingPlots import*
 from sqdtoolz.Variable import*
+from sqdtoolz.HAL.WaveformGeneric import WaveformGeneric
 import numpy as np
 import json
 import copy
@@ -186,7 +187,24 @@ class ExperimentConfiguration:
         self._init_config['WaveformMapping'] = self._dict_wfm_map
 
     def update_waveforms(self, wfm_gen, var_requests=[]):
-        #var_requests is given as a list of tuples: (var_name, waveform_name, segment_name, property_name)
+        #var_requests is given as a list of tuples: (var_name, waveform_related_object, property_name)
+        leVarRequests = []
+        for cur_var_req in var_requests:
+            assert isinstance(cur_var_req, (tuple, list)), "The argument var_requests must be a list of tuples: (var_name, waveform_related_object, property_name)"
+            var_name, waveform_related_object, property_name = cur_var_req
+            cur_parent = waveform_related_object.Parent
+            resolution_tree = []
+            cur_obj = waveform_related_object
+            while (isinstance(cur_parent, (tuple, list)) and cur_parent[0] != None):
+                resolution_tree += [( cur_obj.Name, cur_parent[1] )]
+                cur_obj = cur_parent[0]
+                final_wfm_name = cur_parent[1]
+                cur_parent = cur_obj.Parent
+            assert isinstance(cur_obj, WaveformGeneric), "The argument var_requests must only have things pertaining to the WaveformGeneric object wfm_gen..."
+            resolution_tree = resolution_tree[::-1]
+            #The first node will be (waveform_segment_name, waveform_name). This will be changed to (waveform_name, 'w')
+            resolution_tree[0] = (resolution_tree[0][0], 'w')
+            leVarRequests.append((var_name, final_wfm_name, resolution_tree, property_name))
 
         #Settle the actual waveforms first
         for cur_wave in  wfm_gen.waveforms:
@@ -224,16 +242,15 @@ class ExperimentConfiguration:
                     cur_trig.TrigPolarity = wfm_gen.digitals[cur_dig]['trig_polarity']
         #Now calculate and return any variable requests...
         ret_trans_vars = []
-        for cur_var_req in var_requests:
-            var_name, waveform_name, segment_name, property_name = cur_var_req
-            assert waveform_name in self._dict_wfm_map['waveforms'], f"There is no mapping for waveform \'{waveform_name}\' from which to create a variable."
-            awg_hal = None
+        for cur_var_req in leVarRequests:
+            var_name, final_wfm_name, resolution_tree, property_name = cur_var_req
+            assert final_wfm_name in self._dict_wfm_map['waveforms'], f"There is no mapping for waveform \'{final_wfm_name}\' from which to create a variable."
             for cur_hal in self._list_HALs:
-                if self._dict_wfm_map['waveforms'][waveform_name] == cur_hal.Name:
+                if self._dict_wfm_map['waveforms'][final_wfm_name] == cur_hal.Name:
                     awg_hal = cur_hal
                     break
-            assert awg_hal != None, f"The AWG waveform HAL {self._dict_wfm_map['waveforms'][waveform_name]} does not exist in this Experiment Configuration."
-            ret_trans_vars += [ VariablePropertyTransient(var_name, awg_hal.get_waveform_segment(segment_name), property_name) ]
+            assert awg_hal != None, f"The AWG waveform HAL {self._dict_wfm_map['waveforms'][final_wfm_name]} does not exist in this Experiment Configuration."
+            ret_trans_vars += [ VariablePropertyTransient(var_name, self._lab._get_resolved_obj([(awg_hal.Name, 'HAL')] + resolution_tree), property_name) ]
         return ret_trans_vars
 
     def init_instruments(self, **kwargs):

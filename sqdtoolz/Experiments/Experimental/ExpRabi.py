@@ -78,7 +78,7 @@ class ExpRabi(Experiment):
             WFS_Constant("read", None, self.readout_time, 0.0)
         ])
         wfm.set_digital_segments('readout', 'qubit', ['read'])
-        self._temp_vars = self._expt_config.update_waveforms(wfm, [('Drive Amplitude', 'qubit', 'drive', 'Amplitude')] )
+        self._temp_vars = self._expt_config.update_waveforms(wfm, [('Drive Amplitude', wfm.get_waveform_segment('qubit', 'drive'), 'Amplitude')] )
 
         sweep_vars = [(self._temp_vars[0], self._range_amps)]
 

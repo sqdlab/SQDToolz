@@ -66,7 +66,7 @@ class ExpT1GE(Experiment):
             WFS_Constant("read", None, self.readout_time, 0.0)
         ])
         wfm.set_digital_segments('readout', 'qubit', ['read'])
-        self._temp_vars = self._expt_config.update_waveforms(wfm, [('Wait Time', 'qubit', 'wait', 'Duration')] )
+        self._temp_vars = self._expt_config.update_waveforms(wfm, [('Wait Time', wfm.get_waveform_segment('qubit', 'wait'), 'Duration')] )
 
         sweep_vars = [(self._temp_vars[0], self._range_waits)]
 

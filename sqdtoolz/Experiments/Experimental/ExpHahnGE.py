@@ -71,7 +71,8 @@ class ExpHahnGE(Experiment):
             WFS_Constant("read", None, self.readout_time, 0.0)
         ])
         wfm.set_digital_segments('readout', 'qubit', ['read'])
-        self._temp_vars = self._expt_config.update_waveforms(wfm, [('Wait Time', 'qubit', 'wait', 'Duration'), ('Wait Time 2', 'qubit', 'wait2', 'Duration')] )
+        self._temp_vars = self._expt_config.update_waveforms(wfm, [('Wait Time', wfm.get_waveform_segment('qubit', 'wait'), 'Duration'),
+                                                                   ('Wait Time 2', wfm.get_waveform_segment('qubit', 'wait2'), 'Duration')] )
 
         sweep_vars = [('hahnDelay', [self._temp_vars[0], self._temp_vars[1]], np.array([self._range_waits, self._range_waits]).T)]
 

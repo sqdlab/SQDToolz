@@ -7,7 +7,24 @@ class WaveformGeneric:
         self.digitals = {x:{} for x in digital_pulses}
 
     def set_waveform(self, waveform_name, waveform_data):
-        self.waveforms[waveform_name] = waveform_data
+        self.waveforms[waveform_name] = []
+        for cur_wfm in waveform_data:
+            for chk_wfm in self.waveforms[waveform_name]:
+                assert chk_wfm.Name != cur_wfm.Name, "Waveform segment names must be unique."
+            cur_wfm.Parent = (self, waveform_name)
+            self.waveforms[waveform_name].append(cur_wfm)        
+
+    def get_waveform_segment(self, waveform_name, waveform_segment_name):
+        found_seg = None
+        for cur_wfm in self.waveforms[waveform_name]:
+            if cur_wfm.Name == waveform_segment_name:
+                found_seg = cur_wfm
+                break
+        return found_seg
+    
+    @property
+    def Parent(self):
+        return None
 
     def set_digital_segments(self, signal_name, ref_waveform_name, segments, active_on_state=1):
         assert signal_name in self.digitals, f'Signal name {signal_name} not declared in digital pulses.'

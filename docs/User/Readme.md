@@ -1,6 +1,7 @@
 # User Documentation
 
 Quick-start guide
+- [Example usage](example_usage.ipynb)
 
 Main structure:
 - [Laboratory Class](Laboratory.md)

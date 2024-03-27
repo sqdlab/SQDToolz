@@ -1,0 +1,7 @@
+instruments:
+  sw_rpi:
+    type: sqdtoolz.Drivers.SW_RpiIQBox.SW_RpiIQBox
+    address: 'TCPIP::192.168.1.18::4000::SOCKET'
+    parameters:
+      pulse_delay_time:
+        initial_value: 1

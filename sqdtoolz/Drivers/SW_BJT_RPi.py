@@ -1,4 +1,5 @@
 from qcodes import VisaInstrument
+from qcodes.utils import validators as vals
 import time
 
 class SW_BJT_RPi(VisaInstrument):
@@ -11,6 +12,15 @@ class SW_BJT_RPi(VisaInstrument):
         super().__init__(name, address, terminator='\n', timeout=30)
         #kwargs['init_instrument_only'] = True
         self._state_map = pins
+
+        self._delay_time = 0.1
+
+        self.add_parameter('pulse_delay_time', unit='s',
+                label="Output voltage pulse time",
+                initial_value=0.1,
+                vals=vals.Numbers(0.001, 10),
+                get_cmd=lambda : self._delay_time,
+                set_cmd=self._set_delay)
 
         #Set the prescribed pins to outputs
         for cur_key in self._state_map:
@@ -40,18 +50,24 @@ class SW_BJT_RPi(VisaInstrument):
                 return
         assert False, "Timed out waiting for RPi-Switch to get ready..."
 
+
+    def _set_delay(self, delay):
+        self._delay_time = delay
+
+
     def _set_state(self, state) :
         """
         Wrapper method to handle setting of state
         @param state <String> : Switch position e.g. "P1"
         """
         # RESET SWITCH with a 1s pulse
-        self.write(f'GPIO:SOUR:DIG:PULS{self._state_map["P0"]} 1, 0.1')
-        self._wait_till_ready()        
+        if self._state_map["P0"] > 0:
+            self.write(f'GPIO:SOUR:DIG:PULS{self._state_map["P0"]} 1, {self._delay_time}')
+            self._wait_till_ready()        
 
         # SET NEW STATE with a 1s pulse
         if (state != "P0"):
-            self.write(f'GPIO:SOUR:DIG:PULS{self._state_map[state]} 1, 0.1')
+            self.write(f'GPIO:SOUR:DIG:PULS{self._state_map[state]} 1, {self._delay_time}')
             self._wait_till_ready()
         self._current_state = state # update state tracking variable
 

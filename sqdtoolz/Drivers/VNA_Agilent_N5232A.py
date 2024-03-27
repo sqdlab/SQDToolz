@@ -519,8 +519,8 @@ class VNA_Agilent_N5232A(VisaInstrument):
         return {'data': ret_data}
 
     def _get_data_SW(self, **kwargs):
-        assert 'trig_func' in kwargs, "Must provide a trigger function to manually trigger the VNA for time-1f-SW!"
-        trig_func = kwargs.get('trig_func')
+        assert 'trig_obj' in kwargs, "Must provide a trigger HAL to manually trigger the VNA for time-1f-SW!"
+        trig_obj = kwargs.get('trig_obj')
 
         #Just check what data traces are being measured at the moment just in case...
         cur_meas_traces = self.ask('CALC:PAR:CAT:EXT?').strip('"').split(',')
@@ -562,9 +562,10 @@ class VNA_Agilent_N5232A(VisaInstrument):
                 # self.ask('*OPC?')
                 # self.write('ABORT')
                 
-                trig_func()
-
-                self.ask('*OPC?')
+                trig_obj.ManualTrigger()
+                self.ask('*OPC?')   
+                trig_obj.Hold()
+            
             for cur_meas_name, cur_meas in cur_meas_traces:
                 self.write(f'CALC:PAR:SEL \'{cur_meas_name}\'')
                 #Note that SDATA just means complex-valued...
@@ -576,7 +577,7 @@ class VNA_Agilent_N5232A(VisaInstrument):
             ret_data['data'][cur_ch] = np.array(ret_data['data'][cur_ch])
         # self.visa_handle.read_raw()
         self.ask('*OPC?')
-        ret_data['parameter_values'][x_var_name] = np.array(self.visa_handle.query_binary_values('CALC:X?', datatype=u'f', is_big_endian=self._is_big_endian))
+        ret_data['parameter_values'][x_var_name] = np.array(self.visa_handle.query_binary_values('SENS:X?', datatype=u'f', is_big_endian=self._is_big_endian))
         self.ask('*OPC?')
        
         leProc = kwargs.get('data_processor', None)

@@ -145,7 +145,7 @@ class ACQvna(HALbase):
         self.data_processor = proc_obj
 
     def get_data(self):
-        return self._instr_vna.get_data(data_processor = self.data_processor, trig_func = lambda : self._trigger_HAL.ManualTrigger())
+        return self._instr_vna.get_data(data_processor = self.data_processor, trig_obj = self._trigger_HAL)
 
     @property
     def ManualTriggerHAL(self):

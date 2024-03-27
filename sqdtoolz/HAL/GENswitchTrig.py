@@ -25,6 +25,9 @@ class GENswitchTrig(HALbase):
 
     def ManualTrigger(self):
         self._instr_switch.manual_trigger()
+    
+    def Hold(self):
+        self._instr_switch.hold()
 
     def _get_current_config(self):
         ret_dict = {

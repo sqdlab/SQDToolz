@@ -20,7 +20,7 @@ from qcodes.utils.validators import Numbers
 from qcodes.utils import validators as vals
 
 logger = logging.getLogger()
-
+import time
 
 
 
@@ -62,6 +62,7 @@ class SW_FPGA_VNA(Instrument):
         self.ser.write(bytes(cmd,encoding='utf-8'))
 
     def query(self, cmd):
+        self.ser.reset_input_buffer()
         self.write(cmd)
         ret_str = self.ser.read(1)
         ret_str = ret_str.decode(encoding='utf-8')
@@ -72,12 +73,16 @@ class SW_FPGA_VNA(Instrument):
         return "P" + str(self.state())
     @Position.setter
     def Position(self, pos):
+        ans = ''
         if pos == "P1":
-            self.write('U')
+            while (ans != 'P'):
+                ans = self.query('U')
         elif pos == "P2":
-            self.write('j')
+            while (ans != 'R'):
+                ans = self.query('j')
         elif pos == "P3":
-            self.write('f')
+            while (ans != 'S'):
+                ans = self.query('f')
         elif pos == "P4":
             self.write('w')
 
@@ -91,7 +96,15 @@ class SW_FPGA_VNA(Instrument):
 
     def manual_trigger(self):
         self.Position = self._position_init
-        self.Position = "P4"
+        cur_ans = ''
+        while (True):
+            cur_ans = self.query('w')
+            if cur_ans == 'T':
+                break
+            self.Position = self._position_init
+    
+    def hold(self):
+        self.Position = self._position_init
 
     def get_all_switch_contacts(self):
         return ["P1", "P2", "P3", "P4"]

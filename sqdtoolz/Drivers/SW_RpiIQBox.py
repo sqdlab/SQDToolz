@@ -11,6 +11,7 @@ class SW_RpiIQBox(SW_BJT_RPi):
         self._GPIO_LED = 16
         super().__init__(name, address, pins={"P0":-1, "Pmix": 26, "Pmeas": 21}, **kwargs)
         
+        self.write('GPIO:BUZZ 13,Z1')
         self.write(f'GPIO:SOUR:DIG:IO{self._GPIO_LED} OUT')
         #kwargs['init_instrument_only'] = True
 
@@ -22,6 +23,7 @@ class SW_RpiIQBox(SW_BJT_RPi):
         if pos in self._state_map.keys():
             self._set_state(pos)
         if pos == "Pmix":
+            self.write('GPIO:BUZZ 13,Z2')
             self.write(f'GPIO:SOUR:DIG:DATA{self._GPIO_LED} 1')
         else:
             self.write(f'GPIO:SOUR:DIG:DATA{self._GPIO_LED} 0')

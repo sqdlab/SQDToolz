@@ -11,6 +11,10 @@ instruments:
       pxi_chassis: 0
       pxi_slot: 3
     parameters:
+      ref_osc_src:
+        initial_value: 'EXT'
+      ref_osc_freq:
+        initial_value: 10e6
       AWG.CH1.trig_src:
         initial_value: 'NONE'
       AWG.CH2.trig_src:

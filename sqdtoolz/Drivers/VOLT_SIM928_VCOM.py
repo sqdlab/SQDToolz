@@ -370,7 +370,7 @@ class VOLT_SIM928_VCOM(VisaInstrument):
         self.close()
 
 def runme():
-    mySim = SIM928_PLX("bob", '192.168.1.208', 2)
+    mySim = VOLT_SIM928_VCOM("bob", 'ASRL1')
     mySim.get_output(3).RampRate = 0.5
     mySim.get_output(3).Voltage = 0.0
     a = 0

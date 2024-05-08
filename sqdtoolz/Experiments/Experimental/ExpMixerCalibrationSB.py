@@ -15,12 +15,14 @@ class ExpMixerCalibrationSB(Experiment):
         self._range_amps = (min(range_amps), max(range_amps))
         self._var_phs = var_phs
         self._range_phs = (min(range_phs), max(range_phs))
-        self._ch_id = kwargs.get('acq_ch', 'CH1')
         self._iters = kwargs.get('iterations', 1)
 
+        self._edge_map_points = kwargs.get('num_map_edge_points', 5)
         self._optimise = optimise
         self._sample_points = kwargs.get('sample_points', 3)
         self._win_shrink_factor = kwargs.get('win_shrink_factor', 0.33)
+
+        self._opt_val = (1,0)
 
     def _cost_func(self, x, y):
         self._var_amp.Value = x
@@ -28,7 +30,9 @@ class ExpMixerCalibrationSB(Experiment):
         self._expt_config.prepare_instruments()
         smpl_data = self._expt_config.get_data()['data']
 
-        i_val, q_val = smpl_data['data'][self._ch_id + '_I'], smpl_data['data'][self._ch_id + '_Q']
+        ch_names = sorted([x for x in smpl_data['data']])
+        assert len(ch_names) == 2, "The acquisition and processing should only return two channels in the output for I and Q respectively."
+        i_val, q_val = smpl_data['data'][ch_names[0]], smpl_data['data'][ch_names[1]]
 
         ampl = np.sqrt(i_val**2 + q_val**2)
         if isinstance(ampl, np.ndarray):
@@ -50,6 +54,7 @@ class ExpMixerCalibrationSB(Experiment):
             print(f'Minimum Coordinate: Amp={min_coord[0]}, Phs={min_coord[1]}, Value={min_coord[2]}')
             
             self._var_amp.Value, self._var_phs.Value = min_coord[0], min_coord[1]
+            self._opt_val = min_coord[0], min_coord[1]
             #
             data_opt = np.array(opt.opt_data)
             final_data = {
@@ -65,8 +70,8 @@ class ExpMixerCalibrationSB(Experiment):
             data_file.close()
             return FileIOReader(file_path + 'data.h5')
         else:
-            return super()._run(file_path, [(self._var_amp, np.linspace(self._range_amps[0], self._range_amps[1], 5)),
-                                            (self._var_phs, np.linspace(self._range_phs[0], self._range_phs[1], 5))], **kwargs)
+            return super()._run(file_path, [(self._var_amp, np.linspace(self._range_amps[0], self._range_amps[1], self._edge_map_points)),
+                                            (self._var_phs, np.linspace(self._range_phs[0], self._range_phs[1], self._edge_map_points))], **kwargs)
 
     def _post_process(self, data):
         if self._optimise:
@@ -90,3 +95,6 @@ class ExpMixerCalibrationSB(Experiment):
             self._var_amp.Value, self._var_phs.Value = dpkt['extremum']
 
             return dpkt['fig']
+
+    def commit_to_SPEC(self, SPEC_obj):
+        SPEC_obj['AmpFac'].Value, SPEC_obj['PhsOff'].Value = self._opt_val

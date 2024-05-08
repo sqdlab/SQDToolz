@@ -1382,7 +1382,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
             done = int(resp_items[1])
             #print("{0}. {1}".format(done, resp_items))
             loopcount += 1
-            if loopcount > 100000 and captured_frame_count == 0:    #As in nothing captured over 100000 check-loops...
+            if loopcount > 1000000 and captured_frame_count == 0:    #As in nothing captured over 100000 check-loops...
                 #print("No Trigger was detected")
                 assert False, "No trigger detected during the acquisiton sniffing window."
 

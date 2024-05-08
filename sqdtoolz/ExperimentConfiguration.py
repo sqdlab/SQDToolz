@@ -441,3 +441,8 @@ class ExperimentConfiguration:
                 assert False, "The \'Type\' key in the dictionary returned on calling the function _get_timing_diagram_info is invalid."
 
         return tp.finalise_plot(self._total_time*scale_fac, plt_units, f'Configuration: {self.Name}', tol=min_tol)
+
+    def update_SPECs(self, list_spec_names):
+        assert isinstance(list_spec_names, (list, tuple)), "Must give the SPECs as a list of names."
+        self._list_spec_names = list_spec_names[:]
+        self._init_config['SPECs'] = self._list_spec_names

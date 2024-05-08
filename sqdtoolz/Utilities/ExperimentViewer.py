@@ -8,7 +8,7 @@ import json
 import sys
 
 from numpy import isin
-
+from sqdtoolz.Utilities.Miscellaneous import Miscellaneous
 
 class DoubleScrollBarFrame:
     """
@@ -495,7 +495,7 @@ class ExperimentViewer:
         elif isinstance(leDict, list):
             return ','.join([self._whittle_dict(x) for x in leDict]).replace('\'','')
         else:
-            return str(self._get_units(leDict))
+            return str(Miscellaneous.get_units(leDict))
 
     def main_loop(self):
         self.pw_main_LR_UI.update()
@@ -544,27 +544,27 @@ class ExperimentViewer:
                 cur_list = []
                 for cur_key in cur_hal:
                     if isinstance(cur_hal[cur_key], str) or isinstance(cur_hal[cur_key], float) or isinstance(cur_hal[cur_key], int) or isinstance(cur_hal[cur_key], bool):
-                        cur_str += f"{cur_key}: {self._get_units(cur_hal[cur_key])}\n"
+                        cur_str += f"{cur_key}: {Miscellaneous.get_units(cur_hal[cur_key])}\n"
                     elif cur_key == "WaveformSegments": #Custom processing for AWG waveforms...
                         # cur_str += "Segments:\n"
                         for cur_seg in cur_hal[cur_key]:
                             if "Value" in cur_seg:
-                                ampl_val = self._get_units(cur_seg["Value"])
+                                ampl_val = Miscellaneous.get_units(cur_seg["Value"])
                             elif "Amplitude" in cur_seg:
-                                ampl_val = self._get_units(cur_seg["Amplitude"])
+                                ampl_val = Miscellaneous.get_units(cur_seg["Amplitude"])
                             else:
                                 ampl_val = ""
                             #Trim the WFS_ in the Type...
-                            cur_list.append((f'\t{cur_seg["Name"]}, [{cur_seg["Type"][4:]}], {self._get_units(cur_seg["Duration"])}s, {ampl_val}\n', 'white'))
+                            cur_list.append((f'\t{cur_seg["Name"]}, [{cur_seg["Type"][4:]}], {Miscellaneous.get_units(cur_seg["Duration"])}s, {ampl_val}\n', 'white'))
                     elif cur_key == "triggers": #Custom processing for DDG pulses...
                         for cur_output in cur_hal[cur_key]:
                             cur_dict = cur_hal[cur_key][cur_output]
                             cur_strTrig = cur_output + ": "
                             if "TrigPulseLength" in cur_dict:
-                                cur_strTrig += self._get_units(cur_dict["TrigPulseLength"]) + "s,"
+                                cur_strTrig += Miscellaneous.get_units(cur_dict["TrigPulseLength"]) + "s,"
                             if "TrigPulseDelay" in cur_dict:
                                 if float(cur_dict["TrigPulseDelay"]) > 0:
-                                    cur_strTrig += self._get_units(cur_dict["TrigPulseDelay"]) + "s dly,"
+                                    cur_strTrig += Miscellaneous.get_units(cur_dict["TrigPulseDelay"]) + "s dly,"
                             col='white'
                             if "TrigEnable" in cur_dict:
                                 if cur_dict["TrigEnable"]:
@@ -615,7 +615,7 @@ class ExperimentViewer:
                 cur_list = []
                 for cur_key in cur_proc:
                     if isinstance(cur_proc[cur_key], str):
-                        cur_str += f"{cur_key}: {self._get_units(cur_proc[cur_key])}\n"
+                        cur_str += f"{cur_key}: {Miscellaneous.get_units(cur_proc[cur_key])}\n"
                     elif isinstance(cur_proc[cur_key], list):
                         cur_list.append((cur_key + ":", 'white'))
                         for cur_pipe in cur_proc[cur_key]:
@@ -629,7 +629,7 @@ class ExperimentViewer:
                 cur_str = ""
                 for cur_key in cur_wfmt:
                     if isinstance(cur_wfmt[cur_key], str) or isinstance(cur_wfmt[cur_key], float) or isinstance(cur_wfmt[cur_key], int) or isinstance(cur_wfmt[cur_key], bool):
-                        cur_str += f"{cur_key}: {self._get_units(cur_wfmt[cur_key])}\n"
+                        cur_str += f"{cur_key}: {Miscellaneous.get_units(cur_wfmt[cur_key])}\n"
                 col = 'white'
                 cur_wfmts += [(cur_str[:-1], col)]
 
@@ -648,7 +648,7 @@ class ExperimentViewer:
                         dest = f"({dest[0][1]}: {dest[0][0]})"
                     else:
                         dest = ""
-                    cur_str = f"{cur_key}: {self._get_units(cur_spec['Entries'][cur_key]['Value'])} {dest}"
+                    cur_str = f"{cur_key}: {Miscellaneous.get_units(cur_spec['Entries'][cur_key]['Value'])} {dest}"
                     if cur_key in cur_attrs:
                         self.dash_SPECs.item(cur_attrs[cur_key], text=cur_str, tags=[cur_key])
                     else:
@@ -679,7 +679,7 @@ class ExperimentViewer:
 
             cur_vars = []
             for cur_var in data:
-                cur_vars += [f"{cur_var}: {self._get_units(data[cur_var]['Value'])}\n"]
+                cur_vars += [f"{cur_var}: {Miscellaneous.get_units(data[cur_var]['Value'])}\n"]
             # self.dash_VARs.set_simple_labels([(cur_str[:-1], 'white')])
             self.dash_VARs.set_simple_list([cur_vars])
 

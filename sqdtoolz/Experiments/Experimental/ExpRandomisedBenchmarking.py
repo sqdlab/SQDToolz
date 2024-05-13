@@ -92,29 +92,36 @@ class ExpRandomisedBenchmarking(Experiment):
 
         seq_lens = data.param_vals[0]
 
-        fig, ax = plt.subplots(1)
+        fig, axs = plt.subplots(ncols=2); fig.set_figwidth(12); axs[0].grid(); axs[1].grid()
 
         mean_vals = []
         std_vals = []
         for m in range(seq_lens.size):
             cur_x = [seq_lens[m]]*self._num_trials
             cur_y = norm_obj.normalise_data(arr[m])
-            ax.plot(cur_x, cur_y, 'kx')
+            axs[0].plot(cur_x, cur_y, 'kx')
             mean_vals.append(np.mean(cur_y))
             std_vals.append(np.std(cur_y))
         mean_vals = np.array(mean_vals)
         std_vals = np.array(std_vals)
 
-        ax.plot(seq_lens, mean_vals)
-        ax.fill_between(seq_lens, mean_vals-std_vals, mean_vals+std_vals, alpha=0.5)
+        axs[0].plot(seq_lens, mean_vals)
+        axs[0].fill_between(seq_lens, mean_vals-std_vals, mean_vals+std_vals, alpha=0.5)
+        axs[0].set_xlabel('Sequence Length')
+        axs[0].set_ylabel('Excited State Probability')
+        axs[0].set_title(f'Number of Trials per Sequence Length: {self._num_trials}')
 
-        ax.set_xlabel('Sequence Length')
-        ax.set_ylabel('Excited State Probability')
-        ax.set_title(f'Number of Trials per Sequence Length: {self._num_trials}')
+        zProj = mean_vals - 0.5
+        slope, intercept = np.polyfit(seq_lens, np.log(zProj), deg=1)
+        error_per_gate = np.exp(slope)
+        axs[1].plot(seq_lens, np.log(zProj), 'kx')
+        axs[1].plot(seq_lens, seq_lens*slope+intercept, 'r-')
+        axs[1].set_xlabel('Sequence Length')
+        axs[1].set_ylabel(r'$\ell n(Z_{proj})$')
+        axs[1].set_title(f"Error per Gate: {(error_per_gate*100):.4g}%")
+        axs[1].legend(['Raw Data', 'Fitted Error line'])
 
         fig.show()
-        fig.savefig(self._file_path + 'fitted_plot.png')
-
         return data
 
     def _generate_sequence(self, seq_len):

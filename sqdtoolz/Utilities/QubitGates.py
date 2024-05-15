@@ -103,7 +103,8 @@ class QubitGatesBase:
             assert False, f"Cannot write this angle {angle} naturally."
 
 class TransmonGates(QubitGatesBase):
-    def __init__(self, wmft_drive_func, spec_qubit, envelope='Gaussian'):
+    def __init__(self, wmft_drive_func, spec_qubit, envelope='Gaussian', arb_rot_func='simple_sine'):
+        #simple_sine uses the Pi-rotation amplitude and calculates the required fraction for the demanded angle...
         self._wfmt_qubit_drive = wmft_drive_func
         self._spec_qubit = spec_qubit
         if envelope == 'Gaussian':
@@ -112,32 +113,69 @@ class TransmonGates(QubitGatesBase):
             self._env_func = WFS_Constant
         else:
             assert False, "Envelope must be Gaussian or Constant."
+
+        #TODO: Investigate more sophisticated arbitrary rotation calibration - e.g. spline interpolation?
+        assert arb_rot_func=='simple_sine', "The arbitrary rotation function must be either: 'simple_sine' or ..."
+        self._arb_rot_func = arb_rot_func
     
     def get_qubit_SPEC(self):
         return self._spec_qubit
 
     def get_available_gates(self):
         #TODO: Add freq_offset along with phase_off to the WFMT to enable Hadamards?
-        return ['I', 'X', 'X/2', '-X/2', 'Y', 'Y/2', '-Y/2']
+        return ['I', 'X', 'X/2', '-X/2', 'Y', 'Y/2', '-Y/2', 'Z', 'Z/2', '-Z/2']
 
     def generate_gates(self, gate_list, gate_set_prefix='gate'):
         assert isinstance(gate_list, (list, tuple)), "gate_list must be given as a list of valid gates."
         ret_gates = []
+        phase_offset = 0
         for m, cur_gate in enumerate(gate_list):
-            if cur_gate == 'I':
-                ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(), self._spec_qubit['GE X-Gate Time'].Value, 0.0))
+            if isinstance(cur_gate, (tuple, list)):
+                assert len(cur_gate) == 2, "Arbitrary rotations must be specified as a tuple - e.g. ('Rx',0.02)."
+                if cur_gate[0] == 'Rz':
+                    phase_offset = angle
+                else:
+                    #Calculate the amplitude for the rotation
+                    if self._arb_rot_func == 'simple_sine':
+                        angle = cur_gate[1] % (2*np.pi)
+                        if angle > np.pi:
+                            angle = angle - 2*np.pi
+                        ampl =  self._spec_qubit['GE X-Gate Time'].Value * angle/(np.pi)
+                    #
+                    if cur_gate[0] == 'Rx':
+                        ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_offset=phase_offset), self._spec_qubit['GE X-Gate Time'].Value, ampl))
+                    elif cur_gate[0] == 'Ry':
+                        ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_offset=phase_offset, phase_segment=np.pi/2), self._spec_qubit['GE X-Gate Time'].Value, ampl))
+                    else:
+                        assert False, "The gate type for arbitrary rotations must be 'Rx', 'Ry' or 'Rz'."
+                    phase_offset = 0
+            elif cur_gate == 'I':
+                ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_offset=phase_offset), self._spec_qubit['GE X-Gate Time'].Value, 0.0))
+                phase_offset = 0
             elif cur_gate == 'X':
-                ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(), self._spec_qubit['GE X-Gate Time'].Value, self._spec_qubit['GE X-Gate Amplitude'].Value))
+                ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_offset=phase_offset), self._spec_qubit['GE X-Gate Time'].Value, self._spec_qubit['GE X-Gate Amplitude'].Value))
+                phase_offset = 0
             elif cur_gate == 'X/2':
-                ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(), self._spec_qubit['GE X/2-Gate Time'].Value, self._spec_qubit['GE X/2-Gate Amplitude'].Value))
+                ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_offset=phase_offset), self._spec_qubit['GE X/2-Gate Time'].Value, self._spec_qubit['GE X/2-Gate Amplitude'].Value))
+                phase_offset = 0
             elif cur_gate == '-X/2':
-                ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_segment=np.pi), self._spec_qubit['GE X/2-Gate Time'].Value, self._spec_qubit['GE X/2-Gate Amplitude'].Value))
+                ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_offset=phase_offset, phase_segment=np.pi), self._spec_qubit['GE X/2-Gate Time'].Value, self._spec_qubit['GE X/2-Gate Amplitude'].Value))
+                phase_offset = 0
             elif cur_gate == 'Y':
-                ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_segment=np.pi/2), self._spec_qubit['GE X-Gate Time'].Value, self._spec_qubit['GE X-Gate Amplitude'].Value))
+                ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_offset=phase_offset, phase_segment=np.pi/2), self._spec_qubit['GE X-Gate Time'].Value, self._spec_qubit['GE X-Gate Amplitude'].Value))
+                phase_offset = 0
             elif cur_gate == 'Y/2':
-                ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_segment=np.pi/2), self._spec_qubit['GE X/2-Gate Time'].Value, self._spec_qubit['GE X/2-Gate Amplitude'].Value))
+                ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_offset=phase_offset, phase_segment=np.pi/2), self._spec_qubit['GE X/2-Gate Time'].Value, self._spec_qubit['GE X/2-Gate Amplitude'].Value))
+                phase_offset = 0
             elif cur_gate == '-Y/2':
-                ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_segment=3*np.pi/2), self._spec_qubit['GE X/2-Gate Time'].Value, self._spec_qubit['GE X/2-Gate Amplitude'].Value))
+                ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_offset=phase_offset, phase_segment=3*np.pi/2), self._spec_qubit['GE X/2-Gate Time'].Value, self._spec_qubit['GE X/2-Gate Amplitude'].Value))
+                phase_offset = 0
+            elif cur_gate == 'Z':
+                phase_offset = np.pi
+            elif cur_gate == 'Z/2':
+                phase_offset = np.pi/2
+            elif cur_gate == '-Z/2':
+                phase_offset = -np.pi/2
             else:
                 assert False, f"Gate \'{cur_gate}\' is not a valid gate."
         return ret_gates

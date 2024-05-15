@@ -178,7 +178,7 @@ class WFMT_ModulationIQ(WaveformTransformation):
                 self._cur_t0 += kwargs.get('phase_offset') / (2*np.pi*self.IQFrequency)
             else:
                 self._cur_t0 -= kwargs.get('phase_offset') / (2*np.pi*self.IQFrequency)
-        elif 'phase_segment' in kwargs:
+        if 'phase_segment' in kwargs:
             if self.IQUpperSideband:
                 cur_t_off = kwargs.get('phase_segment') / (2*np.pi*self.IQFrequency)
             else:

@@ -133,7 +133,7 @@ class TransmonGates(QubitGatesBase):
             if isinstance(cur_gate, (tuple, list)):
                 assert len(cur_gate) == 2, "Arbitrary rotations must be specified as a tuple - e.g. ('Rx',0.02)."
                 if cur_gate[0] == 'Rz':
-                    phase_offset = angle
+                    phase_offset = phase_offset + angle  # in case prev gate was also Rz
                 else:
                     #Calculate the amplitude for the rotation
                     if self._arb_rot_func == 'simple_sine':
@@ -171,11 +171,11 @@ class TransmonGates(QubitGatesBase):
                 ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_offset=phase_offset, phase_segment=3*np.pi/2), self._spec_qubit['GE X/2-Gate Time'].Value, self._spec_qubit['GE X/2-Gate Amplitude'].Value))
                 phase_offset = 0
             elif cur_gate == 'Z':
-                phase_offset = np.pi
+                phase_offset = phase_offset + np.pi
             elif cur_gate == 'Z/2':
-                phase_offset = np.pi/2
+                phase_offset = phase_offset + np.pi/2
             elif cur_gate == '-Z/2':
-                phase_offset = -np.pi/2
+                phase_offset = phase_offset - np.pi/2
             else:
                 assert False, f"Gate \'{cur_gate}\' is not a valid gate."
         return ret_gates

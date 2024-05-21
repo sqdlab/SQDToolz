@@ -73,13 +73,8 @@ class ExpRandomisedBenchmarking(Experiment):
             json.dump(all_seqs, outfile, indent=4)
         data_file.close()
 
-        data_fileC = FileIOWriter(file_path + 'dataCalib.h5')
-        varInd = VariableInternalTransient('State')
-        final_data = self._qubit_gate_obj.run_circuit(['I'], self._expt_config, self.load_time, self.readout_time)
-        data_fileC.push_datapkt(final_data, [(varInd, np.arange(2))])
-        final_data = self._qubit_gate_obj.run_circuit(['X'], self._expt_config, self.load_time, self.readout_time)
-        data_fileC.push_datapkt(final_data, [(varInd, np.arange(2))])
-        data_fileC.close()
+        self._qubit_gate_obj.calib_normalisation(self._expt_config, self.load_time, self.readout_time, file_path)
+
         self._file_path = file_path
 
         self.file_io_read_calib = FileIOReader(file_path + 'dataCalib.h5')
@@ -88,7 +83,6 @@ class ExpRandomisedBenchmarking(Experiment):
 
     def _post_process(self, data):
         arr = data.get_numpy_array()
-        norm_obj = DataIQNormalise.calibrateFromFileIOReader(self.file_io_read_calib)
 
         seq_lens = data.param_vals[0]
 
@@ -98,7 +92,7 @@ class ExpRandomisedBenchmarking(Experiment):
         std_vals = []
         for m in range(seq_lens.size):
             cur_x = [seq_lens[m]]*self._num_trials
-            cur_y = norm_obj.normalise_data(arr[m])
+            cur_y = self._qubit_gate_obj.normalise_data(arr[m])
             axs[0].plot(cur_x, cur_y, 'kx')
             mean_vals.append(np.mean(cur_y))
             std_vals.append(np.std(cur_y))
@@ -122,6 +116,8 @@ class ExpRandomisedBenchmarking(Experiment):
         axs[1].legend(['Raw Data', 'Fitted Error line'])
 
         fig.show()
+        fig.savefig(self._file_path + 'Summary.png')
+
         return data
 
     def _generate_sequence(self, seq_len):

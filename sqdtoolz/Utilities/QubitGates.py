@@ -2,6 +2,9 @@ from sqdtoolz.HAL.WaveformSegments import WFS_Gaussian, WFS_Constant
 from sqdtoolz.HAL.WaveformGeneric import*
 import numpy as np
 import scipy.linalg
+from sqdtoolz.Utilities.FileIO import FileIOWriter
+from sqdtoolz.Variable import VariableInternalTransient
+from sqdtoolz.Utilities.DataIQNormalise import DataIQNormalise
 
 class QubitGatesBase:
     def get_available_gates(self):
@@ -117,7 +120,37 @@ class TransmonGates(QubitGatesBase):
         #TODO: Investigate more sophisticated arbitrary rotation calibration - e.g. spline interpolation?
         assert arb_rot_func=='simple_sine', "The arbitrary rotation function must be either: 'simple_sine' or ..."
         self._arb_rot_func = arb_rot_func
-    
+
+        if not "GE -X/2-Gate Phase" in spec_qubit:
+            spec_qubit.add("GE -X/2-Gate Phase", np.pi)
+        if not "GE Y/2-Gate Phase" in spec_qubit:
+            spec_qubit.add("GE Y/2-Gate Phase", np.pi/2)
+        if not "GE -Y/2-Gate Phase" in spec_qubit:
+            spec_qubit.add("GE -Y/2-Gate Phase", -np.pi/2)
+        if not "GE Y-Gate Phase" in spec_qubit:
+            spec_qubit.add("GE Y-Gate Phase", np.pi/2)
+        
+        self.norm_calib = None
+
+    def calib_normalisation(self, expt_config, load_time, readout_time, file_path = None, fileName = 'dataCalib.h5'):
+        store_to_file = isinstance(file_path, str)
+        if store_to_file:
+            data_fileC = FileIOWriter(file_path + fileName)
+            varInd = VariableInternalTransient('State')
+        final_dataG = self.run_circuit(['I'], expt_config, load_time, readout_time)
+        final_dataE = self.run_circuit(['X'], expt_config, load_time, readout_time)
+        if store_to_file:
+            data_fileC.push_datapkt(final_dataG, [(varInd, np.arange(2))])
+            data_fileC.push_datapkt(final_dataE, [(varInd, np.arange(2))])
+            data_fileC.close()
+            self.norm_calib = DataIQNormalise.calibrateFromFile(file_path + fileName)
+        else:
+            self.norm_calib = DataIQNormalise(np.array([[final_dataG['data']['CH_I'][0][0], final_dataG['data']['CH_Q'][0][0]]]), np.array([[final_dataE['data']['CH_I'][0][0], final_dataE['data']['CH_Q'][0][0]]]))
+
+    def normalise_data(self, data):
+        #data given as Nx2 array of N IQ-values...
+        return self.norm_calib(data)
+
     def get_qubit_SPEC(self):
         return self._spec_qubit
 
@@ -159,16 +192,16 @@ class TransmonGates(QubitGatesBase):
                 ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_offset=phase_offset), self._spec_qubit['GE X/2-Gate Time'].Value, self._spec_qubit['GE X/2-Gate Amplitude'].Value))
                 phase_offset = 0
             elif cur_gate == '-X/2':
-                ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_offset=phase_offset, phase_segment=np.pi), self._spec_qubit['GE X/2-Gate Time'].Value, self._spec_qubit['GE X/2-Gate Amplitude'].Value))
+                ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_offset=phase_offset, phase_segment=self._spec_qubit['GE -X/2-Gate Phase'].Value), self._spec_qubit['GE X/2-Gate Time'].Value, self._spec_qubit['GE X/2-Gate Amplitude'].Value))
                 phase_offset = 0
             elif cur_gate == 'Y':
-                ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_offset=phase_offset, phase_segment=np.pi/2), self._spec_qubit['GE X-Gate Time'].Value, self._spec_qubit['GE X-Gate Amplitude'].Value))
+                ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_offset=phase_offset, phase_segment=self._spec_qubit['GE Y-Gate Phase'].Value), self._spec_qubit['GE X-Gate Time'].Value, self._spec_qubit['GE X-Gate Amplitude'].Value))
                 phase_offset = 0
             elif cur_gate == 'Y/2':
-                ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_offset=phase_offset, phase_segment=np.pi/2), self._spec_qubit['GE X/2-Gate Time'].Value, self._spec_qubit['GE X/2-Gate Amplitude'].Value))
+                ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_offset=phase_offset, phase_segment=self._spec_qubit['GE Y/2-Gate Phase'].Value), self._spec_qubit['GE X/2-Gate Time'].Value, self._spec_qubit['GE X/2-Gate Amplitude'].Value))
                 phase_offset = 0
             elif cur_gate == '-Y/2':
-                ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_offset=phase_offset, phase_segment=3*np.pi/2), self._spec_qubit['GE X/2-Gate Time'].Value, self._spec_qubit['GE X/2-Gate Amplitude'].Value))
+                ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_offset=phase_offset, phase_segment=self._spec_qubit['GE -Y/2-Gate Phase'].Value), self._spec_qubit['GE X/2-Gate Time'].Value, self._spec_qubit['GE X/2-Gate Amplitude'].Value))
                 phase_offset = 0
             elif cur_gate == 'Z':
                 phase_offset = phase_offset + np.pi
@@ -181,6 +214,17 @@ class TransmonGates(QubitGatesBase):
         return ret_gates
     
     def run_circuit(self, gate_list, expt_config, load_time, readout_time):
+        i_val, q_val = self.run_circuit_direct(gate_list, expt_config, load_time, readout_time)
+
+        return {
+            'data' : {
+                'CH_I' : np.array([i_val]),
+                'CH_Q' : np.array([q_val]),
+            },
+            'parameters' : []
+        }
+    
+    def run_circuit_direct(self, gate_list, expt_config, load_time, readout_time, normalise=False):
         wfm = WaveformGeneric(['qubit'], ['readout'])
         wfm.set_waveform('qubit', [
             WFS_Constant("SEQPAD", None, -1, 0.0),
@@ -197,15 +241,12 @@ class TransmonGates(QubitGatesBase):
         smpl_data = expt_config.get_data()['data']
         ch_names = sorted([x for x in smpl_data['data']])
         assert len(ch_names) == 2, "The acquisition and processing should only return two channels in the output for I and Q respectively."
+        
         i_val, q_val = smpl_data['data'][ch_names[0]], smpl_data['data'][ch_names[1]]
-
-        return {
-            'data' : {
-                'CH_I' : np.array([i_val]),
-                'CH_Q' : np.array([q_val]),
-            },
-            'parameters' : []
-        }
+        if normalise and self.norm_calib != None:
+            return self.norm_calib.normalise_data(np.array([[i_val[0], q_val[0]]]))[0]
+        else:
+            return i_val, q_val
 
 # QubitGatesBase.compute_inverse_rotation_Pauli_Matrices( QubitGatesBase.get_rotation_from_Pauli_Matrix('X') )
 # a=0

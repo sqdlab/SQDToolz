@@ -40,6 +40,15 @@ class Experiment:
         assert os.path.exists(fname), f"The dataset {dset_name} was not generated in the last experiment run and thus, does not exist."
         return FileIOReader(fname)
 
+    def _setup_progress_bar(self, **kwargs):
+        self._ping_iteration = kwargs.get('ping_iteration')
+        self._ping_iteration(reset=True)
+        self._disable_progress_bar = kwargs.get('disable_progress_bar', False)
+
+    def _update_progress_bar(self, pct_complete):
+        if not self._disable_progress_bar:
+            self._ping_iteration(pct_complete)
+
     def _init_extra_rec_params(self):
         #Should return a list of strings
         return []
@@ -70,11 +79,9 @@ class Experiment:
         self.last_rec_params = None
         self._file_path = file_path
         delay = kwargs.get('delay', 0.0)
-        ping_iteration = kwargs.get('ping_iteration')
         kill_signal = kwargs.get('kill_signal')
         self._abort_gracefully = kwargs.get('kill_signal_send')     #Used in mid_process to abort...
-        ping_iteration(reset=True)
-        disable_progress_bar = kwargs.get('disable_progress_bar', False)
+        self._setup_progress_bar(**kwargs)
 
         self._data_file_index = kwargs.get('data_file_index', -1)
         self._store_timestamps = kwargs.get('store_timestamps', True)
@@ -189,8 +196,7 @@ class Experiment:
                     self._sweep_vars = sweep_vars2
                     self._mid_process()
                     self._data = None
-                    if not disable_progress_bar:
-                        ping_iteration((ind_coord+1)/self._sweep_grids.shape[0])
+                    self._update_progress_bar((ind_coord+1)/self._sweep_grids.shape[0])
 
         #Close all data files
         for cur_file in self._cur_filewriters:

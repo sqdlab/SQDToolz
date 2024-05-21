@@ -82,6 +82,9 @@ class ExperimentSpecification:
         assert key in self._cur_mappings, f"Entry \'{key}\' does not exist and must first be added via the \'add\' function."
         return self._key_value_item(self, key)
     
+    def __contains__(self, key):
+        return key in self._cur_mappings
+    
     def commit_entries(self):
         for cur_entry in self._cur_mappings:
             if len(self._cur_mappings[cur_entry]['Destination']) == 0:

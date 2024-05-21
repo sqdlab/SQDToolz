@@ -4,6 +4,10 @@
 
     "GE X/2-Gate Amplitude" : 0.0,
     "GE X/2-Gate Time" : 20e-9,
+    "GE -X/2-Gate Phase" : 3.1415926535897932384626433832795,
+    "GE Y/2-Gate Phase" : 1.5707963267948966192313216916398,
+    "GE -Y/2-Gate Phase" : -1.5707963267948966192313216916398,
+    "GE Y-Gate Phase" : 1.5707963267948966192313216916398,
 
     "GE X-Gate Amplitude" : 0.0,
     "GE X-Gate Time" : 20e-9,

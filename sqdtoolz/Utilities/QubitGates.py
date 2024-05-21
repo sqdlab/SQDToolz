@@ -149,7 +149,7 @@ class TransmonGates(QubitGatesBase):
 
     def normalise_data(self, data):
         #data given as Nx2 array of N IQ-values...
-        return self.norm_calib(data)
+        return self.norm_calib.normalise_data(data)
 
     def get_qubit_SPEC(self):
         return self._spec_qubit

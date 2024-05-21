@@ -5,7 +5,7 @@ from sqdtoolz.Utilities.DataFitting import*
 from sqdtoolz.Experiments.Experimental.ExpCalibGE import*
 
 class ExpCalibXrot(Experiment):
-    def __init__(self, name, expt_config, wfmt_qubit_drive, SPEC_qubit, rotDenom, numPeriods=4, iq_indices = [0,1], **kwargs):
+    def __init__(self, name, expt_config, wfmt_qubit_drive, SPEC_qubit, rotDenom, numPeriods=4, numPeriodsStep=1, iq_indices = [0,1], **kwargs):
         #This assumes that Pi-X and frequency (i.e. Ramsey) have been reasonably calibrated...
         #Rotation angle is np.pi / rotDenom
 
@@ -16,6 +16,7 @@ class ExpCalibXrot(Experiment):
 
         self._rotDenom = rotDenom
         self._numTotalRepeats = numPeriods * self._rotDenom * 2
+        self._numPeriodsStep = numPeriodsStep
         
         # self._range_amps = kwargs.get('range_amps', None)
         self._post_processor = kwargs.get('post_processor', None)
@@ -64,7 +65,7 @@ class ExpCalibXrot(Experiment):
         wfm.set_digital_segments('readout', 'qubit', ['read'])
         self._temp_vars = self._expt_config.update_waveforms(wfm, [('Num Pulses', wfm.get_waveform_segment('qubit', 'drivePulses'), 'NumRepeats')] )
         
-        sweep_vars = [(self._temp_vars[0], np.arange(0,self._numTotalRepeats+1))]
+        sweep_vars = [(self._temp_vars[0], np.arange(0,self._numTotalRepeats+1, self._numPeriodsStep))]
 
         kwargs['skip_init_instruments'] = True
 
@@ -90,7 +91,7 @@ class ExpCalibXrot(Experiment):
         data_y = self.norm_expt.normalise_data(data_raw_IQ, ax=axs[1])
 
         # dpkt = dfit.get_fitted_plot(data_x, data_y, 'Drive Amplitude', 'IQ Amplitude', fig, axs[0])
-        x_vals = np.arange(0,self._numTotalRepeats+1)
+        x_vals = np.arange(0,self._numTotalRepeats+1, self._numPeriodsStep)
         axs[0].plot(x_vals, data_y, 'kx')
         axs[0].set_xlabel('Number of Pulses'); axs[0].set_ylabel('Normalised Population')
         axs[0].grid(visible=True, which='minor'); axs[0].grid(visible=True, which='major', color='k');

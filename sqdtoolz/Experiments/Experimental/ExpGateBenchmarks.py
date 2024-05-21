@@ -64,7 +64,7 @@ class ExpGateBenchmarks(Experiment):
             final_data = self._qubit_gate_obj.run_circuit(cur_seq, self._expt_config, self.load_time, self.readout_time)
             data_file.push_datapkt(final_data, [(varTrial, np.arange(len(self._gate_seqs)))])
             all_seqs[m] = cur_seq
-            self._update_progress_bar(m+1)/len(self._gate_seqs)
+            self._update_progress_bar((m+1)/len(self._gate_seqs))
         with open(file_path + 'Benchmark_Sequences.json', 'w') as outfile:
             json.dump(all_seqs, outfile, indent=4)
         data_file.close()

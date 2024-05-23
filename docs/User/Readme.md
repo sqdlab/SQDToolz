@@ -22,6 +22,7 @@ Main structure:
         - [Available FPGA processors](Proc_FPGA_list.md)
     - General purpose HALs:
         - [Microwave sources](GENmwSource.md)
+        - [Switches](GENswitch.md)
 - Combine HAL settings to form `ExperimentConfiguration` objects:
     - [Creating ExperimentConfiguration objects](Exp_Config_Basic.md)
     - [Defining Variables](Var_Defns.md)
@@ -44,4 +45,7 @@ Other advanced use-cases:
 - [Synthesising SQDToolz HDF5 data files](Data_Write.md)
 - [Non-uniform data sampling](ACQ_NonUniformDataSampling.md)
 
-**Driver-level documentation** on setting up the hardware (e.g. template YAML and wiring diagrams) can be found [here](InstrumentSpecific/Readme.md).
+Other auxiliary articles:
+- **[Driver-level documentation](InstrumentSpecific/Readme.md)** on setting up the hardware (e.g. template YAML and wiring diagrams)
+- [Notes on custom devices](CustomDevices/Readme.md)
+- [Measurement methods](MeasurementMethods/Readme.md)

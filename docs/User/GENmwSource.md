@@ -9,6 +9,7 @@ import sqdtoolz as stz
 
 lab.load_instrument('src_sgs')
 stz.GENmwSource("MWcavity", lab, 'src_sgs', 'RFOUT')
+
 lab.HAL('MWcavity').Mode = 'Continuous'
 lab.HAL('MWcavity').Power = 14.5
 lab.HAL('MWcavity').Frequency = 8.1e9

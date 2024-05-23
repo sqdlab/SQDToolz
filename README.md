@@ -7,6 +7,9 @@ This is a toolbox to control instruments to run a general lab experiments. This 
 There are two classes of documentation provided for this stack:
 
 - [User documentation](docs/User/Readme.md)
+    - [Driver-specific documentation](docs/User/InstrumentSpecific/Readme.md)
+    - [Custom device documentation](docs/User/CustomDevices/Readme.md)
+    - [Measurement methods](docs/User/MeasurementMethods/Readme.md)
 - [Developer documentation](docs/Developer/Readme.md)
 
 

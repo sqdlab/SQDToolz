@@ -646,6 +646,11 @@ class TestHALInstantiation(unittest.TestCase):
 
         self.cleanup()
 class TestSaveLoad(unittest.TestCase):
+    def arr_equality(self, arr1, arr2):
+        if arr1.size != arr2.size:
+            return False
+        return np.sum(np.abs(arr1 - arr2)) < 1e-15
+
     def initialise(self):
         self.lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir/')
 
@@ -693,6 +698,9 @@ class TestSaveLoad(unittest.TestCase):
             read_segs2 += [f"zero2{m}"]
         awg_wfm.get_output_channel(0).marker(1).set_markers_to_segments(read_segs)
         awg_wfm.get_output_channel(1).marker(0).set_markers_to_segments(read_segs2)
+        awg_wfm.get_output_channel(1).reset_software_triggers(2)
+        awg_wfm.get_output_channel(1).software_trigger(0).set_markers_to_segments(read_segs2)
+        awg_wfm.get_output_channel(1).software_trigger(1).set_markers_to_segments(read_segs)
         awg_wfm.AutoCompression = 'None'#'Basic'
         #
         hal_acq.set_trigger_source(awg_wfm.get_output_channel(0).marker(1))
@@ -828,6 +836,13 @@ class TestSaveLoad(unittest.TestCase):
         assert awg_wfm.get_waveform_segment('init2').Duration == 20e-9, "Property incorrectly reloaded in AWG Waveform Segment."
         assert awg_wfm.get_waveform_segment('zero11').Value == 0.1, "Property incorrectly reloaded in AWG Waveform Segment."
         assert awg_wfm.get_waveform_segment('zero22').Duration == 77e-9*3, "Property incorrectly reloaded in AWG Waveform Segment."
+        #Test with software triggers to be sure...
+        self.arr_equality(awg_wfm.get_output_channel(1).marker(0).get_raw_trigger_waveform(), awg_wfm.get_output_channel(1).software_trigger(0).get_raw_trigger_waveform()), "The software trigger does not match the hardware trigger waveform."
+        self.arr_equality(awg_wfm.get_output_channel(1).marker(1).get_raw_trigger_waveform(), awg_wfm.get_output_channel(1).software_trigger(1).get_raw_trigger_waveform()), "The software trigger does not match the hardware trigger waveform."
+        awg_wfm.get_output_channel(1).reset_software_triggers()
+        expConfig.update_config(leConfig)
+        self.arr_equality(awg_wfm.get_output_channel(1).marker(0).get_raw_trigger_waveform(), awg_wfm.get_output_channel(1).software_trigger(0).get_raw_trigger_waveform()), "After reloading, the software trigger does not match the hardware trigger waveform."
+        self.arr_equality(awg_wfm.get_output_channel(1).marker(1).get_raw_trigger_waveform(), awg_wfm.get_output_channel(1).software_trigger(1).get_raw_trigger_waveform()), "After reloading, the software trigger does not match the hardware trigger waveform."
 
         shutil.rmtree('test_save_dir')
         self.cleanup()

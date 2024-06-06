@@ -53,6 +53,17 @@ class DummyACQex(Instrument):
     @TriggerInputEdge.setter
     def TriggerInputEdge(self, pol):
         self._trigger_edge = pol
+    
+    @property
+    def ChannelStates(self):
+        return (True,)
+    @ChannelStates.setter
+    def ChannelStates(self, ch_states):
+        pass
+
+    @property
+    def AvailableChannels(self):
+        return 1
 
     def gen_ss_traces(self, probs, noise=0.05):
         cur_seg_data = []

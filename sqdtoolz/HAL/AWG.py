@@ -6,51 +6,15 @@ import matplotlib.pyplot as plt
 from sqdtoolz.HAL.WaveformSegments import*
 import scipy.signal
 
-class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
-    def __init__(self, hal_name, lab, awg_channel_tuples, sample_rate, total_time=-1, global_factor = 1.0):
-        HALbase.__init__(self, hal_name)
-        if not lab._HAL_exists(hal_name):
-            #awg_channel_tuples is given as (instr_AWG_name, channel_name)
-            self._awg_chan_list = []
-            assert isinstance(awg_channel_tuples, list), "The parameter awg_channel_tuples must be a LIST of TUPLEs of form (instr_AWG_name, channel_name)."
-            for ch_index, cur_ch_tupl in enumerate(awg_channel_tuples):
-                assert len(cur_ch_tupl) == 2, "The list awg_channel_tuples must contain tuples of form (instr_AWG_name, channel_name)."
-                cur_awg_name, cur_ch_name = cur_ch_tupl            
-                self._awg_chan_list.append(AWGOutputChannel(lab, cur_awg_name, cur_ch_name, ch_index, self, sample_rate))
-                
-            self._sample_rate = sample_rate
-            self._global_factor = global_factor
-            self._wfm_segment_list = []
-            self._auto_comp = 'None'
-            self._auto_comp_linked = False
-            self._auto_comp_algos = ['None', 'Basic']
-            self._total_time = total_time
-        else:
-            assert len(awg_channel_tuples) == len(self._awg_chan_list), "Cannot reinstantiate a waveform by the same name, but different channel configurations."
-            for ch_index, cur_ch_tupl in enumerate(awg_channel_tuples):
-                assert lab._get_instrument(cur_ch_tupl[0]) == self._awg_chan_list[ch_index]._instr_awg, "Cannot reinstantiate a waveform by the same name, but different channel configurations."
-                assert cur_ch_tupl[1] == self._awg_chan_list[ch_index]._channel_name, "Cannot reinstantiate a waveform by the same name, but different channel configurations."
-                self._awg_chan_list[ch_index].update_sample_rate(sample_rate)
-            self._sample_rate = sample_rate
-            self._global_factor = global_factor
-            self._wfm_segment_list = []
-            self._total_time = total_time
-        
-        self._trig_src_pol = 1
-        self._lab = lab
-        self._cur_prog_waveforms = [None]*len(awg_channel_tuples)
-        lab._register_HAL(self)
-
-    @classmethod
-    def fromConfigDict(cls, config_dict, lab):
-        awg_channel_tuples = []
-        for cur_ch_dict in config_dict['OutputChannels']:
-            awg_channel_tuples += [(cur_ch_dict['InstrumentAWG'], cur_ch_dict['InstrumentChannel'])]
-        return cls(config_dict["Name"], lab,
-                    awg_channel_tuples,
-                    config_dict["SampleRate"],
-                    config_dict["TotalTime"],
-                    config_dict["global_factor"])
+class AWGBase:
+    def __init__(self, sample_rate, total_time, global_factor):
+        self._sample_rate = sample_rate
+        self._wfm_segment_list = []
+        self._auto_comp = 'None'
+        self._auto_comp_linked = False
+        self._auto_comp_algos = ['None', 'Basic']
+        self._total_time = total_time
+        self._global_factor = global_factor        
 
     @property
     def AutoCompression(self):
@@ -66,59 +30,6 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
     @AutoCompressionLinkChannels.setter
     def AutoCompressionLinkChannels(self, boolVal):
         self._auto_comp_linked = boolVal
-
-    def _get_child(self, tuple_name_group):
-        cur_name, cur_type = tuple_name_group
-        if cur_type == 'w':
-            for cur_wfm in self._wfm_segment_list:
-                if cur_wfm.Name == cur_name:
-                    return cur_wfm
-            return None
-        elif cur_type == 'c':
-            for cur_ch in self._awg_chan_list:
-                if cur_ch.Name == cur_name:
-                    return cur_ch
-            return None
-        return None
-
-    def clear_segments(self):
-        self._wfm_segment_list.clear()
-
-    def set_waveform_segments(self, wfm_segment_list):
-        self._wfm_segment_list = wfm_segment_list[:]
-        #NOTE: THIS WORKS BECAUSE WAVEFORM SEGMENTS CANNOT BE SHARED ACROSS WAVEFORM HALS - THIS IS WHY IT'S a COPY [:] OPERATION!
-        for cur_wfm in self._wfm_segment_list:
-            cur_wfm.Parent = (self, 'w')
-            cur_wfm._lab = self._lab
-
-    def add_waveform_segment(self, wfm_segment):
-        self._wfm_segment_list.append(wfm_segment)
-        wfm_segment.Parent = (self, 'w')
-        wfm_segment._lab = self._lab
-        
-    def get_waveform_segment(self, wfm_segment_name):
-        the_seg = None
-        for cur_seg in self._wfm_segment_list:
-            if cur_seg.Name == wfm_segment_name:
-                the_seg = cur_seg
-                break
-        assert the_seg != None, "Waveform Segment of name " + wfm_segment_name + " is not present in the current list of added Waveform Segments."
-        return the_seg
-
-    def get_output_channel(self, outputIndex = 0):
-        '''
-        Returns an AWGOutputChannel object.
-        '''
-        assert outputIndex >= 0 and outputIndex < len(self._awg_chan_list), "Channel output index is out of range"
-        return self._awg_chan_list[outputIndex]
-
-    def get_output_channels(self):
-        return self._awg_chan_list[:]
-
-    def set_trigger_source_all(self, trig_src_obj, trig_pol = 1):
-        assert isinstance(trig_src_obj, TriggerOutput) or trig_src_obj == None, "Must supply a valid Trigger Output object (i.e. digital trigger output like a marker)."
-        for cur_ch in self._awg_chan_list:
-            cur_ch.set_trigger_source(trig_src_obj, trig_pol)
 
     @property
     def Duration(self):
@@ -172,10 +83,6 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
                 num_pts = mem_params['MinSize']
             ret_vals += [ num_pts / self.SampleRate ]
         return ret_vals
-
-    def null_all_markers(self):
-        for cur_output in self._awg_chan_list:
-            cur_output.null_all_markers()
 
     def _get_marker_waveform_from_segments(self, segments):
         #Temporarily set the Duration of Elastic time-segment...
@@ -275,6 +182,218 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
             self._wfm_segment_list[elas_seg_ind].Duration = -1
     
         return (final_wfms, elas_seg_ind)
+
+    def _check_changes_wfm_data(self, dict_wfm_data, final_wfm, final_mkrs):
+        #Check waveform equality (works for sequenced/autocompressed version as well)
+        prog_wfm = np.concatenate([dict_wfm_data['waveforms'][x] for x in dict_wfm_data['seq_ids']])
+        if not np.array_equal(prog_wfm, final_wfm):
+            return False
+        #Check markers...
+        for m in range(len(final_mkrs)):
+            prog_mkrs = np.concatenate([dict_wfm_data['markers'][x][m] for x in dict_wfm_data['seq_ids']])
+            if not np.array_equal(prog_mkrs, final_mkrs[m]):
+                return False
+        return True
+    def _extract_marker_segments(self, mkr_list_overall, slice_start, slice_end):
+        cur_mkrs = []
+        for sub_mkr in range(len(mkr_list_overall)):
+            if mkr_list_overall[sub_mkr].size > 0:
+                cur_mkrs += [ mkr_list_overall[sub_mkr][slice_start:slice_end] ]
+            else:
+                cur_mkrs += [ mkr_list_overall[sub_mkr][:] ]    #Copy over the empty array...
+        return cur_mkrs
+
+    def _program_auto_comp_basic(self, cur_awg_chan, final_wfm_for_chan, mkr_list):
+        #TODO: Add flags for changed/requires-update to ensure that segments in sequence are not unnecessary programmed repeatedly...
+        #TODO: Improve algorithm (a winter research project for a Winter Student!)
+        dict_auto_comp = cur_awg_chan._instr_awg.AutoCompressionSupport
+        dS = dict_auto_comp['MinSize']
+        num_main_secs = int(np.floor(final_wfm_for_chan.size / dS))
+        seq_segs = [final_wfm_for_chan[0:dS]]
+        seq_mkrs = [self._extract_marker_segments(mkr_list, 0, dS)]
+        seq_ids  = [0]
+        for m in range(1,num_main_secs):
+            cur_seg = final_wfm_for_chan[(m*dS):((m+1)*dS)]
+            cur_mkrs = self._extract_marker_segments(mkr_list, m*dS, (m+1)*dS)
+            found_match = False
+            for ind, cur_seq_seg in enumerate(seq_segs):
+                #Check main waveform array
+                if np.array_equal(cur_seg, cur_seq_seg):
+                    #Check the sub-markers
+                    mkrs_match = True
+                    for mkr in range(len(cur_mkrs)):
+                        if not np.array_equal(seq_mkrs[ind][mkr], cur_mkrs[mkr]):
+                            mkrs_match = False
+                            break
+                    if mkrs_match:
+                        seq_ids += [ind]
+                        found_match = True
+                        break
+            if not found_match:
+                seq_ids += [len(seq_segs)]
+                seq_segs += [cur_seg]
+                seq_mkrs += [cur_mkrs]
+        if (m+1)*dS < final_wfm_for_chan.size:
+            #Reverse it if it was matched against some other segment previously...
+            cur_mkrs = self._extract_marker_segments(mkr_list, m*dS, mkr_list[0].size)
+            if found_match:
+                seq_ids[-1] = len(seq_segs)
+                seq_segs += [final_wfm_for_chan[(m*dS):]]
+                seq_mkrs += [cur_mkrs]
+            else:
+                seq_segs[-1] = final_wfm_for_chan[(m*dS):]
+                seq_mkrs[-1] = cur_mkrs
+
+        return {'waveforms' : seq_segs, 'markers' : seq_mkrs, 'seq_ids' : seq_ids}
+
+    def _program_auto_comp_basic_linked(self, minSize, final_wfms, final_mkrs):
+        #TODO: Add flags for changed/requires-update to ensure that segments in sequence are not unnecessary programmed repeatedly...
+        #TODO: Improve algorithm (a winter research project for a Winter Student!)
+        num_channels = len(final_wfms)
+        dS = minSize
+        num_main_secs = int(np.floor(final_wfms[0].size / dS))
+        #The following variables are representative across all channels.
+        seq_segs = [[final_wfm_for_chan[0:dS]] for final_wfm_for_chan in final_wfms]                #Slice: channel, waveform-segment, waveform-pts
+        seq_mkrs = [[self._extract_marker_segments(mkr_list, 0, dS)] for mkr_list in final_mkrs]    #Slice: channel, marker-segment, marker-index, marker-pts
+        seq_ids  = [0]
+        for m in range(1,num_main_secs):
+            #Extract current dS slice of the final waveforms and markers across all channels
+            cur_seg = [final_wfm_for_chan[(m*dS):((m+1)*dS)] for final_wfm_for_chan in final_wfms]
+            cur_mkrs = [self._extract_marker_segments(mkr_list, m*dS, (m+1)*dS) for mkr_list in final_mkrs]
+            #Check for a match in a previous segment
+            for seg_ind in range(len(seq_segs[0])):     #Loop through all previous segments
+                found_match = True
+                for cur_ch in range(num_channels):   #For each segment to check, check across all channels
+                    #Check main waveform array
+                    if np.array_equal(cur_seg[cur_ch], seq_segs[cur_ch][seg_ind]):
+                        #Check the sub-markers
+                        mkrs_match = True
+                        for mkr in range(len(cur_mkrs[cur_ch])):
+                            if not np.array_equal(seq_mkrs[cur_ch][seg_ind][mkr], cur_mkrs[cur_ch][mkr]):
+                                mkrs_match = False
+                                break
+                        #If for the current channel, the markers do not match, move onto the next segment...
+                        if not mkrs_match:
+                            found_match = False
+                            break
+                    else:
+                        found_match = False
+                        break
+                if found_match:
+                    seq_ids += [seg_ind]
+                    break
+            if not found_match:
+                seq_ids += [len(seq_segs[0])]
+                for cur_ch in range(num_channels):
+                    seq_segs[cur_ch] += [cur_seg[cur_ch]]
+                    seq_mkrs[cur_ch] += [cur_mkrs[cur_ch]]
+        if (m+1)*dS < final_wfms[0].size:
+            #Reverse it if it was matched against some other segment previously...
+            cur_mkrs = [self._extract_marker_segments(mkr_list, m*dS, mkr_list[0].size) for mkr_list in final_mkrs]
+            if found_match:
+                seq_ids[-1] = len(seq_segs)
+                for cur_ch in range(num_channels):
+                    seq_segs[cur_ch] += [final_wfms[cur_ch][(m*dS):]]
+                    seq_mkrs[cur_ch] += [cur_mkrs[cur_ch]]
+            else:
+                for cur_ch in range(num_channels):
+                    seq_segs[cur_ch][-1] = final_wfms[cur_ch][(m*dS):]
+                    seq_mkrs[cur_ch][-1] = cur_mkrs[cur_ch]
+
+        return [{'waveforms' : seq_segs[cur_ch], 'markers' : seq_mkrs[cur_ch], 'seq_ids' : seq_ids} for cur_ch in range(num_channels)]
+
+
+
+class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible, AWGBase):
+    def __init__(self, hal_name, lab, awg_channel_tuples, sample_rate, total_time=-1, global_factor = 1.0):
+        HALbase.__init__(self, hal_name)
+        AWGBase.__init__(self, sample_rate, total_time, global_factor)
+        if not lab._HAL_exists(hal_name):
+            #awg_channel_tuples is given as (instr_AWG_name, channel_name)
+            self._awg_chan_list = []
+            assert isinstance(awg_channel_tuples, list), "The parameter awg_channel_tuples must be a LIST of TUPLEs of form (instr_AWG_name, channel_name)."
+            for ch_index, cur_ch_tupl in enumerate(awg_channel_tuples):
+                assert len(cur_ch_tupl) == 2, "The list awg_channel_tuples must contain tuples of form (instr_AWG_name, channel_name)."
+                cur_awg_name, cur_ch_name = cur_ch_tupl            
+                self._awg_chan_list.append(AWGOutputChannel(lab, cur_awg_name, cur_ch_name, ch_index, self, sample_rate))
+        else:
+            assert len(awg_channel_tuples) == len(self._awg_chan_list), "Cannot reinstantiate a waveform by the same name, but different channel configurations."
+            for ch_index, cur_ch_tupl in enumerate(awg_channel_tuples):
+                assert lab._get_instrument(cur_ch_tupl[0]) == self._awg_chan_list[ch_index]._instr_awg, "Cannot reinstantiate a waveform by the same name, but different channel configurations."
+                assert cur_ch_tupl[1] == self._awg_chan_list[ch_index]._channel_name, "Cannot reinstantiate a waveform by the same name, but different channel configurations."
+                self._awg_chan_list[ch_index].update_sample_rate(sample_rate)
+        self._trig_src_pol = 1
+        self._lab = lab
+        self._cur_prog_waveforms = [None]*len(awg_channel_tuples)
+        lab._register_HAL(self)
+
+    @classmethod
+    def fromConfigDict(cls, config_dict, lab):
+        awg_channel_tuples = []
+        for cur_ch_dict in config_dict['OutputChannels']:
+            awg_channel_tuples += [(cur_ch_dict['InstrumentAWG'], cur_ch_dict['InstrumentChannel'])]
+        return cls(config_dict["Name"], lab,
+                    awg_channel_tuples,
+                    config_dict["SampleRate"],
+                    config_dict["TotalTime"],
+                    config_dict["global_factor"])
+
+    def _get_child(self, tuple_name_group):
+        cur_name, cur_type = tuple_name_group
+        if cur_type == 'w':
+            for cur_wfm in self._wfm_segment_list:
+                if cur_wfm.Name == cur_name:
+                    return cur_wfm
+            return None
+        elif cur_type == 'c':
+            for cur_ch in self._awg_chan_list:
+                if cur_ch.Name == cur_name:
+                    return cur_ch
+            return None
+        return None
+
+    def clear_segments(self):
+        self._wfm_segment_list.clear()
+
+    def set_waveform_segments(self, wfm_segment_list):
+        self._wfm_segment_list = wfm_segment_list[:]
+        #NOTE: THIS WORKS BECAUSE WAVEFORM SEGMENTS CANNOT BE SHARED ACROSS WAVEFORM HALS - THIS IS WHY IT'S a COPY [:] OPERATION!
+        for cur_wfm in self._wfm_segment_list:
+            cur_wfm.Parent = (self, 'w')
+            cur_wfm._lab = self._lab
+
+    def add_waveform_segment(self, wfm_segment):
+        self._wfm_segment_list.append(wfm_segment)
+        wfm_segment.Parent = (self, 'w')
+        wfm_segment._lab = self._lab
+        
+    def get_waveform_segment(self, wfm_segment_name):
+        the_seg = None
+        for cur_seg in self._wfm_segment_list:
+            if cur_seg.Name == wfm_segment_name:
+                the_seg = cur_seg
+                break
+        assert the_seg != None, "Waveform Segment of name " + wfm_segment_name + " is not present in the current list of added Waveform Segments."
+        return the_seg
+
+    def get_output_channel(self, outputIndex = 0):
+        '''
+        Returns an AWGOutputChannel object.
+        '''
+        assert outputIndex >= 0 and outputIndex < len(self._awg_chan_list), "Channel output index is out of range"
+        return self._awg_chan_list[outputIndex]
+
+    def get_output_channels(self):
+        return self._awg_chan_list[:]
+
+    def set_trigger_source_all(self, trig_src_obj, trig_pol = 1):
+        assert isinstance(trig_src_obj, TriggerOutput) or trig_src_obj == None, "Must supply a valid Trigger Output object (i.e. digital trigger output like a marker)."
+        for cur_ch in self._awg_chan_list:
+            cur_ch.set_trigger_source(trig_src_obj, trig_pol)
+
+    def null_all_markers(self):
+        for cur_output in self._awg_chan_list:
+            cur_output.null_all_markers()
 
     def _get_trigger_output_by_id(self, outputID):
         #Doing it this way as the naming scheme may change in the future - just flatten list and find the marker object...
@@ -497,129 +616,6 @@ class WaveformAWG(HALbase, TriggerOutputCompatible, TriggerInputCompatible):
                 cur_awg_chan._instr_awg.program_channel(cur_awg_chan._instr_awg_chan.short_name, self.cur_wfms_to_commit[ind])
                 #Set it AFTER the programming in case there is an error etc...
                 self._cur_prog_waveforms[ind] = self.cur_wfms_to_commit[ind]
-
-    def _check_changes_wfm_data(self, dict_wfm_data, final_wfm, final_mkrs):
-        #Check waveform equality (works for sequenced/autocompressed version as well)
-        prog_wfm = np.concatenate([dict_wfm_data['waveforms'][x] for x in dict_wfm_data['seq_ids']])
-        if not np.array_equal(prog_wfm, final_wfm):
-            return False
-        #Check markers...
-        for m in range(len(final_mkrs)):
-            prog_mkrs = np.concatenate([dict_wfm_data['markers'][x][m] for x in dict_wfm_data['seq_ids']])
-            if not np.array_equal(prog_mkrs, final_mkrs[m]):
-                return False
-        return True
-        
-
-    def _extract_marker_segments(self, mkr_list_overall, slice_start, slice_end):
-        cur_mkrs = []
-        for sub_mkr in range(len(mkr_list_overall)):
-            if mkr_list_overall[sub_mkr].size > 0:
-                cur_mkrs += [ mkr_list_overall[sub_mkr][slice_start:slice_end] ]
-            else:
-                cur_mkrs += [ mkr_list_overall[sub_mkr][:] ]    #Copy over the empty array...
-        return cur_mkrs
-
-    def _program_auto_comp_basic(self, cur_awg_chan, final_wfm_for_chan, mkr_list):
-        #TODO: Add flags for changed/requires-update to ensure that segments in sequence are not unnecessary programmed repeatedly...
-        #TODO: Improve algorithm (a winter research project for a Winter Student!)
-        dict_auto_comp = cur_awg_chan._instr_awg.AutoCompressionSupport
-        dS = dict_auto_comp['MinSize']
-        num_main_secs = int(np.floor(final_wfm_for_chan.size / dS))
-        seq_segs = [final_wfm_for_chan[0:dS]]
-        seq_mkrs = [self._extract_marker_segments(mkr_list, 0, dS)]
-        seq_ids  = [0]
-        for m in range(1,num_main_secs):
-            cur_seg = final_wfm_for_chan[(m*dS):((m+1)*dS)]
-            cur_mkrs = self._extract_marker_segments(mkr_list, m*dS, (m+1)*dS)
-            found_match = False
-            for ind, cur_seq_seg in enumerate(seq_segs):
-                #Check main waveform array
-                if np.array_equal(cur_seg, cur_seq_seg):
-                    #Check the sub-markers
-                    mkrs_match = True
-                    for mkr in range(len(cur_mkrs)):
-                        if not np.array_equal(seq_mkrs[ind][mkr], cur_mkrs[mkr]):
-                            mkrs_match = False
-                            break
-                    if mkrs_match:
-                        seq_ids += [ind]
-                        found_match = True
-                        break
-            if not found_match:
-                seq_ids += [len(seq_segs)]
-                seq_segs += [cur_seg]
-                seq_mkrs += [cur_mkrs]
-        if (m+1)*dS < final_wfm_for_chan.size:
-            #Reverse it if it was matched against some other segment previously...
-            cur_mkrs = self._extract_marker_segments(mkr_list, m*dS, mkr_list[0].size)
-            if found_match:
-                seq_ids[-1] = len(seq_segs)
-                seq_segs += [final_wfm_for_chan[(m*dS):]]
-                seq_mkrs += [cur_mkrs]
-            else:
-                seq_segs[-1] = final_wfm_for_chan[(m*dS):]
-                seq_mkrs[-1] = cur_mkrs
-
-        return {'waveforms' : seq_segs, 'markers' : seq_mkrs, 'seq_ids' : seq_ids}
-
-    def _program_auto_comp_basic_linked(self, minSize, final_wfms, final_mkrs):
-        #TODO: Add flags for changed/requires-update to ensure that segments in sequence are not unnecessary programmed repeatedly...
-        #TODO: Improve algorithm (a winter research project for a Winter Student!)
-        num_channels = len(final_wfms)
-        dS = minSize
-        num_main_secs = int(np.floor(final_wfms[0].size / dS))
-        #The following variables are representative across all channels.
-        seq_segs = [[final_wfm_for_chan[0:dS]] for final_wfm_for_chan in final_wfms]                #Slice: channel, waveform-segment, waveform-pts
-        seq_mkrs = [[self._extract_marker_segments(mkr_list, 0, dS)] for mkr_list in final_mkrs]    #Slice: channel, marker-segment, marker-index, marker-pts
-        seq_ids  = [0]
-        for m in range(1,num_main_secs):
-            #Extract current dS slice of the final waveforms and markers across all channels
-            cur_seg = [final_wfm_for_chan[(m*dS):((m+1)*dS)] for final_wfm_for_chan in final_wfms]
-            cur_mkrs = [self._extract_marker_segments(mkr_list, m*dS, (m+1)*dS) for mkr_list in final_mkrs]
-            #Check for a match in a previous segment
-            for seg_ind in range(len(seq_segs[0])):     #Loop through all previous segments
-                found_match = True
-                for cur_ch in range(num_channels):   #For each segment to check, check across all channels
-                    #Check main waveform array
-                    if np.array_equal(cur_seg[cur_ch], seq_segs[cur_ch][seg_ind]):
-                        #Check the sub-markers
-                        mkrs_match = True
-                        for mkr in range(len(cur_mkrs[cur_ch])):
-                            if not np.array_equal(seq_mkrs[cur_ch][seg_ind][mkr], cur_mkrs[cur_ch][mkr]):
-                                mkrs_match = False
-                                break
-                        #If for the current channel, the markers do not match, move onto the next segment...
-                        if not mkrs_match:
-                            found_match = False
-                            break
-                    else:
-                        found_match = False
-                        break
-                if found_match:
-                    seq_ids += [seg_ind]
-                    break
-            if not found_match:
-                seq_ids += [len(seq_segs[0])]
-                for cur_ch in range(num_channels):
-                    seq_segs[cur_ch] += [cur_seg[cur_ch]]
-                    seq_mkrs[cur_ch] += [cur_mkrs[cur_ch]]
-        if (m+1)*dS < final_wfms[0].size:
-            #Reverse it if it was matched against some other segment previously...
-            cur_mkrs = [self._extract_marker_segments(mkr_list, m*dS, mkr_list[0].size) for mkr_list in final_mkrs]
-            if found_match:
-                seq_ids[-1] = len(seq_segs)
-                for cur_ch in range(num_channels):
-                    seq_segs[cur_ch] += [final_wfms[cur_ch][(m*dS):]]
-                    seq_mkrs[cur_ch] += [cur_mkrs[cur_ch]]
-            else:
-                for cur_ch in range(num_channels):
-                    seq_segs[cur_ch][-1] = final_wfms[cur_ch][(m*dS):]
-                    seq_mkrs[cur_ch][-1] = cur_mkrs[cur_ch]
-
-        return [{'waveforms' : seq_segs[cur_ch], 'markers' : seq_mkrs[cur_ch], 'seq_ids' : seq_ids} for cur_ch in range(num_channels)]
-
-
 
 class AWGOutputChannel(TriggerInput, LockableProperties):
     def __init__(self, lab, instr_awg_name, channel_name, ch_index, parent_awg_waveform, sample_rate):

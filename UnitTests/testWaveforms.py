@@ -444,7 +444,7 @@ class TestSegments(unittest.TestCase):
         awg_wfm.add_waveform_segment(WFS_Gaussian("ZEROLENGTH", None, 0e-9, 0.5-0.1))
         awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
         awg_wfm.get_output_channel(0).marker(0).set_markers_to_segments([ 'init', 'ZEROLENGTH', ['TestGroup','init2'], 'init3' ])
-        raw_mkrs = awg_wfm.get_output_channel(0).marker(0).get_raw_marker_waveform()
+        raw_mkrs = awg_wfm.get_output_channel(0).marker(0).get_raw_trigger_waveform()
         exp_mkrs = np.array( [0]*10 + [1]*20  +  [0]*30 + [1]*45  +  [0]*77 + [1]*45 )
         assert self.arr_equality(raw_mkrs, exp_mkrs), "WFS_Group failed in marker compilation."
         #
@@ -462,7 +462,7 @@ class TestSegments(unittest.TestCase):
         awg_wfm.add_waveform_segment(WFS_Gaussian("ZEROLENGTH", None, 0e-9, 0.5-0.1))
         awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
         awg_wfm.get_output_channel(0).marker(0).set_markers_to_segments([ 'init', 'ZEROLENGTH', ['TestGroup','init2'], ['TestGroup','ZEROLENGTH'], 'init3' ])
-        raw_mkrs = awg_wfm.get_output_channel(0).marker(0).get_raw_marker_waveform()
+        raw_mkrs = awg_wfm.get_output_channel(0).marker(0).get_raw_trigger_waveform()
         exp_mkrs = np.array( [0]*10 + [1]*20  +  [0]*30 + [1]*45  +  [0]*77 + [1]*45 )
         assert self.arr_equality(raw_mkrs, exp_mkrs), "WFS_Group failed in marker compilation."
 
@@ -597,7 +597,7 @@ class TestSegments(unittest.TestCase):
         awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 77e-9, 0.0))
         awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
         awg_wfm.get_output_channel(0).marker(0).set_markers_to_segments([ 'init', ['TestGroup','init2'], 'init3' ])
-        raw_mkrs = awg_wfm.get_output_channel(0).marker(0).get_raw_marker_waveform()
+        raw_mkrs = awg_wfm.get_output_channel(0).marker(0).get_raw_trigger_waveform()
         exp_mkrs = np.array( [0]*10 + [1]*20  +  [0]*30 + [1]*45  +  [0]*77 + [1]*45 )
         assert self.arr_equality(raw_mkrs, exp_mkrs), "WFS_Group failed in marker compilation."
         #
@@ -613,7 +613,7 @@ class TestSegments(unittest.TestCase):
         awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 2e-9, 0.0))
         awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
         awg_wfm.get_output_channel(0).marker(0).set_markers_to_segments([ 'init', ['TestGroup','init2'], 'init3' ])
-        raw_mkrs = awg_wfm.get_output_channel(0).marker(0).get_raw_marker_waveform()
+        raw_mkrs = awg_wfm.get_output_channel(0).marker(0).get_raw_trigger_waveform()
         exp_mkrs = np.array( [0]*10 + [1]*20  +  ([0]*30 + [1]*45)*2  +  [0]*2 + [1]*45 )
         assert self.arr_equality(raw_mkrs, exp_mkrs), "WFS_Group failed in marker compilation when using repeats."
         #
@@ -636,7 +636,7 @@ class TestSegments(unittest.TestCase):
                                         ], time_len=10e-9))
         awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
         awg_wfm.get_output_channel(0).marker(0).set_markers_to_segments([ 'init', ['TestGroup','init2'], 'init3', ['TestGroup2', 'Sub1', 'init2'] ])
-        raw_mkrs = awg_wfm.get_output_channel(0).marker(0).get_raw_marker_waveform()
+        raw_mkrs = awg_wfm.get_output_channel(0).marker(0).get_raw_trigger_waveform()
         exp_mkrs = np.array( [0]*10 + [1]*20  +  [0]*30 + [1]*45  +  [0]*77 +    [0]*3+[1]*2+[0]*5    + [1]*45 )
         assert self.arr_equality(raw_mkrs, exp_mkrs), "WFS_Group failed in marker compilation in a nested case."
         #
@@ -659,7 +659,7 @@ class TestSegments(unittest.TestCase):
                                         ], time_len=10e-9))
         awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
         awg_wfm.get_output_channel(0).marker(0).set_markers_to_segments([ 'init', ['TestGroup','init2'], 'init3', ['TestGroup2', 'Sub1', 'init2'] ])
-        raw_mkrs = awg_wfm.get_output_channel(0).marker(0).get_raw_marker_waveform()
+        raw_mkrs = awg_wfm.get_output_channel(0).marker(0).get_raw_trigger_waveform()
         exp_mkrs = np.array( [0]*10 + [1]*20  +  ([0]*30 + [1]*45)*3  +  [0]*77 +    [0]*3+[1]*2+[0]*5    + [1]*45 )
         assert self.arr_equality(raw_mkrs, exp_mkrs), "WFS_Group failed in marker compilation in a nested case when using repeats."
 
@@ -681,6 +681,48 @@ class TestSegments(unittest.TestCase):
             read_segs += [f"read{m}"]
         self.lab.HAL("wfmRabi").add_waveform_segment(WFS_Constant("init_pad", None, -1, 0.0))
         self.lab.HAL("wfmRabi").get_raw_waveforms()
+
+        shutil.rmtree('test_save_dir')
+        self.cleanup()
+
+    def test_SoftwareTriggers(self):
+        self.initialise()
+        #Modulations
+        WFMT_ModulationIQ('IQmod', self.lab, 47e7)
+        WFMT_ModulationIQ('IQmod2', self.lab, 13e7)
+
+        #Default test to check triggers are parsed correctly...
+        awg_wfm = WaveformAWG("Wfm1", self.lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9, total_time=227e-9)
+        awg_wfm.clear_segments()
+        awg_wfm.add_waveform_segment(WFS_Constant("SEQPAD", None, -1, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init", self.lab.WFMT('IQmod').apply(), 20e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero1", None, 30e-9, 0.1))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init2", None, 45e-9, 0.5-0.1))
+        awg_wfm.add_waveform_segment(WFS_Constant("zero2", None, 77e-9, 0.0))
+        awg_wfm.add_waveform_segment(WFS_Gaussian("init3", None, 45e-9, 0.5-0.1))
+        #
+        try:
+            awg_wfm.get_output_channel(0).software_trigger(0).set_markers_to_segments([ 'init' ])
+        except AssertionError:
+            assert_found = True
+        assert assert_found, "Somehow a software_trigger was queried when none have been initialised."
+        awg_wfm.get_output_channel(0).reset_software_triggers()
+        try:
+            awg_wfm.get_output_channel(0).software_trigger(0).set_markers_to_segments([ 'init' ])
+        except AssertionError:
+            assert_found = True
+        assert assert_found, "Somehow a software_trigger was queried when none have been initialised."
+        awg_wfm.get_output_channel(0).reset_software_triggers(2)
+        awg_wfm.get_output_channel(0).software_trigger(0).set_markers_to_segments([ 'init' ])
+        awg_wfm.get_output_channel(0).software_trigger(1).set_markers_to_segments([ 'zero1', 'zero2' ])
+        #
+        raw_mkrs = awg_wfm.get_output_channel(0).software_trigger(0).get_raw_trigger_waveform()
+        exp_mkrs = np.array( [0]*10 + [1]*20  +  [0]*30 + [0]*45  +  [0]*77 + [0]*45 )
+        assert self.arr_equality(raw_mkrs, exp_mkrs), "WFS_Group failed in marker compilation."
+        #
+        raw_mkrs = awg_wfm.get_output_channel(0).software_trigger(1).get_raw_trigger_waveform()
+        exp_mkrs = np.array( [0]*10 + [0]*20  +  [1]*30 + [0]*45  +  [1]*77 + [0]*45 )
+        assert self.arr_equality(raw_mkrs, exp_mkrs), "WFS_Group failed in marker compilation."
 
         shutil.rmtree('test_save_dir')
         self.cleanup()

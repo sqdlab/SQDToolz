@@ -32,7 +32,8 @@ class ExperimentSpecification:
             with open(avail_templates[init_specs]) as json_file:
                 data = json.load(json_file)
             for cur_key in data:
-                self.add(cur_key, data[cur_key])
+                if not cur_key in self._cur_mappings:
+                    self.add(cur_key, data[cur_key])
 
     def __new__(cls, *args, **kwargs):
         if len(args) == 0:

@@ -31,6 +31,8 @@ class customJSONencoder(json.JSONEncoder):
         #Inspired by: https://stackoverflow.com/questions/56250514/how-to-tackle-with-error-object-of-type-int32-is-not-json-serializable/56254172
         if isinstance(obj, np.int32):
             return int(obj)
+        if isinstance(obj, np.int64):
+            return int(obj)
         return json.JSONEncoder.default(self, obj)
 
 class Laboratory:

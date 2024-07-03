@@ -12,7 +12,7 @@ The solution is to uniquely identity an object within the tree of children. The 
 Given some object, the resolution involves backtracking up through every parent until it meets up with a fundamental laboratory object (e.g. a HAL, WFMT, VAR etc.). This is done by implementing a `Parent` property (sometimes it is endowed by the parent object - e.g. `WaveformSegmentBase` gives it to `WaveformTransformationArgs`) that returns a tuple with:
 
 - Reference to the actual parent object - this is used by the engine to backtrack up the tree.
-- A character ID used to signify the child type. Can be `None` if the parent only has one type of child (e.g. currently `AWGOutputChannel` only has one child type being `AWGOutputMarker`)
+- A character ID used to signify the child type. Can be `None` if the parent only has one type of child (e.g. currently `AWGOutputChannel` only has one child type being `AWGOutputTrigger`)
 
 Some character IDs currently implemented are:
 

@@ -3,6 +3,8 @@ from sqdtoolz.HAL.WaveformSegments import*
 from sqdtoolz.Utilities.Optimisers import OptimiseParaboloid
 from sqdtoolz.Utilities.DataFitting import*
 from sqdtoolz.Utilities.FileIO import*
+from sqdtoolz.ExperimentSpecification import ExperimentSpecification
+
 class ExpMixerCalibrationLO(Experiment):
     def __init__(self, name, expt_config, var_down_conv_freq, LO_frequency, var_DC_off_I, range_DC_off_I, var_DC_off_Q, range_DC_off_Q, optimise=False, **kwargs):
         super().__init__(name, expt_config)
@@ -124,4 +126,5 @@ class ExpMixerCalibrationLO(Experiment):
             self.fig.savefig(self._file_path + 'fitted_plot.png')
 
     def commit_to_SPEC(self, SPEC_obj):
+        assert isinstance(SPEC_obj, ExperimentSpecification), "SPEC_obj must be an ExperimentSpecification object."
         SPEC_obj['IdcOff'].Value, SPEC_obj['QdcOff'].Value = self._opt_val

@@ -16,7 +16,7 @@ from sqdtoolz.HAL.GENsmu import*
 from sqdtoolz.HAL.Processors.ProcessorCPU import*
 try:
     from sqdtoolz.HAL.Processors.ProcessorGPU import*
-except ModuleNotFoundError:
+except (ModuleNotFoundError, ImportError):
     pass
 from sqdtoolz.HAL.Processors.ProcessorFPGA import*
 from datetime import datetime

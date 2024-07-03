@@ -44,7 +44,10 @@ class ExpGateBenchmarks(Experiment):
             ['X/2', 'X/2'],
             ['Y/2', 'Y/2'],
             ['X/2', 'Y/2'],
-            ['Y/2', 'X/2']
+            ['Y/2', 'X/2'],
+            ['H'],
+            ['H', 'X/2'],
+            ['H', 'Y/2']
         ]
 
         self._rng = np.random.default_rng(seed = self._rb_seed)

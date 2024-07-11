@@ -84,8 +84,8 @@ In addition, it is noteworthy that least-squares residual used in circle fits ca
 This applies to a **reflection spectra for resonators terminating transmission line**. The corresponding equation can be shown to be (c.f. [appendix D in thesis](https://unsworks.unsw.edu.au/entities/publication/6d9ea387-bc52-49d2-b5c2-6979779f4d30)):
 
 $$
-S_{11}(f)=-A\cdot\frac{1-\tfrac{\text{Q}_\text{ext}}{\text{Q}_\text{int}}\left(1+j\text{Q}_\text{int}\left(\tfrac{f}{f_0}-\tfrac{f_0}{f}\right)\right)}
-{1+\tfrac{\text{Q}_\text{ext}}{\text{Q}_\text{int}}\left(1+j\text{Q}_\text{int}\left(\tfrac{f}{f_0}-\tfrac{f_0}{f}\right)\right)}\cdot \exp\left({j\frac{4\pi L}{c}f+j\phi}\right)
+S_{11}(f)=-A\cdot\frac{1-\tfrac{\text{Q}_ \text{ext}}{\text{Q}_ \text{int}}\left(1+j\text{Q}_ \text{int}\left(\tfrac{f}{f_0}-\tfrac{f_0}{f}\right)\right)}
+{1+\tfrac{\text{Q}_ \text{ext}}{\text{Q}_ \text{int}}\left(1+j\text{Q}_ \text{int}\left(\tfrac{f}{f_0}-\tfrac{f_0}{f}\right)\right)}\cdot \exp\left({j\frac{4\pi L}{c}f+j\phi}\right)
 $$
 
 Note that:
@@ -130,26 +130,26 @@ The fitting function requires accurate estimates of the final parameters. This s
 The first step is to remove any phase trends due to the finite length of the probing cables. The idea is to fit a line to the phase trend off-resonant from the main peak. The gradient and y-intercept of the linear fit readily gives $L$ and $\phi$. Now by multiplying $\exp\left({-j\frac{4\pi L}{c}f-j\phi}\right)$ to negate the phase slope, the detrended phase slope at resonance is given by:
 
 $$
-p_0=\left.\frac{d\phi}{df}\right|_{f=f_0}=\frac{\text{Q}_\text{ext}\text{Q}_\text{int}^2}{2\pi f_0(\text{Q}_\text{ext}^2-\text{Q}_\text{int}^2)}.
+p_0=\left.\frac{d\phi}{df}\right|_ {f=f_0}=\frac{\text{Q}_ \text{ext}\text{Q}_ \text{int}^2}{2\pi f_0(\text{Q}_ \text{ext}^2-\text{Q}_ \text{int}^2)}.
 $$
 
 Now looking at the amplitude, the resulting trough will have a height (that is, the vertical size when viewing the amplitude plot - found by fitting a Lorentzian to the amplitude response $|S_{11}|$):
 
 $$
-h=\frac{2A\text{Q}_\text{int}}{\text{Q}_\text{int}+\text{Q}_\text{ext}}.
+h=\frac{2A\text{Q}_ \text{int}}{\text{Q}_ \text{int}+\text{Q}_ \text{ext}}.
 $$
 
 Now algebraically solve the equations to get:
 
 $$
 \begin{align}
-\text{Q}_\text{ext}&=\left\lbrace
+\text{Q}_ \text{ext}&=\left\lbrace
 \begin{array}{lc}
 -\tfrac{2\pi(h-1)f_0}{h^2}\cdot\tfrac{d\phi}{df} & \tfrac{d\phi}{df}>0 \\
 \tfrac{2\pi(h-1)f_0}{(h-2)^2}\cdot\tfrac{d\phi}{df} & \tfrac{d\phi}{df}<0
 \end{array}
 \right.\\
-\text{Q}_\text{int}&=\left\lbrace
+\text{Q}_ \text{int}&=\left\lbrace
 \begin{array}{lc}
 \tfrac{2\pi(h-1)f_0}{h(h-2)}\cdot\tfrac{d\phi}{df} & \tfrac{d\phi}{df}>0 \\
 -\tfrac{2\pi(h-1)f_0}{h(h-2)}\cdot\tfrac{d\phi}{df} & \tfrac{d\phi}{df}<0

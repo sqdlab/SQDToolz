@@ -1,0 +1,25 @@
+instruments:
+  fpga1:
+    type: sqdtoolz.Drivers.ACQ_ETH_FPGA.ETHFPGA
+    init:
+      uri: 'Z:/DataAnalysis/Notebooks/qcodes/FPGA_Rack1_URI.txt'
+  pulser:
+    driver: sqdtoolz.Drivers.DDG_DG645
+    type: DG645
+    address: 'TCPIP::192.168.1.42::INSTR' #'TCPIP::192.168.1.120::INSTR'
+    enable_forced_reconnect: true
+  TaborAWG:
+    driver: sqdtoolz.Drivers.Tabor_P2584M
+    type: Tabor_P2584M
+    init:
+      pxi_chassis: 0
+      pxi_slot: 3
+    parameters:
+      ref_osc_src:
+        initial_value: 'EXT'
+      ref_osc_freq:
+        initial_value: 10e6
+      AWG.CH1.trig_src:
+        initial_value: 'TRG1'
+      AWG.CH2.trig_src:
+        initial_value: 'TRG1'

@@ -1,4 +1,4 @@
-# ETH FPGA (Driver:ACQ_ETH_FPGA)
+# ETH FPGA (Driver: ACQ_ETH_FPGA)
 
 The ETH FPGA card was developed for ETH (by a now defunc company). Its operations are highlighted in detail in [Deniz Bozyigit's 2010 Masters Thesis](https://qudev.phys.ethz.ch/static/content/science/Documents/master/Bozyigit_Deniz_MasterThesis.pdf). The card has:
 
@@ -25,8 +25,8 @@ Currently, to connect to card:
 - Monitor the QTLab console for any potential error messages.
 
 If during operation, the card throws an error, reset the FPGA using any/all of the following commands in the QTLab console:
-- fpga.reload()
-- fpga.reset()
+- `fpga.reload()`
+- `fpga.reset()`
 
 
 

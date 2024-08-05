@@ -118,7 +118,24 @@ lab.VAR("testVarSpaced").Value = 5e6
 #   lab.VAR("MWpulseFreq").Value = 5e6 + 100e6
 ```
 
-This is useful when setting frequency parameters that require a sideband offset or a demodulation offset to be set simultaneously to another source.
+This is useful when setting frequency parameters that require a sideband offset or a demodulation offset to be set simultaneously to another source. Note that this variable also has a sixth argument `negate_first`. In this case:
+
+```python
+VariableSpaced("testVarSpaced2", lab, lab.VAR("var1"), lab.VAR("var2"), 100e6, negate_first=True)
+```
+
+In the example above, it is set to `True` (default value is `False`). When setting the variable `"testVarSpaced2"`, `"var1"` will be set to the value while `"var2"` will be set to 100e6 minus the value:
+
+```python
+lab.VAR("testVarSpaced2").Value = 5e6
+
+#Now:
+#   lab.VAR("var1").Value   = 5e6
+#   lab.VAR("var2").Value = 100e6 - 5e6
+```
+
+
+
 
 ## VariableDifferential
 

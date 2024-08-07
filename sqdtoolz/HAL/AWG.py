@@ -14,7 +14,9 @@ class AWGBase:
         self._auto_comp_linked = False
         self._auto_comp_algos = ['None', 'Basic']
         self._total_time = total_time
-        self._global_factor = global_factor        
+        self._global_factor = global_factor
+        if not hasattr(self, '_awg_chan_list'):
+            self._awg_chan_list = []
 
     @property
     def AutoCompression(self):

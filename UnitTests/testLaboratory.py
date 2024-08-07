@@ -581,6 +581,15 @@ class TestColdReload(unittest.TestCase):
         new_proc.add_stage(CPU_FIR([{'Type' : 'low', 'Taps' : 40, 'fc' : 0.01, 'Win' : 'hamming'}]*2))
         new_proc.add_stage_end(CPU_Mean('repetition'))
         self.lab.HAL("dum_acq").set_data_processor(new_proc)
+        new_proc = ProcessorCPU('cpu_test2', self.lab)
+        new_proc.add_stage(CPU_DDC([0.14]))
+        new_proc.add_stage(CPU_FIR([{'Type' : 'low', 'Taps' : 40, 'fc' : 0.01, 'Win' : 'hamming'}]*2))
+        new_proc.add_stage_end(CPU_Mean('repetition'))
+        new_proc = ProcessorCPU('cpu_test3', self.lab)
+        new_proc.add_stage(CPU_DDC([0.14]))
+        new_proc.add_stage(CPU_FIR([{'Type' : 'low', 'Taps' : 40, 'fc' : 0.01, 'Win' : 'hamming'}]*2))
+        new_proc.add_stage_end(CPU_Mean('repetition'))
+        self.lab.HAL("dum_acq").set_extra_post_processors([self.lab.PROC('cpu_test2'), self.lab.PROC('cpu_test3')])
         self.lab.CONFIG('testConf4').save_config()
         #
         self.lab.save_laboratory_config('UnitTests/', 'laboratory_configuration4.txt')
@@ -1274,6 +1283,6 @@ class TestExpSweeps(unittest.TestCase):
         self.cleanup()
 
 if __name__ == '__main__':
-    temp = TestExpSweeps()
-    temp.test_SnakeExp()
+    temp = TestColdReload()
+    temp.test_VARs()
     unittest.main()

@@ -103,11 +103,21 @@ class ExperimentConfiguration:
                     cur_proc = self._lab.PROC(cur_dict['Processor'])
                     if cur_proc != None:
                         self._proc_configs += [cur_proc]
+                if 'ExProcessors' in cur_dict:
+                    for proc_name in cur_dict['ExProcessors']:
+                        cur_proc = self._lab.PROC(proc_name)
+                        if cur_proc != None:
+                            self._proc_configs += [cur_proc]
         else:            
             if self._hal_ACQ and hasattr(self._hal_ACQ, 'data_processor'):
                 cur_proc = self._hal_ACQ.data_processor
                 if cur_proc:
                     self._proc_configs = [cur_proc]
+                if hasattr(self._hal_ACQ, '_post_processors'):  #TODO: Perhaps refactor to have ACQ return all used processors?
+                    for proc_name in self._hal_ACQ._post_processors:
+                        cur_proc = self._lab.PROC(proc_name)
+                        if cur_proc != None:
+                            self._proc_configs += [cur_proc]                
 
     def get_config(self):
         return self._init_config

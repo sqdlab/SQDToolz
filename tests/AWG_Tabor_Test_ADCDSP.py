@@ -28,6 +28,7 @@ from sqdtoolz.HAL.Decisions.DEC_SVM import DEC_SVM
 import time
 import unittest
 import matplotlib.pyplot as plt
+import os
 
 #Wiring requirements:
 #   AWG CH1 to ADC CH1
@@ -40,7 +41,14 @@ import matplotlib.pyplot as plt
 #   - Stars with black centres denoting averages.
 
 # Create New Laboratory Class
-lab = Laboratory(instr_config_file = "tests/AWG_Tabor_Test_ADCDSP.yaml", save_dir = "mySaves\\")
+
+if os.path.exists('AWG_Tabor_Test_ADCDSP.yaml'):
+    yaml_file = 'AWG_Tabor_Test_ADCDSP.yaml'
+    plot_stuff = False
+else:
+    yaml_file = 'tests/AWG_Tabor_Test_ADCDSP.yaml'
+    plot_stuff = True
+lab = Laboratory(instr_config_file = yaml_file, save_dir = "mySaves\\")
 
 # Load the Tabor into the lab class to use
 lab.load_instrument('TaborAWG')
@@ -350,10 +358,16 @@ def benchmark_sample_integration(lab, num_points_per_corner=3, num_corners=12, d
         lab.PROC('fpga_dsp').reset_pipeline()
         lab.PROC('fpga_dsp').add_stage(FPGA_DDCFIR([[{'fLO':100e6, 'fc':10e6, 'Taps':40}], [{'fLO':100e6, 'fc':10e6, 'Taps':40}]]))
         lab.PROC('fpga_dsp').add_stage(FPGA_Decimation('sample', 10))
-        lab.PROC('fpga_dsp').add_stage(FPGA_Integrate('sample'))
-
+        # lab.PROC('fpga_dsp').add_stage(FPGA_Integrate('sample'))
         acq_module.set_data_processor(lab.PROC('fpga_dsp'))
+
+        ProcessorCPU('cpu_dsp', lab)
+        lab.PROC('cpu_dsp').reset_pipeline()
+        lab.PROC('cpu_dsp').add_stage(CPU_Integrate('sample'))
+        acq_module.set_extra_post_processors([lab.PROC('cpu_dsp')])
+
         leData = acq_module.get_data()['data']
+        a=0
 
     cur_time = time.time() - cur_time
     print(f'Expected Time: {lab.HAL("DDG").RepetitionTime * lab.HAL("TaborACQ").NumRepetitions * 4}s')
@@ -361,13 +375,14 @@ def benchmark_sample_integration(lab, num_points_per_corner=3, num_corners=12, d
 
 # test_basic_time_traces(lab, skip_normal=False)
 # test_FFT(lab)
-test_averaging(lab, num_points_per_corner=3)
+# test_averaging(lab, num_points_per_corner=3)
 
 # vprof -c p  test.py --port 8001 
-# benchmark_sample_integration(lab)
+benchmark_sample_integration(lab)
 
-plt.show()
-awg_wfm.get_output_channel(0).Output = False
-awg_wfm.get_output_channel(1).Output = False
-input('Press ENTER to finish test.')
+if plot_stuff:
+    plt.show()
+    awg_wfm.get_output_channel(0).Output = False
+    awg_wfm.get_output_channel(1).Output = False
+    input('Press ENTER to finish test.')
 

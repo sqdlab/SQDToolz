@@ -1443,7 +1443,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
             self._parent._set_cmd(':DIG:INIT', 'OFF')
             self._parent._chk_err('after actual acquisition.')
 
-    def NormalAVGSignal(self, wav,AvgCount,is_dsp,ADCFS=1000,BINOFFSET=True):
+    def NormalAVGSignal(self, wav,AvgCount,is_dsp,ADCFS=1000,BINOFFSET=True, sample_integrations_frame_header=False):
         def getAvgDivFactor(AvgCount=1000,is_dsp=False):
             msb_pos = 0
             while AvgCount > 0:
@@ -1479,7 +1479,10 @@ class TaborP2584M_ACQ(InstrumentChannel):
             mVwavNorm = convertTimeSignedDataTomV(wavNorm,ADCFS,bitnum=BITNUM)
         
             #TODO: Ask Tabour about this strange offset...
-            return mVwavNorm + 2**13/AvgCount    #Have to add this offset to make averages properly centred at 0?
+            if sample_integrations_frame_header:
+                return mVwavNorm + 2**13/AvgCount    #Have to add this offset to make averages properly centred at 0?
+            else:
+                return mVwavNorm
         else:
             wav = wav / AvgCount
             
@@ -1487,9 +1490,9 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
     def conv_data(self, data, final_dsp_order, fac=2**15):
         if final_dsp_order['avRepetitions']:
-            return self.NormalAVGSignal(data, self.NumRepetitions, final_dsp_order['dsp_active'])*1.0
+            return self.NormalAVGSignal(data, self.NumRepetitions, final_dsp_order['dsp_active'], sample_integrations_frame_header=final_dsp_order['avSamples'])*1.0
         else:
-            return (data*1.0 - fac) / fac
+            return data*(1.0 / fac) - 1.0
 
     def _read_data_frames(self, final_dsp_order):
         #Choose to read all frames
@@ -1552,8 +1555,6 @@ class TaborP2584M_ACQ(InstrumentChannel):
                 ret_val['parameters'] = ['sample']
         else:
             ret_val['parameters'] = ['repetition', 'sample']
-            #TODO: Change after new firmware release...
-            ret_val['parameters'].pop(-1)
         leSampleRates = []
         final_scale = final_dsp_order['final_scale_factor']
         if not final_dsp_order['dsp_active']:
@@ -1568,48 +1569,33 @@ class TaborP2584M_ACQ(InstrumentChannel):
             ret_val['misc']['SampleRates'] = leSampleRates
         else:
             num_ch_divs = final_dsp_order['num_ch_divs']
-            if num_ch_divs[0] > 0:
-                wav1 = self.conv_data(wav1, final_dsp_order)
             if final_dsp_order['doFFT']:
-                ret_val['data']['fft_real'] = wav1[:,int(2*5+1)::12] * final_scale
-                ret_val['data']['fft_imag'] = wav1[:,int(2*5)::12] * final_scale
+                ret_val['data']['fft_real'] = self.conv_data(wav1[:,int(2*5+1)::12], final_dsp_order) * final_scale
+                ret_val['data']['fft_imag'] = self.conv_data(wav1[:,int(2*5)::12], final_dsp_order) * final_scale
                 #
                 wav2 = self.conv_data(wav2, final_dsp_order)
-                ret_val['data']['debug_time_I'] = wav2[:,int(2*5+1)::12] * final_scale
-                ret_val['data']['debug_time_Q'] = wav2[:,int(2*5)::12] * final_scale
+                ret_val['data']['debug_time_I'] = self.conv_data(wav2[:,int(2*5+1)::12], final_dsp_order) * final_scale
+                ret_val['data']['debug_time_Q'] = self.conv_data(wav2[:,int(2*5)::12], final_dsp_order) * final_scale
             else:
                 offset = 0
                 for m in range(num_ch_divs[0]):
                     if final_dsp_order['avRepetitions']:
-                        ret_val['data'][f'CH1_{m}_I'] = wav1[0,int(2*(m+offset)+1)::10] * final_scale*self.NumRepetitions  #TODO: Review after new firmware release
-                        ret_val['data'][f'CH1_{m}_Q'] = wav1[0,int(2*(m+offset))::10] * final_scale*self.NumRepetitions    #TODO: Review after new firmware release
-                        #TODO: Change after new firmware release...
-                        if final_dsp_order['avSamples']:
-                            ret_val['data'][f'CH1_{m}_I'] = np.array([np.sum(ret_val['data'][f'CH1_{m}_I'])])*2.0
-                            ret_val['data'][f'CH1_{m}_Q'] = np.array([np.sum(ret_val['data'][f'CH1_{m}_Q'])])*2.0
-                        #TODO: Change after new firmware release...
-                        wav1 =self.conv_data(wav2, final_dsp_order)
-                        # offset = -1
+                        ret_val['data'][f'CH1_{m}_I'] = self.conv_data(wav1[0,int(2*(m+offset)+1)::10], final_dsp_order) * (final_scale*self.NumRepetitions)
+                        ret_val['data'][f'CH1_{m}_Q'] = self.conv_data(wav1[0,int(2*(m+offset))::10], final_dsp_order) * (final_scale*self.NumRepetitions)
                     else:
-                        ret_val['data'][f'CH1_{m}_I'] = wav1[:,int(2*(m+offset)+1)::12] * final_scale
-                        ret_val['data'][f'CH1_{m}_Q'] = wav1[:,int(2*(m+offset))::12] * final_scale
+                        ret_val['data'][f'CH1_{m}_I'] = self.conv_data(wav1[:,int(2*(m+offset)+1)::12], final_dsp_order) * final_scale
+                        ret_val['data'][f'CH1_{m}_Q'] = self.conv_data(wav1[:,int(2*(m+offset))::12], final_dsp_order) * final_scale
                     leSampleRates += [self.SampleRate / 10]*2
                     if m == 4:
-                        wav1 = self.conv_data(wav2, final_dsp_order)    #This is relevant in the BIND mode...
+                        wav1 = wav2    #This is relevant in the BIND mode...
                         offset = -5
-                if num_ch_divs[1] > 0:
-                    wav2 =self.conv_data(wav2, final_dsp_order)
                 for m in range(num_ch_divs[1]):
                     if final_dsp_order['avRepetitions']:
-                        ret_val['data'][f'CH2_{m}_I'] = wav2[0,int(2*m+1)::10] * final_scale*self.NumRepetitions
-                        ret_val['data'][f'CH2_{m}_Q'] = wav2[0,int(2*m)::10] * final_scale*self.NumRepetitions
-                        #TODO: Change after new firmware release...
-                        if final_dsp_order['avSamples']:
-                            ret_val['data'][f'CH2_{m}_I'] = np.array([np.sum(ret_val['data'][f'CH2_{m}_I'])])*2.0
-                            ret_val['data'][f'CH2_{m}_Q'] = np.array([np.sum(ret_val['data'][f'CH2_{m}_Q'])])*2.0
+                        ret_val['data'][f'CH2_{m}_I'] = self.conv_data(wav2[0,int(2*m+1)::10], final_dsp_order) * (final_scale*self.NumRepetitions)
+                        ret_val['data'][f'CH2_{m}_Q'] = self.conv_data(wav2[0,int(2*m)::10], final_dsp_order) * (final_scale*self.NumRepetitions)
                     else:
-                        ret_val['data'][f'CH2_{m}_I'] = wav2[:,int(2*m+1)::12] * final_scale
-                        ret_val['data'][f'CH2_{m}_Q'] = wav2[:,int(2*m)::12] * final_scale
+                        ret_val['data'][f'CH2_{m}_I'] = self.conv_data(wav2[:,int(2*m+1)::12], final_dsp_order) * final_scale
+                        ret_val['data'][f'CH2_{m}_Q'] = self.conv_data(wav2[:,int(2*m)::12], final_dsp_order) * final_scale
                     leSampleRates += [self.SampleRate / 10]*2
                 ret_val['misc']['SampleRates'] = leSampleRates
         return ret_val
@@ -1746,7 +1732,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
             def proc_data(data, final_dsp_order, ret_val):
                 if final_dsp_order['avRepetitions']:
                     #TODO: Later make this read straight off decision block changes in their newer firmware releases
-                    return self.NormalAVGSignal(data, self.NumRepetitions, True)*final_dsp_order['final_scale_factor'] * self.NumRepetitions    #TODO: Perhaps just support FPGA_Mean?!
+                    return self.NormalAVGSignal(data, self.NumRepetitions, True, sample_integrations_frame_header=True)*final_dsp_order['final_scale_factor'] * self.NumRepetitions    #TODO: Perhaps just support FPGA_Mean?!
                 else:
                     #self.conv_data(np.array(data)*final_dsp_order['final_scale_factor'], final_dsp_order, 2**14)*2.0
                     return np.array(data)*final_dsp_order['final_scale_factor']/2**14   #x2 as the DSP takes the 15 MSBs

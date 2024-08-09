@@ -14,6 +14,10 @@ instruments:
       ref_osc_freq:
         initial_value: 10e6
       AWG.CH1.trig_src:
-        initial_value: 'NONE'
+        initial_value: 'TRG1'
       AWG.CH2.trig_src:
-        initial_value: 'NONE'
+        initial_value: 'TRG1'
+      AWG.CH3.trig_src:
+        initial_value: 'TRG1'
+      AWG.CH4.trig_src:
+        initial_value: 'TRG1'

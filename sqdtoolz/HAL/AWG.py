@@ -765,7 +765,7 @@ class AWGOutputChannel(TriggerInput, LockableProperties):
             obj = self._software_triggers.pop()
             del obj
         for m in range(num_triggers):
-            self._software_triggers.append(AWGOutputTrigger(self._parent_waveform_obj, self, f'soft_trig_{m}', m))
+            self._software_triggers.append(AWGOutputTrigger(self._parent_waveform_obj, self, f'soft_trig_{m}', m, True))
 
     def software_trigger(self, soft_trig_index):
         '''
@@ -816,7 +816,7 @@ class AWGOutputChannel(TriggerInput, LockableProperties):
             self._software_triggers[ind]._set_current_config(cur_mark_dict)
 
 class AWGOutputTrigger(TriggerOutput, TriggerInput, LockableProperties):
-    def __init__(self, parent_waveform_obj, awg_output_ch, name, ch_index):
+    def __init__(self, parent_waveform_obj, awg_output_ch, name, ch_index, isVirtual=False):
         self._parent_waveform_obj = parent_waveform_obj
         self._awg_output_ch = awg_output_ch
         assert isinstance(self._awg_output_ch, (AWGOutputChannel, WaveformAWG)), "The awg_output_ch argument must be an AWGOutputChannel type if hardware marker or WaveformAWG itself if software trigger."
@@ -830,6 +830,7 @@ class AWGOutputTrigger(TriggerOutput, TriggerInput, LockableProperties):
         self._marker_trig_length = 1e-9
         self._ch_index = ch_index
         self._name = name
+        self._isVirtual = isVirtual
 
     @property
     def Name(self):
@@ -841,7 +842,7 @@ class AWGOutputTrigger(TriggerOutput, TriggerInput, LockableProperties):
     
     @property
     def IsVirtual(self):
-        return self._parent_waveform_obj == self._awg_output_ch
+        return self._isVirtual
 
     def set_markers_to_segments(self, list_seg_names):
         self._marker_status = 'Segments'
@@ -960,7 +961,10 @@ class AWGOutputTrigger(TriggerOutput, TriggerInput, LockableProperties):
         return self._assemble_marker_raw()
 
     def get_trigger_id(self):
-        return [self._awg_output_ch._ch_index, self._ch_index]
+        if self.IsVirtual:
+            return [self._awg_output_ch._ch_index, self._ch_index, 'v']
+        else:
+            return [self._awg_output_ch._ch_index, self._ch_index]
     def _get_instr_trig_src(self):
         '''
         Used by TimingConfiguration to backtrack through all interdependent trigger sources (i.e. traversing up the tree)

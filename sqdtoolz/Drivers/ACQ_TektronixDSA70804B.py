@@ -117,7 +117,7 @@ class TektronixDSA70804BTriEdg(InstrumentChannel):    #trigger edge settings
             set_cmd = 'TRIGger:%s:STATE {}' %(self.tri_edg_name), \
             vals =vals.MultiType(vals.Enum('on','off'),vals.Numbers())             #50% min~max voltage
             )              
-
+ 
         self.add_parameter( #query only
         'trigger_state_sys', label = 'Trigger State Sys', unit = 'a.u.',
         get_cmd = 'TRIGger:STATE?', get_parser = str

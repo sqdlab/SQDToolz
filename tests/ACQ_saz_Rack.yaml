@@ -10,7 +10,7 @@ instruments:
       RFoutA.REF_Source:
         initial_value: 'EXT'
       RFoutB.REF_Source:
-        initial_value: 'EXT' 
+        initial_value: 'EXT'
 
   MWS_Windfreak_2:
     driver: sqdtoolz.Drivers.MWS_WFSynthHDProV2
@@ -18,7 +18,9 @@ instruments:
     address: 'COM5'
     enable_forced_reconnect: true
     parameters:
-      EXT_REF_frequency:
+      RFoutA.EXT_REF_frequency:
+        initial_value: 10e6
+      RFoutB.EXT_REF_frequency:
         initial_value: 10e6
       RFoutA.REF_Source:
         initial_value: 'EXT'
@@ -31,7 +33,9 @@ instruments:
     address: 'COM4'##
     enable_forced_reconnect: true
     parameters:
-      EXT_REF_frequency:
+      RFoutA.EXT_REF_frequency:
+        initial_value: 10e6
+      RFoutB.EXT_REF_frequency:
         initial_value: 10e6
       RFoutA.REF_Source:
         initial_value: 'EXT'

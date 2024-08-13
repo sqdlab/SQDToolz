@@ -14,7 +14,9 @@ YAML entry:
     address: 'COM3'
     enable_forced_reconnect: true
     parameters:
-      EXT_REF_frequency:
+      RFoutA.EXT_REF_frequency:
+        initial_value: 10e6
+      RFoutB.EXT_REF_frequency:
         initial_value: 10e6
       RFoutA.REF_Source:
         initial_value: 'EXT'

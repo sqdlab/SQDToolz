@@ -58,12 +58,19 @@ class MWS_WFSynthHDProV2_Channel(InstrumentChannel):
                                'OFF':0
                            })
         
-        
         self.add_parameter('REF_Source',
                             get_cmd=partial(self._get_cmd, 'x?'),
                             set_cmd=partial(self._set_cmd, 'x'),
                             set_parser=int,
                             val_mapping={'INT':  1, 'EXT': 0})
+
+        self.add_parameter('EXT_REF_frequency', label='External REF Frequency', unit='Hz',
+                            get_cmd=partial(self._get_cmd, '*?'),
+                            set_cmd=self._set_cmd_trunc_ref_freq,
+                            get_parser=lambda x: float(x)*1.0e6,
+                            set_parser=lambda x: float(x)/1.0e6,
+                            vals=vals.Numbers(10e6, 100e6))
+        self.EXT_REF_frequency(10e6)
 
     def _get_cmd(self, cmd):
         #Perform channel-select
@@ -85,6 +92,11 @@ class MWS_WFSynthHDProV2_Channel(InstrumentChannel):
         self._parent._set_cmd(f'C{self._chan_ind}','')
         #Perform command
         self._parent._set_cmd(cmd + ('%06.3f'%val),'')
+    def _set_cmd_trunc_ref_freq(self, val):
+        #Perform channel-select
+        self._parent._set_cmd(f'C{self._chan_ind}', '')
+        #Perform command
+        self._parent._set_cmd('*' + ('%07.3f'%val),'')
 
     @property
     def Output(self):
@@ -185,14 +197,6 @@ class MWS_WFSynthHDProV2(VisaInstrument):
             cur_channel = MWS_WFSynthHDProV2_Channel(self, ch_name, ch_ind)
             self.add_submodule(ch_name, cur_channel)
             self._source_outputs[ch_name] = cur_channel
-
-        self.add_parameter('EXT_REF_frequency', label='External REF Frequency', unit='Hz',
-                            get_cmd=partial(self._get_cmd, '*?'),
-                            set_cmd=self._set_cmd_ref_freq,
-                            get_parser=lambda x: float(x)*1.0e6,
-                            set_parser=lambda x: float(x)/1.0e6,
-                            vals=vals.Numbers(10e6, 100e6))
-        self.EXT_REF_frequency()
 
     def get_output(self, identifier):
         return self._source_outputs[identifier]

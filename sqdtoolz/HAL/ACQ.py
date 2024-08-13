@@ -12,6 +12,7 @@ class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
             #
             self._trig_src_obj = None
             self.data_processor = None
+            self._post_processors = []
             self.decision_blocks = []
 
     @classmethod
@@ -91,8 +92,16 @@ class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
     def set_data_processor(self, proc_obj):
         self.data_processor = proc_obj
 
+    def set_extra_post_processors(self, list_proc_objs):
+        assert self.data_processor != None, "Set/use set_data_processor first to set the primary driver-integrated processor. This function is to set extra/auxiliary processors."
+        self._post_processors = list_proc_objs[:]
+
     def get_data(self):
-        return self._instr_acq.get_data(data_processor = self.data_processor, decision_blocks = self.decision_blocks)
+        ret_data = self._instr_acq.get_data(data_processor = self.data_processor, decision_blocks = self.decision_blocks)
+        for cur_proc in self._post_processors:
+            cur_proc.push_data(ret_data['data'])
+            ret_data['data'] = cur_proc.get_all_data()
+        return ret_data
 
     def set_trigger_source(self, trig_src_obj):
         assert isinstance(trig_src_obj, TriggerOutput) or trig_src_obj == None, "Must supply a valid Trigger Output object (i.e. digital trigger output like a marker)."
@@ -109,6 +118,12 @@ class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
         '''
         return self._trig_src_obj
 
+    def _get_all_PROC_dependencies(self):
+        ret_list = []
+        if self.data_processor:
+            ret_list.append(self.data_processor)
+        return ret_list + self._post_processors
+
     def _get_trigger_sources(self):
         return [self._trig_src_obj]
 
@@ -122,7 +137,8 @@ class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
             'instrument' : self._instr_id,
             'Type' : self.__class__.__name__,
             'TriggerSource' : self._get_trig_src_params_dict(),
-            'Processor' : proc_name
+            'Processor' : proc_name,
+            'ExProcessors' : [x.Name for x in self._post_processors]
             }
         self.pack_properties_to_dict(['NumSamples', 'NumSegments', 'NumRepetitions', 'SampleRate', 'InputTriggerEdge', 'ChannelStates'], ret_dict)
         if len(self.decision_blocks) > 0:
@@ -141,6 +157,10 @@ class ACQ(TriggerInputCompatible, TriggerInput, HALbase):
         self.set_trigger_source(trig_src_obj)
         if dict_config['Processor'] != '':
             self.data_processor = lab.PROC(dict_config['Processor'])
+        self._post_processors = []
+        if 'ExProcessors' in dict_config:
+            for cur_proc in dict_config['ExProcessors']:
+                self._post_processors.append(lab.PROC(cur_proc))
         if 'DecisionBlocks' in dict_config:
             self.decision_block = []
             for cur_dec_block in dict_config['DecisionBlocks']:

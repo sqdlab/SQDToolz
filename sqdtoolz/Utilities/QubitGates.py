@@ -34,7 +34,8 @@ class QubitGatesBase:
                 '-Y/2': QubitGatesBase.get_rotation_from_Pauli_Matrix_Arb(0,1,0,-np.pi/2),
                 'Z': QubitGatesBase.get_rotation_from_Pauli_Matrix_Arb(0,0,1,np.pi),
                 'Z/2': QubitGatesBase.get_rotation_from_Pauli_Matrix_Arb(0,0,1,np.pi/2),
-                '-Z/2': QubitGatesBase.get_rotation_from_Pauli_Matrix_Arb(0,0,1,-np.pi/2)
+                '-Z/2': QubitGatesBase.get_rotation_from_Pauli_Matrix_Arb(0,0,1,-np.pi/2),
+                'H': QubitGatesBase.get_rotation_from_Pauli_Matrix_Arb(1/np.sqrt(2),0,1/np.sqrt(2),np.pi)
                 #TODO: Add more gates here!
                 }
         assert gate_name in QubitGatesBase._pre_calc_gates, f"{gate_name} is not a recognised gate."
@@ -106,7 +107,7 @@ class QubitGatesBase:
             assert False, f"Cannot write this angle {angle} naturally."
 
 class TransmonGates(QubitGatesBase):
-    def __init__(self, wmft_drive_func, spec_qubit, envelope='Gaussian', arb_rot_func='simple_sine'):
+    def __init__(self, wmft_drive_func, spec_qubit, envelope='Gaussian', arb_rot_func='simple_sine', **kwargs):
         #simple_sine uses the Pi-rotation amplitude and calculates the required fraction for the demanded angle...
         self._wfmt_qubit_drive = wmft_drive_func
         self._spec_qubit = spec_qubit
@@ -116,6 +117,8 @@ class TransmonGates(QubitGatesBase):
             self._env_func = WFS_Constant
         else:
             assert False, "Envelope must be Gaussian or Constant."
+
+        self._pulse_pad = kwargs.get('pulse_pad', 0)
 
         #TODO: Investigate more sophisticated arbitrary rotation calibration - e.g. spline interpolation?
         assert arb_rot_func=='simple_sine', "The arbitrary rotation function must be either: 'simple_sine' or ..."
@@ -156,7 +159,7 @@ class TransmonGates(QubitGatesBase):
 
     def get_available_gates(self):
         #TODO: Add freq_offset along with phase_off to the WFMT to enable Hadamards?
-        return ['I', 'X', 'X/2', '-X/2', 'Y', 'Y/2', '-Y/2', 'Z', 'Z/2', '-Z/2']
+        return ['I', 'X', 'X/2', '-X/2', 'Y', 'Y/2', '-Y/2', 'Z', 'Z/2', '-Z/2', 'H']
 
     def generate_gates(self, gate_list, gate_set_prefix='gate'):
         assert isinstance(gate_list, (list, tuple)), "gate_list must be given as a list of valid gates."
@@ -166,7 +169,8 @@ class TransmonGates(QubitGatesBase):
             if isinstance(cur_gate, (tuple, list)):
                 assert len(cur_gate) == 2, "Arbitrary rotations must be specified as a tuple - e.g. ('Rx',0.02)."
                 if cur_gate[0] == 'Rz':
-                    phase_offset = phase_offset + angle  # in case prev gate was also Rz
+                        angle = cur_gate[1] % (2*np.pi)
+                        phase_offset = phase_offset + angle  # in case prev gate was also Rz
                 else:
                     #Calculate the amplitude for the rotation
                     if self._arb_rot_func == 'simple_sine':
@@ -209,8 +213,17 @@ class TransmonGates(QubitGatesBase):
                 phase_offset = phase_offset + np.pi/2
             elif cur_gate == '-Z/2':
                 phase_offset = phase_offset - np.pi/2
+            elif cur_gate == 'H':
+                #Check link: https://www.quantum-inspire.com/kbase/hadamard/
+                #Basically we run a Z gate followed by a Y_pi/2 and then a 
+                phase_offset += np.pi
+                ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_offset=phase_offset, phase_segment=self._spec_qubit['GE Y/2-Gate Phase'].Value), self._spec_qubit['GE X/2-Gate Time'].Value, self._spec_qubit['GE X/2-Gate Amplitude'].Value))
+                phase_offset = 0
             else:
                 assert False, f"Gate \'{cur_gate}\' is not a valid gate."
+                
+            if self._pulse_pad > 0:
+                ret_gates.append(WFS_Constant(f"gate_pad{m}", None, self._pulse_pad, 0.0))
         return ret_gates
     
     def run_circuit(self, gate_list, expt_config, load_time, readout_time):

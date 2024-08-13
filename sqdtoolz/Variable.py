@@ -270,25 +270,29 @@ class VariablePropertyOneManyTransient:
         return []   #Shouldn't actually get called?
 
 class VariableSpaced(VariableBase):
-    def __init__(self, name, lab, var_1, var_2, space_val):
+    def __init__(self, name, lab, var_1, var_2, space_val, negate_first=False):
         super().__init__(name, lab)
         self._lab = lab
         self._var_1 = var_1
         self._var_2 = var_2
         self.space_val = space_val
+        self.negate_first = negate_first
         #
         lab._register_VAR(self)
 
     @classmethod
     def fromConfigDict(cls, name, config_dict, lab):
-        return cls(name, lab, config_dict["Var1"], config_dict["Var2"], config_dict["Space"])
+        return cls(name, lab, config_dict["Var1"], config_dict["Var2"], config_dict["Space"], config_dict.get('Negate_First', False))
 
     def get_raw(self):
         return self._lab.VAR(self._var_1).get_raw()
 
     def set_raw(self, value):
         self._lab.VAR(self._var_1).set_raw(value)
-        self._lab.VAR(self._var_2).set_raw(value + self.space_val)
+        if self.negate_first:
+            self._lab.VAR(self._var_2).set_raw(self.space_val - value)
+        else:
+            self._lab.VAR(self._var_2).set_raw(value + self.space_val)
 
     def _get_current_config(self):
         return {
@@ -296,6 +300,7 @@ class VariableSpaced(VariableBase):
             'Var1'  : self._var_1,
             'Var2'  : self._var_2,
             'Space' : self.space_val,
+            'Negate_First' : self.negate_first,
             'Type'  : self.__class__.__name__
         }
 
@@ -304,6 +309,7 @@ class VariableSpaced(VariableBase):
         self._var_1 = dict_config['Var1']
         self._var_2 = dict_config['Var2']
         self.space_val = dict_config['Space']
+        self.negate_first = dict_config.get('Negate_First', False)
 
     def _get_written_objs(self):
         return [self._lab.VAR(self._var_1), self._lab.VAR(self._var_2)]

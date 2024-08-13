@@ -16,7 +16,7 @@ from sqdtoolz.HAL.GENsmu import*
 from sqdtoolz.HAL.Processors.ProcessorCPU import*
 try:
     from sqdtoolz.HAL.Processors.ProcessorGPU import*
-except ModuleNotFoundError:
+except (ModuleNotFoundError, ImportError):
     pass
 from sqdtoolz.HAL.Processors.ProcessorFPGA import*
 from datetime import datetime
@@ -30,6 +30,8 @@ class customJSONencoder(json.JSONEncoder):
     def default(self, obj):
         #Inspired by: https://stackoverflow.com/questions/56250514/how-to-tackle-with-error-object-of-type-int32-is-not-json-serializable/56254172
         if isinstance(obj, np.int32):
+            return int(obj)
+        if isinstance(obj, np.int64):
             return int(obj)
         return json.JSONEncoder.default(self, obj)
 

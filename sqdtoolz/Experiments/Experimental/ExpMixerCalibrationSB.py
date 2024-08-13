@@ -5,6 +5,7 @@ from sqdtoolz.Utilities.Optimisers import OptimiseParaboloid
 from sqdtoolz.Utilities.DataFitting import*
 import scipy.optimize
 from sqdtoolz.Utilities.FileIO import*
+from sqdtoolz.ExperimentSpecification import ExperimentSpecification
 
 class ExpMixerCalibrationSB(Experiment):
     def __init__(self, name, expt_config, var_down_conv_freq, freq_SB_minimise, var_amp, range_amps, var_phs, range_phs, optimise=False, **kwargs):
@@ -97,4 +98,5 @@ class ExpMixerCalibrationSB(Experiment):
             return dpkt['fig']
 
     def commit_to_SPEC(self, SPEC_obj):
+        assert isinstance(SPEC_obj, ExperimentSpecification), "SPEC_obj must be an ExperimentSpecification object."
         SPEC_obj['AmpFac'].Value, SPEC_obj['PhsOff'].Value = self._opt_val

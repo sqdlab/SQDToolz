@@ -2,5 +2,27 @@ instruments:
   MWS_Windfreak:
     driver: sqdtoolz.Drivers.MWS_WFSynthHDProV2
     type: MWS_WFSynthHDProV2
-    address: 'COM3'
+    address: 'COM5'
     enable_forced_reconnect: true
+    parameters:
+      EXT_REF_frequency:
+        initial_value: 10e6 
+
+  MW_IF:
+    type: sqdtoolz.Drivers.MWS_SGS100A.MWS_SGS100A
+    address: TCPIP::192.168.1.119::INSTR
+    enable_forced_reconnect: true
+    parameters:
+      ref_osc_source:
+        initial_value: 'EXT' #Can be INT or EXT
+      ref_osc_external_freq:
+        initial_value: '10MHz'   #Can be '10MHz', '100MHz', '1000MHz'
+      ref_osc_output_freq:
+        initial_value: '1000MHz'  #Can be '10MHz', '100MHz', '1000MHz'
+      alc:
+        initial_value: 'OFF'  #Can be ON, OFF, AUTO
+      trigger_impedance:
+        initial_value: 'G10K' #Important when using low-amplitude/weakly-driven trigger pulses
+      #Output Channel Parameters
+      RFOUT.output:
+        initial_value: 'OFF'

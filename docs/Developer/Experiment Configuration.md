@@ -29,7 +29,7 @@ The `TriggerOutputCompatible` class requires the implementation of:
 
 ### Trigger inputs
 
-HAL objects that can accept an input trigger to synchronise their output waveforms (like acquisition or AWG modules) must implement a similar couple of classes:
+HAL objects that can accept an input trigger to synchronise their output waveforms (like acquisition or AWG modules) must similarly implement a couple of classes:
 
 - The HAL object itself must implement `TriggerInputCompatible` in order both appear in timing diagrams and to pass internal verification checks run on HAL objects by the `ExperimentConfiguration` class when using said HAL object to accept a trigger input signal.
 - The individual trigger inputs are either implemented within the object itself or via a list of classes housed within the HAL object (like with AWG markers); said objects must implement `TriggerInput` to ensure that they have the right functions to interface with the `ExperimentConfiguration` class.

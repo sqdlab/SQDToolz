@@ -641,9 +641,10 @@ class DFitReflectanceResonance:
         cut_ind2 = int(freq_vals.size-freq_vals.size*prop_detrend_end)
         coefs2 = np.polyfit(freq_vals[cut_ind2:], phase_vals[cut_ind2:], 1)
         coefs = 0.5*(coefs1+coefs2)
-        # coefs[1] = coefs1[1]
+        poly1d_fn = np.poly1d(coefs*1.0)
+        coefs[1] = phase_vals[0] - coefs[0]*freq_vals[0]
+        poly1d_fnData = np.poly1d(coefs)
         #Plot the line...
-        poly1d_fn = np.poly1d(coefs)
         if not dont_plot and not dont_plot_estimates:
             axPhsDetrend.plot(freq_vals, phase_vals, 'k', alpha=0.5)
             poly1d_fn0 = np.poly1d(coefs1)
@@ -658,7 +659,7 @@ class DFitReflectanceResonance:
             axPhsDetrend.axvspan(freq_vals[cut_ind2-1], freq_vals[-1], alpha=0.2)
 
         #Phase slope estimation
-        detrended_phase = phase_vals - poly1d_fn(freq_vals)
+        detrended_phase = phase_vals - poly1d_fnData(freq_vals)
         def smooth(y, box_pts):
             box = np.ones(box_pts)/box_pts
             y_smooth = np.convolve(y, box, mode='valid')
@@ -675,10 +676,12 @@ class DFitReflectanceResonance:
         f0 = dpkt['centre']
         #Plot the Detrended+Slope Estimate...
         if not dont_plot:
-            axPhs.plot(freq_vals, phase_vals - poly1d_fn(freq_vals), 'k', alpha=0.5)
+            phsData = phase_vals - poly1d_fnData(freq_vals)
+            axPhs.plot(freq_vals, phsData, 'k', alpha=0.5)
             if not dont_plot_estimates:
                 tempYlims = axPhs.get_ylim()
-                axPhs.plot(freq_vals, ps*(freq_vals-f0), 'r', alpha=0.5)
+                f0ind = np.argmin(np.abs(freq_vals-f0))
+                axPhs.plot(freq_vals, ps*(freq_vals-f0)+phsData[f0ind], 'r', alpha=0.75)
                 axPhs.set_ylim(tempYlims)
                 axPhs.set_xlabel('Frequency (Hz)')
                 axPhs.set_ylabel('Detrended Phase (rad)')
@@ -707,7 +710,7 @@ class DFitReflectanceResonance:
         else:
             Qext = (h-1)*w0/(h-2)**2*p
         p0 = coefs[0]/(np.pi*2)
-        phi0 = coefs[1]
+        phi0 = phase_vals[0] - coefs[0]*freq_vals[0]
         l = coefs[0]*3e8/(4*np.pi)
 
         #Perform actual fitting...
@@ -740,8 +743,9 @@ class DFitReflectanceResonance:
             axAmp.set_xlabel('Frequency (Hz)')
             axAmp.set_ylabel('Amplitude')
 
-            axPhs.plot(freq_vals,np.angle(func(freq_vals, init_conds[:4]+[0,0])))
-            axPhs.plot(freq_vals,np.angle(func(freq_vals, sol.x[:4].tolist()+[0,0])))
+            axPhs.plot(freq_vals,np.unwrap(np.angle(func(freq_vals, init_conds[:4]+[0,0]))), alpha=0.75)
+            axPhs.plot(freq_vals,np.unwrap(np.angle(func(freq_vals, sol.x[:4].tolist()+[0,0]))), alpha=0.75)
+            axPhs.legend(['Data', 'Slope', 'Guess', 'Fitted'])
 
             axIQ.plot(i_vals, q_vals, 'k', alpha=0.5)
             axIQ.plot(np.real(func(freq_vals, init_conds)), np.imag(func(freq_vals, init_conds)))

@@ -389,13 +389,13 @@ class ETHFPGA(Instrument):
                         self._call('set_fir_coeffs', fir_specs[0][0].tolist())
                     if len(fir_specs) == 2:
                         assert len(fir_specs[1]) == 1, "ETH FPGA can only filter one tone per channel."
-                        num_taps2 = fir_specs[0][1].size
+                        num_taps2 = fir_specs[1][0].size
                         assert num_taps2 == 7 or num_taps2 == 29 or num_taps2 == 40, "FIR filter taps must be either 7, 29 or 4"
                         if len(fir_specs[0]) == 1:
                             assert num_taps == num_taps2, "The ETH FPGA must use the same FIR filter on both channels."
-                            assert np.sum(np.abs(fir_specs[0][0] - fir_specs[0][1])) < 1e-9, "The ETH FPGA must use the same FIR filter coefficients on both channels."
+                            assert np.sum(np.abs(fir_specs[0][0] - fir_specs[1][0])) < 1e-9, "The ETH FPGA must use the same FIR filter coefficients on both channels."
                         else:
-                            self._call('set_fir_coeffs', fir_specs[0][1].tolist())
+                            self._call('set_fir_coeffs', fir_specs[1][0].tolist())
                     fir_done = True
                 elif isinstance(cur_node, FPGA_Decimation):
                     assert not deci_done, "Cannot run Decimation FIR stages on the ETH FPGA card."

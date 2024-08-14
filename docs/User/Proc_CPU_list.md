@@ -10,6 +10,7 @@ This document lists all the CPU processing nodes that can be used with the `Proc
   * [CPU_Integrate](#cpu-integrate)
   * [CPU_ChannelArithmetic](#cpu-channelarithmetic)
   * [CPU_ConstantArithmetic](#cpu-constantarithmetic)
+  * [CPU_AmpPhs](#cpu-ampphs) (amplitude/phase conversion from IQ-pairs)
   * [CPU_FFT](#cpu-fft)
   * [CPU_ESD](#cpu-esd)
   * [CPU_Duplicate](#cpu-duplicate)
@@ -167,6 +168,27 @@ In this example, the first node will divide the first and third channels by 4, w
 - The first argument in `CPU_ConstantArithmetic` is a **constant to act as the second argument in the binary operation**.
 - The second argument is the binary operation. One may select: `'+'`, `'-'`, `'*'`, `'/'`, `'%'` for addition, subtraction, multiplication, division and modulo respectively.
 - The third argument is a list of channel indices (in the above example, the first node performs the division by 4 on the first and third input channels). If `None` is specified instead of a list (like in the second node of the example above), then the constant operation is performed (in this case adding 5) on all input channels.
+
+Note that the design choice to choose channel indices is for portability of code for the channel names stem from the physical channel names down in the ACQ driver; for example, a two channel signal from the first and fifth inputs of an ACQ HAL will perhaps yield the names `'CH1'` and `'CH5'` etc.
+
+## CPU AmpPhs
+
+`CPU_AmpPhs` calculates the amplitude and phase of *N* IQ-pairs. To use the `CPU_AmpPhs` stage, consider the following code (assuming that `lab` is a valid `Laboratory` object):
+
+```python
+import sqdtoolz as stz
+...
+stz.ProcessorCPU('test', lab)
+...
+lab.PROC('test').add_stage( stz.CPU_AmpPhs([0,1], False) )
+```
+
+In this example, the I and Q values for the IQ-pair are given by the data in positions 0 and 1. The second argument being `False` indicates that the original inputs are NOT to be discarded. If it is `True`, then the original inputs will be discarded.
+
+Note that:
+
+- The first argument in `CPU_AmpPhs` must be a list of indices with an even number of elements denoting *N* IQ-pairs.
+- The second argument denotes whether the original IQ-input channel data pieces are to be discarded.
 
 Note that the design choice to choose channel indices is for portability of code for the channel names stem from the physical channel names down in the ACQ driver; for example, a two channel signal from the first and fifth inputs of an ACQ HAL will perhaps yield the names `'CH1'` and `'CH5'` etc.
 

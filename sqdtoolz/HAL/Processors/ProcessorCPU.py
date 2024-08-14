@@ -13,6 +13,7 @@ class ProcNodeCPU:
     def _get_current_config(self):
         raise NotImplementedError()
 
+from sqdtoolz.HAL.Processors.CPU.CPU_AmpPhs import*
 from sqdtoolz.HAL.Processors.CPU.CPU_DDC import*
 from sqdtoolz.HAL.Processors.CPU.CPU_FIR import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Integrate import*

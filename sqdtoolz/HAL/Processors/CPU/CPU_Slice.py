@@ -34,7 +34,7 @@ class CPU_Slice(ProcNodeCPU):
         #TODO: Make sure to check that the sliced arrays are all the same size above!!!
 
         #TODO: Clean this up... Not sure how to make this axis consistent anyway...
-        data_pkt['parameter_values'][self.param_name] = data_pkt['parameter_values'][self.param_name][slice(*self.slices[0])]
+        # data_pkt['parameter_values'][self.param_name] = data_pkt['parameter_values'][self.param_name][slice(*self.slices[0])]
 
         return data_pkt
 

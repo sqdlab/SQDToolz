@@ -19,6 +19,8 @@ from sqdtoolz.HAL.Processors.CPU.CPU_FIR import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Integrate import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Max import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Mean import*
+from sqdtoolz.HAL.Processors.CPU.CPU_Variance import*
+from sqdtoolz.HAL.Processors.CPU.CPU_MeanVariance import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Duplicate import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Slice import*
 from sqdtoolz.HAL.Processors.CPU.CPU_Rename import*

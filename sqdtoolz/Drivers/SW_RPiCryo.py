@@ -51,7 +51,7 @@ class CryoSwitchChannel(InstrumentChannel):
         self.pin_cs = cs
         self.pins_fault = fault
         self.portmap = portmap
-        self.add_parameter('settle_time', ManualParameter, initial_value=10e-3, 
+        self.add_parameter('settle_time', ManualParameter, initial_value=0.01, 
                            vals=vals.Numbers(0.5e-6, 1.), unit='s')
         for port in self.portmap.keys():
             self.add_parameter('{}_state'.format(port), CryoSwitchPort, 
@@ -136,17 +136,28 @@ class SW_RPiCryo(VisaInstrument):
 
         #NOTE THAT P3 IS THE COMMON PIN TO WHICH P1, P2, P4 and P5 SWITCH TO...
 
-        print("THE SW_RPiCryo DRIVER IS DEPRECATED - USE SW_BJT_RPi DRIVER INSTEAD.")
+        print("This driver should only be used for the switches mounted in the SD as of 20240910. USE SW_BJT_RPi DRIVER INSTEAD.")
 
         # en and in lines are shared between both switches
+        # ground lines are per switch
         cground0 = DriverChannel(21, 22)
-        cground1 = DriverChannel(23, 24) # now unused
-        ports = dict(
-            P1 = (DriverChannel(5, 3), cground0), 
-            P2 = (DriverChannel(8, 7), cground0), 
-            P4 = (DriverChannel(11, 10), cground0), 
-            P5 = (DriverChannel(18, 19), cground0)
-        )
+        cground1 = DriverChannel(23, 24) # (?) use for CrSw1 in SD fridge
+        if switch_ind == 0:
+            ports = dict(
+                # 'cground0' should be used for CrSw0
+                P1 = (DriverChannel(8, 7), cground0), 
+                P2 = (DriverChannel(5, 3), cground0), 
+                P4 = (DriverChannel(11, 10), cground0), 
+                P5 = (DriverChannel(18, 19), cground0)
+            )
+        elif switch_ind == 1:
+            ports = dict(
+                # 'cground1' should be used for CrSw1
+                P1 = (DriverChannel(8, 7), cground1),
+                P2 = (DriverChannel(5, 3), cground1),  
+                P4 = (DriverChannel(11, 10), cground1), 
+                P5 = (DriverChannel(18, 19), cground1)
+            )
 
         self._cur_contacts = ['P1', 'P2', 'P4', 'P5']
 
@@ -183,5 +194,5 @@ class SW_RPiCryo(VisaInstrument):
     def get_all_switch_contacts(self):
         return self._cur_contacts[:]
 
-sw = SW_RPiCryo('test', 'TCPIP::192.168.1.16::4000::SOCKET', 1)
-a=0
+# sw = SW_RPiCryo('test', 'TCPIP::192.168.1.144::4000::SOCKET', 1)
+# a=0

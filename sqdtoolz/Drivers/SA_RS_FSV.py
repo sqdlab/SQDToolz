@@ -30,8 +30,13 @@ class SA_RS_FSV(VisaInstrument):
 
         # setting and query the data format to the tranferred
         self.add_parameter(
-        'format_data', label = 'Format Data', unit = 'a.u.', get_cmd='format:data?', get_parser = str,set_cmd = 'format:data {}',vals=vals.Enum('ascii','real,32')
-        )
+            'format_data', label = 'Format Data', unit = 'a.u.',
+            get_cmd='format:data?',
+            get_parser = str,
+            set_cmd = 'format:data {}',
+            vals=vals.Enum('ascii','real,32'),
+            initial_value='real,32'
+            )
         # the power unit of the y axis
         self.add_parameter(
         'calculate_unit_power', label = 'Calculate Unit Power', unit = 'a.u.',get_cmd='CALCulate:UNIT:POWer?',get_parser = str,set_cmd = 'CALCulate:UNIT:POWer {}',vals=vals.Enum('dBm','V','A','W','dBpW','watt','dBuV','dBmV','volt','dBuA','ampere')
@@ -42,12 +47,54 @@ class SA_RS_FSV(VisaInstrument):
         )
         # set the center frequency
         self.add_parameter(
-        'sense_frequency_center', label = 'Sense Frequency Center', unit = 'a.u.',get_cmd='sense:frequency:center?',get_parser=float,set_cmd = 'sense:frequency:center {}',vals=vals.Numbers()
+        'sense_frequency_center', label = 'Sense Frequency Center', unit = 'Hz',get_cmd='sense:frequency:center?',get_parser=float,set_cmd = 'sense:frequency:center {}',vals=vals.Numbers()
         )
         # set the frequency span
         self.add_parameter(
-        'sense_frequency_span', label = 'Sense Frequency Span', unit = 'a.u.',get_cmd='sense:frequency:span?',get_parser=float,set_cmd = 'sense:frequency:span {}',vals=vals.Numbers()
+        'sense_frequency_span', label = 'Sense Frequency Span', unit = 'Hz.',get_cmd='sense:frequency:span?',get_parser=float,set_cmd = 'sense:frequency:span {}',vals=vals.Numbers()
         )
+
+        self.add_parameter(
+            'res_bandwidth', label = 'Resolution Bandwidth', unit = 'Hz',
+            get_cmd='BAND:RES?',
+            get_parser=float,
+            set_cmd = 'BAND:RES {}',
+            vals=vals.Numbers()
+            )
+
+        self.add_parameter(
+            'sweep_points', label = 'Resolution Bandwidth', unit = 'Hz',
+            get_cmd='SENS:SWE:POINts?',
+            get_parser=int,
+            set_cmd = 'SENS:SWE:POINts {}',
+            vals=vals.Numbers(101, 32001)
+            )
+
+        self.add_parameter(
+            'average_enable',
+            docstring = 'Enables average',
+            get_cmd = 'AVER?', 
+            set_cmd = 'AVER {}',
+            val_mapping = {True: 1, False: 0}
+            )
+
+        self.add_parameter(
+            'average_count', label = 'Number of averages',
+            get_cmd='AVER:COUN?',
+            get_parser=int,
+            set_cmd = 'AVER:COUN {}',
+            vals=vals.Numbers()
+            )
+
+        self.add_parameter(
+            'average_type', label = 'Number of averages',
+            get_cmd='AVER:COUN?',
+            get_parser=int,
+            set_cmd = 'AVER:COUN {}',
+            vals=vals.Enum('VID', 'LIN', 'POW'),    #LIN means average first then take log, POW is the reverse...
+            initial_value='LIN'
+            )
+
         # set the full span0-30 GHz
         self.add_parameter(
         'sense_frequency_span_full', label = 'Sense Frequency Span Full', unit = 'a.u.',set_cmd = 'sense:frequency:span:{}',vals=vals.Enum('full')
@@ -69,51 +116,86 @@ class SA_RS_FSV(VisaInstrument):
         )
 
 
-    def wfm_plot(self):
-        wfm_data=self.wfm_data
-        n_x=self.wfm_x
-        self.X=n_x
-        self.Y=wfm_data
-        plt.plot(n_x,wfm_data)
-        plt.xlabel('Frequency (Hz)')
-        plt.ylabel('Power (%s)'%self.CalculateUnitPower)
-        
-    def data2hdf5(self,filepath):
-        data_array=np.zeros((len(self.Y),1))
-        data_array[:,0]=self.Y
-        # data_array[:,1]=np.imag(self.Y)
-
-        param_names = ["Frequency (Hz)"]
-        param_vals = [self.X]
-        print(np.shape(param_vals))
-        # print(type(param_vals))
-        dep_param_names = ['Power (%s)'%self.CalculateUnitPower]
-        FileIOWriter.write_file_direct(filepath, data_array, param_names, param_vals, dep_param_names)        
-
-    @property 
-    def wfm_data(self):
-        data_format=self.FormatData
-        if data_format=='ASC,0':
-            wfm_data_=self.visa_handle.query_ascii_values('trace:data? trace1')
-            return np.array(wfm_data_)
-        elif data_format=='REAL,32':
-            wfm_data_=self.visa_handle.query_binary_values('trace:data? trace1', datatype='f', is_big_endian=False)
-            return np.array(wfm_data_)
-        else:
-            print('Data format: %s'%data_format)            
-            raise Exception('Invalid data format')
     @property
-    def wfm_x(self):
-        data_format=self.FormatData
-        if data_format=='ASC,0':
-            wfm_x_=self.visa_handle.query_ascii_values('TRACe:DATA:X? TRACE1')
-            return np.array(wfm_x_)
-        elif data_format=='REAL,32':
-            wfm_x_=self.visa_handle.query_binary_values('TRACe:DATA:X? TRACE1', datatype='f', is_big_endian=False)
-            return np.array(wfm_x_)
+    def FrequencyStart(self):        
+        return self.sense_frequency_start()
+    @FrequencyStart.setter
+    def FrequencyStart(self,val):
+        self.sense_frequency_start(val)
+    @property
+    def FrequencyEnd(self):        
+        return self.sense_frequency_stop()
+    @FrequencyEnd.setter
+    def FrequencyEnd(self,val):
+        self.sense_frequency_stop(val)   
+    @property
+    def FrequencyCentre(self):        
+        return self.sense_frequency_center()
+    @FrequencyCentre.setter
+    def FrequencyCentre(self,val):
+        self.sense_frequency_center(val)  
+    @property
+    def FrequencySpan(self):        
+        return self.sense_frequency_span()
+    @FrequencySpan.setter
+    def FrequencySpan(self,val):
+        self.sense_frequency_span(val)
+
+    @property
+    def Bandwidth(self):
+        return self.res_bandwidth()
+    @Bandwidth.setter
+    def Bandwidth(self, val):
+        self.res_bandwidth(val)
+    @property
+    def SweepPoints(self):
+        return self.sweep_points()
+    @SweepPoints.setter
+    def SweepPoints(self, val):
+        self.sweep_points(val)
+
+    @property
+    def AveragesEnable(self):
+        return self.average_enable() == '1'
+    @AveragesEnable.setter
+    def AveragesEnable(self, val):
+        if (val):
+            self.write('AVER ON')
         else:
-            print('Data format: %s'%data_format)            
-            raise Exception('Invalid data format')        
+            self.write('AVER OFF')
+    @property
+    def AveragesNum(self):
+        return self.average_count()
+    @AveragesNum.setter
+    def AveragesNum(self, val):
+        self.average_count(val)
+
+    def get_data(self, **kwargs):
+        self.write('INIT:CONT OFF')
+
+        #Restart and initiate the sweep and block all subsequent commands...
+        self.ask('ABOR;INIT:IMM;*OPC?')
+
+        wfm_data = self.visa_handle.query_binary_values('trace:data? trace1', datatype='f', is_big_endian=False)
+        wfm_x = self.visa_handle.query_binary_values('TRACe:DATA:X? TRACE1', datatype='f', is_big_endian=False)
+
+        ret_data = {
+            'parameters' : ['Frequency'],
+            'data' : {},
+            'parameter_values' : {}
+            }
+
+        ret_data['data'][f'Power_dBm'] = np.array(wfm_data)
+        ret_data['parameter_values']['Frequency'] = np.array(wfm_x)
+        
+        leProc = kwargs.get('data_processor', None)
+        if leProc is not None:
+            leProc.push_data(ret_data)
+            return {'data': leProc.get_all_data()}
+        return {'data': ret_data}
+
+
+
     @property 
     def GTR(self):
         return
@@ -127,13 +209,6 @@ class SA_RS_FSV(VisaInstrument):
     @SystemDisplayUpdate.setter
     def SystemDisplayUpdate(self,val):
         self.system_display_update(val)
-
-    @property 
-    def FormatData(self):
-        return self.format_data()
-    @FormatData.setter
-    def FormatData(self,val):
-        self.format_data(val)
     
     @property 
     def CalculateUnitPower(self):
@@ -163,64 +238,9 @@ class SA_RS_FSV(VisaInstrument):
         return pw_unit
     @CalculateUnitPower.setter
     def CalculateUnitPower(self,val):
-        self.calculate_unit_power(val)
-
-    @property
-    def SenseAdjustAll(self):
-        return
-    @SenseAdjustAll.setter
-    def SenseAdjustAll(self,val):
-        self.sense_adjust_all(val)
-
-    @property
-    def SenseFrequencyCenter(self):        
-        return self.sense_frequency_center()
-    @SenseFrequencyCenter.setter
-    def SenseFrequencyCenter(self,val):
-        self.sense_frequency_center(val)  
-    
-    @property
-    def SenseFrequencySpan(self):        
-        return self.sense_frequency_span()
-    @SenseFrequencySpan.setter
-    def SenseFrequencySpan(self,val):
-        self.sense_frequency_span(val)   
-
-    @property
-    def SenseFrequencySpanFull(self):        
-        return 
-    @SenseFrequencySpanFull.setter
-    def SenseFrequencySpanFull(self,val):
-        self.sense_frequency_span_full(val)  
-
-    @property
-    def SenseFrequencyStart(self):        
-        return self.sense_frequency_start()
-    @SenseFrequencyStart.setter
-    def SenseFrequencyStart(self,val):
-        self.sense_frequency_start(val)   
-
-    @property
-    def SenseFrequencyStop(self):        
-        return self.sense_frequency_stop()
-    @SenseFrequencyStop.setter
-    def SenseFrequencyStop(self,val):
-        self.sense_frequency_stop(val)   
-
-    @property
-    def SenseRoscillatorExternalFrequency(self):        
-        return self.sense_roscillator_external_frequency()
-    @SenseRoscillatorExternalFrequency.setter
-    def SenseRoscillatorExternalFrequency(self,val):
-        self.sense_roscillator_external_frequency(val) 
-
-    @property
-    def SenseRoscillatorSource(self):        
-        return self.sense_roscillator_source()
-    @SenseRoscillatorSource.setter
-    def SenseRoscillatorSource(self,val):
-        self.sense_roscillator_source(val)                   
+        self.calculate_unit_power(val)             
 
 if __name__=='__main__':
-    obj = RS_FSV_SAZ('test', address='TCPIP::192.168.1.150::INSTR')
+    obj = SA_RS_FSV('test', address='TCPIP::192.168.1.150::INSTR')
+
     a=0       

@@ -890,6 +890,145 @@ class TestCPU(unittest.TestCase):
 
         self.cleanup()
 
+    def test_AmpPhs(self):
+        self.initialise()
+        data_size = 512#*1024*4
+        num_reps = 10
+        num_segs = 47
+        #
+        #Test with simple case:
+        leOrigArray = np.array([[sorted([(s+2*r)*x for x in range(1,data_size+1)], key=lambda k: random.random()) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])*1.0
+        leOrigArray2 = np.array([[sorted([(s+2*r)*x for x in range(1,data_size+1)], key=lambda k: random.random()) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])*1.0
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            #Shuffle the list to make it interesting...
+            'data' : { 'ch1' : leOrigArray*1.0, 'ch2' : leOrigArray2*1.0 },
+            'misc' : {'SampleRates' : [1.1,1.1]}
+        }
+        new_proc = ProcessorCPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_AmpPhs([0,1],True))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ansA = np.sqrt(leOrigArray**2 + leOrigArray2**2)
+        expected_ansP = np.arctan2(leOrigArray2, leOrigArray)
+        assert self.arr_equality(fin_data['data'][f'Amp_ch1ch2'], expected_ansA), f"CPU Amplitude/Phase does not yield expected Amplitude."
+        assert self.arr_equality(fin_data['data'][f'Phs_ch1ch2'], expected_ansP), f"CPU Amplitude/Phase does not yield expected Phase."
+        assert self.arr_equality( np.array(fin_data['misc']['SampleRates']), np.array([1.1,1.1]) ), f"CPU Amplitude/Phase did not settle SampleRates properly."
+        #
+        #Test with 2 IQ-pairs:
+        leOrigArray = np.array([[sorted([(s+2*r)*x for x in range(1,data_size+1)], key=lambda k: random.random()) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])*1.0
+        leOrigArray2 = np.array([[sorted([(s+2*r)*x for x in range(1,data_size+1)], key=lambda k: random.random()) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])*1.0
+        leOrigArray3 = np.array([[sorted([(s+2*r)*x for x in range(1,data_size+1)], key=lambda k: random.random()) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])*4.2
+        leOrigArray4 = np.array([[sorted([(s+2*r)*x for x in range(1,data_size+1)], key=lambda k: random.random()) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])*3.7
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            #Shuffle the list to make it interesting...
+            'data' : { 'ch1' : leOrigArray*1.0, 'ch2' : leOrigArray2*1.0,  'ch3' : leOrigArray3*1.0, 'ch4' : leOrigArray4*1.0 },
+            'misc' : {'SampleRates' : [1.2,1.2,2.3,2.3]}
+        }
+        new_proc = ProcessorCPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_AmpPhs([0,1,3,2],True))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        expected_ansA = np.sqrt(leOrigArray**2 + leOrigArray2**2)
+        expected_ansP = np.arctan2(leOrigArray2, leOrigArray)
+        assert self.arr_equality(fin_data['data'][f'Amp_ch1ch2'], expected_ansA), f"CPU Amplitude/Phase does not yield expected Amplitude."
+        assert self.arr_equality(fin_data['data'][f'Phs_ch1ch2'], expected_ansP), f"CPU Amplitude/Phase does not yield expected Phase."
+        expected_ansA = np.sqrt(leOrigArray4**2 + leOrigArray3**2)
+        expected_ansP = np.arctan2(leOrigArray3, leOrigArray4)
+        assert self.arr_equality(fin_data['data'][f'Amp_ch4ch3'], expected_ansA), f"CPU Amplitude/Phase does not yield expected Amplitude."
+        assert self.arr_equality(fin_data['data'][f'Phs_ch4ch3'], expected_ansP), f"CPU Amplitude/Phase does not yield expected Phase."
+        assert self.arr_equality( np.array(fin_data['misc']['SampleRates']), np.array([1.2,1.2,2.3,2.3]) ), f"CPU Amplitude/Phase did not settle SampleRates properly."
+        
+        #Keep inputs
+        #
+        leOrigArray = np.array([[sorted([(s+2*r)*x for x in range(1,data_size+1)], key=lambda k: random.random()) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])*1.0
+        leOrigArray2 = np.array([[sorted([(s+2*r)*x for x in range(1,data_size+1)], key=lambda k: random.random()) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])*1.0
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            #Shuffle the list to make it interesting...
+            'data' : { 'ch1' : leOrigArray*1.0, 'ch2' : leOrigArray2*1.0 },
+            'misc' : {'SampleRates' : [1.1,1.1]}
+        }
+        new_proc = ProcessorCPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_AmpPhs([0,1], False))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        assert self.arr_equality(fin_data['data'][f'ch1'], leOrigArray), f"CPU Amplitude/Phase does not keep inputs properly when asked."
+        assert self.arr_equality(fin_data['data'][f'ch2'], leOrigArray2), f"CPU Amplitude/Phase does not keep inputs properly when asked."
+        expected_ansA = np.sqrt(leOrigArray**2 + leOrigArray2**2)
+        expected_ansP = np.arctan2(leOrigArray2, leOrigArray)
+        assert self.arr_equality(fin_data['data'][f'Phs_ch1ch2'], expected_ansP), f"CPU Amplitude/Phase does not yield expected Phase."
+        assert self.arr_equality(fin_data['data'][f'Amp_ch1ch2'], expected_ansA), f"CPU Amplitude/Phase does not yield expected Amplitude."
+        assert self.arr_equality(fin_data['data'][f'Phs_ch1ch2'], expected_ansP), f"CPU Amplitude/Phase does not yield expected Phase."
+        assert self.arr_equality( np.array(fin_data['misc']['SampleRates']), np.array([1.1,1.1,1.1,1.1]) ), f"CPU Amplitude/Phase did not settle SampleRates properly when keeping inputs."
+        #
+        #Test with 2 IQ-pairs:
+        leOrigArray = np.array([[sorted([(s+2*r)*x for x in range(1,data_size+1)], key=lambda k: random.random()) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])*1.0
+        leOrigArray2 = np.array([[sorted([(s+2*r)*x for x in range(1,data_size+1)], key=lambda k: random.random()) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])*1.0
+        leOrigArray3 = np.array([[sorted([(s+2*r)*x for x in range(1,data_size+1)], key=lambda k: random.random()) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])*4.2
+        leOrigArray4 = np.array([[sorted([(s+2*r)*x for x in range(1,data_size+1)], key=lambda k: random.random()) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])*3.7
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            #Shuffle the list to make it interesting...
+            'data' : { 'ch1' : leOrigArray*1.0, 'ch2' : leOrigArray2*1.0,  'ch3' : leOrigArray3*1.0, 'ch4' : leOrigArray4*1.0 },
+            'misc' : {'SampleRates' : [1.2,1.2,2.3,2.3]}
+        }
+        new_proc = ProcessorCPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_AmpPhs([0,1,3,2],False))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        assert self.arr_equality(fin_data['data'][f'ch1'], leOrigArray), f"CPU Amplitude/Phase does not keep inputs properly when asked."
+        assert self.arr_equality(fin_data['data'][f'ch2'], leOrigArray2), f"CPU Amplitude/Phase does not keep inputs properly when asked."
+        assert self.arr_equality(fin_data['data'][f'ch3'], leOrigArray3), f"CPU Amplitude/Phase does not keep inputs properly when asked."
+        assert self.arr_equality(fin_data['data'][f'ch4'], leOrigArray4), f"CPU Amplitude/Phase does not keep inputs properly when asked."
+        expected_ansA = np.sqrt(leOrigArray**2 + leOrigArray2**2)
+        expected_ansP = np.arctan2(leOrigArray2, leOrigArray)
+        assert self.arr_equality(fin_data['data'][f'Amp_ch1ch2'], expected_ansA), f"CPU Amplitude/Phase does not yield expected Amplitude."
+        assert self.arr_equality(fin_data['data'][f'Phs_ch1ch2'], expected_ansP), f"CPU Amplitude/Phase does not yield expected Phase."
+        expected_ansA = np.sqrt(leOrigArray4**2 + leOrigArray3**2)
+        expected_ansP = np.arctan2(leOrigArray3, leOrigArray4)
+        assert self.arr_equality(fin_data['data'][f'Amp_ch4ch3'], expected_ansA), f"CPU Amplitude/Phase does not yield expected Amplitude."
+        assert self.arr_equality(fin_data['data'][f'Phs_ch4ch3'], expected_ansP), f"CPU Amplitude/Phase does not yield expected Phase."
+        assert self.arr_equality( np.array(fin_data['misc']['SampleRates']), np.array([1.2,1.2,2.3,2.3, 1.2,1.2,2.3,2.3]) ), f"CPU Amplitude/Phase did not settle SampleRates properly when keeping inputs."
+        #
+        #Test with 2 IQ-pairs:
+        leOrigArray = np.array([[sorted([(s+2*r)*x for x in range(1,data_size+1)], key=lambda k: random.random()) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])*1.0
+        leOrigArray2 = np.array([[sorted([(s+2*r)*x for x in range(1,data_size+1)], key=lambda k: random.random()) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])*1.0
+        leOrigArray3 = np.array([[sorted([(s+2*r)*x for x in range(1,data_size+1)], key=lambda k: random.random()) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])*4.2
+        leOrigArray4 = np.array([[sorted([(s+2*r)*x for x in range(1,data_size+1)], key=lambda k: random.random()) for s in range(1,num_segs+1)] for r in range(1,num_reps+1)])*3.7
+        cur_data = {
+            'parameters' : ['repetition', 'segment', 'sample'],
+            #Shuffle the list to make it interesting...
+            'data' : { 'ch1' : leOrigArray*1.0, 'ch2' : leOrigArray2*1.0, 'chPhantom': leOrigArray2*4.0,  'ch3' : leOrigArray3*1.0, 'ch4' : leOrigArray4*1.0 },
+            'misc' : {'SampleRates' : [1.2,1.2,5.5,2.3,2.3]}
+        }
+        new_proc = ProcessorCPU('cpu_test', self.lab)
+        new_proc.reset_pipeline()
+        new_proc.add_stage(CPU_AmpPhs([0,1,4,3],False))
+        new_proc.push_data(cur_data)
+        fin_data = new_proc.get_all_data()
+        assert self.arr_equality(fin_data['data'][f'ch1'], leOrigArray), f"CPU Amplitude/Phase does not keep inputs properly when asked."
+        assert self.arr_equality(fin_data['data'][f'ch2'], leOrigArray2), f"CPU Amplitude/Phase does not keep inputs properly when asked."
+        assert self.arr_equality(fin_data['data'][f'ch3'], leOrigArray3), f"CPU Amplitude/Phase does not keep inputs properly when asked."
+        assert self.arr_equality(fin_data['data'][f'ch4'], leOrigArray4), f"CPU Amplitude/Phase does not keep inputs properly when asked."
+        expected_ansA = np.sqrt(leOrigArray**2 + leOrigArray2**2)
+        expected_ansP = np.arctan2(leOrigArray2, leOrigArray)
+        assert self.arr_equality(fin_data['data'][f'Amp_ch1ch2'], expected_ansA), f"CPU Amplitude/Phase does not yield expected Amplitude."
+        assert self.arr_equality(fin_data['data'][f'Phs_ch1ch2'], expected_ansP), f"CPU Amplitude/Phase does not yield expected Phase."
+        expected_ansA = np.sqrt(leOrigArray4**2 + leOrigArray3**2)
+        expected_ansP = np.arctan2(leOrigArray3, leOrigArray4)
+        assert self.arr_equality(fin_data['data'][f'Amp_ch4ch3'], expected_ansA), f"CPU Amplitude/Phase does not yield expected Amplitude."
+        assert self.arr_equality(fin_data['data'][f'Phs_ch4ch3'], expected_ansP), f"CPU Amplitude/Phase does not yield expected Phase."
+        assert self.arr_equality( np.array(fin_data['misc']['SampleRates']), np.array([1.2,1.2, 5.5, 2.3,2.3, 1.2,1.2,2.3,2.3]) ), f"CPU Amplitude/Phase did not settle SampleRates properly when keeping inputs."
+        
+        
+        self.cleanup()
+
     def test_FFT(self):
         self.initialise()
 
@@ -2470,6 +2609,6 @@ class TestFPGA(unittest.TestCase):
         self.cleanup()
 
 if __name__ == '__main__':
-    TestGPU().test_ESD()
+    TestCPU().test_AmpPhs()
     # TestFPGA().test_reprogram()
     unittest.main()

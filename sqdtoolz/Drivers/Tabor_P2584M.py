@@ -8,6 +8,7 @@ from sqdtoolz.HAL.Processors.FPGA.FPGA_DDC import FPGA_DDC
 from sqdtoolz.HAL.Processors.FPGA.FPGA_Integrate import FPGA_Integrate
 from sqdtoolz.HAL.Processors.FPGA.FPGA_Decimation import FPGA_Decimation
 from sqdtoolz.HAL.Processors.FPGA.FPGA_FFT import FPGA_FFT
+from sqdtoolz.HAL.Processors.FPGA.FPGA_MultiplierConst import FPGA_MultiplierConst
 
 import numpy as np
 import math
@@ -1090,7 +1091,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
                 }
         """
         ret_val = {
-                        'parameters' : ['repetition', 'segment', 'sample'],
+                        'parameters' : ['repetition', 'sample'],
                         'data' : {},
                         'misc' : {'SampleRates' : [self.SampleRate]*2}
                     }
@@ -1274,7 +1275,7 @@ class TaborP2584M_ACQ(InstrumentChannel):
             final_dsp_order['dsp_active'] = True
 
         for m, cur_node in enumerate(cur_processor.pipeline):
-            if isinstance(cur_node, FPGA_DDCFIR) or isinstance(cur_node, FPGA_DDC):
+            if isinstance(cur_node, FPGA_DDCFIR) or isinstance(cur_node, FPGA_DDC) or isinstance(cur_node, FPGA_MultiplierConst):
                 assert not kernel_settled, "The P2584M only supports one kernel stage (e.g. variants of DDCs)."
                 assert not decimation, "The P2584M only supports kernel stages (e.g. variants of DDCs) before decimation."
                 assert not final_dsp_order['avSamples'], "The P2584M only supports kernel stages (e.g. variants of DDCs) before averaging."
@@ -1565,7 +1566,8 @@ class TaborP2584M_ACQ(InstrumentChannel):
             if (self.ChannelStates[1]) :
                 ret_val['data']['CH2'] = self.conv_data(wav2, final_dsp_order) * final_scale
                 leSampleRates += [self.SampleRate]
-            ret_val['parameters'] = ['repetition', 'segment', 'sample']
+            ret_val['parameters'] = ['repetition', 'sample']
+            # ret_val['parameters'] = ['repetition', 'segment', 'sample']
             ret_val['misc']['SampleRates'] = leSampleRates
         else:
             num_ch_divs = final_dsp_order['num_ch_divs']
@@ -1710,8 +1712,8 @@ class TaborP2584M_ACQ(InstrumentChannel):
 
         ret_val = self._perform_data_capture(cur_processor, final_dsp_order, blocksize)
 
-        if not isinstance(cur_processor, ProcessorFPGA):
-            return {'data': ret_val}
+        # if not isinstance(cur_processor, ProcessorFPGA):
+        #     return {'data': ret_val}
 
         if final_dsp_order['avSamples']:   #TODO: Change after firmware update (i.e. read header for average)
             ret_val = {

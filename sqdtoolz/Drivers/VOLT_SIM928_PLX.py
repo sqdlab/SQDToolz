@@ -113,7 +113,9 @@ class VOLT_SIM928_PLX(PrologixGPIBEthernet, Instrument):
         self.select(gpib_slot)
         
         self.write('*DCL')  # device clear
+        time.sleep(0.5)
         self.write('FLSH')  # flush port buffers
+        time.sleep(0.5)
         self.write('SRST')  # SIM reset (causes 100 ms delay)
         time.sleep(0.5)
 

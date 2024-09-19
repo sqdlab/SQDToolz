@@ -2,7 +2,7 @@ instruments:
   sim_rack928:
     driver: sqdtoolz.Drivers.VOLT_SIM928_PLX
     type: VOLT_SIM928_PLX
-    address: '192.168.1.208'
+    address: '192.168.1.130'
     enable_forced_reconnect: true
     init:
       gpib_slot: 2

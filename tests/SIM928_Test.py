@@ -8,7 +8,7 @@ new_lab = Laboratory(instr_config_file = "tests\\SIM928.yaml", save_dir = "mySav
 
 instr_sim928 = new_lab._station.load_sim_rack928()
 
-volt_module = GENvoltSource(instr_sim928.get_output(3))
+volt_module = new_lab.GENvoltSource('v_coil', lab, ['sim_rack928','CH1']) #HAL
 
 #Slow Ramp
 volt_module.RampRate = 0.001

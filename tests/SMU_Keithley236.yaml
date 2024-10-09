@@ -2,7 +2,7 @@ instruments:
   smu:
     driver: sqdtoolz.Drivers.SMU_Keithley236
     type: SMU_Keithley236
-    address: '192.168.0.200'
+    address: '192.168.1.230'
     init:
       gpib_slot: 19
     enable_forced_reconnect: true

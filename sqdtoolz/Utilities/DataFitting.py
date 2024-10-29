@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import scipy.optimize
 from sqdtoolz.Utilities.Miscellaneous import Miscellaneous
 
@@ -763,3 +764,61 @@ class DFitReflectanceResonance:
             'Amplitude': sol.x[0],
             'Phase' : sol.x[5]
         }
+
+class ResonatorFitTLS:
+    def __init__(self):
+        # Fits TLS loss model to a power sweep of Q-values.
+        pass
+
+    # TLS fit model
+    @staticmethod
+    def TLS_fit(axes, n_ph, Qi, temperature, frequency, colourmap='viridis', title='TLS fit', print_results=False, start_ind=0, end_ind=False, smooth=True):
+
+        hbar = 1.054 * 10**(-34)
+        kB = 1.380649 * 10**(-23)
+        
+        mpl.colormaps[colourmap]
+        
+        # compute terms for current temperature and frequency values
+        freq_frac = (hbar * 2. * np.pi * frequency) / (kB * temperature)
+        tanh_term = np.tanh(freq_frac)
+
+        # TLS loss fit (from Crowley 2023)
+        def TLS_crowley(n_ph, F_delta_TLS_0, n_c, Q_HP, beta):
+
+            # Reference: Crowley, Kevin D., Russell A. McLellan, Aveek Dutta, Nana Shumiya, Alexander P. M. Place, Xuan Hoang Le, Youqi Gang, et al. “Disentangling Losses in Tantalum Superconducting Circuits.” arXiv, January 18, 2023. http://arxiv.org/abs/2301.07848.
+            delta_TLS = F_delta_TLS_0 * (tanh_term / ((1. + (n_ph / n_c))**beta))
+            return (delta_TLS + (1. / Q_HP))**(-1)
+
+        # trim data (if required)
+        if (end_ind==False) or (end_ind > len(Qi)):
+            end_index = len(Qi)
+        else:
+            end_index = end_ind
+
+        # no bounds
+        popt, pcov = scipy.optimize.curve_fit(TLS_crowley, n_ph[start_ind:end_index], Qi[start_ind:end_index], p0=[2.e-6, 0.001, 1.e6, 0.4], bounds=([0,0,0,0.3], [2.e-3, np.inf, np.inf, 0.5]))
+        
+        # print fit results (if requested)
+        if print_results==True:
+            print(f"  F_delta_TLS_0 = {popt[0]:.3e}")
+            print(f"  n_c           = {popt[1]:>3f}")
+            print(f"  Q_i,HP        = {popt[2]:>3f}")
+            print(f"  beta          = {popt[3]:>3f}\n")
+        
+        # smoothing
+        if smooth==True:
+            n_ph_smooth = np.logspace(-2, 6, num=500);
+        else:
+            n_ph_smooth = n_ph
+
+        # plot fit
+        ax.plot(n_ph_smooth, TLS_crowley(n_ph_smooth, *popt), alpha=0.8, lw=2)
+        ax.scatter(n_ph[start_ind:end_index], Qi[start_ind:end_index], marker='o', linewidths=1.2, label=f'f={frequency/(10**9):.2f} GHz')
+
+        # plot setup
+        ax.set_title(title)
+        ax.grid(visible=True, which='both', axis='both')
+        ax.set_ylabel('$Q_i$')
+        ax.set_xlabel('photon number')
+        ax.legend()

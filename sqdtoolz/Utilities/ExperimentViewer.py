@@ -556,7 +556,7 @@ class ExperimentViewer:
                 except:
                     pass
             else:
-                cur_exp_params = []
+                cur_exp_params = [('Idle', 'white')]
 
             #Process the HALs...
             cur_ddgs = []

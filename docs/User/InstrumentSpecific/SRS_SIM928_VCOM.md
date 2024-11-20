@@ -1,6 +1,6 @@
-# SRS SIM928 SIM900 rack Module (using RS232-Ethernet adapter) (Driver: VOLT_SIM928_VCOM)
+# SRS SIM928 voltage module (using RS232-Ethernet adapter) (Driver: VOLT_SIM928_VCOM)
 
-The SIM928 module has:
+The SIM928 module takes up 1 slot in the SIM900 rack main frame. It has:
 - One voltage output channel spanning ±20V (limited to 20mA output current)
 - The module can be operated without code via the buttoned interface
 - This driver connects to the serial version of the SIM900 mainframe using a *USR IOT Serial Device Server* adaptor (specifically the *USR-RCP232-302* model)
@@ -22,8 +22,7 @@ YAML entry:
 
 ```yaml
   sim_rack928:
-    driver: sqdtoolz.Drivers.VOLT_SIM928_VCOM
-    type: VOLT_SIM928_VCOM
+    type: sqdtoolz.Drivers.VOLT_SIM928_VCOM.VOLT_SIM928_VCOM
     address: 'COM4'
     enable_forced_reconnect: true
     init:

@@ -16,7 +16,7 @@ Connect the RS232-Ethernet module to its 5V supply, Ethernet cable and the appro
 - It may crash - just restart the program
 - Make sure it says "Connected" under "Net State" and then copy the COM ID (e.g. "COM4") into the YAML shown in the next section.
 
-## Digital pulse modulation
+## Usage
 
 YAML entry:
 

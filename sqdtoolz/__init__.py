@@ -14,6 +14,7 @@ from sqdtoolz.HAL.AWG import WaveformAWG #TODO: Refactor this - RB is angry
 from sqdtoolz.HAL.GENmwSource import GENmwSource
 from sqdtoolz.HAL.GENvoltSource import GENvoltSource
 from sqdtoolz.HAL.GENatten import GENatten
+from sqdtoolz.HAL.GENfuncGen import GENfuncGen
 from sqdtoolz.HAL.GENswitch import GENswitch
 from sqdtoolz.HAL.GENswitchTrig import GENswitchTrig
 from sqdtoolz.HAL.GENtherm import GENtherm

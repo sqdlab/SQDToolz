@@ -1,10 +1,10 @@
 from typing import Any
-
 import numpy as np
 from qcodes import (ChannelList, InstrumentChannel, ParameterWithSetpoints,
                     VisaInstrument)
 from qcodes.utils.validators import Arrays, Enum, Numbers
-
+from qcodes import validators as vals
+import time
 
 class RigolDS1054ZChannel(InstrumentChannel):
     """
@@ -29,14 +29,51 @@ class RigolDS1054ZChannel(InstrumentChannel):
                            get_parser=float
                            )
 
-        self.add_parameter("trace",
-                           get_cmd=self._get_full_trace,
-                           vals=Arrays(shape=(self.parent.waveform_npoints,)),
-                           setpoints=(self.parent.time_axis,),
-                           unit='V',
-                           parameter_class=ParameterWithSetpoints,
-                           snapshot_value=False
+        self.add_parameter("vertical_offset",
+                           get_cmd=f":CHANnel{channel}:OFFSet?",
+                           set_cmd=":CHANnel{}:OFFSet {}".format(channel, "{}"),
+                           get_parser=float
                            )
+
+        self.add_parameter("input_coupling",
+                           get_cmd=f":CHANnel{channel}:COUPling?",
+                           set_cmd=":CHANnel{}:COUPling {}".format(channel, "{}"),
+                           vals=Enum('AC', 'DC', 'GND')
+                           )
+
+        self.add_parameter("displayed",
+                           get_cmd=f":CHANnel{channel}:DISPlay?",
+                           set_cmd=":CHANnel{}:DISPlay {}".format(channel, "{}"),
+                           val_mapping={True: '1', False: '0'}
+                           )
+
+    @property
+    def VoltageRange(self):
+        return self.vertical_scale() * 8    #8 vertical divisions
+    @VoltageRange.setter
+    def VoltageRange(self, volt_range):
+        self.vertical_scale(volt_range/8)   #8 vertical divisions
+
+    @property
+    def VoltageOffset(self):
+        return self.vertical_offset()
+    @VoltageOffset.setter
+    def VoltageOffset(self, volt_offset):
+        self.vertical_offset(volt_offset)
+
+    @property
+    def InputCoupling(self):
+        return self.input_coupling()
+    @InputCoupling.setter
+    def InputCoupling(self, coupling):
+        self.input_coupling(coupling)
+
+    @property
+    def Enabled(self):
+        return self.displayed()
+    @Enabled.setter
+    def Enabled(self, enabled):
+        self.displayed(enabled)
 
     def _get_full_trace(self) -> np.ndarray:
         y_raw = self._get_raw_trace()*1.0
@@ -48,11 +85,7 @@ class RigolDS1054ZChannel(InstrumentChannel):
 
     def _get_raw_trace(self) -> np.ndarray:
         # set the channel from where data will be obtained
-        self.root_instrument.data_source(f"ch{self.channel}")
-
-        # set the out type from oscilloscope channels to BYTE
-        self.root_instrument.write(':WAVeform:FORMat BYTE')
-        self.root_instrument.write(':WAVeform:MODE RAW')
+        self.root_instrument.data_source(f"CH{self.channel}")
 
         def get_raw_data():
             return self.root_instrument.visa_handle.query_binary_values(
@@ -64,6 +97,8 @@ class RigolDS1054ZChannel(InstrumentChannel):
         # Obtain the trace
         numPts = self.root_instrument.waveform_npoints()
         if numPts < 250000:
+            self.root_instrument.write(f':WAV:STAR 1')
+            self.root_instrument.write(f':WAV:STOP {numPts}')
             raw_trace_val = get_raw_data()
         else:
             numCycls = int(numPts / 250000)
@@ -81,7 +116,7 @@ class RigolDS1054ZChannel(InstrumentChannel):
         return np.array(raw_trace_val)
 
 
-class DS1054Z(VisaInstrument):
+class DSO_DS1054Z(VisaInstrument):
     """
     The QCoDeS drivers for Oscilloscope Rigol DS1074Z.
 
@@ -100,6 +135,33 @@ class DS1054Z(VisaInstrument):
             **kwargs: Any):
         super().__init__(name, address, terminator=terminator, timeout=timeout,
                          **kwargs)
+
+        self._allowed_time_divs = [ 5e-9, 1e-8, 2e-8, 5e-8,
+                                    1e-7, 2e-7, 5e-7,
+                                    1e-6, 2e-6, 5e-6,
+                                    1e-5, 2e-5, 5e-5,
+                                    1e-4, 2e-4, 5e-4,
+                                    1e-3, 2e-3, 5e-3,
+                                    1e-2, 2e-2, 5e-2,
+                                    1e-1, 2e-1, 5e-1,
+                                    1, 2, 5,
+                                    10, 20, 50]
+
+        self.add_parameter('time_per_division',
+                           get_cmd=':TIMebase:MAIN:SCALe?',
+                           set_cmd=':TIMebase:MAIN:SCALe {}',
+                           unit='s',
+                           vals = vals.Enum(*self._allowed_time_divs),
+                           get_parser=float
+                           )
+
+        self._allowed_mem_depths = ['12000', '120000', '1200000', '12000000', '24000000']
+        self.add_parameter('mem_depth',
+                           get_cmd=':ACQuire:MDEPth?',
+                           set_cmd=':ACQuire:MDEPth {}',
+                           vals = vals.Enum(*self._allowed_mem_depths),
+                           )
+        self._allowed_mem_depths_int = np.array([int(x) for x in self._allowed_mem_depths])
 
         self.add_parameter('waveform_xorigin',
                            get_cmd='WAVeform:XORigin?',
@@ -154,17 +216,17 @@ class DS1054Z(VisaInstrument):
                            unit='V',
                            get_cmd=self._get_trigger_level,
                            set_cmd=self._set_trigger_level,
-                           vals=Numbers()
+                           get_parser=float
                            )
 
         self.add_parameter('trigger_edge_source',
                            label='Source channel for the edge trigger',
                            get_cmd=':TRIGger:EDGE:SOURce?',
                            set_cmd=':TRIGger:EDGE:SOURce {}',
-                           val_mapping={'ch1': 'CHAN1',
-                                        'ch2': 'CHAN2',
-                                        'ch3': 'CHAN3',
-                                        'ch4': 'CHAN4'
+                           val_mapping={'CH1': 'CHAN1',
+                                        'CH2': 'CHAN2',
+                                        'CH3': 'CHAN3',
+                                        'CH4': 'CHAN4'
                                         }
                            )
 
@@ -175,14 +237,20 @@ class DS1054Z(VisaInstrument):
                            vals=Enum('positive', 'negative', 'neither')
                            )
 
+        self.add_parameter('trigger_status',
+                           label='Slope of the edge trigger',
+                           get_cmd=':TRIGger:STATus?',
+                           vals=Enum('TD', 'WAIT', 'RUN', 'AUTO', 'STOP')
+                           )
+
         self.add_parameter('data_source',
                            label='Waveform Data source',
                            get_cmd=':WAVeform:SOURce?',
                            set_cmd=':WAVeform:SOURce {}',
-                           val_mapping={'ch1': 'CHAN1',
-                                        'ch2': 'CHAN2',
-                                        'ch3': 'CHAN3',
-                                        'ch4': 'CHAN4'
+                           val_mapping={'CH1': 'CHAN1',
+                                        'CH2': 'CHAN2',
+                                        'CH3': 'CHAN3',
+                                        'CH4': 'CHAN4'
                                         }
                            )
 
@@ -201,15 +269,23 @@ class DS1054Z(VisaInstrument):
                                snapshotable=False
                                )
 
+        self._input_channels = {}
         for channel_number in range(1, 5):
+            leName = f"CH{channel_number}"
             channel = RigolDS1054ZChannel(self,
-                                          f"ch{channel_number}",
+                                          leName,
                                           channel_number
                                           )
             channels.append(channel)
+            self._input_channels[leName] = channel
 
         channels.lock()
         self.add_submodule('channels', channels)
+
+        # set the out type from oscilloscope channels to BYTE
+        self.root_instrument.write(':WAVeform:FORMat BYTE')
+        self.root_instrument.write(':WAVeform:MODE RAW')
+        self.root_instrument.write(':mem_depth 12000000')
 
         self.connect_message()
 
@@ -232,15 +308,103 @@ class DS1054Z(VisaInstrument):
         self.root_instrument.write(f":TRIGger:{self.trigger_mode()}:LEVel {value}")
 
 
-# osc = DS1054Z('test','TCPIP::...::INSTR')
-# data = osc.channels.ch1.trace()
-# data2 = osc.channels.ch2.trace()
-# data3 = osc.channels.ch3.trace()
-# x_vals = osc._get_time_axis()
-# import matplotlib.pyplot as plt
-# plt.plot(x_vals, data)
-# plt.plot(x_vals, data2+10)
-# plt.plot(x_vals, data3+20)
-# plt.show()
-# input('test')
-# a = 0
+    def get_output(self, identifier):
+        return self._input_channels[identifier]
+
+    def get_all_outputs(self):
+        return [(x,self._input_channels[x]) for x in self._input_channels]
+
+    @property
+    def SampleRate(self):
+        return float(self.ask(':ACQuire:SRATe?'))
+    @SampleRate.setter
+    def SampleRate(self, sample_rate):
+        numpts = int(self.mem_depth())
+        total_time = numpts / sample_rate
+        t_per_div = total_time / 12   #12 divisions on screen...
+        #
+        min_ind = np.argmin(np.abs(np.array(self._allowed_time_divs) - t_per_div))
+        self.time_per_division(self._allowed_time_divs[min_ind])
+
+    @property
+    def NumSamples(self):
+        return int(self.mem_depth())
+    @NumSamples.setter
+    def NumSamples(self, num_points):
+        self.write(':RUN')
+        min_ind = np.argmin(np.abs(self._allowed_mem_depths_int - num_points))
+        self.mem_depth(self._allowed_mem_depths[min_ind])
+        self.write(':STOP')
+
+    @property
+    def ACQTriggerChannel(self):
+        return self.trigger_edge_source()
+    @ACQTriggerChannel.setter
+    def ACQTriggerChannel(self, ch_id):
+        self.trigger_edge_source(ch_id)
+
+    @property
+    def ACQTriggerSlope(self):
+        return self.trigger_edge_slope()
+    @ACQTriggerSlope.setter
+    def ACQTriggerSlope(self, slope_type):
+        if slope_type == 'POS':
+            self.trigger_edge_slope('positive')
+        elif slope_type == 'NEG':
+            self.trigger_edge_slope('negative')
+        elif slope_type == 'BOTH':
+            self.trigger_edge_slope('neither')
+
+    @property
+    def ACQTriggerVoltageLevel(self):
+        return self.trigger_level()
+    @ACQTriggerVoltageLevel.setter
+    def ACQTriggerVoltageLevel(self, volt_level):
+        self.trigger_level(volt_level)
+
+    def get_data(self, **kwargs):
+        self.write(':STOP')
+
+        self.write(':SINGle')
+        triggered = False
+        for m in range(1000):
+            if self.trigger_status() == 'STOP':
+                triggered = True
+                time.sleep(0.01)
+                break
+        assert triggered, "Timed out trying to find trigger."
+
+        cur_processor = kwargs.get('data_processor', None)
+
+        data_pkt = {
+                'parameters' : ['time'],
+                'parameter_values' : {},
+                'data' : {},
+                'misc' : {}
+            }
+        num_chs = 0
+        for cur_ch in self._input_channels:
+            if self._input_channels[cur_ch].Enabled:
+                data_pkt['data'][cur_ch] = self._input_channels[cur_ch]._get_full_trace()
+                num_chs += 1
+        data_pkt['parameter_values']['time'] = self._get_time_axis()
+        data_pkt['misc']['SampleRates'] = [self.SampleRate]*num_chs
+
+        cur_proc = kwargs.get('data_processor', None)
+        if cur_proc:
+            cur_proc.push_data(data_pkt['data'])
+            data_pkt['data'] = cur_proc.get_all_data()
+        return {'data': data_pkt}
+        
+
+
+if __name__ == '__main__':
+    osc = DSO_DS1054Z('test','TCPIP::10.42.95.46::INSTR')
+    data_pkt = osc.get_data()
+    import matplotlib.pyplot as plt
+    plt.plot(x_vals, data)
+    plt.plot(x_vals, data2+10)
+    # plt.plot(x_vals, data3+20)
+    plt.show()
+    input('test')
+    a = 0

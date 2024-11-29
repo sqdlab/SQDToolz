@@ -10,6 +10,7 @@ try:
 except ModuleNotFoundError:
     pass
 from sqdtoolz.HAL.ACQ import ACQ
+from sqdtoolz.HAL.ACQdso import ACQdso
 from sqdtoolz.HAL.AWG import WaveformAWG #TODO: Refactor this - RB is angry
 from sqdtoolz.HAL.GENmwSource import GENmwSource
 from sqdtoolz.HAL.GENvoltSource import GENvoltSource

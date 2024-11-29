@@ -22,4 +22,4 @@ YAML entry:
     enable_forced_reconnect: true
 ```
 
-Just set the appropriate COM port ID (e.g. `'COM4'` for the `address`). Just use the HAL `GENfuncGen` to access control this unit. The output channels are enumerated as `'CH1'` and `'CH2'`.
+Just set the appropriate COM port ID (e.g. `'COM4'` for the `address`). Just use the HAL `GENfuncGen` to control this unit. Note that the output channels are enumerated as `'CH1'` and `'CH2'`.

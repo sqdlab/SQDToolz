@@ -23,7 +23,7 @@ YAML entry:
     enable_forced_reconnect: true
 ```
 
-Just set the appropriate Prologix IP address and the GPIB port number. The read panel should be connected as follows:
+Just set the appropriate Prologix IP address and the GPIB port number. The rear panel should be connected as follows:
 
 ![My Diagram3](Keithley_236_2Wire.drawio.svg)
 
@@ -42,7 +42,7 @@ YAML entry:
     enable_forced_reconnect: true
 ```
 
-Just set the appropriate Prologix IP address and the GPIB port number. The read panel should be connected as follows:
+Just set the appropriate Prologix IP address and the GPIB port number. The rear panel should be connected as follows:
 
 ![My Diagram3](Keithley_236_4Wire.drawio.svg)
 

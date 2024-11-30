@@ -1,0 +1,9 @@
+instruments:
+  rigoldso:
+    type: sqdtoolz.Drivers.DSO_DS1054Z.DSO_DS1054Z
+    address: 'TCPIP::10.42.95.46::INSTR'
+    enable_forced_reconnect: true
+  fgen:
+    type: sqdtoolz.Drivers.FGEN_FY6900.FGEN_FY6900
+    address: '/dev/ttyUSB0'
+    enable_forced_reconnect: true

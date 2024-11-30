@@ -7,6 +7,11 @@ lab = stz.Laboratory(instr_config_file = "tests/DSO_DS1054Z.yaml", save_dir = "m
 lab.load_instrument('rigoldso')
 stz.ACQdso('DSO', lab, 'rigoldso')
 
+lab.HAL('DSO').channel(0).Enabled = True
+lab.HAL('DSO').channel(1).Enabled = False
+lab.HAL('DSO').channel(2).Enabled = False
+lab.HAL('DSO').channel(3).Enabled = False
+
 lab.HAL('DSO').SampleRate = 10e6
 lab.HAL('DSO').NumSamples = 120000
 
@@ -15,21 +20,5 @@ lab.HAL('DSO').NumSamples = 120000
 stz.ExperimentConfiguration('contMeas', lab, 500e-6, [], 'DSO')
 new_exp = stz.Experiment('test', lab.CONFIG('contMeas'))
 leData = lab.run_single(new_exp, [])
-
-lab.HAL('fgen1').Waveform = "SQUARE"
-lab.HAL('fgen1').Frequency = 69e3
-lab.HAL('fgen1').Amplitude = 2
-lab.HAL('fgen1').Offset = -0.05
-lab.HAL('fgen1').Output = True
-
-
-input('press <ENTER> to continue')
-
-
-lab.HAL('fgen1').Waveform = "SINE"
-lab.HAL('fgen1').Frequency = 100e3
-lab.HAL('fgen1').Amplitude = 2
-lab.HAL('fgen1').Offset = 0.0
-lab.HAL('fgen1').Output = False
 
 input('press <ENTER> to continue')

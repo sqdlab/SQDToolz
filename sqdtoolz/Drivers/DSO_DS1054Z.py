@@ -99,6 +99,8 @@ class RigolDS1054ZChannel(InstrumentChannel):
         if numPts < 250000:
             self.root_instrument.write(f':WAV:STAR 1')
             self.root_instrument.write(f':WAV:STOP {numPts}')
+            while (not self.ask('*OPC?')):
+                pass
             raw_trace_val = get_raw_data()
         else:
             numCycls = int(numPts / 250000)
@@ -155,13 +157,11 @@ class DSO_DS1054Z(VisaInstrument):
                            get_parser=float
                            )
 
-        self._allowed_mem_depths = ['12000', '120000', '1200000', '12000000', '24000000']
         self.add_parameter('mem_depth',
                            get_cmd=':ACQuire:MDEPth?',
                            set_cmd=':ACQuire:MDEPth {}',
-                           vals = vals.Enum(*self._allowed_mem_depths),
+                           get_parser=int
                            )
-        self._allowed_mem_depths_int = np.array([int(x) for x in self._allowed_mem_depths])
 
         self.add_parameter('waveform_xorigin',
                            get_cmd='WAVeform:XORigin?',
@@ -289,6 +289,18 @@ class DSO_DS1054Z(VisaInstrument):
 
         self.connect_message()
 
+    def _get_allowed_memory_depths(self):
+        num_chs_enabled = 0
+        for ch in self._input_channels:
+            if self._input_channels[ch].Enabled:
+                num_chs_enabled += 1
+        if num_chs_enabled > 2:
+            return [3000, 30000, 300000, 3000000, 6000000]
+        elif num_chs_enabled == 2:
+            return [6000, 60000, 600000, 6000000, 12000000]
+        else:
+            return [12000, 120000, 1200000, 12000000, 24000000]
+
     def _get_num_pts(self):
         return int(self.ask(':WAVeform:PREamble?').split(',')[2])
 
@@ -332,8 +344,9 @@ class DSO_DS1054Z(VisaInstrument):
     @NumSamples.setter
     def NumSamples(self, num_points):
         self.write(':RUN')
-        min_ind = np.argmin(np.abs(self._allowed_mem_depths_int - num_points))
-        self.mem_depth(self._allowed_mem_depths[min_ind])
+        allowed_mem_depths = np.array(self._get_allowed_memory_depths())
+        min_ind = np.argmin(np.abs(allowed_mem_depths - num_points))
+        self.mem_depth(allowed_mem_depths[min_ind])
         self.write(':STOP')
 
     @property
@@ -373,6 +386,9 @@ class DSO_DS1054Z(VisaInstrument):
                 time.sleep(0.01)
                 break
         assert triggered, "Timed out trying to find trigger."
+        while (not self.ask('*OPC?')):
+            pass
+        time.sleep(0.1)
 
         cur_processor = kwargs.get('data_processor', None)
 

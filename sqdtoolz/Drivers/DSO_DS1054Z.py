@@ -383,12 +383,12 @@ class DSO_DS1054Z(VisaInstrument):
         for m in range(1000):
             if self.trigger_status() == 'STOP':
                 triggered = True
-                time.sleep(0.01)
                 break
+            time.sleep(0.01)
         assert triggered, "Timed out trying to find trigger."
         while (not self.ask('*OPC?')):
             pass
-        time.sleep(0.1)
+        time.sleep(0.5)
 
         cur_processor = kwargs.get('data_processor', None)
 

@@ -25,6 +25,7 @@ import json
 import os
 import time
 import numpy as np
+import sys
 
 class customJSONencoder(json.JSONEncoder):
     def default(self, obj):
@@ -432,6 +433,12 @@ class Laboratory:
             new_rec_params += [(new_rec_param[0], new_rec_param[1], cur_param_name)]
         kwargs['rec_params'] = new_rec_params
 
+        #Setup marker for running Experiment (mostly to notify the ExperimentViewer...)
+        exp_params = {'Configuration': expt_obj.ConfigName, 'SPECs': self.CONFIG(expt_obj.ConfigName).get_spec_names()}
+        expt_param_file = self._save_dir + '_cur_exp.json'
+        with open(expt_param_file, 'w') as outfile:
+            json.dump(exp_params, outfile, indent=4, cls=customJSONencoder)
+
         ret_vals = expt_obj._run(cur_exp_path, sweep_vars, ping_iteration=self._update_progress_bar, **kwargs)
         self._group_dir['ExptIndex'] += 1
 
@@ -451,6 +458,10 @@ class Laboratory:
         
         #Save Laboratory Parameters
         self.save_variables(cur_exp_path)
+
+        #Delete the currently running experiment parameters file...
+        if os.path.exists(expt_param_file):
+            os.remove(expt_param_file)
 
         self.update_state()
         return ret_vals
@@ -558,12 +569,13 @@ class Laboratory:
         if self.UpdateStateEnabled:
             self.save_laboratory_config(self._save_dir, '_last_state.txt')
             self.save_variables(self._save_dir, '_last_vars.txt')
-            self.save_experiment_configs(self._save_dir, '_last_exp_configs.txt')
+        self.save_experiment_configs(self._save_dir, '_last_exp_configs.txt')   #This is just a JSON transfer...
     def open_browser(self):
         cur_dir = os.path.dirname(os.path.realpath(__file__)).replace('\\','/')
         drive = cur_dir[0:2]
         full_abs_path = os.path.abspath(self._save_dir) + '/'    #Extra / as abspath doesn't include it...
-        os.system(f'start \"temp\" cmd /k \"{drive} && cd \"{cur_dir}/Utilities\" && python ExperimentViewer.py \"{full_abs_path}\"\"')
+        current_python_interpreter_path = sys.executable
+        os.system(f'start \"temp\" cmd /k \"{drive} && cd \"{cur_dir}/Utilities\" && {current_python_interpreter_path} ExperimentViewer.py \"{full_abs_path}\"\"')
 
     def _kill_signal_send_internal(self):
         self._kill_internal = True

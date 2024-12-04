@@ -176,8 +176,8 @@ class TransmonGates(QubitGatesBase):
                     if self._arb_rot_func == 'simple_sine':
                         angle = cur_gate[1] % (2*np.pi)
                         if angle > np.pi:
-                            angle = angle - 2*np.pi
-                        ampl =  self._spec_qubit['GE X-Gate Time'].Value * angle/(np.pi)
+                            angle = angle - 2*np.pi     #i.e. negative angle creates a negative sign on a cosine in cos(wt+phi)
+                        ampl =  self._spec_qubit['GE X-Gate Amplitude'].Value * angle/(np.pi)
                     #
                     if cur_gate[0] == 'Rx':
                         ret_gates.append(self._env_func(f"{gate_set_prefix}{m}", self._wfmt_qubit_drive.apply(phase_offset=phase_offset), self._spec_qubit['GE X-Gate Time'].Value, ampl))

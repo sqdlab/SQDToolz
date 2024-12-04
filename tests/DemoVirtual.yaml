@@ -1,0 +1,15 @@
+instruments:
+  virACQ:
+    type: sqdtoolz.Drivers.dummyACQ.DummyACQ
+  virACQblowup:
+    type: sqdtoolz.Drivers.dummyACQ.DummyACQ
+    init:
+      blow_up_path: 'test_save_dir/blowup.txt'
+  virDDG:
+    type: sqdtoolz.Drivers.dummyDDG.DummyDDG
+  virAWG:
+    type: sqdtoolz.Drivers.dummyAWG.DummyAWG
+  virMWS:
+    type: sqdtoolz.Drivers.dummyGENmwSource.DummyGENmwSrc
+  virMWS2:
+    type: sqdtoolz.Drivers.dummyGENmwSource.DummyGENmwSrc

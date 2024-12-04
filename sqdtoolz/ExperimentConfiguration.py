@@ -42,6 +42,9 @@ class ExperimentConfiguration:
             else:
                 self._hal_ACQ = None
 
+            assert isinstance(list_spec_names, list), "Must give SPECs as a LIST of SPEC names."
+            for cur_spec in list_spec_names:
+                assert isinstance(cur_spec, str), "Each SPEC in the list must be given as a name (i.e. a STRING)."
             self._list_spec_names = list_spec_names[:]
 
             self._dict_wfm_map = {'waveforms' : {}, 'digital' : {} }
@@ -288,6 +291,8 @@ class ExperimentConfiguration:
                 spec_obj.commit_entries()
         
 
+    def get_spec_names(self):
+        return self._list_spec_names[:]
 
     def edit(self):
         self.init_instruments()

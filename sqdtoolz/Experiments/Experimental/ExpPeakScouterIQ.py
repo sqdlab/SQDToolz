@@ -21,7 +21,6 @@ class ExpPeakScouterIQ(Experiment):
     def _run(self, file_path, sweep_vars=[], **kwargs):
         assert len(sweep_vars) == 1, "Can only sweep one variable in this experiment."
         self._cur_param_name = sweep_vars[0][0].Name
-        self._file_path = file_path
         return super()._run(file_path, sweep_vars, **kwargs)
 
     def _post_process(self, data):

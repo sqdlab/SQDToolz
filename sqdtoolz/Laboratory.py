@@ -46,6 +46,9 @@ class Laboratory:
 
         #Convert Windows backslashes into forward slashes (should be compatible with MAC/Linux then...)
         self._save_dir = save_dir.replace('\\','/')
+        if self._save_dir[-1] != '/':
+            self._save_dir += '/'
+            print("Warning: Added a slash / to the end of the path; the save-directory must be a valid path.")
         self._group_dir = {'Dir':"", 'InitDir':"", 'SweepQueue':[], 'ExptIndex' : -1}
 
         Path(self._save_dir).mkdir(parents=True, exist_ok=True)

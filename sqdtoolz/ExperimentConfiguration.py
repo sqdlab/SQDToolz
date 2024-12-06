@@ -362,7 +362,7 @@ class ExperimentConfiguration:
                 #Translate the current trigger edges by the previous trigger edges
                 cur_gated_segments = np.concatenate( [cur_gated_segments + prev_time for prev_time in all_times] )
                 all_times = np.concatenate( [cur_times + prev_time for prev_time in all_times] )
-        return (all_times, cur_gated_segments)
+        return (all_times, cur_gated_segments, cur_trig_srcs)
 
     def plot(self):
         '''
@@ -405,7 +405,10 @@ class ExperimentConfiguration:
 
         for cur_obj in disp_objs[::-1]:
             if isinstance(cur_obj, TriggerInput):
-                trig_times, seg_times = self.get_trigger_edges(cur_obj)
+                trig_times, seg_times, cur_trig_srcs = self.get_trigger_edges(cur_obj)
+                for cur_trig_src in cur_trig_srcs:
+                    cur_HAL = cur_trig_src[0]._get_parent_HAL()
+                    assert cur_HAL in self._list_HALs, f"HAL \"{cur_HAL.Name}\" is a trigger dependency in the tree for \"{cur_obj.Name}\". But \"{cur_HAL.Name}\" is not listed in this CONFIG {self.Name}."
             else:
                 #TODO: Flag the root sources in diagram?
                 trig_times = np.array([0.0])

@@ -39,7 +39,7 @@ Main structure:
     - [Data retrieval](Data_IO.md)
     - [Data fitting (Basic)](Data_Fitting.md)
     - [Data fitting (RF resonators)](Data_Fitting_RF.md)
-
+    - [Data retrieval, fitting, and plotting (RF resonator power sweeps)](Resonator_Tools.md)
 
 Other advanced use-cases:
 - [Synthesising SQDToolz HDF5 data files](Data_Write.md)

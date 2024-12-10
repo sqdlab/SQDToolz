@@ -430,7 +430,7 @@ class ResonatorPowerSweep:
         self.fit_data = df_filtered
 
     # basic data plot
-    def plotBokeh_n_ph(
+    def plotBokeh_Qi_n_ph(
         self,
         with_fit=True,
         with_errorbars=True,
@@ -523,18 +523,19 @@ class ResonatorPowerSweep:
         # legend
         self.fig_ph.legend.location = legend_location
         # title
-        self.fig_ph.title = f"{self.name}"
+        self.fig_ph.title = f"{self.name}: " + r"$Q_i$"
         # show plot
         if show_plot == True:
             show(self.fig_ph)
         # save plot
         if save_plot == True:
-            export_path = os.path.join(self.save_path, 'n_ph.png')
+            export_path = os.path.join(self.save_path, 'Qi_bokeh.png')
             export.export_png(obj=self.fig_ph, filename=export_path)
             print(f"Plot saved at {export_path}")
 
     # Plotting with matplotlib (default)
-    def plotMpl_n_ph(self,
+    # TODO: merge with previous function and use backend option for plot method
+    def plotMpl_Qi_n_ph(self,
                      with_fit=True,
                      with_errorbars=True,
                      legend_location="lower right",
@@ -542,7 +543,7 @@ class ResonatorPowerSweep:
                      save_plot=True
         ):
         """
-        Make Bokeh plot from self.fit_data: n_ph vs. Qi
+        Make matplotlib plot from self.fit_data: n_ph vs. Qi
         """
         assert isinstance(self.fit_data, pd.DataFrame)
         self._colourmap = plt.cm.viridis
@@ -623,9 +624,78 @@ class ResonatorPowerSweep:
             plt.show()
         # save plot
         if save_plot == True:
-            export_path = os.path.join(self.save_path, 'n_ph_mpl.png')
+            export_path = os.path.join(self.save_path, 'Qi_mpl.png')
             self.fig_ph_mpl.savefig(export_path)
             print(f"Plot saved at {export_path}")
+        
+    def plot_fr_n_ph(self, backend="matplotlib", with_errorbars=True, legend_location="bottom_right", show_plot=True, save_plot=True, as_deviation=True):
+        # check backend is valid
+        assert backend in ["matplotlib", "bokeh"], "Please choose 'matplotlib' or 'bokeh' as the backend"
+        df_rev = self.fit_data[::-1]
+        if backend == "bokeh":
+            p = figure(title=f"{self.name}: Frequency", x_axis_type="log", x_axis_label=r"Photon number $$\langle n \rangle$$")
+            if as_deviation == True:
+                p.yaxis.axis_label = r"Frequency deviation (Hz)" 
+            else: 
+                p.yaxis.axis_label = r"Frequency (Hz)"
+            self._colourmap = Viridis256
+            # loop through frequency bins
+            for i, freq_bin_cur in enumerate(self.freq_bin_labels):
+                # initialise plot data for new resonator
+                n_ph, fr, fr_upper, fr_lower, fr_err = [], [], [], [], []
+                f = float(freq_bin_cur.split()[0]) * 1e9  # Hz
+                first_of_freq = True
+                for _, row in df_rev.iterrows():
+                    # add measurement from self.fit_data if in current bin
+                    if row["freq bin"] == freq_bin_cur:
+                        if (first_of_freq == True) and (as_deviation == True):
+                            fr_comp = row["fr"]
+                            first_of_freq = False
+                        n_ph.append(row["n_ph"])
+                        fr.append(row["fr"] - fr_comp) if (as_deviation == True) else fr.append(row["fr"])
+                        fr_err.append(row["fr_err"])
+                        fr_upper.append(row["fr"] + row["fr_err"])
+                        fr_lower.append(row["fr"] - row["fr_err"])
+                # convert to ColumnDataSource for Bokeh plotting
+                source = ColumnDataSource(
+                    data=dict(n_ph=n_ph, fr=fr, upper=fr_upper, lower=fr_lower, fr_err=fr_err)
+                )
+                # do plotting
+                color = self._colourmap[i * len(self._colourmap) // self.num_resonators]
+                p.scatter(
+                    source=source,
+                    x="n_ph",
+                    y="fr",
+                    size=10,
+                    color=color,
+                    alpha=0.7,
+                    legend_label=f"{freq_bin_cur}",
+                )
+                # errorbars
+                if with_errorbars == True:
+                    errorbars = Whisker(
+                        base="n_ph",
+                        upper="upper",
+                        lower="lower",
+                        source=source,
+                        line_color=color,
+                        line_alpha=0.7,
+                        line_cap="round",
+                        line_width="2",
+                        upper_head=TeeHead(line_color=color, line_alpha=0.7, size=6),
+                        lower_head=TeeHead(line_color=color, line_alpha=0.7, size=6),
+                    )
+                    p.add_layout(errorbars)
+            # legend
+            p.legend.location = legend_location
+            # show plot
+            if show_plot == True:
+                show(p)
+            # save plot
+            if save_plot == True:
+                export_path = os.path.join(self.save_path, 'fr_bokeh.png')
+                export.export_png(obj=p, filename=export_path)
+                print(f"Plot saved at {export_path}")
 
     # TLS fit
     @staticmethod
@@ -780,3 +850,6 @@ class ResonatorPowerSweep:
         else: 
             df[columns_to_use].to_csv(output_path, sep="\t", index=False, float_format='%.2e')
         print(f"\nFit data written to {output_path}\n")
+
+    # TODO add n_ph vs. Qc (+ Qc err)
+    # TODO add subplot data summary function with all plots

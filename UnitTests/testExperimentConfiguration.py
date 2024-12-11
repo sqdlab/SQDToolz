@@ -129,7 +129,7 @@ class TestHALInstantiation(unittest.TestCase):
         #
         #Test the case where there are no trigger relations
         expConfig = ExperimentConfiguration('testConf', self.lab, 1.0, ['ddg'], 'dum_acq')
-        arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
+        arr_act, arr_act_segs, cur_trig_srcs = expConfig.get_trigger_edges(hal_acq)
         assert arr_act.size == 0, "There are erroneous trigger edges found in the current configuration."
         assert arr_act_segs.size == 0, "There are erroneous trigger segments found in the current configuration."
         #
@@ -140,7 +140,7 @@ class TestHALInstantiation(unittest.TestCase):
         expConfig = ExperimentConfiguration('testConf', self.lab, 1.0, ['ddg'], 'dum_acq')
         assert_found = False
         try:
-            arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_ddg)    
+            arr_act, arr_act_segs, cur_trig_srcs = expConfig.get_trigger_edges(hal_ddg)    
         except AssertionError:
             assert_found = True
             # assert arr_act.size == 0, "There are erroneous trigger edges found in the current configuration."
@@ -149,7 +149,7 @@ class TestHALInstantiation(unittest.TestCase):
         #Test ACQ with positive input polarity
         hal_acq.set_trigger_source(hal_ddg.get_trigger_output('A'))
         expConfig = ExperimentConfiguration('testConf', self.lab, 1.0, ['ddg'], 'dum_acq')
-        arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
+        arr_act, arr_act_segs, cur_trig_srcs = expConfig.get_trigger_edges(hal_acq)
         arr_exp = np.array([50e-9])
         assert self.arr_equality(arr_act, arr_exp), "Incorrect trigger edges returned by the get_trigger_edges function."
         arr_exp = self.round_to_samplerate(awg_wfm, np.vstack([arr_exp, arr_exp + hal_ddg.get_trigger_output('A').TrigPulseLength]).T )
@@ -159,7 +159,7 @@ class TestHALInstantiation(unittest.TestCase):
         #Test ACQ again with the same positive input polarity
         hal_acq.set_trigger_source(hal_ddg.get_trigger_output('B'))
         expConfig = ExperimentConfiguration('testConf', self.lab, 1.0, ['ddg'], 'dum_acq')
-        arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
+        arr_act, arr_act_segs, cur_trig_srcs = expConfig.get_trigger_edges(hal_acq)
         arr_exp = np.array([50e-9])
         assert self.arr_equality(arr_act, arr_exp), "Incorrect trigger edges returned by the get_trigger_edges function."
         arr_exp = self.round_to_samplerate(awg_wfm, np.vstack([arr_exp, arr_exp + hal_ddg.get_trigger_output('B').TrigPulseLength]).T )
@@ -169,7 +169,7 @@ class TestHALInstantiation(unittest.TestCase):
         #Test ACQ with negative input polarity
         hal_acq.set_trigger_source(hal_ddg.get_trigger_output('C'))
         expConfig = ExperimentConfiguration('testConf', self.lab, 1.0, ['ddg'], 'dum_acq')
-        arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
+        arr_act, arr_act_segs, cur_trig_srcs = expConfig.get_trigger_edges(hal_acq)
         arr_exp = np.array([650e-9])
         assert self.arr_equality(arr_act, arr_exp), "Incorrect trigger edges returned by the get_trigger_edges function."
         arr_exp = self.round_to_samplerate(awg_wfm, np.array([[0.0, hal_ddg.get_trigger_output('C').TrigPulseDelay]]) )
@@ -196,8 +196,11 @@ class TestHALInstantiation(unittest.TestCase):
         #Test assert flagged when including a trigger source outside that supplied into ExperimentConfiguration
         hal_acq.set_trigger_source(awg_wfm.get_output_channel(0).marker(1))
         awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('A'))
+        assert_found = False
         try:
             expConfig = ExperimentConfiguration('testConf', self.lab, 1.0, ['ddg'], 'dum_acq')
+            expConfig.plot()
+            #TODO: Make this test (i.e. the thing in plotting) more native so that it tests before that stage...
         except AssertionError:
             assert_found = True
             # assert arr_act.size == 0, "There are erroneous trigger edges found in the current configuration."
@@ -207,7 +210,7 @@ class TestHALInstantiation(unittest.TestCase):
         hal_acq.set_trigger_source(awg_wfm.get_output_channel(0).marker(1))
         awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('A'))
         expConfig = ExperimentConfiguration('testConf', self.lab, 1.0, ['ddg', 'Wfm1'], 'dum_acq')
-        arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
+        arr_act, arr_act_segs, cur_trig_srcs = expConfig.get_trigger_edges(hal_acq)
         arr_exp = self.round_to_samplerate(awg_wfm, np.array([10e-9, 1e-9*(10+20+30+45+77), 1e-9*(10+(20+30+45)*2+77*3), 1e-9*(10+(20+30+45)*3+77*6)]) + 50e-9 )
         assert self.arr_equality(arr_act, arr_exp), "Incorrect trigger edges returned by the get_trigger_edges function on including an AWG."
         arr_exp = self.round_to_samplerate(awg_wfm, np.vstack([arr_exp, arr_exp+20e-9]).T )
@@ -218,7 +221,7 @@ class TestHALInstantiation(unittest.TestCase):
         hal_acq.set_trigger_source(awg_wfm.get_output_channel(0).marker(1))
         awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('C'))
         expConfig = ExperimentConfiguration('testConf', self.lab, 1.0, ['ddg', 'Wfm1'], 'dum_acq')
-        arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
+        arr_act, arr_act_segs, cur_trig_srcs = expConfig.get_trigger_edges(hal_acq)
         arr_exp = self.round_to_samplerate(awg_wfm, np.array([10e-9, 1e-9*(10+20+30+45+77), 1e-9*(10+(20+30+45)*2+77*3), 1e-9*(10+(20+30+45)*3+77*6)]) + 650e-9 )
         assert self.arr_equality(arr_act, arr_exp), "Incorrect trigger edges returned by the get_trigger_edges function on including an AWG."
         arr_exp = self.round_to_samplerate(awg_wfm, np.vstack([arr_exp, arr_exp+20e-9]).T )
@@ -230,7 +233,7 @@ class TestHALInstantiation(unittest.TestCase):
         awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('C'))
         hal_acq.InputTriggerEdge = 0
         expConfig = ExperimentConfiguration('testConf', self.lab, 1.0, ['ddg', 'Wfm1'], 'dum_acq')
-        arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
+        arr_act, arr_act_segs, cur_trig_srcs = expConfig.get_trigger_edges(hal_acq)
         arr_exp = self.round_to_samplerate(awg_wfm, np.array([(10+20)*1e-9, 1e-9*(10+20+30+45+77+20), 1e-9*(10+(20+30+45)*2+77*3+20), 1e-9*(10+(20+30+45)*3+77*6+20)]) + 650e-9 )
         assert self.arr_equality(arr_act, arr_exp), "Incorrect trigger edges returned by the get_trigger_edges function on including an AWG."
         arr_exp = self.round_to_samplerate(awg_wfm, np.concatenate([ np.array([[650e-9, 650e-9+10e-9]]), np.vstack( [ arr_exp, arr_exp + np.array([1,2,3,4])*77e-9+(30+45)*1e-9 ] ).T ]) )
@@ -252,7 +255,7 @@ class TestHALInstantiation(unittest.TestCase):
         awg_wfm2.set_trigger_source_all(awg_wfm.get_output_channel(0).marker(1))
         awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('C'))
         expConfig = ExperimentConfiguration('testConf', self.lab, 1.0, ['ddg', 'Wfm1', 'Wfm2'], 'dum_acq')
-        arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
+        arr_act, arr_act_segs, cur_trig_srcs = expConfig.get_trigger_edges(hal_acq)
         temp = np.array([10e-9, 1e-9*(10+20+30+45+77), 1e-9*(10+(20+30+45)*2+77*3), 1e-9*(10+(20+30+45)*3+77*6)])
         arr_exp = self.round_to_samplerate(awg_wfm, np.sort(np.concatenate( [(650+20)*1e-9 + temp, (650+20+27+20)*1e-9 + temp])) )
         assert self.arr_equality(arr_act, arr_exp), "Incorrect trigger edges returned by the get_trigger_edges function on including 2 AWGs."
@@ -265,7 +268,7 @@ class TestHALInstantiation(unittest.TestCase):
         awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('C'))
         hal_acq.InputTriggerEdge = 0
         expConfig = ExperimentConfiguration('testConf', self.lab, 2e-6, ['ddg', 'Wfm1', 'Wfm2'], 'dum_acq')
-        arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
+        arr_act, arr_act_segs, cur_trig_srcs = expConfig.get_trigger_edges(hal_acq)
         temp = np.array([10e-9, 1e-9*(10+20+30+45+77), 1e-9*(10+(20+30+45)*2+77*3), 1e-9*(10+(20+30+45)*3+77*6)])
         arr_exp = self.round_to_samplerate(awg_wfm, np.sort(np.concatenate( [(650+0)*1e-9 + temp, (650+20+27)*1e-9 + temp])) )
         assert self.arr_equality(arr_act, arr_exp), "Incorrect trigger edges returned by the get_trigger_edges function on including 2 AWGs."
@@ -273,7 +276,17 @@ class TestHALInstantiation(unittest.TestCase):
         assert self.arr_equality(arr_act_segs[:,0], arr_exp[:,0]), "Incorrect trigger segment intervals returned by the get_trigger_edges function on including 2 AWGs."
         assert self.arr_equality(arr_act_segs[:,1], arr_exp[:,1]), "Incorrect trigger segment intervals returned by the get_trigger_edges function on including 2 AWGs."
         hal_acq.InputTriggerEdge = 1
-        
+
+        #Try when having a dependency HAL not on the list...
+        expConfig = ExperimentConfiguration('testConf', self.lab, 2e-6, ['Wfm1', 'Wfm2'], 'dum_acq')
+        assert_found = False
+        try:
+            expConfig.plot()
+        except AssertionError:
+            assert_found = True
+            # assert arr_act.size == 0, "There are erroneous trigger edges found in the current configuration."
+        assert assert_found, "ExperimentConfiguration failed to trigger an assertion error when omitting a trigger source in the supplied HAL objects."
+
         self.cleanup()
 
     def test_MWsource(self):
@@ -325,7 +338,7 @@ class TestHALInstantiation(unittest.TestCase):
         awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('C'))
         hal_acq.InputTriggerEdge = 0
         expConfig = ExperimentConfiguration('testConf', self.lab, 2e-6, ['ddg', 'Wfm1', 'Wfm2', 'MW-Src'], 'dum_acq')
-        arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
+        arr_act, arr_act_segs, cur_trig_srcs = expConfig.get_trigger_edges(hal_acq)
         temp = np.array([10e-9, 1e-9*(10+20+30+45+77), 1e-9*(10+(20+30+45)*2+77*3), 1e-9*(10+(20+30+45)*3+77*6)])
         arr_exp = self.round_to_samplerate(awg_wfm, np.sort(np.concatenate( [(650+0)*1e-9 + temp, (650+20+27)*1e-9 + temp])) )
         assert self.arr_equality(arr_act, arr_exp), "Incorrect trigger edges returned by the get_trigger_edges function on including 2 AWGs and MW-Source."
@@ -343,7 +356,7 @@ class TestHALInstantiation(unittest.TestCase):
         awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('C'))
         hal_acq.InputTriggerEdge = 0
         expConfig = ExperimentConfiguration('testConf', self.lab, 2e-6, ['ddg', 'Wfm1', 'Wfm2', 'MW-Src'], 'dum_acq')
-        arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
+        arr_act, arr_act_segs, cur_trig_srcs = expConfig.get_trigger_edges(hal_acq)
         temp = np.array([10e-9, 1e-9*(10+20+30+45+77), 1e-9*(10+(20+30+45)*2+77*3), 1e-9*(10+(20+30+45)*3+77*6)])
         arr_exp = self.round_to_samplerate(awg_wfm, np.sort(np.concatenate( [(650+0)*1e-9 + temp, (650+20+27)*1e-9 + temp])) )
         assert self.arr_equality(arr_act, arr_exp), "Incorrect trigger edges returned by the get_trigger_edges function on including 2 AWGs and MW-Source."
@@ -360,7 +373,7 @@ class TestHALInstantiation(unittest.TestCase):
         awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('C'))
         hal_acq.InputTriggerEdge = 0
         expConfig = ExperimentConfiguration('testConf', self.lab, 2e-6, ['ddg', 'Wfm1', 'Wfm2', 'MW-Src'], 'dum_acq')
-        arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
+        arr_act, arr_act_segs, cur_trig_srcs = expConfig.get_trigger_edges(hal_acq)
         temp = np.array([10e-9, 1e-9*(10+20+30+45+77), 1e-9*(10+(20+30+45)*2+77*3), 1e-9*(10+(20+30+45)*3+77*6)])
         arr_exp = self.round_to_samplerate(awg_wfm, np.sort(np.concatenate( [(650+0)*1e-9 + temp, (650+20+27)*1e-9 + temp])) )
         assert self.arr_equality(arr_act, arr_exp), "Incorrect trigger edges returned by the get_trigger_edges function on including 2 AWGs and MW-Source."
@@ -377,7 +390,7 @@ class TestHALInstantiation(unittest.TestCase):
         awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('C'))
         hal_acq.InputTriggerEdge = 0
         expConfig = ExperimentConfiguration('testConf', self.lab, 2e-6, ['ddg', 'Wfm1', 'Wfm2', 'MW-Src'], 'dum_acq')
-        arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_mw)
+        arr_act, arr_act_segs, cur_trig_srcs = expConfig.get_trigger_edges(hal_mw)
         arr_exp = self.round_to_samplerate(awg_wfm, np.array([1e-9*(10+20+30+45), 1e-9*(10+(20+30+45)*2+77), 1e-9*(10+(20+30+45)*3+77*3), 1e-9*(10+(20+30+45)*4+77*6)]) + 650e-9 )
         assert self.arr_equality(arr_act, arr_exp), "Incorrect trigger edges returned by the get_trigger_edges function on including 2 AWGs and MW-Source."
         arr_exp = self.round_to_samplerate(awg_wfm, np.vstack([arr_exp, arr_exp + np.array([1,2,3,4])*77e-9]).T )
@@ -394,7 +407,7 @@ class TestHALInstantiation(unittest.TestCase):
         awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('C'))
         hal_acq.InputTriggerEdge = 0
         expConfig = ExperimentConfiguration('testConf', self.lab, 2e-6, ['ddg', 'Wfm1', 'Wfm2', 'MW-Src'], 'dum_acq')
-        arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_mw)
+        arr_act, arr_act_segs, cur_trig_srcs = expConfig.get_trigger_edges(hal_mw)
         arr_exp = self.round_to_samplerate(awg_wfm, np.array([0.0, 1e-9*(10+20+30+45+77), 1e-9*(10+(20+30+45)*2+77*3), 1e-9*(10+(20+30+45)*3+77*6)]) + 650e-9 )
         assert self.arr_equality(arr_act, arr_exp), "Incorrect trigger edges returned by the get_trigger_edges function on including 2 AWGs and MW-Source."
         arr_exp = self.round_to_samplerate(awg_wfm, np.vstack([arr_exp, arr_exp + np.array([10+20+30+45,20+30+45,20+30+45,20+30+45])*1e-9]).T )
@@ -471,7 +484,7 @@ class TestHALInstantiation(unittest.TestCase):
         wfm.set_digital_trigger('sequence', 50e-9)
         leVars = expConfig.update_waveforms(wfm, [('init_phase', wfm.get_waveform_segment('qubit', 'init').get_WFMT(), 'phase'),
                                                   ('init2_ampl', wfm.get_waveform_segment('qubit', 'init2'), 'Amplitude')])
-        arr_act, arr_act_segs = expConfig.get_trigger_edges(awg_wfm2.get_output_channel(0).marker(0))
+        arr_act, arr_act_segs, cur_trig_srcs = expConfig.get_trigger_edges(awg_wfm2.get_output_channel(0).marker(0))
         arr_exp = self.round_to_samplerate(awg_wfm, np.array([20e-9+30e-9+45e-9]) + 650e-9 )
         assert self.arr_equality(arr_act, arr_exp), "Incorrect trigger edges when using waveform mapping."
         #Check returned variables
@@ -502,7 +515,7 @@ class TestHALInstantiation(unittest.TestCase):
         wfm.set_digital_segments('readout', 'qubit', ['zero2'])
         wfm.set_digital_trigger('sequence', 50e-9)
         expConfig.update_waveforms(wfm)
-        arr_act, arr_act_segs = expConfig.get_trigger_edges(awg_wfm2.get_output_channel(0).marker(0))
+        arr_act, arr_act_segs, cur_trig_srcs = expConfig.get_trigger_edges(awg_wfm2.get_output_channel(0).marker(0))
         arr_exp = self.round_to_samplerate(awg_wfm, np.array([20e-9+30e-9+45e-9]) + 650e-9 )
         assert self.arr_equality(arr_act, arr_exp), "Incorrect trigger edges when using waveform mapping."
         #
@@ -530,7 +543,7 @@ class TestHALInstantiation(unittest.TestCase):
         wfm.set_digital_segments('readout', 'qubit1', ['zero1'])
         wfm.set_digital_segments('sequence', 'qubit2', ['init2X'])
         expConfig.update_waveforms(wfm)
-        arr_act, arr_act_segs = expConfig.get_trigger_edges(awg_wfm2.get_output_channel(0).marker(0))
+        arr_act, arr_act_segs, cur_trig_srcs = expConfig.get_trigger_edges(awg_wfm2.get_output_channel(0).marker(0))
         arr_exp = self.round_to_samplerate(awg_wfm, np.array([20e-9]) + 650e-9 )
         assert self.arr_equality(arr_act, arr_exp), "Incorrect trigger edges when using waveform mapping on multiple waveforms."
         #
@@ -558,7 +571,7 @@ class TestHALInstantiation(unittest.TestCase):
         wfm.set_digital_segments('readout', 'qubit2', ['init2X'])
         wfm.set_digital_segments('sequence', 'qubit1', ['zero1'])
         expConfig.update_waveforms(wfm)
-        arr_act, arr_act_segs = expConfig.get_trigger_edges(awg_wfm2.get_output_channel(0).marker(0))
+        arr_act, arr_act_segs, cur_trig_srcs = expConfig.get_trigger_edges(awg_wfm2.get_output_channel(0).marker(0))
         arr_exp = self.round_to_samplerate(awg_wfm, np.array([65e-9]) + 650e-9 )
         assert self.arr_equality(arr_act, arr_exp), "Incorrect trigger edges when using waveform mapping on multiple waveforms."
         #Check the assert triggers if the waveforms are of different size...
@@ -601,7 +614,7 @@ class TestHALInstantiation(unittest.TestCase):
         wfm.set_digital_segments('readout', 'qubit1', ['init2'])
         wfm.set_digital_segments('sequence', 'qubit1', ['zero2'])
         expConfig.update_waveforms(wfm)
-        arr_act, arr_act_segs = expConfig.get_trigger_edges(awg_wfm2.get_output_channel(0).marker(0))
+        arr_act, arr_act_segs, cur_trig_srcs = expConfig.get_trigger_edges(awg_wfm2.get_output_channel(0).marker(0))
         arr_exp = self.round_to_samplerate(awg_wfm, np.array([20e-9+58e-9]) + 650e-9 )
         assert self.arr_equality(arr_act, arr_exp), "Incorrect trigger edges when using an elastic waveform and waveform mapping on multiple waveforms."
         #
@@ -631,7 +644,7 @@ class TestHALInstantiation(unittest.TestCase):
         wfm.set_digital_segments('readout', 'qubit2', ['init2X'])
         wfm.set_digital_segments('sequence', 'qubit1', ['zero1'])
         expConfig.update_waveforms(wfm)
-        arr_act, arr_act_segs = expConfig.get_trigger_edges(awg_wfm2.get_output_channel(0).marker(0))
+        arr_act, arr_act_segs, cur_trig_srcs = expConfig.get_trigger_edges(awg_wfm2.get_output_channel(0).marker(0))
         arr_exp = self.round_to_samplerate(awg_wfm, np.array([65e-9]) + 650e-9 )
         assert self.arr_equality(arr_act, arr_exp), "Incorrect trigger edges when using an elastic waveform and waveform mapping on multiple waveforms."
         #Check the assert triggers if the waveforms are of different size...
@@ -1045,5 +1058,5 @@ class TestSaveLoad(unittest.TestCase):
 
 if __name__ == '__main__':
     temp = TestHALInstantiation()
-    temp.test_AWG_Mapping()
+    temp.test_get_trigger_edges()#test_AWG_Mapping()
     unittest.main()

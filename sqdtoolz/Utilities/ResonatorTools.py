@@ -204,6 +204,9 @@ class ResonatorPowerSweep:
                 else:
                     # add line attenuation by dictionary
                     if self.power_dict != None:
+                        if "default" not in self.power_dict.keys():
+                            self.power_dict["default"] = 0
+                            warnings.warn(f"There was no 'default' value in your given power_dict... setting default to 0 and proceeding.")
                         for label, _ in self.power_dict.items():
                             if label.casefold() in root.casefold():
                                 attenuation = (

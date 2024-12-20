@@ -1139,4 +1139,36 @@ class ResonatorPowerSweep:
             )
         print(f"\nFit data written to {output_path}\n")
 
+    @staticmethod
+    def single_circlefit(freq_data, i_vals, q_vals, power_dBm, expected_qi_lims=(0, 1e8)):
+        """
+        Method for a single circlefit. Returns fit results as a dictionary.
+        """
+        # setup circlefit
+        port = circuit.notch_port()
+        port.add_data(
+            freq_data,
+            i_vals + 1j * q_vals,
+        )
+        try:
+            port.autofit()
+        except:
+            print(f"Fitting failed.")
+            return 0
+        else:
+            # write fit results to data dictionary
+            if (
+                expected_qi_lims[0]
+                < port.fitresults["Qi_dia_corr"]
+                < expected_qi_lims[1]
+            ):
+                Qi = port.fitresults['Qi_dia_corr']
+                Qi_err = port.fitresults['Qi_dia_corr_err']
+                n_ph = port.get_photons_in_resonator(power_dBm, unit='dBm', diacorr=True)
+                Qc = port.fitresults['absQc']
+                # write fit results to plot and save
+                port.plotall(save_path="circlefit.pdf", 
+                             text=f"$Q_i=${Qi:.1e} $\pm$ {Qi_err:.1e}, $\langle n \rangle ={n_ph:.1e}$")
+            return port.fitresults
+
     # TODO add subplot data summary function with all plots

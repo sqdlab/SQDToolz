@@ -1,0 +1,5 @@
+instruments:
+  fgen:
+    type: sqdtoolz.Drivers.FGEN_FY6900.FGEN_FY6900
+    address: '/dev/ttyUSB0'
+    enable_forced_reconnect: true

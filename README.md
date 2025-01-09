@@ -22,13 +22,13 @@ The installation is done by cloning the repository and running the setup file vi
 Run Anaconda prompt and run the following command to create an environment (in this example, the name is sqdtoolz_env):
 
 ```
-conda create -n sqdtoolz_env python=3.9
+conda create -n sqdtoolz_env python=3.10
 ```
 
 Now activate the environment:
 
 ```
-activate sqdtoolz
+activate sqdtoolz_env
 ```
 
 Now choose a folder to house the SQDToolz stack (idea is to create an editable folder such that the code can be modified and pushed without upsetting the pip package manager). Once navigating to this folder, run the usual GIT clone:

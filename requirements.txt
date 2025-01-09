@@ -103,6 +103,7 @@ pyzmq                   == 22.2.1
 qcodes                  == 0.22.0
 qtconsole               == 5.1.1
 QtPy                    == 1.10.0
+resonator_tools @ git+https://github.com/6biscuits/resonator_tools.git
 requests                == 2.26.0
 requests-unixsocket     == 0.2.0
 requirements-parser     == 0.2.0

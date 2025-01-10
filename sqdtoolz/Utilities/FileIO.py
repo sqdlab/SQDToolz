@@ -132,9 +132,11 @@ class FileIOWriter:
         #Doing the columns individually - e.g. as required when using reverse for example as only some channels get filled/populated at a time...
         for x in data_pkt['data']:
             cur_data = data_pkt['data'][x].flatten()
+            assert x in self._meas_chs, f"The channel {x} was not present when initialising the FileIOWriter object. Cannot write this data as the storage has not been properly initialised."
             self._dset[cur_dset_ind*self._datapkt_size : (cur_dset_ind+1)*self._datapkt_size, self._meas_chs.index(x)] = cur_data
         #
         if self.store_timestamps:
+            #TODO: When reverse-sweeping, the time-stamps are just overwritten as they don't go to the granularity of dependent variables? Fix this with some changes?
             #Trick taken from here: https://stackoverflow.com/questions/68443753/datetime-storing-in-hd5-database
             utc_strs = np.repeat(np.datetime_as_string(np.datetime64(datetime.now()),timezone='UTC').encode('utf-8'), cur_data.shape[0])
             self._dsetTS[cur_dset_ind*self._datapkt_size : (cur_dset_ind+1)*self._datapkt_size] = utc_strs

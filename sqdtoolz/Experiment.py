@@ -27,14 +27,14 @@ class Experiment:
     def ConfigName(self):
         return self._expt_config.Name
 
-    def _init_data_file(self, filename):
+    def _init_data_file(self, filename, fileio_options):
         if self._data_file_index >= 0:
             data_file_name = f'{filename}{self._data_file_index}'
         else:
             data_file_name = filename
         if data_file_name in self._cur_filewriters:
             return
-        data_file = FileIOWriter(self._file_path + data_file_name + '.h5', store_timestamps=self._store_timestamps)
+        data_file = FileIOWriter(self._file_path + data_file_name + '.h5', store_timestamps=self._store_timestamps, **fileio_options)
         self._cur_filewriters[data_file_name] = data_file
         return data_file, data_file_name + '.h5'
 
@@ -90,12 +90,20 @@ class Experiment:
         self._data_file_index = kwargs.get('data_file_index', -1)
         self._store_timestamps = kwargs.get('store_timestamps', True)
 
-        data_file, data_file_name = self._init_data_file('data')
+        init_data_file_options = {}
+        rev_ind = kwargs.get('reverse_index', -1)
+        rev_suffix = kwargs.get('reverse_variable_suffix', '_reverse')
+        assert not (len(sweep_vars) == 0 and rev_ind >= 0), "Cannot reverse indices when no sweeping variables are given."  #Although the one below covers this, it's nicer to have a more specific error message...
+        assert rev_ind < len(sweep_vars), "Index for reversing variable does not fall within the list of given sweeping variables."
+        if rev_ind >= 0:
+            init_data_file_options['add_reverse_channels'] = True
+            init_data_file_options['reverse_channel_suffix'] = rev_suffix
+        data_file, data_file_name = self._init_data_file('data', init_data_file_options)
         
         rec_params = kwargs.get('rec_params')
         rec_params_extra = self._init_extra_rec_params()
         if len(rec_params) + len(rec_params_extra) > 0:
-            rec_data_file, rec_param_file_name = self._init_data_file('rec_params')
+            rec_data_file, rec_param_file_name = self._init_data_file('rec_params', init_data_file_options)
 
         self._init_aux_datafiles()
 
@@ -130,6 +138,7 @@ class Experiment:
         else:
             sweep_vars2 = []
             sweepEx = {}
+            assert rev_ind == -1 or rev_ind >= 0, "The parameter reverse_index must be supplied as a non-negative indexing integer."
             for ind_var, cur_var in enumerate(sweep_vars):
                 assert isinstance(cur_var, tuple) or isinstance(cur_var, list), "Sweeping variables must be given as a LIST of TUPLEs: [(VAR1, range1), (VAR2, range2), ...]"
                 if len(cur_var) == 2:
@@ -149,7 +158,9 @@ class Experiment:
 
             if not kill_signal():
                 sweep_arrays = [x[1] for x in sweep_vars2]
-                self._sweep_shape = [x[1].size for x in sweep_vars2]
+                if rev_ind >= 0:
+                    sweep_arrays[rev_ind] = np.concatenate([sweep_arrays[rev_ind], sweep_arrays[rev_ind][::-1]])
+                self._sweep_shape = [x.size for x in sweep_arrays]
                 self._sweep_grids = np.meshgrid(*sweep_arrays)
                 self._sweep_grids = np.array(self._sweep_grids)
                 axes = np.arange(len(self._sweep_grids.shape))
@@ -162,6 +173,7 @@ class Experiment:
                 
                 #Setup permutations on the sweeping orders:        
                 sweep_orders = kwargs.get('sweep_orders', [])
+                assert not (len(sweep_orders) > 0 and rev_ind >= 0), "Cannot supply reverse_index and sweep_orders simultaneously."
                 swp_order = np.arange(self._sweep_grids.shape[0])
                 for cur_order in sweep_orders:
                     assert isinstance(cur_order, ExperimentSweepBase), "The argument sweep_orders must be specified as a list of ExpSwp* (i.e. ExperimentSweepBase) objects."
@@ -192,11 +204,16 @@ class Experiment:
                     cur_raw_data = self._expt_config.get_data()
                     self._data = cur_raw_data.pop('data')
                     for x in cur_raw_data:
-                        self._init_data_file(x)
-                        self._cur_filewriters[x].push_datapkt(cur_raw_data, sweep_vars, dset_ind=ind_coord) #TODO: Update documentation on ACQ Data Format - i.e. for auxiliary pieces...
-                    data_file.push_datapkt(self._data, sweep_vars2, sweepEx, dset_ind=ind_coord)
+                        self._init_data_file(x, init_data_file_options)
+                        store_pkt, store_ind = self._reverse_datapkt(cur_raw_data[x], sweep_vars2, rev_ind, ind_coord)
+                        self._cur_filewriters[x].push_datapkt(store_pkt, sweep_vars2, dset_ind=store_ind) #TODO: Update documentation on ACQ Data Format - i.e. for auxiliary pieces...
+                    #
+                    store_pkt, store_ind = self._reverse_datapkt(self._data, sweep_vars2, rev_ind, ind_coord)
+                    data_file.push_datapkt(store_pkt, sweep_vars2, sweepEx, dset_ind=store_ind)
+                    #
                     if len(rec_params) > 0:
-                        rec_data_file.push_datapkt(self._prepare_rec_params(rec_params, rec_params_extra), sweep_vars2, sweepEx, dset_ind=ind_coord)
+                        store_pkt, store_ind = self._reverse_datapkt(self._prepare_rec_params(rec_params, rec_params_extra), sweep_vars2, rev_ind, ind_coord)
+                        rec_data_file.push_datapkt(store_pkt, sweep_vars2, sweepEx, dset_ind=store_ind)
                     self._sweep_vars = sweep_vars2
                     self._mid_process()
                     self._data = None
@@ -214,6 +231,24 @@ class Experiment:
         self._cur_names = []
 
         return FileIOReader(file_path + data_file_name)
+
+    def _reverse_datapkt(self, datapkt, sweep_vars, rev_ind, ind_coord):
+        if rev_ind < 0:
+            return datapkt, ind_coord
+        sweep_inds = list(np.unravel_index(ind_coord, self._sweep_shape))
+        store_shape = [x[1].size for x in sweep_vars]
+        num_swp_pts_on_reverse_var = sweep_vars[rev_ind][1].size
+        if sweep_inds[rev_ind] < num_swp_pts_on_reverse_var:
+            store_ind = np.ravel_multi_index(sweep_inds, store_shape)
+            return datapkt, store_ind    #MISTAKE HERE NEED TO SUBTRACT OFFSET
+        #
+        le_channels = [x for x in datapkt['data']]
+        for cur_ch in le_channels:
+            datapkt['data'][cur_ch + '_reverse'] = datapkt['data'].pop(cur_ch)
+        sweep_inds[rev_ind] = self._sweep_shape[rev_ind]-1 - sweep_inds[rev_ind]
+        store_ind = np.ravel_multi_index(sweep_inds, store_shape)
+        return datapkt, store_ind
+
 
     def _prepare_rec_params(self, rec_params, rec_params_extra):
         ret_data = {

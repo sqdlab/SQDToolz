@@ -9,6 +9,7 @@ This article covers:
 - [Basic Sweeps](#basic-sweeps)
 - [One-Many Sweeps](#one-many-sweeps)
 - [Changing the sampled order in sweeps](#changing-the-sampled-order-in-sweeps)
+- [Reverse sweeps](#reverse-sweeps)
 
 
 ## Basic sweeps
@@ -201,3 +202,110 @@ Note that **the order of entries in the HDF5 data file is the same, only the sam
 
 - The `sweep_orders` is given as a list of `ExSwp*` objects where it shuffles the order with the listed functions from left to right. That is, each shuffling transformatio is applied in ascending order.
 - See the [other article](Exp_SweepPerm.md) for a list of available `ExpSwp*` classes.
+
+
+## Reverse sweeps
+
+When measuring hysteretic devices, the data will be different when sweeping a given parameter in the forward and backward directions. When setting up a parametric sweep, one may automatically take the reverse sweep. The subsequent data is added to a different channel with the suffix `'_reverse'`. Simply add the `reverse_index` parameter to highlight the index (of the sweeping parameter in the list) to reverse when running the experiment:
+
+
+```python
+#Assuming that exp is an Experiment object and lab is a Laboratory object
+lab.run_single(exp, [(lab.VAR('volt'), np.arange(-1, 1, 0.1)), (lab.VAR('flux'), np.arange(-20,20,0.1))], reverse_index=1)
+```
+
+
+```python
+lab.VAR("volt").Value = -1
+lab.VAR("flux").Value = -20
+# --- Get Data --- # store to normal channel
+lab.VAR("flux").Value = -19.9
+# --- Get Data --- # store to normal channel
+...
+lab.VAR("flux").Value = 19.8
+# --- Get Data --- # store to normal channel
+lab.VAR("flux").Value = 19.9
+# --- Get Data --- # store to normal channel
+lab.VAR("flux").Value = 19.9
+# --- Get Data --- # store to reverse channel
+lab.VAR("flux").Value = 19.8
+# --- Get Data --- # store to reverse channel
+...
+lab.VAR("flux").Value = -20
+# --- Get Data --- # store to reverse channel
+
+lab.VAR("volt").Value = -0.9
+lab.VAR("flux").Value = -20
+# --- Get Data --- # store to normal channel
+lab.VAR("flux").Value = -19.9
+# --- Get Data --- # store to normal channel
+...
+lab.VAR("flux").Value = 19.8
+# --- Get Data --- # store to normal channel
+lab.VAR("flux").Value = 19.9
+# --- Get Data --- # store to normal channel
+lab.VAR("flux").Value = 19.9
+# --- Get Data --- # store to reverse channel
+lab.VAR("flux").Value = 19.8
+# --- Get Data --- # store to reverse channel
+...
+lab.VAR("flux").Value = -20
+# --- Get Data --- # store to reverse channel
+
+...
+```
+
+However, if `reverse_index=0`:
+
+```python
+lab.VAR("volt").Value = -1
+lab.VAR("flux").Value = -20
+# --- Get Data --- # store to normal channel
+lab.VAR("flux").Value = -19.9
+# --- Get Data --- # store to normal channel
+...
+lab.VAR("flux").Value = 19.8
+# --- Get Data --- # store to normal channel
+
+lab.VAR("volt").Value = -0.9
+lab.VAR("flux").Value = -20
+# --- Get Data --- # store to normal channel
+lab.VAR("flux").Value = -19.9
+# --- Get Data --- # store to normal channel
+...
+lab.VAR("flux").Value = 19.8
+# --- Get Data --- # store to normal channel
+
+...
+
+lab.VAR("volt").Value = 0.9
+lab.VAR("flux").Value = -20
+# --- Get Data --- # store to normal channel
+lab.VAR("flux").Value = -19.9
+# --- Get Data --- # store to normal channel
+...
+lab.VAR("flux").Value = 19.8
+# --- Get Data --- # store to normal channel
+
+lab.VAR("volt").Value = 0.9
+lab.VAR("flux").Value = -20
+# --- Get Data --- # store to reverse channel
+lab.VAR("flux").Value = -19.9
+# --- Get Data --- # store to reverse channel
+...
+lab.VAR("flux").Value = 19.8
+# --- Get Data --- # store to reverse channel
+
+lab.VAR("volt").Value = 0.8
+lab.VAR("flux").Value = -20
+# --- Get Data --- # store to reverse channel
+lab.VAR("flux").Value = -19.9
+# --- Get Data --- # store to reverse channel
+...
+lab.VAR("flux").Value = 19.8
+# --- Get Data --- # store to reverse channel
+
+...
+```
+
+Optionally, if the suffix for the reverse channels is to be changed, one may provide it in the `reverse_variable_suffix` argument (default value is `'_reverse'`) in `run_single`.

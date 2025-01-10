@@ -624,6 +624,7 @@ class TestSweeps(unittest.TestCase):
         self.lab.load_instrument('virAWG')
         self.lab.load_instrument('virMWS')
         self.lab.load_instrument('virMWS2')
+        self.lab.load_instrument('virSMU')
 
         #Initialise test-modules
         hal_acq = ACQ("dum_acq", self.lab, 'virACQ')
@@ -631,6 +632,7 @@ class TestSweeps(unittest.TestCase):
         awg_wfm = WaveformAWG("Wfm1", self.lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9)
         hal_mw = GENmwSource("MW-Src", self.lab, 'virMWS', 'CH1')
         hal_mw2 = GENmwSource("MW-Src2", self.lab, 'virMWS2', 'CH1')
+        hal_smu = GENsmu('SMU', self.lab, 'virSMU')
 
         #Reinitialise the waveform
         read_segs = []
@@ -791,6 +793,68 @@ class TestSweeps(unittest.TestCase):
 
         shutil.rmtree('test_save_dir')
         self.cleanup()
+
+
+    def test_ExpReverseSweep(self):
+        self.initialise()
+        
+        #Check basic parameter storage with 1D reverse sweep...
+        exp = Experiment("test", self.lab.CONFIG('testConf'))
+        self.lab.VAR('myFreq').Value = 5
+        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1))], delay=0.1, reverse_index=0, rec_params=[self.lab.VAR('myFreq'), self.lab.VAR('testAmpl')])
+        assert hasattr(exp, 'last_rec_params'), "Running an experiment with rec_params did not create an attribute \'last_rec_params\'."
+        assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array().shape), np.array([3,4])), "Reverse sweeping experiment in 1D did not produce the right number of dependent parameters."
+        assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array()), np.array([[5,0]*2,[5,1]*2,[5,2]*2])), "Reverse sweeping experiment in 1D did not store the correct data."
+        assert self.arr_equality(np.array(exp.last_rec_params.param_vals[0]), np.arange(0,3,1)), "Reverse sweeping experiment in 1D did not produce the right parameter values."
+        #
+        #Check basic parameter storage with 1D reverse sweep...
+        exp = Experiment("test", self.lab.CONFIG('testConf'))
+        self.lab.VAR('myFreq').Value = 2
+        self.lab.UpdateStateEnabled = False
+        self.lab.HAL('SMU').Voltage = 0
+        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1))], delay=0.1, reverse_index=0, rec_params=[self.lab.VAR('myFreq'), self.lab.VAR('testAmpl'), (self.lab.HAL('SMU'), 'Voltage')])
+        assert hasattr(exp, 'last_rec_params'), "Running an experiment with rec_params did not create an attribute \'last_rec_params\'."
+        arr = exp.last_rec_params.get_numpy_array()
+        assert self.arr_equality(np.array(arr.shape), np.array([3,6])), "Reverse sweeping experiment in 1D did not produce the right number of dependent parameters."
+        assert self.arr_equality(np.array(arr[:,0:2]), np.array([[2,0],[2,1],[2,2]])), "Reverse sweeping experiment in 1D did not store the correct data."
+        assert self.arr_equality(np.array(arr[:,3:5]), np.array([[2,0],[2,1],[2,2]])), "Reverse sweeping experiment in 1D did not store the correct data."
+        assert self.arr_equality(np.diff(np.concatenate([arr[:,2], arr[:,5][::-1]])), np.ones(5)), "Reverse sweeping experiment in 1D did not store the data in correct order."
+        assert self.arr_equality(np.array(exp.last_rec_params.param_vals[0]), np.arange(0,3,1)), "Reverse sweeping experiment in 1D did not produce the right parameter values."
+        #
+        #Check basic parameter storage with 2D reverse sweep...
+        exp = Experiment("test", self.lab.CONFIG('testConf'))
+        self.lab.VAR('myFreq').Value = 2
+        self.lab.UpdateStateEnabled = False
+        self.lab.HAL('SMU').Voltage = 0
+        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1)), (self.lab.VAR("myFreq"), np.arange(1,5,1))], delay=0.1, reverse_index=0, rec_params=[self.lab.VAR('myFreq'), self.lab.VAR('testAmpl'), (self.lab.HAL('SMU'), 'Voltage')])
+        assert hasattr(exp, 'last_rec_params'), "Running an experiment with rec_params did not create an attribute \'last_rec_params\'."
+        arr = exp.last_rec_params.get_numpy_array()
+        assert self.arr_equality(np.array(arr.shape), np.array([3,4,6])), "Reverse sweeping experiment in 1D did not produce the right number of dependent parameters."
+        assert self.arr_equality(np.array(arr[:,:,0:2]), np.array([[[1,0],[2,0],[3,0],[4,0]], [[1,1],[2,1],[3,1],[4,1]], [[1,2],[2,2],[3,2],[4,2]]])), "Reverse sweeping experiment in 1D did not store the correct data."
+        assert self.arr_equality(np.array(arr[:,:,3:5]), np.array([[[1,0],[2,0],[3,0],[4,0]], [[1,1],[2,1],[3,1],[4,1]], [[1,2],[2,2],[3,2],[4,2]]])), "Reverse sweeping experiment in 1D did not store the correct data."
+        assert self.arr_equality(np.diff(np.concatenate([np.ndarray.flatten(arr[:,:,2]), np.ndarray.flatten(arr[:,:,5][::-1])])), np.ones(23)), "Reverse sweeping experiment in 1D did not store the data in correct order."
+        assert self.arr_equality(np.array(exp.last_rec_params.param_vals[0]), np.arange(0,3,1)), "Reverse sweeping experiment in 1D did not produce the right parameter values."
+        assert self.arr_equality(np.array(exp.last_rec_params.param_vals[1]), np.arange(1,5,1)), "Reverse sweeping experiment in 1D did not produce the right parameter values."
+        #
+        #Check basic parameter storage with 2D reverse sweep...
+        exp = Experiment("test", self.lab.CONFIG('testConf'))
+        self.lab.VAR('myFreq').Value = 2
+        self.lab.UpdateStateEnabled = False
+        self.lab.HAL('SMU').Voltage = 0
+        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1)), (self.lab.VAR("myFreq"), np.arange(1,5,1))], delay=0.1, reverse_index=1, rec_params=[self.lab.VAR('myFreq'), self.lab.VAR('testAmpl'), (self.lab.HAL('SMU'), 'Voltage')])
+        assert hasattr(exp, 'last_rec_params'), "Running an experiment with rec_params did not create an attribute \'last_rec_params\'."
+        arr = exp.last_rec_params.get_numpy_array()
+        assert self.arr_equality(np.array(arr.shape), np.array([3,4,6])), "Reverse sweeping experiment in 1D did not produce the right number of dependent parameters."
+        assert self.arr_equality(np.array(arr[:,:,0:2]), np.array([[[1,0],[2,0],[3,0],[4,0]], [[1,1],[2,1],[3,1],[4,1]], [[1,2],[2,2],[3,2],[4,2]]])), "Reverse sweeping experiment in 1D did not store the correct data."
+        assert self.arr_equality(np.array(arr[:,:,3:5]), np.array([[[1,0],[2,0],[3,0],[4,0]], [[1,1],[2,1],[3,1],[4,1]], [[1,2],[2,2],[3,2],[4,2]]])), "Reverse sweeping experiment in 1D did not store the correct data."
+        assert self.arr_equality(np.diff(np.ndarray.flatten(np.concatenate([(arr[x,:,2], arr[x,:,5][::-1]) for x in range(3)]))), np.ones(23)), "Reverse sweeping experiment in 1D did not store the data in correct order."
+        assert self.arr_equality(np.array(exp.last_rec_params.param_vals[0]), np.arange(0,3,1)), "Reverse sweeping experiment in 1D did not produce the right parameter values."
+        assert self.arr_equality(np.array(exp.last_rec_params.param_vals[1]), np.arange(1,5,1)), "Reverse sweeping experiment in 1D did not produce the right parameter values."
+
+
+        shutil.rmtree('test_save_dir')
+        self.cleanup()
+
 
     def test_ExpSweepAndFullColdReload(self):
         self.initialise()
@@ -1283,6 +1347,6 @@ class TestExpSweeps(unittest.TestCase):
         self.cleanup()
 
 if __name__ == '__main__':
-    temp = TestColdReload()
-    temp.test_VARs()
+    temp = TestSweeps()
+    temp.test_ExpReverseSweep()
     unittest.main()

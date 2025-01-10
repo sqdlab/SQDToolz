@@ -27,7 +27,7 @@ class Experiment:
     def ConfigName(self):
         return self._expt_config.Name
 
-    def _init_data_file(self, filename, fileio_options):
+    def _init_data_file(self, filename, fileio_options = {}):
         if self._data_file_index >= 0:
             data_file_name = f'{filename}{self._data_file_index}'
         else:

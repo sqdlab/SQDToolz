@@ -806,6 +806,8 @@ class TestSweeps(unittest.TestCase):
         assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array().shape), np.array([3,4])), "Reverse sweeping experiment in 1D did not produce the right number of dependent parameters."
         assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array()), np.array([[5,0]*2,[5,1]*2,[5,2]*2])), "Reverse sweeping experiment in 1D did not store the correct data."
         assert self.arr_equality(np.array(exp.last_rec_params.param_vals[0]), np.arange(0,3,1)), "Reverse sweeping experiment in 1D did not produce the right parameter values."
+        res.release()
+        exp.last_rec_params.release()
         #
         #Check basic parameter storage with 1D reverse sweep...
         exp = Experiment("test", self.lab.CONFIG('testConf'))
@@ -820,6 +822,8 @@ class TestSweeps(unittest.TestCase):
         assert self.arr_equality(np.array(arr[:,3:5]), np.array([[2,0],[2,1],[2,2]])), "Reverse sweeping experiment in 1D did not store the correct data."
         assert self.arr_equality(np.diff(np.concatenate([arr[:,2], arr[:,5][::-1]])), np.ones(5)), "Reverse sweeping experiment in 1D did not store the data in correct order."
         assert self.arr_equality(np.array(exp.last_rec_params.param_vals[0]), np.arange(0,3,1)), "Reverse sweeping experiment in 1D did not produce the right parameter values."
+        res.release()
+        exp.last_rec_params.release()
         #
         #Check basic parameter storage with 2D reverse sweep...
         exp = Experiment("test", self.lab.CONFIG('testConf'))
@@ -835,6 +839,8 @@ class TestSweeps(unittest.TestCase):
         assert self.arr_equality(np.diff(np.concatenate([np.ndarray.flatten(arr[:,:,2]), np.ndarray.flatten(arr[:,:,5][::-1])])), np.ones(23)), "Reverse sweeping experiment in 1D did not store the data in correct order."
         assert self.arr_equality(np.array(exp.last_rec_params.param_vals[0]), np.arange(0,3,1)), "Reverse sweeping experiment in 1D did not produce the right parameter values."
         assert self.arr_equality(np.array(exp.last_rec_params.param_vals[1]), np.arange(1,5,1)), "Reverse sweeping experiment in 1D did not produce the right parameter values."
+        res.release()
+        exp.last_rec_params.release()
         #
         #Check basic parameter storage with 2D reverse sweep...
         exp = Experiment("test", self.lab.CONFIG('testConf'))
@@ -850,7 +856,8 @@ class TestSweeps(unittest.TestCase):
         assert self.arr_equality(np.diff(np.ndarray.flatten(np.concatenate([(arr[x,:,2], arr[x,:,5][::-1]) for x in range(3)]))), np.ones(23)), "Reverse sweeping experiment in 1D did not store the data in correct order."
         assert self.arr_equality(np.array(exp.last_rec_params.param_vals[0]), np.arange(0,3,1)), "Reverse sweeping experiment in 1D did not produce the right parameter values."
         assert self.arr_equality(np.array(exp.last_rec_params.param_vals[1]), np.arange(1,5,1)), "Reverse sweeping experiment in 1D did not produce the right parameter values."
-
+        res.release()
+        exp.last_rec_params.release()
 
         shutil.rmtree('test_save_dir')
         self.cleanup()

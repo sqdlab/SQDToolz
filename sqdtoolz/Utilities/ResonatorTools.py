@@ -343,7 +343,7 @@ class ResonatorPowerSweep:
                             f"Qi = {port.fitresults['Qi_dia_corr']:.1e}, "
                             f"P = {measurement_data['raw_data']['power']:.1f} dBm "
                             f"({measurement_data['raw_data']['line_attenuation']} dB)"
-                            f"\t-> n_ph = {n_ph:.1f}"
+                            f"\t-> n_ph = {n_ph:.1e}"
                         )
                         if self.print_log == True
                         else 0
@@ -512,7 +512,7 @@ class ResonatorPowerSweep:
                 height=600,
                 x_axis_type="log",
                 y_axis_type="log",
-                y_axis_label=r"$$Q_c$$",
+                y_axis_label=r"$$Q_i$$",
                 x_axis_label=r"Photon number " + r"$$\langle n \rangle$$",
             )
             self._colourmap = Viridis256
@@ -526,9 +526,9 @@ class ResonatorPowerSweep:
                 for i in range(self.num_resonators)
             ]
             self.ax_ph_mpl.legend(loc="best")
-            self.ax_ph_mpl.set_title(f"{self.name}: " + r"$Q_c$")
+            self.ax_ph_mpl.set_title(f"{self.name}: " + r"$Q_i$")
             self.ax_ph_mpl.set_xlabel(r"Photon number $\langle n \rangle$")
-            self.ax_ph_mpl.set_ylabel(r"$Q_c$")
+            self.ax_ph_mpl.set_ylabel(r"$Q_i$")
             self.ax_ph_mpl.set_xscale("log")
             self.ax_ph_mpl.set_yscale("log")
             self.ax_ph_mpl.grid(True, which="both", alpha=0.2, lw=1)

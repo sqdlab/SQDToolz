@@ -257,7 +257,7 @@ class ResonatorPowerSweep:
 
     # do circlefit
     def do_circlefit(
-        self, expected_qi_lims=(1e3, 1e8), remove_duplicates=True, save_fit=True
+        self, expected_qi_lims=(1e3, 1e8), remove_duplicates=True, n_ph_lims=None, save_fit=True
     ):
         """
         Does circlefits on measurement runs contained in self.data['rawdata'].
@@ -325,6 +325,7 @@ class ResonatorPowerSweep:
                         self.data[measurement_name]["fit"][key] = port.fitresults[key]
                     # include single photon power calc and power
                     single_photon_power = port.get_single_photon_limit(diacorr=True)
+                    n_ph = port.get_photons_in_resonator(power=measurement_data['raw_data']['power'], diacorr=True)
                     self.data[measurement_name]["fit"][
                         "single photon power"
                     ] = single_photon_power
@@ -337,10 +338,12 @@ class ResonatorPowerSweep:
                     fits_completed += 1
                     (
                         print(
-                            f"{fits_completed}\t{measurement_name}\t"
+                            f"{fits_completed}\t{re.split(r'[\\/]', measurement_name)[-1]}\t"
+                            f"f = {port.fitresults['fr']:.1e}, "
                             f"Qi = {port.fitresults['Qi_dia_corr']:.1e}, "
-                            f"P = {measurement_data['raw_data']['power']:.1f} dBm\t"
+                            f"P = {measurement_data['raw_data']['power']:.1f} dBm "
                             f"({measurement_data['raw_data']['line_attenuation']} dB)"
+                            f"\t-> n_ph = {n_ph:.1f}"
                         )
                         if self.print_log == True
                         else 0
@@ -363,7 +366,7 @@ class ResonatorPowerSweep:
         self.n_ph_calculator()
 
         # sort fit data and add to self.fit_data
-        self.fit_data_to_sorted_dataframe()
+        self.fit_data_to_sorted_dataframe(n_ph_lims=n_ph_lims)
         # add frequency binning to help with plotting
         self.get_frequency_bins()
         # remove duplicates
@@ -406,7 +409,7 @@ class ResonatorPowerSweep:
             )
 
     # sort data frame along multiple axes
-    def fit_data_to_sorted_dataframe(self, axes_to_sort=["fr", "power"]):
+    def fit_data_to_sorted_dataframe(self, axes_to_sort=["fr", "power"], n_ph_lims=None):
         fit_data_list = []
         first = True
         for _, measurement_data in self.data.items():
@@ -419,7 +422,12 @@ class ResonatorPowerSweep:
         df_sorted = df.sort_values(by=axes_to_sort, ascending=[True, True]).reset_index(
             drop=True
         )
-        self.fit_data = df_sorted
+        if n_ph_lims != None:
+            assert isinstance(n_ph_lims, list)
+            assert len(n_ph_lims) == 2
+            self.fit_data = df_sorted[(df_sorted['n_ph'] > n_ph_lims[0]) & (df_sorted['n_ph'] < n_ph_lims[1])]
+        else:
+            self.fit_data = df_sorted
 
     # get labels for frequency bins
     def get_frequency_bin_labels(self):

@@ -98,6 +98,20 @@ class Experiment:
         if rev_ind >= 0:
             init_data_file_options['add_reverse_channels'] = True
             init_data_file_options['reverse_channel_suffix'] = rev_suffix
+        if 'aux_sweep' in kwargs:
+            assert rev_ind < 0, "Cannot use reverse_index if using aux_sweep."
+            aux_sweep = kwargs.pop('aux_sweep')
+            assert isinstance(aux_sweep, (list, tuple)), "The aux_sweep parameter must be specified as a 3-tuple: (name, index, array)"
+            assert len(aux_sweep) == 3, "The aux_sweep parameter must be specified as a 3-tuple: (name, index, array)"
+            assert isinstance(aux_sweep[0], str), "The first element in aux_sweep must be a string denoting the name of the dataset."
+            assert isinstance(aux_sweep[1], int), "The second element in aux_sweep must be the index of the list of sweeping parameters to augment."
+            assert isinstance(aux_sweep[2], np.ndarray), "The third element in aux_sweep must be the a numpy array."
+            assert len(aux_sweep[2].shape) == 1, "The numpy array for aux_sweep must be a 1D array."
+            data_file_aux, data_file_name_aux = self._init_data_file('data_' + aux_sweep[0], init_data_file_options)
+            #
+            aux_sweep = (aux_sweep[0], aux_sweep[1], aux_sweep[2], data_file_aux, data_file_name_aux)
+        else:
+            aux_sweep = []            
         data_file, data_file_name = self._init_data_file('data', init_data_file_options)
         
         rec_params = kwargs.get('rec_params')
@@ -149,6 +163,8 @@ class Experiment:
                     assert isinstance(cur_var[0], str) and isinstance(cur_var[1], list) and isinstance(cur_var[2], np.ndarray), "One-many sweeping arguments must be given as the tuple: (name, list of VARs, ND-array)"
                     assert len(cur_var[2].shape) == 2, f"The array for sweeping parameter {cur_var[0]} must be 2D."
                     assert cur_var[2].shape[1] == len(cur_var[1]), f"The array for one-many sweeping parameter {cur_var[0]} must have {len(cur_var[1])} columns."
+                    if len(aux_sweep) > 0:
+                        assert aux_sweep[1] != ind_var, "The variable index for aux_sweep does not support many-one variables."
                     var_amalg = VariablePropertyOneManyTransient(cur_var[0], cur_var[1], cur_var[2])
                     sweep_vars2 += [(var_amalg, np.arange(cur_var[2].shape[0]))]
                     sweepEx[cur_var[0]] = {'vars' : cur_var[1], 'var_vals' : cur_var[2]}
@@ -160,6 +176,8 @@ class Experiment:
                 sweep_arrays = [x[1] for x in sweep_vars2]
                 if rev_ind >= 0:
                     sweep_arrays[rev_ind] = np.concatenate([sweep_arrays[rev_ind], sweep_arrays[rev_ind][::-1]])
+                if len(aux_sweep) > 0:
+                    sweep_arrays[aux_sweep[1]] = np.concatenate([sweep_arrays[aux_sweep[1]], aux_sweep[2]])
                 self._sweep_shape = [x.size for x in sweep_arrays]
                 self._sweep_grids = np.meshgrid(*sweep_arrays)
                 self._sweep_grids = np.array(self._sweep_grids)
@@ -174,6 +192,7 @@ class Experiment:
                 #Setup permutations on the sweeping orders:        
                 sweep_orders = kwargs.get('sweep_orders', [])
                 assert not (len(sweep_orders) > 0 and rev_ind >= 0), "Cannot supply reverse_index and sweep_orders simultaneously."
+                assert not (len(sweep_orders) > 0 and len(aux_sweep) > 0), "Cannot supply aux_sweep and sweep_orders simultaneously."
                 swp_order = np.arange(self._sweep_grids.shape[0])
                 for cur_order in sweep_orders:
                     assert isinstance(cur_order, ExperimentSweepBase), "The argument sweep_orders must be specified as a list of ExpSwp* (i.e. ExperimentSweepBase) objects."
@@ -205,15 +224,19 @@ class Experiment:
                     self._data = cur_raw_data.pop('data')
                     for x in cur_raw_data:
                         self._init_data_file(x, init_data_file_options)
-                        store_pkt, store_ind = self._reverse_datapkt(cur_raw_data[x], sweep_vars2, rev_ind, ind_coord)
-                        self._cur_filewriters[x].push_datapkt(store_pkt, sweep_vars2, dset_ind=store_ind) #TODO: Update documentation on ACQ Data Format - i.e. for auxiliary pieces...
+                        aux_file = self._init_data_file(x+'_'+aux_sweep[0], init_data_file_options)[0] if len(aux_sweep) > 0 else None
+                        self._store_datapkt(cur_raw_data[x], sweep_vars2, sweepEx, rev_ind, ind_coord, self._cur_filewriters[x], aux_file, aux_sweep) #TODO: Update documentation on ACQ Data Format - i.e. for auxiliary pieces...
                     #
-                    store_pkt, store_ind = self._reverse_datapkt(self._data, sweep_vars2, rev_ind, ind_coord)
-                    data_file.push_datapkt(store_pkt, sweep_vars2, sweepEx, dset_ind=store_ind)
+                    self._store_datapkt(self._data, sweep_vars2, sweepEx, rev_ind, ind_coord, data_file, None, aux_sweep)
                     #
                     if len(rec_params) > 0:
-                        store_pkt, store_ind = self._reverse_datapkt(self._prepare_rec_params(rec_params, rec_params_extra), sweep_vars2, rev_ind, ind_coord)
-                        rec_data_file.push_datapkt(store_pkt, sweep_vars2, sweepEx, dset_ind=store_ind)
+                        if len(aux_sweep) > 0:
+                            ret_val = self._init_data_file('rec_params_'+aux_sweep[0], init_data_file_options)
+                            if isinstance(ret_val, (list, tuple)):
+                                aux_file, rec_param_aux_file_name = ret_val
+                        else:
+                            aux_file = None
+                        self._store_datapkt(self._prepare_rec_params(rec_params, rec_params_extra), sweep_vars2, sweepEx, rev_ind, ind_coord, rec_data_file, aux_file, aux_sweep)
                     self._sweep_vars = sweep_vars2
                     self._mid_process()
                     self._data = None
@@ -226,11 +249,22 @@ class Experiment:
         
         if len(rec_params) > 0:
             self.last_rec_params = FileIOReader(file_path + rec_param_file_name)
+            if len(aux_sweep) > 0:
+                self.last_rec_params_aux = FileIOReader(file_path + rec_param_aux_file_name)
         self._expt_config.makesafe_instruments()
         self._sweep_grids = None
         self._cur_names = []
 
+        if len(aux_sweep) > 0:
+            self.last_data_aux = FileIOReader(file_path + data_file_name_aux)
+
         return FileIOReader(file_path + data_file_name)
+
+
+    def _store_datapkt(self, data_pkt, sweep_vars2, sweepEx, rev_ind, ind_coord, primary_file, aux_file, aux_sweep):
+        store_pkt, store_ind = self._reverse_datapkt(data_pkt, sweep_vars2, rev_ind, ind_coord)
+        store_pkt, datafile, store_ind, sweep_vars = self._settle_aux_datafile(data_pkt, primary_file, aux_file, sweep_vars2, aux_sweep, ind_coord)
+        datafile.push_datapkt(store_pkt, sweep_vars, sweepEx, dset_ind=store_ind) #TODO: Update documentation on ACQ Data Format - i.e. for auxiliary pieces...
 
     def _reverse_datapkt(self, datapkt, sweep_vars, rev_ind, ind_coord):
         if rev_ind < 0:
@@ -240,7 +274,7 @@ class Experiment:
         num_swp_pts_on_reverse_var = sweep_vars[rev_ind][1].size
         if sweep_inds[rev_ind] < num_swp_pts_on_reverse_var:
             store_ind = np.ravel_multi_index(sweep_inds, store_shape)
-            return datapkt, store_ind    #MISTAKE HERE NEED TO SUBTRACT OFFSET
+            return datapkt, store_ind
         #
         le_channels = [x for x in datapkt['data']]
         for cur_ch in le_channels:
@@ -248,6 +282,25 @@ class Experiment:
         sweep_inds[rev_ind] = self._sweep_shape[rev_ind]-1 - sweep_inds[rev_ind]
         store_ind = np.ravel_multi_index(sweep_inds, store_shape)
         return datapkt, store_ind
+    
+    def _settle_aux_datafile(self, datapkt, datafile, datafile_aux, sweep_vars, aux_sweep_params, ind_coord):
+        if len(aux_sweep_params) == 0:
+            return datapkt, datafile, ind_coord, sweep_vars
+        sweep_inds = list(np.unravel_index(ind_coord, self._sweep_shape))
+        store_shape = [x[1].size for x in sweep_vars]
+        num_swp_pts_on_main_var = sweep_vars[aux_sweep_params[1]][1].size
+        if sweep_inds[aux_sweep_params[1]] < num_swp_pts_on_main_var:
+            store_ind = np.ravel_multi_index(sweep_inds, store_shape)
+            return datapkt, datafile, store_ind, sweep_vars
+        #
+        store_shape[aux_sweep_params[1]] = aux_sweep_params[2].size
+        sweep_inds[aux_sweep_params[1]] = sweep_inds[aux_sweep_params[1]] - num_swp_pts_on_main_var
+        store_ind = np.ravel_multi_index(sweep_inds, store_shape)
+        if datafile_aux == None:
+            datafile_aux = aux_sweep_params[3]
+        leVars = [[v[0], v[1]*1] for v in sweep_vars]
+        leVars[aux_sweep_params[1]][1] = aux_sweep_params[2]*1
+        return datapkt, datafile_aux, store_ind, leVars
 
 
     def _prepare_rec_params(self, rec_params, rec_params_extra):

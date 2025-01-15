@@ -10,6 +10,8 @@ This article covers:
 - [One-Many Sweeps](#one-many-sweeps)
 - [Changing the sampled order in sweeps](#changing-the-sampled-order-in-sweeps)
 - [Reverse sweeps](#reverse-sweeps)
+- [Auxiliary sweeps](#auxiliary-sweeps)
+
 
 
 ## Basic sweeps
@@ -308,4 +310,62 @@ lab.VAR("flux").Value = 19.8
 ...
 ```
 
-Optionally, if the suffix for the reverse channels is to be changed, one may provide it in the `reverse_variable_suffix` argument (default value is `'_reverse'`) in `run_single`.
+Note:
+- Optionally, if the suffix for the reverse channels is to be changed, one may provide it in the `reverse_variable_suffix` argument (default value is `'_reverse'`) in `run_single`.
+- **If a different resolution/array is to be used for the reverse sweep, consider using auxiliary sweeps**.
+
+## Auxiliary sweeps
+
+In a similar vain to reverse sweeps, auxiliary sweeps:
+- Extends the array on a given sweeping parameter
+- The experiment will treat it as a single sweep, but data values pertaining to the initial array and auxiliary array are stored in separate files
+- The auxiliary file (for the auxiliary portion of the sweeping array) is stored with the suffix given by the name supplied by the user
+
+Syntax is simple. Just specify a paramter `aux_sweep` as a tuple given as: (name, index of parameter, numpy array):
+
+
+```python
+#Assuming that exp is an Experiment object and lab is a Laboratory object
+lab.run_single(exp, [(lab.VAR('volt'), np.arange(-1, 1, 0.1)), (lab.VAR('flux'), np.arange(-20,20,0.1))], aux_sweep=('auxRev', 1, np.arange(22,-20,-1)))
+```
+
+
+```python
+lab.VAR("volt").Value = -1
+lab.VAR("flux").Value = -20
+# --- Get Data --- # store to data.h5
+lab.VAR("flux").Value = -19.9
+# --- Get Data --- # store to data.h5
+...
+lab.VAR("flux").Value = 19.8
+# --- Get Data --- # store to data.h5
+lab.VAR("flux").Value = 19.9
+# --- Get Data --- # store to data.h5
+lab.VAR("flux").Value = 22
+# --- Get Data --- # store to data_auxRev.h5
+lab.VAR("flux").Value = 21
+# --- Get Data --- # store to data_auxRev.h5
+...
+lab.VAR("flux").Value = -19
+# --- Get Data --- # store to data_auxRev.h5
+
+lab.VAR("volt").Value = -0.9
+lab.VAR("flux").Value = -20
+# --- Get Data --- # store to data.h5
+lab.VAR("flux").Value = -19.9
+# --- Get Data --- # store to data.h5
+...
+lab.VAR("flux").Value = 19.8
+# --- Get Data --- # store to data.h5
+lab.VAR("flux").Value = 19.9
+# --- Get Data --- # store to data.h5
+lab.VAR("flux").Value = 22
+# --- Get Data --- # store to data_auxRev.h5
+lab.VAR("flux").Value = 21
+# --- Get Data --- # store to data_auxRev.h5
+...
+lab.VAR("flux").Value = -19
+# --- Get Data --- # store to data_auxRev.h5
+
+...
+```

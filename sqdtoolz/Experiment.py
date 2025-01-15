@@ -256,14 +256,14 @@ class Experiment:
         self._cur_names = []
 
         if len(aux_sweep) > 0:
-            self.last_data_aux = FileIOReader(file_path + data_file_name_aux)
+            self.last_data_aux = FileIOReader(file_path + data_file_name_aux)   #TODO: Document storage of FileIOReaders via attributes in Experiment
 
         return FileIOReader(file_path + data_file_name)
 
 
     def _store_datapkt(self, data_pkt, sweep_vars2, sweepEx, rev_ind, ind_coord, primary_file, aux_file, aux_sweep):
         store_pkt, store_ind = self._reverse_datapkt(data_pkt, sweep_vars2, rev_ind, ind_coord)
-        store_pkt, datafile, store_ind, sweep_vars = self._settle_aux_datafile(data_pkt, primary_file, aux_file, sweep_vars2, aux_sweep, ind_coord)
+        store_pkt, datafile, store_ind, sweep_vars = self._settle_aux_datafile(data_pkt, primary_file, aux_file, sweep_vars2, aux_sweep, store_ind)
         datafile.push_datapkt(store_pkt, sweep_vars, sweepEx, dset_ind=store_ind) #TODO: Update documentation on ACQ Data Format - i.e. for auxiliary pieces...
 
     def _reverse_datapkt(self, datapkt, sweep_vars, rev_ind, ind_coord):

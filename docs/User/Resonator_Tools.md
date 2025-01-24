@@ -17,7 +17,7 @@ The class contains functions useful for data retrieval, analysis, sorting and pl
 
 ### Example usage
 
-This script will import all valid `data.h5` files contained within our directory `data_path = "/path/to/data/folder/"`. Set the sample name and measurement temperature upon initialisation, as well as a `power_dict` (optional), which is used to assign attenuations to measurements based on their file naming. For example, files found in `data_path` containing `lowPower` (not case sensitive) in their path will be assigned -120dB attenuation. The `"default"` argument is used for all files containing no match to other keywords. 
+This script will import all valid `data.h5` files contained within our directory `data_path = "/my_data_folder/"`. Set the sample name and measurement temperature upon initialisation, as well as a `power_dict` (optional), which is used to assign attenuations to measurements based on their file naming. For example, files found in `data_path` containing `lowPower` (not case sensitive) in their path will be assigned -120dB attenuation. The `"default"` argument is used for all files containing no match to other keywords. 
 
 Data is then imported, with an additional -12 dB of attenuation added across the board. A single file from the `data_path`, `"bad-file-name-here"` is ignored upon import.
 
@@ -27,18 +27,26 @@ The imported data
 ```python
 from sqdtoolz.Utilities.ResonatorTools import ResonatorPowerSweep
 
-chunk = ResonatorPowerSweep(data_path = "/path/to/data/folder/",
-                            sample_name = "My_Sample",
+chunk = ResonatorPowerSweep(data_path = "/my_data_folder/",
+                            sample_name = "Sample1",
                             temperature = 24.7e-3,
                             power_dict= {"lowPower" : -120, 
                                          "default" : -70
                                          },
                             )
+
+# data import
 chunk.import_data(additional_attenuation=-12, 
                   files_to_ignore=["bad-file-name-here"]
                   )
+
+# fitting
 chunk.do_circlefit()
-chunk.plotMpl_n_ph()
+
+# plotting
+chunk.plot_Qi_n_ph() # Qi plot
+chunk.plot_fr_n_ph() # frequency plot
+chunk.plot_Qc_n_ph() # Qc plot
 ```
 
 

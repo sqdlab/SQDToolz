@@ -9,27 +9,30 @@ from sqdtoolz.Utilities.FileIO import FileIOReader
 from resonator_tools import circuit  # type: ignore
 from pprint import pprint
 from pathlib import Path
+
 warnings.filterwarnings("ignore", "Covariance of the parameters could not be estimated")
 
 # imports for plotting (optional)
 plot_backend = None
 try:
-    from bokeh.models import Whisker, ColumnDataSource, TeeHead, Band # type: ignore
+    from bokeh.models import Whisker, ColumnDataSource, TeeHead, Band, Range1d  # type: ignore
     from bokeh.plotting import figure, show  # type: ignore
     from bokeh.io import output_notebook, export  # type: ignore
     from bokeh.palettes import Viridis256  # type: ignore
-    output_notebook()
+
+    # output_notebook()
 except:
     warnings.warning("Bokeh not imported. You will have to use mpl for plotting")
-    PLOT_BACKEND = "Matplotlib"
+    PLOT_BACKEND = "matplotlib"
     pass
 else:
-    PLOT_BACKEND = "Bokeh"
+    PLOT_BACKEND = "bokeh"
+
 
 class ResonatorPowerSweep:
     """
     Class for analysis and plotting of power-swept Q-factor
-    measurements for CPW resonators taken at a single temperature. 
+    measurements for CPW resonators taken at a single temperature.
     Includes TLS-fitting capabilities.
 
     Inputs:
@@ -44,7 +47,7 @@ class ResonatorPowerSweep:
                         e.g. power_dict = {"lowPower" : -120,
                                            "midPower" : -120,
                                            "default" : -70}
-        - TLSfit_bounds (Optional) Bounds for fitting parameters 
+        - TLSfit_bounds (Optional) Bounds for fitting parameters
                         [F_delta_TLS0, n_c, Q_HP, beta]. Tuple of lists,
                         defaults to ([0, 0.2, 0, 0.0], [1, 1e3, 1e9, 1])
         - print_log     Boolean to choose if prinouts occur during
@@ -59,7 +62,8 @@ class ResonatorPowerSweep:
         save_path=None,
         power_dict=None,
         TLSfit_bounds=None,
-        print_log=False
+        print_log=False,
+        notebook=False,
     ):
         # initialise data
         self.data_path = data_path
@@ -85,30 +89,39 @@ class ResonatorPowerSweep:
 
         # figure
         self.plot_backend = PLOT_BACKEND
-        if self.plot_backend == "Bokeh":
+        if self.plot_backend == "bokeh":
+            if notebook:
+                output_notebook()
+                warnings.warn(
+                    f"\nNotebook output set (by notebook=True)... please note that LaTeX text in Bokeh figures will not be exported.\n"
+                )
             self._colourmap = Viridis256
-            self.fig_ph = figure(
+            self.fig_bokeh = figure(
                 width=1000,
                 height=600,
-                x_axis_label=r"Photon number $$\langle n \rangle$$",
+                x_axis_label=r"Photon number " + r"$$\langle n \rangle$$",
                 y_axis_label=r"$$Q_i$$",
                 y_axis_type="log",
                 x_axis_type="log",
             )
         else:
             self._colourmap = plt.cm.viridis
-        self.fig_ph_mpl = plt.figure(figsize=(10, 6))
-        self.ax_ph_mpl = self.fig_ph_mpl.add_subplot(111)
-        plt.close(self.fig_ph_mpl) # prevent display for now
-        
+        self.fig_mpl = plt.figure(figsize=(10, 6))
+        self.ax_ph_mpl = self.fig_mpl.add_subplot(111)
+        plt.close(self.fig_mpl)  # prevent display for now
 
     # import data from file
     def import_data(
-        self, line_attenuation=0, power_dict=None, additional_attenuation=0, print_log="none", files_to_ignore=None
+        self,
+        line_attenuation=0,
+        power_dict=None,
+        additional_attenuation=0,
+        print_log="none",
+        files_to_ignore=None,
     ):
         """
         Searches for and imports all data.h5 files in a given directory into a dictionary. Extracts the VNA power and measurement name corresponding to each data file.
-        
+
         The extracted data and metada are stored in self.data with structure:
 
             self.data = {'<measurement_name>' : {
@@ -122,7 +135,7 @@ class ResonatorPowerSweep:
                                     (overwritten by self.power_dict).
                                     Only use if all measurements were taken
                                     with the same attenuation.
-        - power_dict                Dictionary of key-value pairs of keyword 
+        - power_dict                Dictionary of key-value pairs of keyword
                                     containing power reference in an imported
                                     filename with the corresponding attenuation
                                     value.
@@ -131,7 +144,7 @@ class ResonatorPowerSweep:
                                     defined in self.power_dict)
         - print_log                 Options for printout. Defaults to "errors".
                                     Other options are "all" or "none".
-        - files_to_ignore           List of files that will be skipped 
+        - files_to_ignore           List of files that will be skipped
                                     during data import. Should be a list of strings.
 
         Outputs:
@@ -146,8 +159,12 @@ class ResonatorPowerSweep:
             "none",
         ], "Print log options are 'errors', 'all', or 'none'."
         if files_to_ignore:
-            assert isinstance(files_to_ignore, list), "files_to_ignore should be a list of strings, e.g. ['file1', 'file2']."
-            assert isinstance(files_to_ignore[0], str), "Entries in list files_to_ignore should be strings, e.g. ['file1', 'file2']."
+            assert isinstance(
+                files_to_ignore, list
+            ), "files_to_ignore should be a list of strings, e.g. ['file1', 'file2']."
+            assert isinstance(
+                files_to_ignore[0], str
+            ), "Entries in list files_to_ignore should be strings, e.g. ['file1', 'file2']."
 
         if print_log != "none":
             print(f"Importing data from {self.data_path}..\n")
@@ -161,7 +178,11 @@ class ResonatorPowerSweep:
                 good_file = True not in ignore_match
             else:
                 good_file = True
-            if (self._data_file_name in files) and (self._config_file_name in files) and good_file:
+            if (
+                (self._data_file_name in files)
+                and (self._config_file_name in files)
+                and good_file
+            ):
                 attenuation = line_attenuation
                 file_path = os.path.join(root, self._data_file_name)
                 # read data
@@ -183,6 +204,9 @@ class ResonatorPowerSweep:
                 else:
                     # add line attenuation by dictionary
                     if self.power_dict != None:
+                        if "default" not in self.power_dict.keys():
+                            self.power_dict["default"] = 0
+                            warnings.warn(f"There was no 'default' value in your given power_dict... setting default to 0 and proceeding.")
                         for label, _ in self.power_dict.items():
                             if label.casefold() in root.casefold():
                                 attenuation = (
@@ -219,7 +243,7 @@ class ResonatorPowerSweep:
                             "iq_vals": i_vals + 1j * q_vals,
                             "power": total_power,
                             "line_attenuation": attenuation,
-                            "measurement_name": str(root_shortened)
+                            "measurement_name": str(root_shortened),
                         }
                     }
                     if print_log == "all":
@@ -233,7 +257,7 @@ class ResonatorPowerSweep:
 
     # do circlefit
     def do_circlefit(
-        self, expected_qi_lims=(1e3, 1e8), remove_duplicates=True, save_fit=True
+        self, expected_qi_lims=(1e3, 1e8), remove_duplicates=True, n_ph_lims=None, save_fit=True
     ):
         """
         Does circlefits on measurement runs contained in self.data['rawdata'].
@@ -257,11 +281,11 @@ class ResonatorPowerSweep:
                             Defaults to True.
         - remove_duplicates Boolean to choose whether duplicates in
                             power should be removed
-        - save_fit          Boolean to save fitted data to self.save_path 
+        - save_fit          Boolean to save fitted data to self.save_path
                             (tab-delimited .txt file). Defaults to True.
 
         Outputs:
-        - self.fit_data     Pandas DataFrame containing all fitted values for 
+        - self.fit_data     Pandas DataFrame containing all fitted values for
                             each measurement.
         """
 
@@ -301,22 +325,25 @@ class ResonatorPowerSweep:
                         self.data[measurement_name]["fit"][key] = port.fitresults[key]
                     # include single photon power calc and power
                     single_photon_power = port.get_single_photon_limit(diacorr=True)
+                    n_ph = port.get_photons_in_resonator(power=measurement_data['raw_data']['power'], diacorr=True)
                     self.data[measurement_name]["fit"][
                         "single photon power"
                     ] = single_photon_power
                     self.data[measurement_name]["fit"]["power"] = measurement_data[
                         "raw_data"
                     ]["power"]
-                    self.data[measurement_name]["fit"]["measurement name"] = measurement_data[
-                        "raw_data"
-                    ]["measurement_name"]
+                    self.data[measurement_name]["fit"]["measurement name"] = (
+                        measurement_data["raw_data"]["measurement_name"]
+                    )
                     fits_completed += 1
                     (
                         print(
-                            f"{fits_completed}\t{measurement_name}\t"
+                            f"{fits_completed}\t{re.split(r'[\\/]', measurement_name)[-1]}\t"
+                            f"f = {port.fitresults['fr']:.1e}, "
                             f"Qi = {port.fitresults['Qi_dia_corr']:.1e}, "
-                            f"P = {measurement_data['raw_data']['power']:.1f} dBm\t"
+                            f"P = {measurement_data['raw_data']['power']:.1f} dBm "
                             f"({measurement_data['raw_data']['line_attenuation']} dB)"
+                            f"\t-> n_ph = {n_ph:.1e}"
                         )
                         if self.print_log == True
                         else 0
@@ -333,14 +360,13 @@ class ResonatorPowerSweep:
         for invalid_measurement in invalid_data:
             self.data.pop(invalid_measurement)
 
-
         #  make sure fit data has been added to dictionary
         self.assert_subkey_exists(self.data, "fit")
         # add n_ph to dictionary
         self.n_ph_calculator()
 
         # sort fit data and add to self.fit_data
-        self.fit_data_to_sorted_dataframe()
+        self.fit_data_to_sorted_dataframe(n_ph_lims=n_ph_lims)
         # add frequency binning to help with plotting
         self.get_frequency_bins()
         # remove duplicates
@@ -348,7 +374,21 @@ class ResonatorPowerSweep:
 
         # save data
         txt_output = os.path.join(self.save_path, "circlefit.txt")
-        self.df_to_csv(self.fit_data, txt_output, columns_to_use=["freq bin", "fr", "power", "n_ph", "Qi_dia_corr", "Qi_dia_corr_err", "absQc", "Ql", "measurement name"])
+        self.df_to_csv(
+            self.fit_data,
+            txt_output,
+            columns_to_use=[
+                "freq bin",
+                "fr",
+                "power",
+                "n_ph",
+                "Qi_dia_corr",
+                "Qi_dia_corr_err",
+                "absQc",
+                "Ql",
+                "measurement name",
+            ],
+        )
 
         # returns fit data
         return self.fit_data
@@ -369,7 +409,7 @@ class ResonatorPowerSweep:
             )
 
     # sort data frame along multiple axes
-    def fit_data_to_sorted_dataframe(self, axes_to_sort=["fr", "power"]):
+    def fit_data_to_sorted_dataframe(self, axes_to_sort=["fr", "power"], n_ph_lims=None):
         fit_data_list = []
         first = True
         for _, measurement_data in self.data.items():
@@ -382,7 +422,12 @@ class ResonatorPowerSweep:
         df_sorted = df.sort_values(by=axes_to_sort, ascending=[True, True]).reset_index(
             drop=True
         )
-        self.fit_data = df_sorted
+        if n_ph_lims != None:
+            assert isinstance(n_ph_lims, list)
+            assert len(n_ph_lims) == 2
+            self.fit_data = df_sorted[(df_sorted['n_ph'] > n_ph_lims[0]) & (df_sorted['n_ph'] < n_ph_lims[1])]
+        else:
+            self.fit_data = df_sorted
 
     # get labels for frequency bins
     def get_frequency_bin_labels(self):
@@ -426,210 +471,546 @@ class ResonatorPowerSweep:
         # df_sorted.drop_duplicates(keep="last", inplace=True)
         df_filtered = df[to_keep]
         false_locations = [i for i, e in enumerate(to_keep) if e == False]
-        print(f"{to_keep.count(False)} duplicate(s) removed...\n{[f'{df.loc[i, "freq bin"]}: {df.loc[i, "power"]} dBm' for i in false_locations]}") if self.print_log else 0
+        if self.print_log:
+            list_of_removed_duplicates = [
+                f'{df.loc[i, "freq bin"]}: {df.loc[i, "power"]} dBm'
+                for i in false_locations
+            ]
+            print(
+                f"{to_keep.count(False)} duplicate(s) removed...\n{list_of_removed_duplicates}"
+            )
         self.fit_data = df_filtered
 
-    # basic data plot
-    def plotBokeh_n_ph(
+    # Qi vs photon number
+    def plot_Qi_n_ph(
         self,
         with_fit=True,
         with_errorbars=True,
         with_errorband=False,
         legend_location="bottom_right",
         show_plot=True,
-        save_plot=True
+        save_plot=True,
+        backend=None,
+        ylims=None,
+        plot_frequencies=None
     ):
-        """
-        Make Bokeh plot from self.fit_data: n_ph vs. Qi
-        """
         assert isinstance(self.fit_data, pd.DataFrame)
-        self._colourmap = Viridis256
+        if backend == None:
+            backend = self.plot_backend
+        # check backend is valid
+        assert backend in [
+            "matplotlib",
+            "bokeh",
+        ], "Please choose 'matplotlib' or 'bokeh' as the backend"
+        if plot_frequencies:
+            assert isinstance(plot_frequencies, list), "Please give plot frequencies as a list of indeces corresponding to the resonators you want to plot, i.e. [0, 1, 2]"
+        # bokeh setup
+        if backend == "bokeh":
+            self.fig_bokeh = figure(
+                title=f"{self.name}: external Q-factor",
+                width=1000,
+                height=600,
+                x_axis_type="log",
+                y_axis_type="log",
+                y_axis_label=r"$$Q_i$$",
+                x_axis_label=r"Photon number " + r"$$\langle n \rangle$$",
+            )
+            self._colourmap = Viridis256
+            if ylims != None:
+                self.fig_bokeh.y_range = Range1d(ylims[0], ylims[1])
+        # matplotlib setup
+        elif backend == "matplotlib":
+            self._colourmap = plt.cm.viridis
+            colors = [
+                self._colourmap(i / (self.num_resonators - 1))
+                for i in range(self.num_resonators)
+            ]
+            self.ax_ph_mpl.legend(loc="best")
+            self.ax_ph_mpl.set_title(f"{self.name}: " + r"$Q_i$")
+            self.ax_ph_mpl.set_xlabel(r"Photon number $\langle n \rangle$")
+            self.ax_ph_mpl.set_ylabel(r"$Q_i$")
+            self.ax_ph_mpl.set_xscale("log")
+            self.ax_ph_mpl.set_yscale("log")
+            self.ax_ph_mpl.grid(True, which="both", alpha=0.2, lw=1)
+            if ylims != None:
+                self.ax_ph_mpl.set_ylim(bottom=ylims[0], top=ylims[1])
         # loop through frequency bins
+        if plot_frequencies != None:
+            freqs_to_use = plot_frequencies
+        elif plot_frequencies == None:
+            freqs_to_use = range(self.num_resonators)
         for i, freq_bin_cur in enumerate(self.freq_bin_labels):
-            # initialise plot data for new resonator
-            n_ph, Qi, Qi_upper, Qi_lower, Qerr = [], [], [], [], []
-            f = float(freq_bin_cur.split()[0]) * 1e9  # Hz
-            for _, row in self.fit_data.iterrows():
-                # add measurement from self.fit_data if in current bin
-                if row["freq bin"] == freq_bin_cur:
-                    n_ph.append(row["n_ph"])
-                    Qi.append(row["Qi_dia_corr"])
-                    Qi_upper.append(row["Qi_dia_corr"] + row["Qi_dia_corr_err"])
-                    Qi_lower.append(row["Qi_dia_corr"] - row["Qi_dia_corr_err"])
-                    Qerr.append(row["Qi_dia_corr_err"])
-            # convert to ColumnDataSource for Bokeh plotting
-            source = ColumnDataSource(
-                data=dict(n_ph=n_ph, Qi=Qi, upper=Qi_upper, lower=Qi_lower, Qerr=Qerr)
-            )
-            # get single photon Qi
-            sph_indx = self.find_photon_number_index(
-                data=source.data, search_key="n_ph"
-            )
-            sph_Qi = np.array(source.data["Qi"])[sph_indx]
-
-            # do plotting
-            color = self._colourmap[i * len(self._colourmap) // self.num_resonators]
-            self.fig_ph.scatter(
-                source=source,
-                x="n_ph",
-                y="Qi",
-                size=10,
-                color=color,
-                alpha=0.7,
-                legend_label=f"{freq_bin_cur} (Single photon Qi = {sph_Qi:.1e})",
-            )
-            # errorband
-            if with_errorband == True:
-                band2 = Band(
-                    base="n_ph",
-                    upper="upper",
-                    lower="lower",
-                    source=source,
-                    level="underlay",
-                    fill_color=color,
-                    line_alpha=0.2,
-                    fill_alpha=0.1,
-                    line_width=1,
-                    line_color=color,
+            if i in freqs_to_use:
+                # initialise plot data for new resonator
+                n_ph, Qi, Qi_upper, Qi_lower, Qerr = [], [], [], [], []
+                f = float(freq_bin_cur.split()[0]) * 1e9  # Hz
+                for _, row in self.fit_data.iterrows():
+                    # add measurement from self.fit_data if in current bin
+                    if row["freq bin"] == freq_bin_cur:
+                        n_ph.append(row["n_ph"])
+                        Qi.append(row["Qi_dia_corr"])
+                        Qi_upper.append(row["Qi_dia_corr"] + row["Qi_dia_corr_err"])
+                        Qi_lower.append(row["Qi_dia_corr"] - row["Qi_dia_corr_err"])
+                        Qerr.append(row["Qi_dia_corr_err"])
+                # convert to ColumnDataSource for Bokeh plotting
+                source = ColumnDataSource(
+                    data=dict(n_ph=n_ph, Qi=Qi, upper=Qi_upper, lower=Qi_lower, Qerr=Qerr)
                 )
-                self.fig_ph.add_layout(band2)
-            # errorbars
-            if with_errorbars == True:
-                errorbars = Whisker(
-                    base="n_ph",
-                    upper="upper",
-                    lower="lower",
-                    source=source,
-                    line_color=color,
-                    line_alpha=0.7,
-                    line_cap="round",
-                    line_width="2",
-                    upper_head=TeeHead(line_color=color, line_alpha=0.7, size=6),
-                    lower_head=TeeHead(line_color=color, line_alpha=0.7, size=6),
+                # get single photon Qi
+                sph_indx = self.find_photon_number_index(
+                    data=source.data, search_key="n_ph"
                 )
-                self.fig_ph.add_layout(errorbars)
-            # TLS fit
-            n_ph_TLS, TLSfit = None, None
-            if with_fit == True:
-                n_ph_TLS, TLSfit = self.TLS_fit(
-                    n_ph=source.data["n_ph"],
-                    Qi=source.data["Qi"],
-                    f=f,
-                    T=self.T,
-                    Qerr=source.data["Qerr"],
-                    bounds=self.TLSfit_bounds
-                )
-                self.fig_ph.line(n_ph_TLS, TLSfit, line_color=color, line_alpha=0.2, line_width=3)
-        # legend
-        self.fig_ph.legend.location = legend_location
-        # title
-        self.fig_ph.title = f"{self.name}"
-        # show plot
-        if show_plot == True:
-            show(self.fig_ph)
-        # save plot
-        if save_plot == True:
-            export_path = os.path.join(self.save_path, 'n_ph.png')
-            export.export_png(obj=self.fig_ph, filename=export_path)
-            print(f"Plot saved at {export_path}")
+                sph_Qi = np.array(source.data["Qi"])[sph_indx]
 
-    # Plotting with matplotlib (default)
-    def plotMpl_n_ph(self,
-                     with_fit=True,
-                     with_errorbars=True,
-                     legend_location="lower right",
-                     show_plot=True,
-                     save_plot=True
-        ):
-        """
-        Make Bokeh plot from self.fit_data: n_ph vs. Qi
-        """
-        assert isinstance(self.fit_data, pd.DataFrame)
-        self._colourmap = plt.cm.viridis
-        colors = [self._colourmap(i / (self.num_resonators - 1)) for i in range(self.num_resonators)]
-        # loop through frequency bins
-        for i, freq_bin_cur in enumerate(self.freq_bin_labels):
-            # initialise plot data for new resonator
-            n_ph, Qi, Qi_upper, Qi_lower, Qerr = [], [], [], [], []
-            f = float(freq_bin_cur.split()[0]) * 1e9  # Hz
-            for _, row in self.fit_data.iterrows():
-                # add measurement from self.fit_data if in current bin
-                if row["freq bin"] == freq_bin_cur:
-                    n_ph.append(row["n_ph"])
-                    Qi.append(row["Qi_dia_corr"])
-                    Qi_upper.append(row["Qi_dia_corr"] + row["Qi_dia_corr_err"])
-                    Qi_lower.append(row["Qi_dia_corr"] - row["Qi_dia_corr_err"])
-                    Qerr.append(row["Qi_dia_corr_err"])
-            # colour
-            color = colors[i]
-
-            # convert to dict
-            source = {
-                "n_ph": n_ph,
-                "Qi": Qi,
-                "Qerr": Qerr
-            }
-        
-            # get single photon Qi
-            sph_indx = self.find_photon_number_index(
-                data=source, search_key="n_ph"
-            )
-            sph_Qi = np.array(source["Qi"])[sph_indx]
-   
-            # errorbars
-            if with_errorbars == True:
-                self.ax_ph_mpl.errorbar(
-                    x=source["n_ph"],
-                    y=source["Qi"],
-                    yerr=source["Qerr"],
-                    fmt='o',
-                    color=color,
-                    alpha=1,
-                    linewidth=2,
-                    label=f"{freq_bin_cur} (Single photon Qi = {sph_Qi:.1e})"
+                # TLS fit
+                n_ph_TLS, TLSfit = None, None
+                if with_fit == True:
+                    n_ph_TLS, TLSfit = self.TLS_fit(
+                        n_ph=source.data["n_ph"],
+                        Qi=source.data["Qi"],
+                        f=f,
+                        T=self.T,
+                        Qerr=source.data["Qerr"],
+                        bounds=self.TLSfit_bounds,
                     )
+
+                # bokeh plot
+                if backend == "bokeh":
+                    # do plotting
+                    color = self._colourmap[i * len(self._colourmap) // self.num_resonators]
+                    self.fig_bokeh.scatter(
+                        source=source,
+                        x="n_ph",
+                        y="Qi",
+                        size=10,
+                        color=color,
+                        alpha=0.7,
+                        legend_label=f"{freq_bin_cur} (Single photon Qi = {sph_Qi:.1e})",
+                    )
+                    # errorband
+                    if with_errorband == True:
+                        band2 = Band(
+                            base="n_ph",
+                            upper="upper",
+                            lower="lower",
+                            source=source,
+                            level="underlay",
+                            fill_color=color,
+                            line_alpha=0.2,
+                            fill_alpha=0.1,
+                            line_width=1,
+                            line_color=color,
+                        )
+                        self.fig_bokeh.add_layout(band2)
+                    # errorbars
+                    if with_errorbars == True:
+                        errorbars = Whisker(
+                            base="n_ph",
+                            upper="upper",
+                            lower="lower",
+                            source=source,
+                            line_color=color,
+                            line_alpha=0.7,
+                            line_cap="round",
+                            line_width="2",
+                            upper_head=TeeHead(line_color=color, line_alpha=0.7, size=6),
+                            lower_head=TeeHead(line_color=color, line_alpha=0.7, size=6),
+                        )
+                        self.fig_bokeh.add_layout(errorbars)
+                    if with_fit == True:
+                        self.fig_bokeh.line(
+                            n_ph_TLS, TLSfit, line_color=color, line_alpha=0.2, line_width=3
+                        )
+
+                # matplotlib plot
+                if backend == "matplotlib":
+                    # errorbars
+                    if with_errorbars == True:
+                        self.ax_ph_mpl.errorbar(
+                            x=source.data["n_ph"],
+                            y=source.data["Qi"],
+                            yerr=source.data["Qerr"],
+                            fmt="o",
+                            color=color,
+                            alpha=1,
+                            linewidth=2,
+                            label=f"{freq_bin_cur} (Single photon Qi = {sph_Qi:.1e})",
+                        )
+                    else:
+                        self.ax_ph_mpl.scatter(
+                            x=source.data["n_ph"],
+                            y=source.data["Qi"],
+                            size=10,
+                            color=color,
+                            alpha=1,
+                            label=f"{freq_bin_cur} (Single photon Qi = {sph_Qi:.1e})",
+                        )
+                    # TLS fit
+                    n_ph_TLS, TLSfit = None, None
+                    if with_fit == True:
+                        n_ph_TLS, TLSfit = self.TLS_fit(
+                            n_ph=source.data["n_ph"],
+                            Qi=source.data["Qi"],
+                            f=f,
+                            T=self.T,
+                            Qerr=source.data["Qerr"],
+                            bounds=self.TLSfit_bounds,
+                        )
+                        self.ax_ph_mpl.plot(
+                            n_ph_TLS, TLSfit, color=color, alpha=0.4, linewidth=3
+                    )
+
+        if backend == "bokeh":
+            # legend
+            self.fig_bokeh.legend.location = legend_location
+            # title
+            self.fig_bokeh.title = f"{self.name}: Internal Q-factor"
+            # show plot
+            if show_plot == True:
+                show(self.fig_bokeh)
+            # save plot
+            if save_plot == True:
+                export_path = os.path.join(self.save_path, "Qi_bokeh.png")
+                export.export_png(obj=self.fig_bokeh, filename=export_path)
+                print(f"Plot saved at {export_path}")
+        if backend == "matplotlib":
+            # legend
+            self.ax_ph_mpl.legend(loc="best")
+            # title
+            self.ax_ph_mpl.set_title(self.name)
+            # plot settings
+            self.ax_ph_mpl.set_xlabel(r"Photon number $\langle n \rangle$")
+            self.ax_ph_mpl.set_ylabel(r"$Q_i$")
+            self.ax_ph_mpl.loglog()
+            self.ax_ph_mpl.grid(True, which="both", alpha=0.2, lw=1)
+            # show plot
+            if show_plot == True:
+                plt.show()
+            # save plot
+            if save_plot == True:
+                export_path = os.path.join(self.save_path, "Qi_mpl.png")
+                self.fig_mpl.savefig(export_path)
+                print(f"Plot saved at {export_path}")
+
+    def plot_fr_n_ph(
+        self,
+        backend=None,
+        with_errorbars=True,
+        show_plot=True,
+        save_plot=True,
+        as_deviation=True,
+        plot_frequencies=None
+    ):
+        if backend == None:
+            backend = self.plot_backend
+        # check backend is valid
+        assert backend in [
+            "matplotlib",
+            "bokeh",
+        ], "Please choose 'matplotlib' or 'bokeh' as the backend"
+        if plot_frequencies != None:
+            freqs_to_use = plot_frequencies
+        elif plot_frequencies == None:
+            freqs_to_use = range(self.num_resonators)
+        df_rev = self.fit_data[::-1]
+        # bokeh
+        if backend == "bokeh":
+            self.fig_bokeh = figure(
+                title=f"{self.name}: Frequency",
+                x_axis_type="log",
+                x_axis_label="Photon number " + r"$$\langle n \rangle$$",
+                width=1000,
+                height=600,
+            )
+            if as_deviation == True:
+                self.fig_bokeh.yaxis.axis_label = r"Frequency deviation (Hz)"
             else:
-                self.ax_ph_mpl.scatter(
-                    x=source["n_ph"],
-                    y=source["Qi"],
-                    size=10,
-                    color=color,
-                    alpha=1,
-                    label=f"{freq_bin_cur} (Single photon Qi = {sph_Qi:.1e})",
+                self.fig_bokeh.yaxis.axis_label = r"Frequency (Hz)"
+            self._colourmap = Viridis256
+            # loop through frequency bins
+            for i, freq_bin_cur in enumerate(self.freq_bin_labels):
+                if i in freqs_to_use:
+                    # initialise plot data for new resonator
+                    n_ph, fr, fr_upper, fr_lower, fr_err = [], [], [], [], []
+                    f = float(freq_bin_cur.split()[0]) * 1e9  # Hz
+                    first_of_freq = True
+                    for _, row in df_rev.iterrows():
+                        # add measurement from self.fit_data if in current bin
+                        if row["freq bin"] == freq_bin_cur:
+                            if (first_of_freq == True) and (as_deviation == True):
+                                fr_comp = row["fr"]
+                                first_of_freq = False
+                            if as_deviation == True:
+                                fr.append(row["fr"] - fr_comp)
+                                fr_upper.append(row["fr"] - fr_comp + row["fr_err"])
+                                fr_lower.append(row["fr"] - fr_comp - row["fr_err"])
+                            else:
+                                fr.append(row["fr"])
+                                fr_upper.append(row["fr"] + row["fr_err"])
+                                fr_lower.append(row["fr"] - row["fr_err"])
+                            n_ph.append(row["n_ph"])
+                            fr_err.append(row["fr_err"])
+                    # convert to ColumnDataSource for Bokeh plotting
+                    source = ColumnDataSource(
+                        data=dict(
+                            n_ph=n_ph, fr=fr, upper=fr_upper, lower=fr_lower, fr_err=fr_err
+                        )
                     )
-            # TLS fit
-            n_ph_TLS, TLSfit = None, None
-            if with_fit == True:
-                n_ph_TLS, TLSfit = self.TLS_fit(
-                    n_ph=source["n_ph"],
-                    Qi=source["Qi"],
-                    f=f,
-                    T=self.T,
-                    Qerr=source["Qerr"],
-                    bounds=self.TLSfit_bounds
+                    # do plotting
+                    color = self._colourmap[i * len(self._colourmap) // self.num_resonators]
+                    self.fig_bokeh.scatter(
+                        source=source,
+                        x="n_ph",
+                        y="fr",
+                        size=10,
+                        color=color,
+                        alpha=0.7,
+                        legend_label=f"{freq_bin_cur}",
+                    )
+                    # errorbars
+                    if with_errorbars == True:
+                        errorbars = Whisker(
+                            base="n_ph",
+                            upper="upper",
+                            lower="lower",
+                            source=source,
+                            line_color=color,
+                            line_alpha=0.7,
+                            line_cap="round",
+                            line_width="2",
+                            upper_head=TeeHead(line_color=color, line_alpha=0.7, size=6),
+                            lower_head=TeeHead(line_color=color, line_alpha=0.7, size=6),
+                        )
+                        self.fig_bokeh.add_layout(errorbars)
+            # legend
+            # p.legend.location = legend_location
+            # show plot
+            if show_plot == True:
+                show(self.fig_bokeh)
+            # save plot
+            if save_plot == True:
+                export_path = os.path.join(self.save_path, "fr_bokeh.png")
+                export.export_png(obj=self.fig_bokeh, filename=export_path)
+                print(f"Plot saved at {export_path}")
+        # matplotlib
+        elif backend == "matplotlib":
+            self._colourmap = plt.cm.viridis
+            colors = [
+                self._colourmap(i / (self.num_resonators - 1))
+                for i in range(self.num_resonators)
+            ]
+            # loop through frequency bins
+            for i, freq_bin_cur in enumerate(self.freq_bin_labels):
+                if i in freqs_to_use:
+                    # initialise plot data for new resonator
+                    n_ph, fr, fr_err = [], [], []
+                    f = float(freq_bin_cur.split()[0]) * 1e9  # Hz
+                    first_of_freq = True
+                    for _, row in df_rev.iterrows():
+                        # add measurement from self.fit_data if in current bin
+                        if row["freq bin"] == freq_bin_cur:
+                            if (first_of_freq == True) and (as_deviation == True):
+                                fr_comp = row["fr"]
+                                first_of_freq = False
+                            if as_deviation == True:
+                                fr.append(row["fr"] - fr_comp)
+                            else:
+                                fr.append(row["fr"])
+                            n_ph.append(row["n_ph"])
+                            fr_err.append(row["fr_err"])
+                    # colour
+                    color = colors[i]
+                    # convert to dict
+                    source = {"n_ph": n_ph, "fr": fr, "fr_err": fr_err}
+                    # errorbars
+                    if with_errorbars == True:
+                        self.ax_ph_mpl.errorbar(
+                            x=source["n_ph"],
+                            y=source["fr"],
+                            yerr=source["fr_err"],
+                            fmt="o",
+                            color=color,
+                            alpha=1,
+                            linewidth=2,
+                            label=f"{freq_bin_cur}",
+                        )
+                    else:
+                        self.ax_ph_mpl.scatter(
+                            x=source["n_ph"],
+                            y=source["fr"],
+                            size=10,
+                            color=color,
+                            alpha=1,
+                            label=f"{freq_bin_cur}",
+                        )
+            # legend
+            self.ax_ph_mpl.legend(loc="best")
+            # title
+            self.ax_ph_mpl.set_title(f"{self.name}: Frequency")
+            # plot settings
+            self.ax_ph_mpl.set_xlabel(r"Photon number $\langle n \rangle$")
+            if as_deviation == True:
+                self.ax_ph_mpl.set_ylabel(r"Frequency deviation (Hz)")
+            else:
+                self.ax_ph_mpl.set_ylabel(r"Frequency (Hz)")
+            self.ax_ph_mpl.set_xscale("log")
+            self.ax_ph_mpl.grid(True, which="both", alpha=0.2, lw=1)
+            # show plot
+            if show_plot == True:
+                plt.show()
+            # save plot
+            if save_plot == True:
+                export_path = os.path.join(self.save_path, "fr_mpl.png")
+                self.fig_mpl.savefig(export_path)
+                print(f"Plot saved at {export_path}")
+
+    def plot_Qc_n_ph(
+        self,
+        backend=None,
+        with_errorbars=True,
+        show_plot=True,
+        save_plot=True,
+        ylims=None,
+        plot_frequencies=None
+    ):
+        if backend == None:
+            backend = self.plot_backend
+        # check backend is valid
+        assert backend in [
+            "matplotlib",
+            "bokeh",
+        ], "Please choose 'matplotlib' or 'bokeh' as the backend"
+        if ylims:
+            assert isinstance(ylims, (list, tuple)), "Set ylims=[min, max] or None."
+        if plot_frequencies != None:
+            freqs_to_use = plot_frequencies
+        elif plot_frequencies == None:
+            freqs_to_use = range(self.num_resonators)
+        # bokeh setup
+        if backend == "bokeh":
+            self.fig_bokeh = figure(
+                title=f"{self.name}: external Q-factor",
+                width=1000,
+                height=600,
+                x_axis_type="log",
+                y_axis_type="log",
+                y_axis_label=r"$$Q_c$$",
+                x_axis_label=r"Photon number " + r"$$\langle n \rangle$$",
+            )
+            self._colourmap = Viridis256
+            if ylims != None:
+                self.fig_bokeh.y_range = Range1d(ylims[0], ylims[1])
+        # matplotlib setup
+        elif backend == "matplotlib":
+            self._colourmap = plt.cm.viridis
+            colors = [
+                self._colourmap(i / (self.num_resonators - 1))
+                for i in range(self.num_resonators)
+            ]
+            self.ax_ph_mpl.legend(loc="best")
+            self.ax_ph_mpl.set_title(f"{self.name}: " + r"$Q_c$")
+            self.ax_ph_mpl.set_xlabel(r"Photon number $\langle n \rangle$")
+            self.ax_ph_mpl.set_ylabel(r"$Q_c$")
+            self.ax_ph_mpl.set_xscale("log")
+            self.ax_ph_mpl.set_yscale("log")
+            self.ax_ph_mpl.grid(True, which="both", alpha=0.2, lw=1)
+            if ylims != None:
+                self.ax_ph_mpl.set_ylim(bottom=ylims[0], top=ylims[1])
+        # loop through frequency bins
+        for i, freq_bin_cur in enumerate(self.freq_bin_labels):
+            if i in freqs_to_use:
+                # initialise plot data for new resonator
+                n_ph, Qc, Qc_upper, Qc_lower, Qc_err = [], [], [], [], []
+                f = float(freq_bin_cur.split()[0]) * 1e9  # Hz
+                for _, row in self.fit_data.iterrows():
+                    # add measurement from self.fit_data if in current bin
+                    if row["freq bin"] == freq_bin_cur:
+                        Qc.append(row["absQc"])
+                        Qc_upper.append(row["absQc"] + row["absQc_err"])
+                        Qc_lower.append(row["absQc"] - row["absQc_err"])
+                        n_ph.append(row["n_ph"])
+                        Qc_err.append(row["absQc_err"])
+                # convert to ColumnDataSource for Bokeh plotting
+                source = ColumnDataSource(
+                    data=dict(
+                        n_ph=n_ph, Qc=Qc, upper=Qc_upper, lower=Qc_lower, Qc_err=Qc_err
+                    )
                 )
-                self.ax_ph_mpl.plot(n_ph_TLS, TLSfit, color=color, alpha=0.4, linewidth=3)
-        # legend
-        self.ax_ph_mpl.legend(loc=legend_location)
-        # title
-        self.ax_ph_mpl.set_title(self.name)
-        # plot settings
-        self.ax_ph_mpl.set_xlabel(r"Photon number $\langle n \rangle$")
-        self.ax_ph_mpl.set_ylabel(r"$Q_i$")
-        self.ax_ph_mpl.loglog()
-        self.ax_ph_mpl.grid(True, which="both", alpha=0.2, lw=1)
-        # show plot
-        if show_plot == True:
-            plt.show()
-        # save plot
-        if save_plot == True:
-            export_path = os.path.join(self.save_path, 'n_ph_mpl.png')
-            self.fig_ph_mpl.savefig(export_path)
-            print(f"Plot saved at {export_path}")
+                # bokeh
+                if backend == "bokeh":
+                    color = self._colourmap[i * len(self._colourmap) // self.num_resonators]
+                    self.fig_bokeh.scatter(
+                        source=source,
+                        x="n_ph",
+                        y="Qc",
+                        size=10,
+                        color=color,
+                        alpha=0.7,
+                        legend_label=f"{freq_bin_cur}",
+                    )
+                    # errorbars
+                    if with_errorbars == True:
+                        errorbars = Whisker(
+                            base="n_ph",
+                            upper="upper",
+                            lower="lower",
+                            source=source,
+                            line_color=color,
+                            line_alpha=0.7,
+                            line_cap="round",
+                            line_width="2",
+                            upper_head=TeeHead(line_color=color, line_alpha=0.7, size=6),
+                            lower_head=TeeHead(line_color=color, line_alpha=0.7, size=6),
+                        )
+                        self.fig_bokeh.add_layout(errorbars)
+                # matplotlib
+                elif backend == "matplotlib":
+                    # colour
+                    color = colors[i]
+                    # errorbars
+                    if with_errorbars == True:
+                        self.ax_ph_mpl.errorbar(
+                            x=source.data["n_ph"],
+                            y=source.data["Qc"],
+                            yerr=source.data["Qc_err"],
+                            fmt="o",
+                            color=color,
+                            alpha=1,
+                            linewidth=2,
+                            label=f"{freq_bin_cur}",
+                        )
+                    else:
+                        self.ax_ph_mpl.scatter(
+                            x=source.data["n_ph"],
+                            y=source.data["Qc"],
+                            size=10,
+                            color=color,
+                            alpha=1,
+                            label=f"{freq_bin_cur}",
+                        )
+        if backend == "bokeh":
+            # show plot
+            if show_plot == True:
+                show(self.fig_bokeh)
+            # save plot
+            if save_plot == True:
+                export_path = os.path.join(self.save_path, "Qc_bokeh.png")
+                export.export_png(obj=self.fig_bokeh, filename=export_path)
+                print(f"Plot saved at {export_path}")
+        if backend == "matplotlib":
+            if show_plot == True:
+                plt.show()
+            # save plot
+            if save_plot == True:
+                export_path = os.path.join(self.save_path, "Qc_mpl.png")
+                self.fig_mpl.savefig(export_path)
+                print(f"Plot saved at {export_path}")
 
     # TLS fit
     @staticmethod
-    def TLS_fit(n_ph, Qi, f, T, bounds=None, Qerr=None, print_log=False, print_fit=True):
+    def TLS_fit(
+        n_ph, Qi, f, T, bounds=None, Qerr=None, print_log=False, print_fit=True
+    ):
         """
         Function for fitting TLS loss model (e.g. in doi: 10.1063/5.0004622) to n_ph vs. Qi. Note: this is a static method (i.e. does not have access to class variables; all arguments must be passed). Fits parameters [F_delta_TLS0, n_c, Q_HP, beta].
 
@@ -638,7 +1019,7 @@ class ResonatorPowerSweep:
         - Qi        List-like of Qi (y) data.
         - f         Frequency of resonator in Hz.
         - T         Temperature of sample during measurement in K.
-        - bounds    (Optional) Bounds for fitting parameters 
+        - bounds    (Optional) Bounds for fitting parameters
                     [F_delta_TLS0, n_c, Q_HP, beta]. Tuple of lists,
                     defaults to ([0, 0.2, 0, 0.0], [1, 1e3, 1e9, 1])
         - Qerr      (Optional) List-like of Qerr (y error) data.
@@ -670,16 +1051,20 @@ class ResonatorPowerSweep:
         if bounds == None:
             bounds = ([0, 0.2, 0, 0.0], [1, 1e3, 1e9, 1])
         else:
-            assert isinstance(bounds, tuple), "Bounds should be passed as a tuple of lists, with elements corresponding to [F_delta_TLS0, n_c, Q_HP, beta]. The first tuple entry is lower bounds, and the second is upper. e.g. bounds = ([0, 0.2, 0, 0.0], [1, 1e3, 1e9, 1])"
-            assert len(bounds[0]) == 4, "Bounds should be passed as a tuple of lists, with elements corresponding to [F_delta_TLS0, n_c, Q_HP, beta]. The first tuple entry is lower bounds, and the second is upper. e.g. bounds = ([0, 0.2, 0, 0.0], [1, 1e3, 1e9, 1])"
-            
+            assert isinstance(
+                bounds, tuple
+            ), "Bounds should be passed as a tuple of lists, with elements corresponding to [F_delta_TLS0, n_c, Q_HP, beta]. The first tuple entry is lower bounds, and the second is upper. e.g. bounds = ([0, 0.2, 0, 0.0], [1, 1e3, 1e9, 1])"
+            assert (
+                len(bounds[0]) == 4
+            ), "Bounds should be passed as a tuple of lists, with elements corresponding to [F_delta_TLS0, n_c, Q_HP, beta]. The first tuple entry is lower bounds, and the second is upper. e.g. bounds = ([0, 0.2, 0, 0.0], [1, 1e3, 1e9, 1])"
+
         # check guesses are valid (if not, move within bounds)
         for i, init in enumerate(init_guesses):
             if init < bounds[0][i]:
                 init_guesses[i] = bounds[0][i] + 1e-8
             elif init > bounds[1][i]:
                 init_guesses[i] = bounds[1][i] - 1e-8
-                
+
         # with error bars
         if Qerr:
             popt, pcov, infodict, mesg, ier = scipy.optimize.curve_fit(
@@ -707,7 +1092,7 @@ class ResonatorPowerSweep:
             print(f"TLS fit for resonator at {f*1e-9:.2f} GHz")
             pprint(infodict)
             print(f"TLS fit 'mesg' --> {mesg}\n")
-        
+
         if print_fit == True:
             print(f"TLS fit ({f*1e-9:.2f} GHz)") if print_log != True else 0
             print(f"\tF delta_TLS =\t{popt[0]:.2e}")
@@ -768,6 +1153,7 @@ class ResonatorPowerSweep:
 
     @staticmethod
     def find_photon_number_index(data: dict, search_key="n_ph", photon_number=1):
+        assert data[search_key]
         index, value = min(
             enumerate(data[search_key]), key=lambda x: abs(x[1] - photon_number)
         )
@@ -776,7 +1162,43 @@ class ResonatorPowerSweep:
     @staticmethod
     def df_to_csv(df: pd.DataFrame, output_path: str, columns_to_use=[]):
         if columns_to_use == []:
-            df.to_csv(output_path, sep="\t", index=False, float_format='%.2e')
-        else: 
-            df[columns_to_use].to_csv(output_path, sep="\t", index=False, float_format='%.2e')
+            df.to_csv(output_path, sep="\t", index=False, float_format="%.2e")
+        else:
+            df[columns_to_use].to_csv(
+                output_path, sep="\t", index=False, float_format="%.2e"
+            )
         print(f"\nFit data written to {output_path}\n")
+
+    @staticmethod
+    def single_circlefit(freq_data, i_vals, q_vals, power_dBm, expected_qi_lims=(0, 1e8)):
+        """
+        Method for a single circlefit. Returns fit results as a dictionary.
+        """
+        # setup circlefit
+        port = circuit.notch_port()
+        port.add_data(
+            freq_data,
+            i_vals + 1j * q_vals,
+        )
+        try:
+            port.autofit()
+        except:
+            print(f"Fitting failed.")
+            return 0
+        else:
+            # write fit results to data dictionary
+            if (
+                expected_qi_lims[0]
+                < port.fitresults["Qi_dia_corr"]
+                < expected_qi_lims[1]
+            ):
+                Qi = port.fitresults['Qi_dia_corr']
+                Qi_err = port.fitresults['Qi_dia_corr_err']
+                n_ph = port.get_photons_in_resonator(power_dBm, unit='dBm', diacorr=True)
+                Qc = port.fitresults['absQc']
+                # write fit results to plot and save
+                port.plotall(save_path="circlefit.pdf", 
+                             text=f"$Q_i=${Qi:.1e} $\\pm$ {Qi_err:.1e}, $\\langle n \\rangle ={n_ph:.1e}$")
+                return port.fitresults
+            else:
+                print(f"Fitted Qi value outside of range (Qi, fitted: {port.fitresults['Qi_dia_corr_err']}).")

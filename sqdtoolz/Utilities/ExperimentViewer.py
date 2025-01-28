@@ -249,7 +249,7 @@ class ExperimentViewer:
         class ElemSimpleLabel:
             def __init__(self, parent):
                 self.lbl = Label(parent, text = "", justify=LEFT)
-                self.lbl.pack(side=LEFT)
+                self.lbl.pack(side=LEFT, anchor=NW)
             
             def set_text_col(self, text, bg_col):
                 self.lbl['text'] = text
@@ -355,6 +355,8 @@ class ExperimentViewer:
         self.dash_MWs.frame.pack(side=LEFT, fill=Y)
 
         frame_grp0a = Frame(master=frame_dash_right)
+        self.dash_EXPparams = ExperimentViewer.DashboardGroup(frame_grp0a, "Current Experiment")
+        self.dash_EXPparams.frame.pack(side=LEFT, fill=Y)
         self.dash_ACQs = ExperimentViewer.DashboardGroup(frame_grp0a, "Acquisition")
         self.dash_ACQs.frame.pack(side=LEFT, fill=Y)
         self.dash_PROCs = ExperimentViewer.DashboardGroup(frame_grp0a, "Processors")
@@ -377,6 +379,7 @@ class ExperimentViewer:
         frame_grp4 = Frame(master=frame_dash_right)
         self.dash_WFMTs = ExperimentViewer.DashboardGroup(frame_grp4, "Waveform Transformations")
         self.dash_WFMTs.frame.pack(side=LEFT)
+
         
         frame_grp0.pack(side=TOP, fill=X)
         frame_grp0a.pack(side=TOP, fill=X)
@@ -514,7 +517,14 @@ class ExperimentViewer:
                     continue
                 self.trvw_expts.insert(tree_folder_date, "end", text=cur_data_folder, tags=[cur_path_data])
 
+        cur_exp_params = []
         while True:
+            try:
+                self.root.update()
+            except:
+                #Application destroyed...
+                return
+    
             #Reset Kill-Switch if applicable
             if os.path.exists(self._path + 'HALT.txt'):
                 self.btn_kill['text'] = 'Kill Experiment (Signal Sent)'
@@ -530,6 +540,23 @@ class ExperimentViewer:
                     data = json.load(json_file)
             except:
                 continue
+
+            file_exp_params = self._path + "_cur_exp.json"
+            if os.path.isfile(file_exp_params):
+                try:    #Needs try-catch as the file may be written to while being read - abort/ignore if it's being updated...
+                    with open(file_exp_params) as json_file:
+                        exp_param_data = json.load(json_file)
+                    cur_exp_params = f"Configuration: {exp_param_data['Configuration']}\n"
+                    cur_exp_params += "Specifications:"
+                    if len(exp_param_data['SPECs']) > 0:
+                        cur_exp_params += "\n"
+                        for cur_spec in exp_param_data['SPECs']:
+                            cur_exp_params += f"   {cur_spec}\n"
+                    cur_exp_params = [(cur_exp_params[:-1], 'white')]
+                except:
+                    pass
+            else:
+                cur_exp_params = [('Idle', 'white')]
 
             #Process the HALs...
             cur_ddgs = []
@@ -664,6 +691,7 @@ class ExperimentViewer:
             self.dash_ATTENs.set_simple_labels(cur_attens)
             self.dash_WFMs.set_simple_label_list(cur_wfms)
             self.dash_WFMTs.set_simple_labels(cur_wfmts)
+            self.dash_EXPparams.set_simple_labels(cur_exp_params)
 
             self.trvw_expts.column("#0", width=self.expts_frame_left.winfo_width(), minwidth=0, stretch=tk.NO)
 
@@ -682,12 +710,6 @@ class ExperimentViewer:
                 cur_vars += [f"{cur_var}: {Miscellaneous.get_units(data[cur_var]['Value'])}\n"]
             # self.dash_VARs.set_simple_labels([(cur_str[:-1], 'white')])
             self.dash_VARs.set_simple_list([cur_vars])
-
-            try:
-                self.root.update()
-            except:
-                #Application destroyed...
-                return
 
 
     def _get_units(self, val):
@@ -839,5 +861,5 @@ if __name__ == '__main__':
         print(sys.argv[1])
         ExperimentViewer(sys.argv[1]).main_loop()
 
-ExperimentViewer(r'D:\WorkUQ\Other Projects\VNA Chevrons\\').main_loop()
+    # ExperimentViewer(r'mySaves/').main_loop()
 a=0

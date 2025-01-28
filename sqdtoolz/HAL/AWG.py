@@ -291,7 +291,7 @@ class AWGBase(HALbase):
 
 
 class WaveformAWG(AWGBase, HALbase, TriggerOutputCompatible, TriggerInputCompatible):
-    def __init__(self, hal_name, lab, awg_channel_tuples, sample_rate, total_time=-1, global_factor = 1.0):
+    def __init__(self, hal_name, lab, awg_channel_tuples, sample_rate, total_time=-1, global_factor = 1.0, **kwargs):
         AWGBase.__init__(self, hal_name, sample_rate, total_time, global_factor)
         self._wfm_segment_list = []
         if not lab._HAL_exists(hal_name):
@@ -311,6 +311,9 @@ class WaveformAWG(AWGBase, HALbase, TriggerOutputCompatible, TriggerInputCompati
         self._trig_src_pol = 1
         self._lab = lab
         self._cur_prog_waveforms = [None]*len(awg_channel_tuples)
+        config_dict = kwargs.get('dict_config', None)
+        if isinstance(config_dict, dict):
+            self._set_current_config(config_dict, lab)
         lab._register_HAL(self)
 
     @classmethod
@@ -322,7 +325,7 @@ class WaveformAWG(AWGBase, HALbase, TriggerOutputCompatible, TriggerInputCompati
                     awg_channel_tuples,
                     config_dict["SampleRate"],
                     config_dict["TotalTime"],
-                    config_dict["global_factor"])
+                    config_dict["global_factor"], dict_config = config_dict)
 
     @property
     def Duration(self):

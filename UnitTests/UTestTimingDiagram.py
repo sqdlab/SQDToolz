@@ -85,7 +85,7 @@ awg_wfm2.set_trigger_source_all(awg_wfm.get_output_channel(0).marker(1))
 awg_wfm.set_trigger_source_all(hal_ddg.get_trigger_output('C'))
 hal_acq.InputTriggerEdge = 0
 expConfig = ExperimentConfiguration('testConf', lab, 2e-6, ['ddg', 'Wfm1', 'Wfm2', 'MW-Src'], 'dum_acq')
-arr_act, arr_act_segs = expConfig.get_trigger_edges(hal_acq)
+arr_act, arr_act_segs, cur_trig_srcs = expConfig.get_trigger_edges(hal_acq)
 temp = np.array([10e-9, 1e-9*(10+20+30+45+77), 1e-9*(10+(20+30+45)*2+77*3), 1e-9*(10+(20+30+45)*3+77*6)])
 arr_exp = round_to_samplerate(awg_wfm, np.sort(np.concatenate( [(650+0)*1e-9 + temp, (650+20+27)*1e-9 + temp])) )
 assert arr_equality(arr_act, arr_exp), "Incorrect trigger edges returned by the get_trigger_edges function on including 2 AWGs and MW-Source."

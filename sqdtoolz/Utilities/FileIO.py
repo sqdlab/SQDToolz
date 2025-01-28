@@ -20,6 +20,8 @@ class FileIOWriter:
         self._hf = None
         self._data_array_shape = None
         self.store_timestamps = kwargs.get('store_timestamps', True)
+        self._create_reverse_channels = kwargs.get('add_reverse_channels', False)
+        self._reverse_channel_suffix = kwargs.get('reverse_channel_suffix', '_reverse')
 
     def _get_dataset_sizes(self, sweep_vars, data_pkt):
         random_dataset = next(iter(data_pkt['data'].values()))
@@ -38,8 +40,7 @@ class FileIOWriter:
         
         return data_pkt_size, param_sizes, data_array_shape
 
-
-    def _init_hdf5(self, sweep_vars, data_pkt, sweepEx = {}):
+    def _init_hdf5(self, sweep_vars, data_pkt, sweepEx = {}, ):
         if self._hf == None:
             self._datapkt_size, param_sizes, self._data_array_shape = self._get_dataset_sizes(sweep_vars, data_pkt)
             #
@@ -75,10 +76,16 @@ class FileIOWriter:
                 self._meas_chs = []
                 for m, cur_meas_ch in enumerate(data_pkt['data'].keys()):
                     grp_meas.create_dataset(cur_meas_ch, data=np.hstack([m]), maxshape=(None,))
-                    self._meas_chs += [cur_meas_ch]
+                    self._meas_chs.append(cur_meas_ch)
+                if self._create_reverse_channels:
+                    le_ch_names = [x+self._reverse_channel_suffix for x in self._meas_chs]
+                    ind_offset = len(le_ch_names)
+                    for m, cur_meas_ch in enumerate(le_ch_names):
+                        grp_meas.create_dataset(cur_meas_ch, data=np.hstack([m+ind_offset]), maxshape=(None,))
+                        self._meas_chs.append(cur_meas_ch)
 
                 arr_size = int(np.prod(np.array(self._data_array_shape, dtype=np.int64)))
-                self._num_cols = len(data_pkt['data'].keys())
+                self._num_cols = len(self._meas_chs)
                 arr = np.zeros((arr_size, self._num_cols))
                 arr[:] = np.nan
                 #TODO: Change this if allowing resizing on other sweeping axes...
@@ -121,9 +128,15 @@ class FileIOWriter:
             cur_dset_ind = dset_ind
         else:
             cur_dset_ind = self._dset_ind
-        cur_data = np.vstack([data_pkt['data'][x].flatten() for x in self._meas_chs]).T
-        self._dset[cur_dset_ind*self._datapkt_size : (cur_dset_ind+1)*self._datapkt_size] = cur_data
+        #
+        #Doing the columns individually - e.g. as required when using reverse for example as only some channels get filled/populated at a time...
+        for x in data_pkt['data']:
+            cur_data = data_pkt['data'][x].flatten()
+            assert x in self._meas_chs, f"The channel {x} was not present when initialising the FileIOWriter object. Cannot write this data as the storage has not been properly initialised."
+            self._dset[cur_dset_ind*self._datapkt_size : (cur_dset_ind+1)*self._datapkt_size, self._meas_chs.index(x)] = cur_data
+        #
         if self.store_timestamps:
+            #TODO: When reverse-sweeping, the time-stamps are just overwritten as they don't go to the granularity of dependent variables? Fix this with some changes?
             #Trick taken from here: https://stackoverflow.com/questions/68443753/datetime-storing-in-hd5-database
             utc_strs = np.repeat(np.datetime_as_string(np.datetime64(datetime.now()),timezone='UTC').encode('utf-8'), cur_data.shape[0])
             self._dsetTS[cur_dset_ind*self._datapkt_size : (cur_dset_ind+1)*self._datapkt_size] = utc_strs

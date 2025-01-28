@@ -13,5 +13,3 @@ instruments:
     type: sqdtoolz.Drivers.dummyGENmwSource.DummyGENmwSrc
   virMWS2:
     type: sqdtoolz.Drivers.dummyGENmwSource.DummyGENmwSrc
-  virSMU:
-    type: sqdtoolz.Drivers.dummySMU.DummySMU

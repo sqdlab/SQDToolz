@@ -19,6 +19,7 @@ from sqdtoolz.HAL.GENswitchTrig import GENswitchTrig
 from sqdtoolz.HAL.GENtherm import GENtherm
 from sqdtoolz.HAL.SOFTpid import SOFTpid
 from sqdtoolz.HAL.ACQvna import ACQvna
+from sqdtoolz.HAL.ACQsa import ACQsa
 from sqdtoolz.HAL.GENsmu import GENsmu
 from sqdtoolz.HAL.WaveformSegments import*
 from sqdtoolz.HAL.WaveformMapper import*

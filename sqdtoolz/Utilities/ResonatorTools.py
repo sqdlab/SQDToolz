@@ -481,6 +481,134 @@ class ResonatorPowerSweep:
             )
         self.fit_data = df_filtered
 
+    def get_text_summary(
+            self, 
+            n_ph_HP=1e6,
+            ):
+        '''
+        Saves a text file with a complete data summary to the data_path.
+
+        Per resonator
+            Qi,LP
+            Qi,HP
+            Qc average +/- SE
+            Qc total range
+            f average +/- QC
+            f total range
+
+        Averages and statistical values
+            Qi,LP maximum
+            Qi,LP average +/- SE
+            Qi,HP maximum
+            Qi,HP average +/- SE
+            Qc average +/- SE
+            Qc maximum
+            Qc minimum
+        '''
+        export_path = os.path.join(self.save_path, f"data_summary_{self.name}.txt")
+        col_width = 13
+        headers_per_res = ["Qi,LP", "Qi,HP", "Qc med", "Qc range", "f med [Hz]", "f range [Hz]"]
+        headers_stats = ["Qi,LP \tmax", "Qi,LP \tAv +/- SE", "Qi,HP \tmax", "Qi,HP \tAv +/- SE", "Qc    \tAv +/- SE", "Qc    \tmax", "Qc    \tmin"]
+
+        with open(export_path, "w") as file:
+            # Format headers with equal spacing
+            file.write(f"Q-factor summary: {self.name}\nData: {self.data_path}\n\n")  # Write headers to file
+            header_line = "".join(h.ljust(col_width) for h in headers_per_res)
+            file.write("Per resonator\n" + header_line + "\n")  # Write headers to file
+            file.write("-" * (col_width * len(headers_per_res)) + "\n")  # Add a separator line
+
+        # setup for calculating statistical values
+        Qi_LP = []
+        Qi_HP = []
+        Qc = np.array(self.fit_data["Qc_dia_corr"])
+
+        for i, freq_bin_cur in enumerate(self.freq_bin_labels):
+
+            res_data = self.isolate_resonator_data(freq_bin_cur)
+
+            LP_indx = self.find_photon_number_index(
+                data=self.fit_data, search_key="n_ph", photon_number=1
+            )
+            Qi_LP.append(np.array(res_data["Qi"])[LP_indx])
+            # get high power Qi
+            HP_indx = self.find_photon_number_index(
+                data=self.fit_data, search_key="n_ph", photon_number=n_ph_HP
+            )
+            Qi_HP.append(np.array(res_data["Qi"])[HP_indx])
+
+            # calculate per-resonator values
+            f_av = self.filtered_mean_iqr(res_data["f"])
+            Qc_av = self.filtered_mean_iqr(res_data["Qc"]) 
+            f_range = self.filtered_mean_iqr(res_data["f"], filtered_range=True)
+            Qc_range = self.filtered_mean_iqr(res_data["Qc"], filtered_range=True)
+
+            # print to file
+            vals = [Qi_LP[i], Qi_HP[i], Qc_av, Qc_range, f_av, f_range]
+            with open(export_path, "a") as file:
+                file.write("".join(f"{val:<{col_width}.2e}" for val in vals) + "\n")
+
+        # calculate statistical values
+        Qi_LP_max = np.max(Qi_LP)
+        Qi_LP_av = self.filtered_mean_iqr(Qi_LP)
+        Qi_LP_SE = np.std(Qi_LP, ddof=1) / np.sqrt(len(Qi_LP))
+        Qi_HP_max = np.max(Qi_HP)
+        Qi_HP_av = self.filtered_mean_iqr(Qi_HP)
+        Qi_HP_SE = np.std(Qi_HP, ddof=1) / np.sqrt(len(Qi_HP))
+        Qc_av = self.filtered_mean_iqr(Qc)
+        Qc_SE = self.filtered_mean_iqr(Qc, filtered_SE=True)
+        Qc_max = np.max(Qc)
+        Qc_min = np.min(Qc)
+
+        with open(export_path, "a") as file:
+            file.write("\n\nStatistical values across all resonators\n")
+            file.write("-" * (col_width * len(headers_per_res)) + "\n")  # Add a separator line
+            # add values as strings
+            vals = [
+                f"{Qi_LP_max:.3e}",
+                f"{Qi_LP_av:.3e} +/- {Qi_LP_SE:.3e}\n",
+                f"{Qi_HP_max:.3e}",
+                f"{Qi_HP_av:.3e} +/- {Qi_HP_SE:.3e}\n",
+                f"{Qc_av:.3e} +/- {Qc_SE:.3e}",
+                f"{Qc_max:.3e}",
+                f"{Qc_min:.3e}"
+            ]
+            assert len(vals) == len(headers_stats)
+            for i, val in enumerate(vals):
+                file.write(f"{headers_stats[i]:<{2*col_width}}{val}\n")
+            file.write(f"\n\nNotes:\n- HP (high power) is roughly {n_ph_HP:.0e} photons\n- LP (low power) is roughly one photon\n- Values outside 1.5*IQR are removed before calculating\n  mean (av), range, standard error (SE)")
+        print(f"File printed at {export_path}")
+    
+    @staticmethod
+    def filtered_mean_iqr(data, filtered_range=False, filtered_SE=False):
+        data = np.array(data)  # Convert to NumPy array
+        q1, q3 = np.percentile(data, [25, 75])  # First & third quartiles
+        iqr = q3 - q1  # Interquartile range
+        lower_bound = q1 - 1.5 * iqr
+        upper_bound = q3 + 1.5 * iqr
+        filtered_data = data[(data >= lower_bound) & (data <= upper_bound)]  # Keep only in-range values
+
+        if filtered_range == True:
+            # Compute range (max - min) from filtered data
+            return np.ptp(filtered_data) if filtered_data.size > 0 else np.ptp(data)  # Avoid empty array issues
+        elif filtered_SE == True:
+            return np.std(filtered_data, ddof=1) / np.sqrt(len(filtered_data)) if filtered_data.size > 0 else np.std(data, ddof=1) / np.sqrt(len(data)) # Avoid empty array issues # Avoid empty array issues
+        else:
+            return np.mean(filtered_data) if filtered_data.size > 0 else np.mean(data)  # Avoid empty slice
+
+
+    def isolate_resonator_data(self, freq_bin_label):
+        # initialise plot data for new resonator
+        n_ph, Qi, Qc, f = [], [], [], []
+        frequency = float(freq_bin_label.split()[0]) * 1e9  # Hz
+        for _, row in self.fit_data.iterrows():
+            # add measurement from self.fit_data if in current bin
+            if row["freq bin"] == freq_bin_label:
+                n_ph.append(row["n_ph"])
+                Qi.append(row["Qi_dia_corr"])
+                Qc.append(row["Qc_dia_corr"])
+                f.append(row['fr'])
+        return dict(n_ph=n_ph, Qi=Qi, Qc=Qc, f=f)
+
     # Qi vs photon number
     def plot_Qi_n_ph(
         self,
@@ -1153,7 +1281,7 @@ class ResonatorPowerSweep:
 
     @staticmethod
     def find_photon_number_index(data: dict, search_key="n_ph", photon_number=1):
-        assert data[search_key]
+        assert search_key in data.keys()
         index, value = min(
             enumerate(data[search_key]), key=lambda x: abs(x[1] - photon_number)
         )

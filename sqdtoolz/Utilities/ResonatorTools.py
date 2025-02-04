@@ -167,7 +167,7 @@ class ResonatorPowerSweep:
             ), "Entries in list files_to_ignore should be strings, e.g. ['file1', 'file2']."
 
         if print_log != "none":
-            print(f"Importing data from {self.data_path}..\n")
+            print(f"Importing data from {self.data_path}\n")
         # Loop through each sub-folder
         for root, _, files in os.walk(self.data_path):
             # root_shortened = Path(*Path(root).parts[-3:])
@@ -251,7 +251,7 @@ class ResonatorPowerSweep:
             else:
                 if print_log != "none":
                     print(f"Invalid\t\t{root_shortened}")
-        assert self.data
+        assert self.data, "No valid data found at data_path."
         print("\nData import complete.")
         return self.data
 
@@ -487,28 +487,11 @@ class ResonatorPowerSweep:
             ):
         '''
         Saves a text file with a complete data summary to the data_path.
-
-        Per resonator
-            Qi,LP
-            Qi,HP
-            Qc average +/- SE
-            Qc total range
-            f average +/- QC
-            f total range
-
-        Averages and statistical values
-            Qi,LP maximum
-            Qi,LP average +/- SE
-            Qi,HP maximum
-            Qi,HP average +/- SE
-            Qc average +/- SE
-            Qc maximum
-            Qc minimum
         '''
         export_path = os.path.join(self.save_path, f"data_summary_{self.name}.txt")
         col_width = 13
-        headers_per_res = ["Qi,LP", "Qi,HP", "Qc med", "Qc range", "f med [Hz]", "f range [Hz]"]
-        headers_stats = ["Qi,LP \tmax", "Qi,LP \tAv +/- SE", "Qi,HP \tmax", "Qi,HP \tAv +/- SE", "Qc    \tAv +/- SE", "Qc    \tmax", "Qc    \tmin"]
+        headers_per_res = ["Qi,LP", "Qi,HP", "Qc med", "Qc range", "f med [Hz]", "f range [Hz]", "F*tanδ", "n_c"]
+        headers_stats = ["Qi,LP \tmax", "Qi,LP \tAv +/- SE", "Qi,HP \tmax", "Qi,HP \tAv +/- SE", "Qc    \tAv +/- SE", "Qc    \tmax", "Qc    \tmin", "F*tanδ Av +/- SE", "F*tanδ min"]
 
         with open(export_path, "w") as file:
             # Format headers with equal spacing
@@ -520,6 +503,8 @@ class ResonatorPowerSweep:
         # setup for calculating statistical values
         Qi_LP = []
         Qi_HP = []
+        F_tan_delta = []
+        n_c = []
         Qc = np.array(self.fit_data["Qc_dia_corr"])
 
         for i, freq_bin_cur in enumerate(self.freq_bin_labels):
@@ -542,8 +527,13 @@ class ResonatorPowerSweep:
             f_range = self.filtered_mean_iqr(res_data["f"], filtered_range=True)
             Qc_range = self.filtered_mean_iqr(res_data["Qc"], filtered_range=True)
 
+            # calculate F*tanδ
+            fit_dict, _, _ = self.TLS_fit(res_data["n_ph"], res_data["Qi"], f=f_av, T=self.T, Qerr=res_data["Qerr"], bounds=self.TLSfit_bounds)
+            F_tan_delta.append(fit_dict["F_tan_delta"])
+            n_c.append(fit_dict["n_c"])
+
             # print to file
-            vals = [Qi_LP[i], Qi_HP[i], Qc_av, Qc_range, f_av, f_range]
+            vals = [Qi_LP[i], Qi_HP[i], Qc_av, Qc_range, f_av, f_range, F_tan_delta[i], n_c[i]]
             with open(export_path, "a") as file:
                 file.write("".join(f"{val:<{col_width}.2e}" for val in vals) + "\n")
 
@@ -558,6 +548,9 @@ class ResonatorPowerSweep:
         Qc_SE = self.filtered_mean_iqr(Qc, filtered_SE=True)
         Qc_max = np.max(Qc)
         Qc_min = np.min(Qc)
+        F_tan_delta_av = self.filtered_mean_iqr(F_tan_delta)
+        F_tan_delta_SE = self.filtered_mean_iqr(F_tan_delta, filtered_SE=True)
+        F_tan_delta_min = np.min(F_tan_delta)
 
         with open(export_path, "a") as file:
             file.write("\n\nStatistical values across all resonators\n")
@@ -570,7 +563,9 @@ class ResonatorPowerSweep:
                 f"{Qi_HP_av:.3e} +/- {Qi_HP_SE:.3e}\n",
                 f"{Qc_av:.3e} +/- {Qc_SE:.3e}",
                 f"{Qc_max:.3e}",
-                f"{Qc_min:.3e}"
+                f"{Qc_min:.3e}\n",
+                f"{F_tan_delta_av:.3e} +/- {F_tan_delta_SE:.3e}",
+                f"{F_tan_delta_min:.3e}\n"
             ]
             assert len(vals) == len(headers_stats)
             for i, val in enumerate(vals):
@@ -598,7 +593,7 @@ class ResonatorPowerSweep:
 
     def isolate_resonator_data(self, freq_bin_label):
         # initialise plot data for new resonator
-        n_ph, Qi, Qc, f = [], [], [], []
+        n_ph, Qi, Qc, f, Qerr = [], [], [], [], []
         frequency = float(freq_bin_label.split()[0]) * 1e9  # Hz
         for _, row in self.fit_data.iterrows():
             # add measurement from self.fit_data if in current bin
@@ -607,7 +602,8 @@ class ResonatorPowerSweep:
                 Qi.append(row["Qi_dia_corr"])
                 Qc.append(row["Qc_dia_corr"])
                 f.append(row['fr'])
-        return dict(n_ph=n_ph, Qi=Qi, Qc=Qc, f=f)
+                Qerr.append(row["Qi_dia_corr_err"])
+        return dict(n_ph=n_ph, Qi=Qi, Qc=Qc, f=f, Qerr=Qerr)
 
     # Qi vs photon number
     def plot_Qi_n_ph(
@@ -693,7 +689,7 @@ class ResonatorPowerSweep:
                 # TLS fit
                 n_ph_TLS, TLSfit = None, None
                 if with_fit == True:
-                    n_ph_TLS, TLSfit = self.TLS_fit(
+                    _, n_ph_TLS, TLSfit = self.TLS_fit(
                         n_ph=source.data["n_ph"],
                         Qi=source.data["Qi"],
                         f=f,
@@ -776,7 +772,7 @@ class ResonatorPowerSweep:
                     # TLS fit
                     n_ph_TLS, TLSfit = None, None
                     if with_fit == True:
-                        n_ph_TLS, TLSfit = self.TLS_fit(
+                        _, n_ph_TLS, TLSfit = self.TLS_fit(
                             n_ph=source.data["n_ph"],
                             Qi=source.data["Qi"],
                             f=f,
@@ -1155,12 +1151,15 @@ class ResonatorPowerSweep:
         - print_fit (Defaults to True) Prints fit parameters for each fit
 
         Outputs:
-        - Tuple containing (x, y) data, where x is n_ph, and y is the TLS fit.
+        - Tuple containing (x, y, z)
+            - x: dict of fit parameters {"F_tan_delta", "n_c", "Q_HP", "beta"}
+            - y: n_ph (array)
+            - z: the TLS fit as a function of n_ph (array)
         """
 
-        assert isinstance(T, (float, int))
-        assert isinstance(f, (float, int))
-        assert len([n_ph, Qi, Qerr]) > 0
+        assert isinstance(T, (float, int)), "Temperature should be a float or int."
+        assert isinstance(f, (float, int)), "Frequency should be a float or int."
+        assert len([n_ph, Qi, Qerr]) > 0, "Please provide n_ph and Qi data."
 
         # constants
         hbar = 1.054 * 10 ** (-34)
@@ -1195,26 +1194,32 @@ class ResonatorPowerSweep:
 
         # with error bars
         if Qerr:
-            popt, pcov, infodict, mesg, ier = scipy.optimize.curve_fit(
-                TLS_model,
-                xdata=np.array(n_ph),
-                ydata=np.array(Qi),
-                p0=init_guesses,
-                sigma=np.array(Qerr),
-                bounds=bounds,
-                full_output=True,
-            )
+            try:
+                popt, pcov, infodict, mesg, ier = scipy.optimize.curve_fit(
+                    TLS_model,
+                    xdata=np.array(n_ph),
+                    ydata=np.array(Qi),
+                    p0=init_guesses,
+                    sigma=np.array(Qerr),
+                    bounds=bounds,
+                    full_output=True,
+                )
+            except:
+                popt = [0, 0, 0, 0]
         # without error bars
         else:
-            popt, pcov, infodict, mesg, ier = scipy.optimize.curve_fit(
-                TLS_model,
-                xdata=np.array(n_ph),
-                ydata=np.array(Qi),
-                p0=init_guesses,
-                sigma=np.array(Qerr),
-                bounds=bounds,
-                full_output=True,
-            )
+            try:
+                popt, pcov, infodict, mesg, ier = scipy.optimize.curve_fit(
+                    TLS_model,
+                    xdata=np.array(n_ph),
+                    ydata=np.array(Qi),
+                    p0=init_guesses,
+                    sigma=np.array(Qerr),
+                    bounds=bounds,
+                    full_output=True,
+                )
+            except:
+                popt = [0, 0, 0, 0]
         # print info
         if print_log == True:
             print(f"TLS fit for resonator at {f*1e-9:.2f} GHz")
@@ -1227,9 +1232,16 @@ class ResonatorPowerSweep:
             print(f"\tn_c =\t\t{popt[1]:.2f}")
             print(f"\tQ_HP =\t\t{popt[2]:.2e}")
             print(f"\tbeta =\t\t{popt[3]:.2f}\n")
+        
+        fit_dict = {
+            "F_tan_delta": popt[0],
+            "n_c": popt[1],
+            "Q_HP": popt[2],
+            "beta": popt[3],
+        }
 
         # return (x, y) tuple of fit data
-        return (n_ph, TLS_model(np.array(n_ph), *popt))
+        return (fit_dict, n_ph, TLS_model(np.array(n_ph), *popt))
 
     # Function to generate a unique file name by incrementing if file exists
     def get_unique_filename(self, directory=None, base_filename="fitted_data"):

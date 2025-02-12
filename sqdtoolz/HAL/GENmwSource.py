@@ -108,6 +108,10 @@ class GENmwSource(HALbase, TriggerInputCompatible, TriggerInput):
             'ManualActivation' : self.ManualActivation
             }
         self.pack_properties_to_dict(['Power', 'Frequency', 'Phase', 'AmplitudeModDepth', 'FrequencyModAmplitude', 'PhaseModAmplitude', 'Mode', 'Output'], ret_dict)
+        if hasattr(self._instr_mw_output, 'query_hardware_errors'):
+            cur_error = self._instr_mw_output.query_hardware_errors()
+            if cur_error != "":
+                ret_dict['Error'] = cur_error
         return ret_dict
 
     def _set_current_config(self, dict_config, lab):

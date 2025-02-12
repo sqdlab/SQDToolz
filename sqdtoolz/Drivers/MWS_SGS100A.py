@@ -115,6 +115,9 @@ class MWS_SGS100A_Channel(InstrumentChannel):
             assert False, "The SGS100A does not support external amplitude modulation."
         elif new_mode == 'FrequencyModulated':
             assert False, "The SGS100A does not support external frequency modulation."
+    
+    def query_hardware_errors(self):
+        return self._parent.query_hardware_errors()
 
 class MWS_SGS100A(VisaInstrument):
     """
@@ -187,4 +190,14 @@ class MWS_SGS100A(VisaInstrument):
 
     def get_all_outputs(self):
         return [(x,self._source_outputs[x]) for x in self._source_outputs]
+
+    def query_hardware_errors(self):
+        leErrs = self.ask('SYST:SERR?')
+        errCode = int(leErrs.split(',')[0])
+        if errCode == 0:
+            return ""
+        elif errCode == -300:
+            return "Chk. REF Clock."
+        else:
+            return leErrs
 

@@ -801,7 +801,7 @@ class TestSweeps(unittest.TestCase):
         #Check basic parameter storage with 1D reverse sweep...
         exp = Experiment("test", self.lab.CONFIG('testConf'))
         self.lab.VAR('myFreq').Value = 5
-        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1))], delay=0.1, reverse_index=0, rec_params=[self.lab.VAR('myFreq'), self.lab.VAR('testAmpl')])
+        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1))], delay=1, reverse_index=0, rec_params=[self.lab.VAR('myFreq'), self.lab.VAR('testAmpl')])
         assert hasattr(exp, 'last_rec_params'), "Running an experiment with rec_params did not create an attribute \'last_rec_params\'."
         assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array().shape), np.array([3,4])), "Reverse sweeping experiment in 1D did not produce the right number of dependent parameters."
         assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array()), np.array([[5,0]*2,[5,1]*2,[5,2]*2])), "Reverse sweeping experiment in 1D did not store the correct data."
@@ -814,7 +814,7 @@ class TestSweeps(unittest.TestCase):
         self.lab.VAR('myFreq').Value = 2
         self.lab.UpdateStateEnabled = False
         self.lab.HAL('SMU').Voltage = 0
-        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1))], delay=0.1, reverse_index=0, rec_params=[self.lab.VAR('myFreq'), self.lab.VAR('testAmpl'), (self.lab.HAL('SMU'), 'Voltage')])
+        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1))], delay=1, reverse_index=0, rec_params=[self.lab.VAR('myFreq'), self.lab.VAR('testAmpl'), (self.lab.HAL('SMU'), 'Voltage')])
         assert hasattr(exp, 'last_rec_params'), "Running an experiment with rec_params did not create an attribute \'last_rec_params\'."
         arr = exp.last_rec_params.get_numpy_array()
         assert self.arr_equality(np.array(arr.shape), np.array([3,6])), "Reverse sweeping experiment in 1D did not produce the right number of dependent parameters."
@@ -830,7 +830,7 @@ class TestSweeps(unittest.TestCase):
         self.lab.VAR('myFreq').Value = 2
         self.lab.UpdateStateEnabled = False
         self.lab.HAL('SMU').Voltage = 0
-        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1)), (self.lab.VAR("myFreq"), np.arange(1,5,1))], delay=0.1, reverse_index=0, rec_params=[self.lab.VAR('myFreq'), self.lab.VAR('testAmpl'), (self.lab.HAL('SMU'), 'Voltage')])
+        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1)), (self.lab.VAR("myFreq"), np.arange(1,5,1))], delay=1, reverse_index=0, rec_params=[self.lab.VAR('myFreq'), self.lab.VAR('testAmpl'), (self.lab.HAL('SMU'), 'Voltage')])
         assert hasattr(exp, 'last_rec_params'), "Running an experiment with rec_params did not create an attribute \'last_rec_params\'."
         arr = exp.last_rec_params.get_numpy_array()
         assert self.arr_equality(np.array(arr.shape), np.array([3,4,6])), "Reverse sweeping experiment in 2D did not produce the right number of dependent parameters."
@@ -847,7 +847,7 @@ class TestSweeps(unittest.TestCase):
         self.lab.VAR('myFreq').Value = 2
         self.lab.UpdateStateEnabled = False
         self.lab.HAL('SMU').Voltage = 0
-        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1)), (self.lab.VAR("myFreq"), np.arange(1,5,1))], delay=0.1, reverse_index=1, rec_params=[self.lab.VAR('myFreq'), self.lab.VAR('testAmpl'), (self.lab.HAL('SMU'), 'Voltage')])
+        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1)), (self.lab.VAR("myFreq"), np.arange(1,5,1))], delay=1, reverse_index=1, rec_params=[self.lab.VAR('myFreq'), self.lab.VAR('testAmpl'), (self.lab.HAL('SMU'), 'Voltage')])
         assert hasattr(exp, 'last_rec_params'), "Running an experiment with rec_params did not create an attribute \'last_rec_params\'."
         arr = exp.last_rec_params.get_numpy_array()
         assert self.arr_equality(np.array(arr.shape), np.array([3,4,6])), "Reverse sweeping experiment in 2D did not produce the right number of dependent parameters."
@@ -869,7 +869,7 @@ class TestSweeps(unittest.TestCase):
         #Check basic parameter storage with 1D auxiliary sweep...
         exp = Experiment("test", self.lab.CONFIG('testConf'))
         self.lab.VAR('myFreq').Value = 5
-        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1))], delay=0.1, aux_sweep=('reverse', 0, np.arange(3,-1,-1)), rec_params=[self.lab.VAR('myFreq'), self.lab.VAR('testAmpl')])
+        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1))], delay=1, aux_sweep=('reverse', 0, np.arange(3,-1,-1)), rec_params=[self.lab.VAR('myFreq'), self.lab.VAR('testAmpl')])
         assert hasattr(exp, 'last_rec_params'), "Running an experiment with rec_params did not create an attribute \'last_rec_params\'."
         assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array().shape), np.array([3,2])), "Auxiliary sweeping experiment in 1D did not produce the right number of dependent parameters."
         assert self.arr_equality(np.array(exp.last_rec_params.get_numpy_array()), np.array([[5,0],[5,1],[5,2]])), "Auxiliary sweeping experiment in 1D did not store the correct data."
@@ -887,7 +887,7 @@ class TestSweeps(unittest.TestCase):
         self.lab.VAR('myFreq').Value = 2
         self.lab.UpdateStateEnabled = False
         self.lab.HAL('SMU').Voltage = 0
-        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1))], delay=0.1, aux_sweep=('reverse', 0, np.arange(3,-1,-1)), rec_params=[self.lab.VAR('myFreq'), self.lab.VAR('testAmpl'), (self.lab.HAL('SMU'), 'Voltage')])
+        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1))], delay=1, aux_sweep=('reverse', 0, np.arange(3,-1,-1)), rec_params=[self.lab.VAR('myFreq'), self.lab.VAR('testAmpl'), (self.lab.HAL('SMU'), 'Voltage')])
         assert hasattr(exp, 'last_rec_params'), "Running an experiment with rec_params did not create an attribute \'last_rec_params\'."
         arr = exp.last_rec_params.get_numpy_array()
         arrA = exp.last_rec_params_aux.get_numpy_array()
@@ -904,7 +904,7 @@ class TestSweeps(unittest.TestCase):
         self.lab.VAR('myFreq').Value = 2
         self.lab.UpdateStateEnabled = False
         self.lab.HAL('SMU').Voltage = 0
-        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1)), (self.lab.VAR("myFreq"), np.arange(1,5,1))], delay=0.1, aux_sweep=('reverse', 0, np.arange(3,-1,-1)), rec_params=[self.lab.VAR('myFreq'), self.lab.VAR('testAmpl'), (self.lab.HAL('SMU'), 'Voltage')])
+        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1)), (self.lab.VAR("myFreq"), np.arange(1,5,1))], delay=1, aux_sweep=('reverse', 0, np.arange(3,-1,-1)), rec_params=[self.lab.VAR('myFreq'), self.lab.VAR('testAmpl'), (self.lab.HAL('SMU'), 'Voltage')])
         assert hasattr(exp, 'last_rec_params'), "Running an experiment with rec_params did not create an attribute \'last_rec_params\'."
         arr = exp.last_rec_params.get_numpy_array()
         arrA = exp.last_rec_params_aux.get_numpy_array()
@@ -927,7 +927,7 @@ class TestSweeps(unittest.TestCase):
         self.lab.VAR('myFreq').Value = 2
         self.lab.UpdateStateEnabled = False
         self.lab.HAL('SMU').Voltage = 0
-        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1)), (self.lab.VAR("myFreq"), np.arange(1,5,1))], delay=0.1, aux_sweep=('reverse', 1, np.arange(7,2,-1)), rec_params=[self.lab.VAR('myFreq'), self.lab.VAR('testAmpl'), (self.lab.HAL('SMU'), 'Voltage')])
+        res = self.lab.run_single(exp, [(self.lab.VAR("testAmpl"), np.arange(0,3,1)), (self.lab.VAR("myFreq"), np.arange(1,5,1))], delay=1, aux_sweep=('reverse', 1, np.arange(7,2,-1)), rec_params=[self.lab.VAR('myFreq'), self.lab.VAR('testAmpl'), (self.lab.HAL('SMU'), 'Voltage')])
         assert hasattr(exp, 'last_rec_params'), "Running an experiment with rec_params did not create an attribute \'last_rec_params\'."
         arr = exp.last_rec_params.get_numpy_array()
         arrA = exp.last_rec_params_aux.get_numpy_array()

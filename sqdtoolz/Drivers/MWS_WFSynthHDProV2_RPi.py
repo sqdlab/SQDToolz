@@ -9,6 +9,9 @@ class MWS_WFSynthHDProV2_RPi_Device(MWS_WFSynthHDProV2):
     def __init__(self, name, dev_id, parent:Instrument, **kwargs):
         self.dev_id = dev_id
         self._parent = parent
+        self._address = ''
+        self._terminator = ''
+        self.timeout = self._parent.timeout
         super().__init__(name, '', init_instrument_only=True)
         
 

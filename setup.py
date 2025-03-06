@@ -18,7 +18,7 @@ setuptools.setup(
     ],
     python_requires='>=3.9',
     keywords='control toolbox, timing',
-    install_requires=['numpy','qcodes>=0.21.0','matplotlib','scipy','pyvisa-py','resonator_tools @ git+https://github.com/6biscuits/resonator_tools.git'],
+    install_requires=['numpy','qcodes>=0.21.0','matplotlib','scipy','pyvisa-py','resonator_tools @ git+https://github.com/6biscuits/resonator_tools.git', 'ply'],
     package_data={
         "sqdtoolz":["Drivers/*.py","HAL/*.py"]
     }

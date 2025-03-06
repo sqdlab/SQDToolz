@@ -8,18 +8,18 @@ class _ParserOpenQASM:
     # literals = r'=<>,.^"'
     reserved = {
         'gate' : 'GATE',
+        'OPENQASM' : 'VERSION',
         'if' : 'IF',
         'else' : 'ELSE',
         'for' : 'FOR',
-        'int' : 'INT'
+        'int' : 'INT',
+        'opaque' : 'OPAQUE',
+        'save_statevector' : 'SAVE_STATEVECTOR',
+        'qubit' : 'QUBIT',
+        'bit' : 'BIT',
+        'measure' : 'MEASURE'
         }
     tokens = (
-        'IF',
-        'ELSE',
-        'FOR',
-        'INT',
-        'GATE',
-
         'ID',
         'NUMBER',
         'LBRACKET',
@@ -34,8 +34,10 @@ class _ParserOpenQASM:
         'PLUS',
         'MINUS',
         'MULTIPLY',
-        'DIVIDE'
-        )
+        'DIVIDE',
+        'ASSIGN',
+        'ASSIGNOLD'
+        ) + tuple(reserved.values())
     t_ignore  = ' \t\n' #QASM is uses semi-colons, so new-lines are meaningless...
     #
     t_LBRACKET = r'\('
@@ -50,6 +52,8 @@ class _ParserOpenQASM:
     t_MINUS = r'-'
     t_MULTIPLY = r'\*'
     t_DIVIDE = r'/'
+    t_ASSIGN = r'='
+    t_ASSIGNOLD = r'->'
 
 
     def t_ID(self, t):
@@ -58,9 +62,11 @@ class _ParserOpenQASM:
         return t
 
     def t_NUMBER(self,t):
-        r'\d+'
-        self.num_count += 1
-        t.value = int(t.value)
+        r'[.]?[+-]?\d+\.?\d*'
+        try:
+            t.value = int(t.value)
+        except:
+            t.value = float(t.value)
         return t
 
     precedence = (
@@ -86,6 +92,22 @@ class _ParserOpenQASM:
             p[0] = [p[1]]
         else:
             p[0] = [p[1]] + p[3]
+
+    #OPENQASM only allows indexing of qubits in the global scope...
+    def p_params_indexed(self, p):
+        '''indexedparams : ID
+                        | ID COMMA indexedparams
+                        | ID LARRAY NUMBER RARRAY
+                        | ID LARRAY NUMBER RARRAY COMMA indexedparams
+        '''
+        if len(p) == 2:
+            p[0] = [p[1]]
+        elif len(p) == 4:
+            p[0] = [p[1]] + p[3]
+        elif len(p) == 5:
+            p[0] = [(p[1], p[3])]
+        else:
+            p[0] = [(p[1], p[3])] + p[6]
 
     def p_expression(self, p):
         '''expression : expression PLUS expression
@@ -121,13 +143,89 @@ class _ParserOpenQASM:
                       |  ID params SEMICOLON
         '''
         if len(p) == 4:
-            p[0] = ('functioncall', p[1], p[2])
+            p[0] = ('functioncall', {'name':p[1], 'arguments':p[2]})
         else:
-            p[0] = ('functioncall', p[1], p[3], p[5])
+            p[0] = ('functioncall', {'name':p[1], 'options':p[3], 'arguments':p[5]})
+
+    def p_functioncall_global(self, p):
+        '''statement : ID LBRACKET expressions RBRACKET indexedparams SEMICOLON
+                      |  ID indexedparams SEMICOLON
+        '''
+        if len(p) == 4:
+            p[0] = ('functioncall', {'name':p[1], 'arguments':p[2]})
+        else:
+            p[0] = ('functioncall', {'name':p[1], 'options':p[3], 'arguments':p[5]})
     
+    def p_version(self, p):
+        '''globalstatement : VERSION NUMBER SEMICOLON
+        '''
+        p[0] = ('version', p[2])
+    
+    def p_savestatevector(self, p):
+        '''globalstatement : OPAQUE SAVE_STATEVECTOR params SEMICOLON
+                    | SAVE_STATEVECTOR params SEMICOLON
+                    | OPAQUE SAVE_STATEVECTOR indexedparams SEMICOLON
+                    | SAVE_STATEVECTOR indexedparams SEMICOLON
+        '''
+        p[0] = ('sim_construct', p[1:])
+
+    def p_qubit(self, p):
+        '''globalstatement : QUBIT ID SEMICOLON
+                            | QUBIT LARRAY NUMBER RARRAY ID SEMICOLON
+        '''
+        if len(p) == 7:
+            p[0] = ('dec_qubit', p[5], p[3])
+        else:
+            p[0] = ('dec_qubit', p[2], 1)
+
+    def p_bit(self, p):
+        '''globalstatement : BIT ID SEMICOLON
+                            | BIT LARRAY NUMBER RARRAY ID SEMICOLON
+        '''
+        if len(p) == 7:
+            p[0] = ('dec_bit', p[5], p[3])
+        else:
+            p[0] = ('dec_bit', p[2], 1)
+
+    def p_measure(self, p):
+        '''globalstatement : ID ASSIGN MEASURE ID SEMICOLON
+                            |  ID LARRAY NUMBER RARRAY ASSIGN MEASURE ID SEMICOLON
+                            |  ID ASSIGN MEASURE ID LARRAY NUMBER RARRAY SEMICOLON
+                            |  ID LARRAY NUMBER RARRAY ASSIGN MEASURE ID LARRAY NUMBER RARRAY SEMICOLON
+        '''
+        if len(p) == 5:
+            p[0] = ('measure', p[4], p[1])
+        elif len(p) == 8:
+            if p[2] == '[':
+                p[0] = ('measure', p[7], (p[1], p[3]))
+            else:
+                p[0] = ('measure', (p[4], p[6]), p[1])
+        else:
+            p[0] = ('measure', (p[7], p[9]), (p[1], p[3]))
+    #
+    #NOTE: The measurement tuples are: (Qubit to Measure, Classical Register to Store)
+    def p_measure_old(self, p):
+        '''globalstatement : MEASURE ID ASSIGNOLD ID SEMICOLON
+                            |  MEASURE ID LARRAY NUMBER RARRAY ASSIGNOLD ID SEMICOLON
+                            |  MEASURE ID ASSIGNOLD ID LARRAY NUMBER RARRAY SEMICOLON
+                            |  MEASURE ID LARRAY NUMBER RARRAY ASSIGNOLD ID LARRAY NUMBER RARRAY SEMICOLON
+        '''
+        if len(p) == 5:
+            p[0] = ('measure', p[2], p[4])
+        elif len(p) == 8:
+            if p[3] == '[':
+                p[0] = ('measure', (p[2], p[4]), p[7])
+            else:
+                p[0] = ('measure', p[2], (p[4], p[6]))
+        else:
+            p[0] = ('measure', (p[2], p[4]), (p[7], p[9]))
+
+
     def p_statements(self, p):
         '''statements : statement
                     | statement statements
+                    | globalstatement
+                    | globalstatement statements
         '''
         if len(p) == 2:
             p[0] = [p[1]]
@@ -137,8 +235,10 @@ class _ParserOpenQASM:
     def p_program(self, p):
         '''program : 
                     | statement
+                    | globalstatement
                     | gatedec
                     | statement program
+                    | globalstatement program
                     | gatedec program
         '''
         if len(p) == 1:
@@ -157,9 +257,9 @@ class _ParserOpenQASM:
         self.lexer = ply.lex.lex(object=self,**kwargs)
 
     def __init__(self):
-        self.num_count = 0
+        pass
     
-    def tokenise(self, str_input):
+    def _tokenise(self, str_input):
         self.lexer.input(str_input)
         while True:
             tok = self.lexer.token()
@@ -167,9 +267,6 @@ class _ParserOpenQASM:
                 break      # No more input
             print(tok)
         print("\n")
-
-        # result = parser.parse(input_code)
-        # print(result)
     
     def parse(self, str_input):
         parser = ply.yacc.yacc(module=self)
@@ -184,6 +281,9 @@ class ParserOpenQASM:
         overall_includes = []
         self._get_include_tree([main_file], overall_includes, source_dirs)
         self._gate_defs = {}
+        self._qubits = []
+        self._bits = []
+        self._operations = []
         for m, cur_file in enumerate(overall_includes):
             self._parse_file(cur_file)
 
@@ -234,12 +334,19 @@ class ParserOpenQASM:
         str_code = re.sub('include?(.*?);', '', str_code, flags=re.DOTALL) #Strip include statements
         leParser = _ParserOpenQASM()
         leParser.build()
-        # leParser.tokenise(str_code)
         parsed_data = leParser.parse(str_code)
 
         for statement in parsed_data:
             if statement[0] == 'gatedec':
                 self._gate_defs[statement[1]] = {'input_args': statement[2], 'output_args': statement[3], 'function': statement[4]}
+            elif statement[0] == 'sim_construct':
+                print("Warning: Ignoring simulation constructs.")
+            elif statement[0] == 'dec_qubit':
+                self._qubits.append((statement[1], statement[2]))
+            elif statement[0] == 'dec_bit':
+                self._bits.append((statement[1], statement[2]))
+            elif statement[0] == 'functioncall':
+                self._operations.append(statement[1])
             pass
 
 

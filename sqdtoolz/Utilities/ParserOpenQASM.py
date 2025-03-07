@@ -38,7 +38,7 @@ class _ParserOpenQASM:
         'ASSIGN',
         'ASSIGNOLD'
         ) + tuple(reserved.values())
-    t_ignore  = ' \t\n' #QASM is uses semi-colons, so new-lines are meaningless...
+    t_ignore  = ' \t' #QASM is uses semi-colons, so new-lines are meaningless...
     #
     t_LBRACKET = r'\('
     t_RBRACKET = r'\)'
@@ -68,6 +68,16 @@ class _ParserOpenQASM:
         except:
             t.value = float(t.value)
         return t
+
+    def t_newline(self, t):
+        r'\n+'
+        self.lineno += len(t.value)     #i.e. if there are multiple new-lines...
+
+    # Error handling rule
+    def t_error(self, t):
+        print(f"Illegal character '{t.value[0]}' in line {self.lineno}")
+        t.lexer.skip(1)
+
 
     precedence = (
         ('left', 'PLUS', 'MINUS'),
@@ -251,7 +261,7 @@ class _ParserOpenQASM:
             p[0] = [p[1]] + p[2]
     
     def p_error(self, p):
-        pass
+        assert False, f"Syntax error on line number {self.lineno} at '{p.value}'"
 
     def build(self, **kwargs):
         self.lexer = ply.lex.lex(object=self,**kwargs)
@@ -261,6 +271,7 @@ class _ParserOpenQASM:
     
     def _tokenise(self, str_input):
         self.lexer.input(str_input)
+        self.lineno = 1
         while True:
             tok = self.lexer.token()
             if not tok:
@@ -269,6 +280,7 @@ class _ParserOpenQASM:
         print("\n")
     
     def parse(self, str_input):
+        self.lineno = 1
         parser = ply.yacc.yacc(module=self)
         result = parser.parse(str_input, lexer=self.lexer, debug=True)
         return result

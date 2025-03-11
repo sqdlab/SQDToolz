@@ -158,7 +158,6 @@ class TransmonGates(QubitGatesBase):
         return self._spec_qubit
 
     def get_available_gates(self):
-        #TODO: Add freq_offset along with phase_off to the WFMT to enable Hadamards?
         return ['I', 'X', 'X/2', '-X/2', 'Y', 'Y/2', '-Y/2', 'Z', 'Z/2', '-Z/2', 'H']
 
     def generate_gates(self, gate_list, gate_set_prefix='gate'):

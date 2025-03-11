@@ -3,6 +3,7 @@ import os
 import re
 import ply.lex
 import ply.yacc
+import numpy as np
 
 class _ParserOpenQASM:
     # literals = r'=<>,.^"'
@@ -17,7 +18,9 @@ class _ParserOpenQASM:
         'save_statevector' : 'SAVE_STATEVECTOR',
         'qubit' : 'QUBIT',
         'bit' : 'BIT',
-        'measure' : 'MEASURE'
+        'measure' : 'MEASURE',
+        'ctrl' : 'CONTROL',
+        'negctrl' : 'NEGCONTROL'
         }
     tokens = (
         'ID',
@@ -36,7 +39,8 @@ class _ParserOpenQASM:
         'MULTIPLY',
         'DIVIDE',
         'ASSIGN',
-        'ASSIGNOLD'
+        'ASSIGNOLD',
+        'ATCTRL'
         ) + tuple(reserved.values())
     t_ignore  = ' \t' #QASM is uses semi-colons, so new-lines are meaningless...
     #
@@ -54,10 +58,11 @@ class _ParserOpenQASM:
     t_DIVIDE = r'/'
     t_ASSIGN = r'='
     t_ASSIGNOLD = r'->'
+    t_ATCTRL = r'@'
 
 
     def t_ID(self, t):
-        r'[a-zA-Z_][a-zA-Z_0-9]*'
+        r'[a-zA-Zα-ωΑ-Ω][a-zA-Z_0-9]*'
         t.type = self.reserved.get(t.value, 'ID')  # Check for reserved words
         return t
 
@@ -103,6 +108,46 @@ class _ParserOpenQASM:
         else:
             p[0] = [p[1]] + p[3]
 
+    def p_ctrl_params_func_signature1(self, p):
+        '''functionsignature : ID
+                | ID LBRACKET expressions RBRACKET
+                | ID LBRACKET expressions RBRACKET ATCTRL functionsignature
+        '''
+        if len(p) == 2:
+            p[0] = [(p[1], [])]
+        elif len(p) == 5:
+            p[0] = [(p[1], p[3])]
+        else:
+            p[0] = [(p[1], p[3])] + p[6]
+
+    def p_ctrl_params_func_signature2(self, p):
+        '''functionsignature :
+                | CONTROL
+                | NEGCONTROL
+                | CONTROL LBRACKET NUMBER RBRACKET
+                | NEGCONTROL LBRACKET NUMBER RBRACKET
+                | CONTROL ATCTRL functionsignature
+                | NEGCONTROL ATCTRL functionsignature
+                | CONTROL LBRACKET NUMBER RBRACKET ATCTRL functionsignature
+                | NEGCONTROL LBRACKET NUMBER RBRACKET ATCTRL functionsignature
+        '''
+        if len(p) == 1:
+            #TODO: Look into whether the compile-time constants can be allowed for ctrl/negctrl rather than just numbers...
+            #It unwraps it here - perhaps do it like a preprocessor sweep before lex/yacc?
+            #
+            #ctrl/negctrl shouldn't conflict with function names as it's a reserved keyword...
+            if p[1] == 'CONTROL':
+                p[0] = [('ctrl')]
+            else:
+                p[0] = [('negctrl')]
+        elif len(p) == 4:
+            p[0] = [p[1]] + p[3]
+        elif len(p) == 5:
+            p[0] = [p[1]]*p[3]
+        else:
+            p[0] = [p[1]]*p[3] + p[6]
+
+
     #OPENQASM only allows indexing of qubits in the global scope...
     def p_params_indexed(self, p):
         '''indexedparams : ID
@@ -132,7 +177,10 @@ class _ParserOpenQASM:
                     | NUMBER
         '''
         if len(p) == 4:
-            p[0] = (p[2], p[1], p[3])
+            if p[1] == '(' and p[3] == ')':
+                p[0] = (p[2])
+            else:
+                p[0] = (p[2], p[1], p[3])
         elif len(p) == 3:
             p[0] = (p[1], p[2])
         else:
@@ -147,24 +195,15 @@ class _ParserOpenQASM:
         else:
             p[0] = [p[1]] + p[3]
 
-
     def p_functioncall(self, p):
-        '''statement : ID LBRACKET expressions RBRACKET params SEMICOLON
-                      |  ID params SEMICOLON
+        '''statement : functionsignature params SEMICOLON
         '''
-        if len(p) == 4:
-            p[0] = ('functioncall', {'name':p[1], 'arguments':p[2]})
-        else:
-            p[0] = ('functioncall', {'name':p[1], 'options':p[3], 'arguments':p[5]})
+        p[0] = ('functioncall', {'name':p[1], 'arguments':p[2]})
 
     def p_functioncall_global(self, p):
-        '''statement : ID LBRACKET expressions RBRACKET indexedparams SEMICOLON
-                      |  ID indexedparams SEMICOLON
+        '''statement : functionsignature indexedparams SEMICOLON
         '''
-        if len(p) == 4:
-            p[0] = ('functioncall', {'name':p[1], 'arguments':p[2]})
-        else:
-            p[0] = ('functioncall', {'name':p[1], 'options':p[3], 'arguments':p[5]})
+        p[0] = ('functioncall', {'name':p[1], 'arguments':p[2]})
     
     def p_version(self, p):
         '''globalstatement : VERSION NUMBER SEMICOLON
@@ -298,6 +337,7 @@ class ParserOpenQASM:
         self._operations = []
         for m, cur_file in enumerate(overall_includes):
             self._parse_file(cur_file)
+        self.compiled_operations = self._final_compile()
 
     def _get_include_tree(self, cur_includes_stack: List[str], overall_includes: List[str], source_dirs: List[str]):
         current_file = cur_includes_stack[-1]
@@ -346,6 +386,7 @@ class ParserOpenQASM:
         str_code = re.sub('include?(.*?);', '', str_code, flags=re.DOTALL) #Strip include statements
         leParser = _ParserOpenQASM()
         leParser.build()
+        leParser._tokenise(str_code)
         parsed_data = leParser.parse(str_code)
 
         for statement in parsed_data:
@@ -359,7 +400,139 @@ class ParserOpenQASM:
                 self._bits.append((statement[1], statement[2]))
             elif statement[0] == 'functioncall':
                 self._operations.append(statement[1])
-            pass
+    
+    def _eval_expression(self, expr, wildcards):
+        if isinstance(expr, (int, float)):
+            return expr
+        if isinstance(expr, str):
+            #TODO: Look up default fundamental constants supported by OpenQASM...
+            if expr == 'pi' or expr == 'π':
+                return np.pi
+            assert expr in wildcards, f"Argument {expr} could not be evaluated."
+            return self._eval_expression(wildcards[expr], wildcards)
+            
+        #Should be fine as the wildcards cannot be the reserved tokens...
+        expr = [(wildcards[x] if x in wildcards else x) for x in list(expr)]
+        if len(expr) == 1:
+            return self._eval_expression(expr, wildcards)
+        elif len(expr) == 2:
+            return -self._eval_expression(expr[1],wildcards)
+        else:
+            arg1, arg2 = self._eval_expression(expr[1],wildcards) , self._eval_expression(expr[2],wildcards)
+            if expr[0] == '+':
+                return arg1 + arg2
+            elif expr[0] == '-':
+                return arg1 - arg2
+            elif expr[0] == '*':
+                return arg1 * arg2
+            elif expr[0] == '/':
+                return arg1 / arg2
+
+    def _evaluate_func_signature(self, func_sign_list, wildcards):
+        if len(func_sign_list) > 1:
+            found_ind = -1
+            new_sign_list = []
+            for m, cur_func_sign_arg in enumerate(func_sign_list):
+                if isinstance(cur_func_sign_arg, str) and (cur_func_sign_arg == 'ctrl' or cur_func_sign_arg == 'negctrl'):
+                    new_sign_list.append(cur_func_sign_arg)
+                else:
+                    assert isinstance(cur_func_sign_arg, (tuple, list)), f"The argument {cur_func_sign_arg} is invalid in this controlled qubit sequence..."
+                    assert found_ind == -1, "Ill-formed control argument for a controlled-gate; there can only be a unitary on one qubit..."
+                    found_ind = m
+                    new_sign_list.append(cur_func_sign_arg)
+            assert found_ind != -1, "A controlled-gate sequence does not have a unitary on one of the qubits."
+            cur_func = new_sign_list[found_ind]
+        else:
+            cur_func = func_sign_list[0]
+        ret_list = [ (cur_func[0], [self._eval_expression(x, wildcards) for x in cur_func[1]]) ]
+        if len(func_sign_list) > 1:
+            new_sign_list[found_ind] = ret_list[0]
+            ret_list = new_sign_list
+        return ret_list
+
+    def _replace_func_with_arguments(self, func_name, func_inputs, func_outputs):
+        assert len(func_inputs) == len(self._gate_defs[func_name]['input_args']), f"The function {func_name} has {len(self._gate_defs[func_name]['input_args'])} arguments, not {len(func_inputs)}."
+        input_wildcards = {k:func_inputs[m] for m,k in enumerate(self._gate_defs[func_name]['input_args'])}
+        output_wildcards = {k:func_outputs[m] for m,k in enumerate(self._gate_defs[func_name]['output_args'])}
+        sub_func = []
+        for cur_func in self._gate_defs[func_name]['function']:
+            #Basically iterating over potential ctrl/negctrl etc...
+            new_func = {'name': self._evaluate_func_signature(cur_func[1]['name'],input_wildcards),
+                        'arguments': [output_wildcards[x] for x in cur_func[1]['arguments']]}
+            sub_func.append(new_func)
+        return sub_func
 
 
-ParserOpenQASM('qpe.qasm',[])
+    def _eval_func(self, dict_operation):
+        if len(dict_operation['name']) == 1:
+            if dict_operation['name'][0][0] == 'U':
+                return [{'name': [(dict_operation['name'][0][0], dict_operation['name'][0][1])], 'arguments': dict_operation['arguments']}]
+            else:
+                assert dict_operation['name'][0][0] in self._gate_defs, f"The gate operation {dict_operation['name'][0][0]} is undefined."
+                temp_func_list = self._replace_func_with_arguments(*dict_operation['name'][0], dict_operation['arguments'])
+                ret_list = []
+                for cur_func in temp_func_list:
+                    ret_list += self._eval_func(cur_func)
+                return ret_list
+        else:
+            func_sign_list = dict_operation['name']
+            found_ind = -1
+            new_sign_list = []
+            for m, cur_func_sign_arg in enumerate(func_sign_list):
+                if isinstance(cur_func_sign_arg, str) and (cur_func_sign_arg == 'ctrl' or cur_func_sign_arg == 'negctrl'):
+                    new_sign_list.append(cur_func_sign_arg)
+                else:
+                    assert isinstance(cur_func_sign_arg, (tuple, list)), f"The argument {cur_func_sign_arg} is invalid in this controlled qubit sequence..."
+                    assert found_ind == -1, "Ill-formed control argument for a controlled-gate; there can only be a unitary on one qubit..."
+                    found_ind = m
+                    new_sign_list.append(cur_func_sign_arg)
+            assert found_ind != -1, "A controlled-gate sequence does not have a unitary on one of the qubits."
+            cur_func = new_sign_list[found_ind]
+            if cur_func[0] == 'U':
+                return [dict_operation]
+            else:
+                assert cur_func[0] in self._gate_defs, f"Function {cur_func[0]} is undefined."
+                assert len(self._gate_defs[cur_func[0]]['output_args']) == 1, f"The function {cur_func[0]} is not a single-qubit unitary!"
+                temp_func_list = self._replace_func_with_arguments(*cur_func, dict_operation['arguments'])
+                func_sign_args = []
+                for cur_func in temp_func_list:
+                    func_sign_args += self._eval_func(cur_func)
+                ret_list = []
+                for cur_func in func_sign_args:
+                    le_list = [x for x in new_sign_list]
+                    le_list[found_ind] = cur_func['name'][0]
+                    ret_list.append({'name': le_list, 'arguments': dict_operation['arguments']})
+                    
+                return ret_list
+        
+
+    def _final_compile(self):
+        #Flatten the qubit registers into a single qubit array
+        qubit_reg_offset_and_size = {}
+        cur_offset = 0
+        qubit_regs = []
+        for cur_q in self._qubits:
+            qreg_name, qreg_size = cur_q
+            qubit_reg_offset_and_size[qreg_name] = (cur_offset, qreg_size)
+            cur_offset += qreg_size
+            qubit_regs.append((qreg_name, qreg_size))
+        
+        #Process operations
+        ops = []
+        for cur_op in self._operations:
+            ops += self._eval_func(cur_op)
+        #Check qubit registers are valid
+        for cur_op in ops:
+            for cur_qubit_arg in cur_op['arguments']:
+                if isinstance(cur_qubit_arg, (list, tuple)):
+                    assert cur_qubit_arg[1] < qubit_reg_offset_and_size[cur_qubit_arg[0]][1], f"Index of qubit {cur_qubit_arg[0]}[{cur_qubit_arg[1]}] exceeds register size of {qubit_reg_offset_and_size[cur_qubit_arg[0]][1]}."
+        #Note that the format of ops is a list of gates where each element is a dictionary with keys:
+        #   name - a list of controls with exactly one unitary in the list
+        #   arguments - the target qubits upon which to apply the controlled unitary gates
+        return ops
+    
+
+        
+
+poqasm = ParserOpenQASM('qpe.qasm',[])
+a=0

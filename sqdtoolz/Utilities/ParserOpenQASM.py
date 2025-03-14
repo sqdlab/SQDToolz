@@ -4,6 +4,8 @@ import re
 import ply.lex
 import ply.yacc
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatch
 
 class _ParserOpenQASM:
     # literals = r'=<>,.^"'
@@ -516,6 +518,7 @@ class ParserOpenQASM:
             qubit_reg_offset_and_size[qreg_name] = (cur_offset, qreg_size)
             cur_offset += qreg_size
             qubit_regs.append((qreg_name, qreg_size))
+        self._qubit_reg_offset_and_size = qubit_reg_offset_and_size
         
         #Process operations
         ops = []
@@ -531,8 +534,105 @@ class ParserOpenQASM:
         #   arguments - the target qubits upon which to apply the controlled unitary gates
         return ops
     
+    def get_axis_angle_from_unitary(self, unitary_angles):
+        #Based on their definition here: https://openqasm.com/language/gates.html
+        #That is for theta,phi,lambda, it's a ZYZ rotation done via lambda, theta and phi...
+        vtheta,vphi,vlambda = unitary_angles
+        matU = 1/2*np.array([[1+np.exp(1j*vtheta), -1j*np.exp(1j*vlambda)*(1-np.exp(1j*vtheta))],
+                             [1j*np.exp(1j*vphi)*(1-np.exp(1j*vtheta)), np.exp(1j*(vlambda+vphi))*(1+np.exp(1j*vtheta))]])
+        #Note that R(x) = cos(x/2)*I_2 - i*sin(x/2)*(n.sigma)
+        pauli_I2 = (matU[0,0]+matU[1,1])/2
+        pauli_Z  = ((matU[0,0]-matU[1,1]))/2
+        pauli_X = ((matU[0,1]+matU[1,0]))/2
+        pauli_Y = ((matU[0,1]-matU[1,0]))/2j
+        #Calculate global phase
+        pauli_vec = np.array([pauli_I2, pauli_X/-1j, pauli_Y/-1j, pauli_Z/-1j])
+        global_phase = np.exp(-1j*np.angle(pauli_vec[np.argmax(np.abs(pauli_vec))]))
+        pauli_vec *= global_phase
+        #
+        #It's now in a form: cos(x/2)*I_2 + sin(x/2)*(n.sigma)
+        rotation_axis = pauli_vec[1:]
+        sin_angle_2 = np.linalg.norm(rotation_axis)
+        rotation_axis = rotation_axis / sin_angle_2
+        rotation_angle = 2*np.arctan2(np.real(sin_angle_2), np.real(pauli_vec[0]))
 
+        return rotation_axis, rotation_angle
+    
+    def normalise_name(self, axis, angle):
+        if axis[0]>1-1e-6:
+            return r"$X_{angle}$"
+        elif axis[0] < -1+1e-6:
+            return r"$-X_{angle}$"
+        elif axis[1]>1-1e-6:
+            return r"$Y_{angle}$"
+        elif axis[1] < -1+1e-6:
+            return r"$-Y_{angle}$"
+        elif axis[2]>1-1e-6:
+            return r"$Z_{angle}$"
+        elif axis[2] < -1+1e-6:
+            return r"$-Z_{angle}$"
+        else:
+            return "U"#f"({axis[0]}, {axis[1]}, {axis[2]}), {angle}"
+
+    def _plot_gate(self, ax, x,y,text, col):
+        ax.add_artist(mpatch.Rectangle((x-0.45,y-0.45), 0.9, 0.9, facecolor=col))
+        ax.annotate(text, (x,y), color='w', weight='bold', 
+                    fontsize=6, ha='center', va='center')
+    def _plot_ctrl(self, ax, x,y, col):
+        ax.add_artist(mpatch.Circle((x,y), 0.2, facecolor=col))
+
+    def plot(self):
+        yticklabels = []
+        for cur_qubit in self._qubit_reg_offset_and_size:
+            if self._qubit_reg_offset_and_size[cur_qubit][1] > 1:
+                for cur_index in range(self._qubit_reg_offset_and_size[cur_qubit][1]):
+                    yticklabels.append(f"{cur_qubit}[{cur_index}]")
+            else:
+                yticklabels.append(f"{cur_qubit}")
+        num_qubits = len(yticklabels)
+
+        #List the next *free* qubit position in time...
+        qubit_positions = [1 for x in range(num_qubits)]
+
+        fig, ax = plt.subplots(1)
+        ax.set_yticks(range(len(yticklabels)))
+        ax.set_yticklabels(yticklabels, size=12)
+        leCols = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
+        for op_ind,cur_op in enumerate(self.compiled_operations):
+            cur_col = leCols[op_ind%len(leCols)]
+            cur_qubit_indices = []
+            for m,cur_qubit in enumerate(cur_op['arguments']):
+                if isinstance(cur_qubit, tuple):
+                    cur_qubit_indices.append(self._qubit_reg_offset_and_size[cur_qubit[0]][0] + cur_qubit[1])
+                else:
+                    cur_qubit_indices.append(self._qubit_reg_offset_and_size[cur_qubit][0])
+            cur_pos = np.max([qubit_positions[x] for x in cur_qubit_indices])
+            
+            #Draw control stem if applicable
+            if len(cur_qubit_indices) > 1:
+                for x in cur_qubit_indices[1:]:
+                    ax.plot([cur_pos]*2, [cur_qubit_indices[0],x], color=cur_col)
+
+            for m,x in enumerate(cur_qubit_indices):
+                qubit_positions[x] = cur_pos
+                if isinstance(cur_op['name'][m], tuple):
+                    if cur_op['name'][m][0] == 'U':
+                        axis, angle = self.get_axis_angle_from_unitary(cur_op['name'][m][1])
+                        self._plot_gate(ax, qubit_positions[x], x, self.normalise_name(axis, angle), cur_col)
+                elif cur_op['name'][m] == 'ctrl':
+                    self._plot_ctrl(ax, qubit_positions[x], x, cur_col)
+                qubit_positions[x] = cur_pos + 1
+            qubit_positions
+            a=0
+        
+        ax.set_xlim([0,np.max(qubit_positions)])
+        ax.set_ylim([-0.5,num_qubits-0.5])
+        fig.show()
+        a=0
         
 
 poqasm = ParserOpenQASM('qpe.qasm',[])
+poqasm.plot()
+plt.show()
 a=0

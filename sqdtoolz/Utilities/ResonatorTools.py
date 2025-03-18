@@ -18,7 +18,7 @@ try:
     from bokeh.models import Whisker, ColumnDataSource, TeeHead, Band, Range1d  # type: ignore
     from bokeh.plotting import figure, show  # type: ignore
     from bokeh.io import output_notebook, export  # type: ignore
-    from bokeh.palettes import Viridis256  # type: ignore
+    from bokeh.palettes import Viridis256, Category10  # type: ignore
 except:
     warnings.warning("Bokeh not imported. You will have to use mpl for plotting")
     PLOT_BACKEND = "matplotlib"
@@ -1392,6 +1392,32 @@ class ResonatorPowerSweep:
         main_data_directory,
         sample_options
     ):
+        """
+        Creates a bokeh plot for Qi comparison of multiple resonator samples. 
+
+        Inputs:
+        - main_data_directory   The directory in which to search for the data (string).
+        - sample_options        A dictionary containing information pertaining to each sample.
+                                Example:
+                                sample_options = {
+                                    'IQM-05' : {
+                                        'resonator_index_to_plot' : [1, 2, 3, 4, 5],
+                                        'name' : "IQM-05-A",
+                                        'files_to_ignore' : ['IQM-05-A', "141602"],
+                                        'power_dict' : default_power_dict
+                                        },
+                                    'IQM-03-01' : {
+                                        'resonator_index_to_plot' : [1, 2, 3, 4, 5],
+                                        'name' : "IQM-03-01",
+                                        'files_to_ignore' : None,
+                                        'power_dict' : default_power_dict
+                                        }
+                                    }
+
+        This function handles import and fitting, before passing the data to
+        cls.plot_Qi_multisample_bokeh().
+        """
+
         default_power_dict = {"lowPower" : -132, 
                       "highPower" : -82,
                       "default" : -82
@@ -1430,7 +1456,7 @@ class ResonatorPowerSweep:
             sample_options[sample]['freq_bin_labels'] = chunk.freq_bin_labels
             print("\n")
         # pass to plotting function
-        cls.plot_Qi_multisample_bokeh(data, dict(sample_options))
+        cls.plot_Qi_multisample_bokeh(data, dict(sample_options), main_data_directory)
 
     @classmethod
     # Qi vs photon number (static)
@@ -1438,6 +1464,7 @@ class ResonatorPowerSweep:
         cls,
         data,
         sample_options,
+        main_data_directory,
         with_fit=True,
         with_errorbars=True,
         legend_location="bottom_right",
@@ -1449,6 +1476,8 @@ class ResonatorPowerSweep:
         for sample in data.keys():
             assert isinstance(data[sample], pd.DataFrame)
 
+        num_samples = len(data.keys())
+
         # bokeh setup
         fig_bokeh = figure(
             width=1000,
@@ -1458,22 +1487,31 @@ class ResonatorPowerSweep:
             y_axis_label=r"$$Q_i$$",
             x_axis_label=r"Photon number " + r"$$\langle n \rangle$$",
         )
-        colourmap = Viridis256
+        # colourmap = Viridis256
         if ylims != None:
             fig_bokeh.y_range = Range1d(ylims[0], ylims[1])
         
+        # colours
+        base_colors = Category10.get(num_samples) or Category10[10][:num_samples] if num_samples <= 10 else viridis(num_samples)
+        
         # loop through each sample
-        for sample in sample_options.keys():
+        for i, sample in enumerate(sample_options.keys()):
             # create class instance
             chunk = cls(fit_data = pd.DataFrame(data[sample]))
-            freq_bins_labels = sample_options[sample]['freq_bin_labels']
+            freq_bin_labels = sample_options[sample]['freq_bin_labels']
+            num_resonators = len(freq_bin_labels)
             # check which resonators to plot
             if sample_options[sample]['resonator_index_to_plot'] != None:
                 freqs_to_use = sample_options[sample]['resonator_index_to_plot']
-            elif plot_frequencies == None:
-                freqs_to_use = range(freq_bins_labels)
+            elif sample_options[sample]['resonator_index_to_plot'] == None:
+                freqs_to_use = range(freq_bin_labels)
+            # determine colour for each resonator
+            base_color = base_colors[i]
+            # Generate shades by adjusting brightness
+            shades = [cls.adjust_lightness_bokeh(base_color, 0.8 + 0.2 * i / max(1, num_resonators - 1)) for i in range(num_resonators)]
+            
             # loop through frequency bins
-            for i, freq_bin_cur in enumerate(freq_bins_labels):
+            for i, freq_bin_cur in enumerate(freq_bin_labels):
                 if i in freqs_to_use:
                     # initialise plot data for new resonator
                     n_ph, Qi, Qi_upper, Qi_lower, Qerr = [], [], [], [], []
@@ -1507,13 +1545,13 @@ class ResonatorPowerSweep:
                             bounds=chunk.TLSfit_bounds,
                         )
                     # do plotting
-                    color = colourmap[i * len(colourmap) // num_resonators]
+                    # color = colourmap[i * len(colourmap) // num_resonators]
                     fig_bokeh.scatter(
                         source=source,
                         x="n_ph",
                         y="Qi",
                         size=10,
-                        color=color,
+                        color=shades[i],
                         alpha=0.7,
                         legend_label=f"{freq_bin_cur} (Single photon Qi = {sph_Qi:.1e})",
                     )
@@ -1524,17 +1562,17 @@ class ResonatorPowerSweep:
                             upper="upper",
                             lower="lower",
                             source=source,
-                            line_color=color,
+                            line_color=shades[i],
                             line_alpha=0.7,
                             line_cap="round",
                             line_width="2",
-                            upper_head=TeeHead(line_color=color, line_alpha=0.7, size=6),
-                            lower_head=TeeHead(line_color=color, line_alpha=0.7, size=6),
+                            upper_head=TeeHead(line_color=shades[i], line_alpha=0.7, size=6),
+                            lower_head=TeeHead(line_color=shades[i], line_alpha=0.7, size=6),
                         )
                         fig_bokeh.add_layout(errorbars)
                     if with_fit == True:
                         fig_bokeh.line(
-                            n_ph_TLS, TLSfit, line_color=color, line_alpha=0.2, line_width=3
+                            n_ph_TLS, TLSfit, line_color=shades[i], line_alpha=0.2, line_width=3
                     )
         # legend
         fig_bokeh.legend.location = legend_location
@@ -1545,7 +1583,18 @@ class ResonatorPowerSweep:
             show(fig_bokeh)
         # save plot
         if save_plot == True:
-            export_path = os.path.join(save_path, "Qi_bokeh.png")
+            export_name = "_".join(list(sample_options.keys()))
+            export_path = os.path.join(main_data_directory, f"Qi_{export_name}.png")
             export.export_png(obj=fig_bokeh, filename=export_path)
             print(f"Plot saved at {export_path}")
 
+    @staticmethod
+    def adjust_lightness_bokeh(hex_color, factor):
+        import colorsys
+        """Modify the brightness of a hex color."""
+        hex_color = hex_color.lstrip("#")  # Remove '#' from the hex code
+        r, g, b = tuple(int(hex_color[i:i+2], 16) / 255.0 for i in (0, 2, 4))  # Convert to RGB [0,1]
+        h, l, s = colorsys.rgb_to_hls(r, g, b)  # Convert to HLS
+        l = max(0, min(1, l * factor))  # Adjust lightness
+        new_r, new_g, new_b = colorsys.hls_to_rgb(h, l, s)  # Convert back to RGB
+        return f"#{int(new_r * 255):02x}{int(new_g * 255):02x}{int(new_b * 255):02x}"  # Convert back to hex

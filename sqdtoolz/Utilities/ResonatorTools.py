@@ -65,6 +65,7 @@ class ResonatorPowerSweep:
         print_log=False,
         notebook=False,
         fit_data={},
+        with_fit=None
     ):
         # initialise data
         self.data_path = data_path
@@ -83,6 +84,7 @@ class ResonatorPowerSweep:
         self.num_resonators = None
         self.frequencies = []
         self.freq_bin_labels = []
+        self.do_TLS_fit = with_fit
 
         # private class variables
         self._data_file_name = "data.h5"
@@ -522,10 +524,13 @@ class ResonatorPowerSweep:
             self, 
             save_directory=None,
             n_ph_HP=1e6,
+            do_fit=True
             ):
         '''
         Saves a text file with a complete data summary to the data_path.
         '''
+        
+        do_fit = self.do_TLS_fit if self.do_TLS_fit != None else 0
 
         if save_directory != None:
             save_path = save_directory
@@ -562,6 +567,9 @@ class ResonatorPowerSweep:
             HP_indx = self.find_photon_number_index(
                 data=self.fit_data, search_key="n_ph", photon_number=n_ph_HP
             )
+            # adjust HP_indx if it is outside the measured range of n_ph
+            if HP_indx > len(np.array(res_data["Qi"])):
+                HP_indx = len(np.array(res_data["Qi"])) - 1
             Qi_HP.append(np.array(res_data["Qi"])[HP_indx])
 
             # calculate per-resonator values
@@ -570,10 +578,14 @@ class ResonatorPowerSweep:
             f_range = self.filtered_mean_iqr(res_data["f"], filtered_range=True)
             Qc_range = self.filtered_mean_iqr(res_data["Qc"], filtered_range=True)
 
-            # calculate F*tanδ
-            fit_dict, _, _ = self.TLS_fit(res_data["n_ph"], res_data["Qi"], f=f_av, T=self.T, Qerr=res_data["Qerr"], bounds=self.TLSfit_bounds)
-            F_tan_delta.append(fit_dict["F_tan_delta"])
-            n_c.append(fit_dict["n_c"])
+            if do_fit:
+                # calculate F*tanδ
+                fit_dict, _, _ = self.TLS_fit(res_data["n_ph"], res_data["Qi"], f=f_av, T=self.T, Qerr=res_data["Qerr"], bounds=self.TLSfit_bounds)
+                F_tan_delta.append(fit_dict["F_tan_delta"])
+                n_c.append(fit_dict["n_c"])
+            else:
+                F_tan_delta.append(0)
+                n_c.append(0)
 
             # print to file
             vals = [Qi_LP[i], Qi_HP[i], Qc_av, Qc_range, f_av, f_range, F_tan_delta[i], n_c[i]]
@@ -591,9 +603,14 @@ class ResonatorPowerSweep:
         Qc_SE = self.filtered_mean_iqr(Qc, filtered_SE=True)
         Qc_max = np.max(Qc)
         Qc_min = np.min(Qc)
-        F_tan_delta_av = self.filtered_mean_iqr(F_tan_delta)
-        F_tan_delta_SE = self.filtered_mean_iqr(F_tan_delta, filtered_SE=True)
-        F_tan_delta_min = np.min(F_tan_delta)
+        if do_fit:
+            F_tan_delta_av = self.filtered_mean_iqr(F_tan_delta)
+            F_tan_delta_SE = self.filtered_mean_iqr(F_tan_delta, filtered_SE=True)
+            F_tan_delta_min = np.min(F_tan_delta)
+        else:
+            F_tan_delta_av = 0
+            F_tan_delta_SE = 0
+            F_tan_delta_min = 0
 
         with open(export_path, "a") as file:
             file.write("\n\nStatistical values across all resonators\n")
@@ -608,7 +625,7 @@ class ResonatorPowerSweep:
                 f"{Qc_max:.3e}",
                 f"{Qc_min:.3e}\n",
                 f"{F_tan_delta_av:.3e} +/- {F_tan_delta_SE:.3e}",
-                f"{F_tan_delta_min:.3e}\n"
+                f"{F_tan_delta_min:.3e}\n"                  
             ]
             assert len(vals) == len(headers_stats)
             for i, val in enumerate(vals):
@@ -661,6 +678,9 @@ class ResonatorPowerSweep:
         ylims=None,
         plot_frequencies=None
     ):
+        
+        with_fit = self.do_TLS_fit if self.do_TLS_fit != None else 0
+
         assert isinstance(self.fit_data, pd.DataFrame)
         if backend == None:
             backend = self.plot_backend
@@ -837,7 +857,7 @@ class ResonatorPowerSweep:
                 show(self.fig_bokeh)
             # save plot
             if save_plot == True:
-                export_path = os.path.join(self.save_path, "Qi_bokeh.png")
+                export_path = os.path.join(self.save_path, f"{self.name}_Qi_bokeh.png")
                 export.export_png(obj=self.fig_bokeh, filename=export_path)
                 print(f"Plot saved at {export_path}")
         if backend == "matplotlib":
@@ -855,7 +875,7 @@ class ResonatorPowerSweep:
                 plt.show()
             # save plot
             if save_plot == True:
-                export_path = os.path.join(self.save_path, "Qi_mpl.png")
+                export_path = os.path.join(self.save_path, f"{self.name}_Qi_mpl.png")
                 self.fig_mpl.savefig(export_path)
                 print(f"Plot saved at {export_path}")
 
@@ -956,7 +976,7 @@ class ResonatorPowerSweep:
                 show(self.fig_bokeh)
             # save plot
             if save_plot == True:
-                export_path = os.path.join(self.save_path, "fr_bokeh.png")
+                export_path = os.path.join(self.save_path, f"{self.name}_fr_bokeh.png")
                 export.export_png(obj=self.fig_bokeh, filename=export_path)
                 print(f"Plot saved at {export_path}")
         # matplotlib
@@ -1027,7 +1047,7 @@ class ResonatorPowerSweep:
                 plt.show()
             # save plot
             if save_plot == True:
-                export_path = os.path.join(self.save_path, "fr_mpl.png")
+                export_path = os.path.join(self.save_path, f"{self.name}_fr_mpl.png")
                 self.fig_mpl.savefig(export_path)
                 print(f"Plot saved at {export_path}")
 
@@ -1161,7 +1181,7 @@ class ResonatorPowerSweep:
                 show(self.fig_bokeh)
             # save plot
             if save_plot == True:
-                export_path = os.path.join(self.save_path, "Qc_bokeh.png")
+                export_path = os.path.join(self.save_path, f"{self.name}_Qc_bokeh.png")
                 export.export_png(obj=self.fig_bokeh, filename=export_path)
                 print(f"Plot saved at {export_path}")
         if backend == "matplotlib":
@@ -1169,7 +1189,7 @@ class ResonatorPowerSweep:
                 plt.show()
             # save plot
             if save_plot == True:
-                export_path = os.path.join(self.save_path, "Qc_mpl.png")
+                export_path = os.path.join(self.save_path, f"{self.name}_Qc_mpl.png")
                 self.fig_mpl.savefig(export_path)
                 print(f"Plot saved at {export_path}")
 
@@ -1419,9 +1439,9 @@ class ResonatorPowerSweep:
         """
 
         default_power_dict = {"lowPower" : -132, 
-                      "highPower" : -82,
-                      "default" : -82
-                     }
+                              "highPower" : -82,
+                              "default" : -82
+                            }
         default_T = 25*1e-3
         assert os.path.isdir(main_data_directory), f"Main data directory '{main_data_directory}' does not exist."
         # check for valid options, complete setup
@@ -1492,7 +1512,7 @@ class ResonatorPowerSweep:
             fig_bokeh.y_range = Range1d(ylims[0], ylims[1])
         
         # colours
-        base_colors = Category10.get(num_samples) or Category10[10][:num_samples] if num_samples <= 10 else viridis(num_samples)
+        base_colors = Category10.get(num_samples) or Category10[10][:num_samples] if num_samples <= 10 else Viridis256(num_samples)
         
         # loop through each sample
         for i, sample in enumerate(sample_options.keys()):
@@ -1545,16 +1565,26 @@ class ResonatorPowerSweep:
                             bounds=chunk.TLSfit_bounds,
                         )
                     # do plotting
-                    # color = colourmap[i * len(colourmap) // num_resonators]
-                    fig_bokeh.scatter(
+                    fig_bokeh.line(
                         source=source,
                         x="n_ph",
                         y="Qi",
-                        size=10,
+                        size=8,
                         color=shades[i],
                         alpha=0.7,
-                        legend_label=f"{freq_bin_cur} (Single photon Qi = {sph_Qi:.1e})",
+                        legend_label=f"{sample}: {freq_bin_cur} (Qi = {sph_Qi:.1e})",
                     )
+
+                    fig_bokeh.circle(
+                        source=source,
+                        x="n_ph",
+                        y="Qi",
+                        size=8,
+                        color=shades[i],
+                        fill_color="white",
+                        alpha=0.7,
+                    )
+
                     # errorbars
                     if with_errorbars == True:
                         errorbars = Whisker(

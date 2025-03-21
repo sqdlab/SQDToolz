@@ -1410,7 +1410,8 @@ class ResonatorPowerSweep:
     def multisample_plot(
         cls,
         main_data_directory,
-        sample_options
+        sample_options,
+        output_directory=None
     ):
         """
         Creates a bokeh plot for Qi comparison of multiple resonator samples. 
@@ -1437,13 +1438,18 @@ class ResonatorPowerSweep:
         This function handles import and fitting, before passing the data to
         cls.plot_Qi_multisample_bokeh().
         """
-
+        # default values
         default_power_dict = {"lowPower" : -132, 
                               "highPower" : -82,
                               "default" : -82
                             }
         default_T = 25*1e-3
         assert os.path.isdir(main_data_directory), f"Main data directory '{main_data_directory}' does not exist."
+        if output_directory is None:
+            output_directory = main_data_directory
+        else:
+            assert os.path.isdir(output_directory), f"Selected output directory '{output_directory}' does not exist."
+
         # check for valid options, complete setup
         for sample in sample_options.keys():
             assert sample_options[sample].get('name') != None
@@ -1476,7 +1482,11 @@ class ResonatorPowerSweep:
             sample_options[sample]['freq_bin_labels'] = chunk.freq_bin_labels
             print("\n")
         # pass to plotting function
-        cls.plot_Qi_multisample_bokeh(data, dict(sample_options), main_data_directory)
+        cls.plot_Qi_multisample_bokeh(data=data, 
+                                      sample_options=dict(sample_options), 
+                                      main_data_directory=main_data_directory, 
+                                      output_data_directory=output_directory
+                                      )
 
     @classmethod
     # Qi vs photon number (static)
@@ -1485,6 +1495,7 @@ class ResonatorPowerSweep:
         data,
         sample_options,
         main_data_directory,
+        output_data_directory,
         with_fit=True,
         with_errorbars=True,
         legend_location="bottom_right",
@@ -1614,7 +1625,7 @@ class ResonatorPowerSweep:
         # save plot
         if save_plot == True:
             export_name = "_".join(list(sample_options.keys()))
-            export_path = os.path.join(main_data_directory, f"Qi_{export_name}.png")
+            export_path = os.path.join(output_data_directory, f"Qi_{export_name}.png")
             export.export_png(obj=fig_bokeh, filename=export_path)
             print(f"Plot saved at {export_path}")
 

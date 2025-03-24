@@ -19,6 +19,7 @@ try:
     from bokeh.plotting import figure, show  # type: ignore
     from bokeh.io import output_notebook, export  # type: ignore
     from bokeh.palettes import Viridis256, Category10  # type: ignore
+    from bokeh.layouts import gridplot  # type: ignore
 except:
     warnings.warning("Bokeh not imported. You will have to use mpl for plotting")
     PLOT_BACKEND = "matplotlib"
@@ -1411,7 +1412,8 @@ class ResonatorPowerSweep:
         cls,
         main_data_directory,
         sample_options,
-        output_directory=None
+        output_directory=None,
+        include_bar_graph=True
     ):
         """
         Creates a bokeh plot for Qi comparison of multiple resonator samples. 
@@ -1484,18 +1486,18 @@ class ResonatorPowerSweep:
         # pass to plotting function
         cls.plot_Qi_multisample_bokeh(data=data, 
                                       sample_options=dict(sample_options), 
-                                      main_data_directory=main_data_directory, 
-                                      output_data_directory=output_directory
+                                      output_data_directory=output_directory,
+                                      include_bar_graph=include_bar_graph
                                       )
 
     @classmethod
-    # Qi vs photon number (static)
+    # Qi vs photon number (static) and bar-graph with sample statistics
     def plot_Qi_multisample_bokeh(
         cls,
         data,
         sample_options,
-        main_data_directory,
         output_data_directory,
+        include_bar_graph=True,
         with_fit=True,
         with_errorbars=True,
         legend_location="bottom_right",
@@ -1508,19 +1510,28 @@ class ResonatorPowerSweep:
             assert isinstance(data[sample], pd.DataFrame)
 
         num_samples = len(data.keys())
+        sample_names = list(data.keys())
 
-        # bokeh setup
-        fig_bokeh = figure(
-            width=1000,
+        # bokeh setup - Qi vs. n_ph
+        fig_line = figure(
+            width=600,
             height=600,
             x_axis_type="log",
             y_axis_type="log",
             y_axis_label=r"$$Q_i$$",
             x_axis_label=r"Photon number " + r"$$\langle n \rangle$$",
         )
-        # colourmap = Viridis256
         if ylims != None:
-            fig_bokeh.y_range = Range1d(ylims[0], ylims[1])
+            fig_line.y_range = Range1d(ylims[0], ylims[1])
+        # bokeh setup - box plot
+        fig_box = figure(
+            x_range=sample_names,
+            width=600,
+            height=600,
+            y_axis_type="log",
+            y_axis_label=r"$$Q_i$$",
+            x_axis_label=r"Sample name",
+        )
         
         # colours
         base_colors = Category10.get(num_samples) or Category10[10][:num_samples] if num_samples <= 10 else Viridis256(num_samples)
@@ -1545,7 +1556,7 @@ class ResonatorPowerSweep:
             for i, freq_bin_cur in enumerate(freq_bin_labels):
                 if i in freqs_to_use:
                     # initialise plot data for new resonator
-                    n_ph, Qi, Qi_upper, Qi_lower, Qerr = [], [], [], [], []
+                    n_ph, Qi, Qi_upper, Qi_lower, Qerr, Qi_sph = [], [], [], [], [], []
                     f = float(freq_bin_cur.split()[0]) * 1e9  # Hz
                     for _, row in data[sample].iterrows():
                         # add measurement from self.fit_data if in current bin
@@ -1564,6 +1575,7 @@ class ResonatorPowerSweep:
                         data=source.data, search_key="n_ph"
                     )
                     sph_Qi = np.array(source.data["Qi"])[sph_indx]
+                    Qi_sph.append(sph_Qi)
                     # TLS fit
                     n_ph_TLS, TLSfit = None, None
                     if with_fit == True:
@@ -1576,7 +1588,7 @@ class ResonatorPowerSweep:
                             bounds=chunk.TLSfit_bounds,
                         )
                     # do plotting
-                    fig_bokeh.line(
+                    fig_line.line(
                         source=source,
                         x="n_ph",
                         y="Qi",
@@ -1586,7 +1598,7 @@ class ResonatorPowerSweep:
                         legend_label=f"{sample}: {freq_bin_cur} (Qi = {sph_Qi:.1e})",
                     )
 
-                    fig_bokeh.circle(
+                    fig_line.circle(
                         source=source,
                         x="n_ph",
                         y="Qi",
@@ -1610,24 +1622,56 @@ class ResonatorPowerSweep:
                             upper_head=TeeHead(line_color=shades[i], line_alpha=0.7, size=6),
                             lower_head=TeeHead(line_color=shades[i], line_alpha=0.7, size=6),
                         )
-                        fig_bokeh.add_layout(errorbars)
+                        fig_line.add_layout(errorbars)
                     if with_fit == True:
-                        fig_bokeh.line(
+                        fig_line.line(
                             n_ph_TLS, TLSfit, line_color=shades[i], line_alpha=0.2, line_width=3
                     )
+            if include_bar_graph:
+                # calculate per-sample statistics (across all resonators on the sample)
+                q1, q2, q3 = np.percentile(Qi_sph, [25, 50, 75])
+                # q1 = qi_stats[0]
+                # q2 = qi_stats[1]
+                # q3 = qi_stats[2]
+                iqr = q3 - q1
+                upper_whisker = min(max(Qi_sph), q3 + 1.5 * iqr)
+                lower_whisker = max(min(Qi_sph), q1 - 1.5 * iqr)
+                # prepare data for plot and add to box plot
+                box_source = ColumnDataSource(data=dict(
+                                    sample=sample, q1=q1, q2=q2, q3=q3,
+                                    upper=upper_whisker, lower=lower_whisker
+                                ))
+                fig_box.vbar(x='sample', top='q3', bottom='q1', source=source, width=0.5, fill_color=base_color, line_color="black", legend_label=f"{sample}")
+                # Median lines
+                fig_box.segment('sample', 'q2', 'sample', 'q2', source=source, line_width=2, line_color="black")
+                # Whiskers
+                fig_box.segment('sample', 'upper', 'sample', 'q3', source=source, line_color="black")
+                fig_box.segment('sample', 'lower', 'sample', 'q1', source=source, line_color="black")
         # legend
-        fig_bokeh.legend.location = legend_location
+        fig_line.legend.location = legend_location
         # title
-        fig_bokeh.title = f"Internal Q-factor"
-        # show plot
-        if show_plot == True:
-            show(fig_bokeh)
-        # save plot
-        if save_plot == True:
-            export_name = "_".join(list(sample_options.keys()))
-            export_path = os.path.join(output_data_directory, f"Qi_{export_name}.png")
-            export.export_png(obj=fig_bokeh, filename=export_path)
-            print(f"Plot saved at {export_path}")
+        fig_line.title = f"Internal Q-factor"
+        if not include_bar_graph:
+            # show plot
+            if show_plot == True:
+                show(fig_line)
+            # save plot
+            if save_plot == True:
+                export_name = "_".join(list(sample_options.keys()))
+                export_path = os.path.join(output_data_directory, f"Qi_{export_name}.png")
+                export.export_png(obj=fig_line, filename=export_path)
+                print(f"Plot saved at {export_path}")
+        elif include_bar_graph:
+            layout = gridplot([[fig_line, fig_box]])
+            # show plot
+            if show_plot == True:
+                show(layout)
+            # save plot
+            if save_plot == True:
+                export_name = "_".join(list(sample_options.keys()))
+                export_path = os.path.join(output_data_directory, f"Qi_{export_name}.png")
+                export.export_png(obj=layout, filename=export_path)
+                print(f"Plot saved at {export_path}")
 
     @staticmethod
     def adjust_lightness_bokeh(hex_color, factor):

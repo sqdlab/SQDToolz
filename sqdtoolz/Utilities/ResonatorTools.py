@@ -9,6 +9,7 @@ from sqdtoolz.Utilities.FileIO import FileIOReader
 from resonator_tools import circuit  # type: ignore
 from pprint import pprint
 from pathlib import Path
+import csv
 
 warnings.filterwarnings("ignore", "Covariance of the parameters could not be estimated")
 
@@ -50,6 +51,10 @@ class ResonatorPowerSweep:
                         defaults to ([0, 0.2, 0, 0.0], [1, 1e3, 1e9, 1])
         - print_log     Boolean to choose if prinouts occur during
                         execution (optional, defaults to False)
+        - with_fit      Boolean to choose whether or not to fit data with
+                        a TLS model
+        - n_ph_lims     Photon number range to be used for fitting and 
+                        plotting
     """
 
     def __init__(
@@ -66,7 +71,8 @@ class ResonatorPowerSweep:
         print_log=False,
         notebook=False,
         fit_data={},
-        with_fit=None
+        with_fit=None,
+        n_ph_lims=[0, 1e10]
     ):
         # initialise data
         self.data_path = data_path
@@ -86,10 +92,12 @@ class ResonatorPowerSweep:
         self.frequencies = []
         self.freq_bin_labels = []
         self.do_TLS_fit = with_fit
+        self.n_ph_lims = n_ph_lims
 
         # private class variables
         self._data_file_name = "data.h5"
         self._config_file_name = "experiment_configurations.txt"
+        self._fitted_data_file_name = "circlefit.txt"
 
         # figure
         self.plot_backend = PLOT_BACKEND
@@ -181,6 +189,28 @@ class ResonatorPowerSweep:
         for root, _, files in os.walk(self.data_path):
             # root_shortened = Path(*Path(root).parts[-3:])
             root_shortened = Path(*Path(root).parts[-2:])
+            # first, check for existing circlefit data
+            circlefit_match = next((f for f in files if "circlefit.txt" in f), None)
+            if circlefit_match:
+                # read circlefit into self.fit_data, skip searching
+                self.fit_data = {} # clear fit_data
+                fit_data_path = os.path.join(root, circlefit_match)
+                with open(fit_data_path, newline='', encoding='utf-8') as f:
+                    reader = csv.DictReader(f, delimiter='\t')  # Tab-delimited
+                    # get headers 
+                    for header in reader.fieldnames:
+                        self.fit_data[header] = []
+                    for row in reader:
+                        for header in reader.fieldnames:
+                            value = row[header]
+                            try:
+                                # Try to convert to float if possible
+                                self.fit_data[header].append(float(value) if value.replace('.', '', 1).isdigit() else value)
+                            except ValueError:
+                                # If it's not a number, keep it as a string
+                                self.fit_data[header].append(value)
+                print(f'Read {circlefit_match} into self.fit_data')
+                break
             # Check if data.h5 with valid config file exists in the folder
             if files_to_ignore:
                 ignore_match = [(i in str(root_shortened)) for i in files_to_ignore]
@@ -265,7 +295,7 @@ class ResonatorPowerSweep:
             else:
                 if print_log != "none":
                     print(f"Invalid\t\t{root_shortened}")
-        assert self.data, "No valid data found at data_path."
+        assert (self.data or self.fit_data), "No valid data found at data_path."
         print("Data import complete.")
         return self.data
 
@@ -386,7 +416,7 @@ class ResonatorPowerSweep:
         # remove invalid measurements from self.dict
         for invalid_measurement in invalid_data:
             self.data.pop(invalid_measurement)
-        #  make sure fit data has been added to dictionary
+        # make sure fit data has been added to dictionary
         self.assert_subkey_exists(self.data, "fit")
         # add n_ph to dictionary
         self.n_ph_calculator()
@@ -581,7 +611,13 @@ class ResonatorPowerSweep:
 
             if do_fit:
                 # calculate F*tanδ
-                fit_dict, _, _ = self.TLS_fit(res_data["n_ph"], res_data["Qi"], f=f_av, T=self.T, Qerr=res_data["Qerr"], bounds=self.TLSfit_bounds)
+                fit_dict, _, _ = self.TLS_fit(res_data["n_ph"], 
+                                              res_data["Qi"], 
+                                              f=f_av, 
+                                              T=self.T, 
+                                              Qerr=res_data["Qerr"], 
+                                              bounds=self.TLSfit_bounds, 
+                                              n_ph_lims=self.n_ph_lims)
                 F_tan_delta.append(fit_dict["F_tan_delta"])
                 n_c.append(fit_dict["n_c"])
             else:
@@ -760,6 +796,7 @@ class ResonatorPowerSweep:
                         T=self.T,
                         Qerr=source.data["Qerr"],
                         bounds=self.TLSfit_bounds,
+                        n_ph_lims=self.n_ph_lims
                     )
 
                 # bokeh plot
@@ -843,6 +880,7 @@ class ResonatorPowerSweep:
                             T=self.T,
                             Qerr=source.data["Qerr"],
                             bounds=self.TLSfit_bounds,
+                            n_ph_lims=self.n_ph_lims
                         )
                         self.ax_ph_mpl.plot(
                             n_ph_TLS, TLSfit, color=color, alpha=0.4, linewidth=3
@@ -1197,7 +1235,7 @@ class ResonatorPowerSweep:
     # TLS fit
     @staticmethod
     def TLS_fit(
-        n_ph, Qi, f, T, bounds=None, Qerr=None, print_log=False, print_fit=True
+        n_ph, Qi, f, T, bounds=None, Qerr=None, print_log=False, print_fit=True, n_ph_lims=None
     ):
         """
         Function for fitting TLS loss model (e.g. in doi: 10.1063/5.0004622) to n_ph vs. Qi. Note: this is a static method (i.e. does not have access to class variables; all arguments must be passed). Fits parameters [F_delta_TLS0, n_c, Q_HP, beta].
@@ -1213,6 +1251,7 @@ class ResonatorPowerSweep:
         - Qerr      (Optional) List-like of Qerr (y error) data.
         - print_log (Defaults to False) Boolean to activate printouts during fitting.
         - print_fit (Defaults to True) Prints fit parameters for each fit
+        - n_ph_lims Photon number range to be used for fitting 
 
         Outputs:
         - Tuple containing (x, y, z)
@@ -1224,6 +1263,21 @@ class ResonatorPowerSweep:
         assert isinstance(T, (float, int)), "Temperature should be a float or int."
         assert isinstance(f, (float, int)), "Frequency should be a float or int."
         assert len([n_ph, Qi, Qerr]) > 0, "Please provide n_ph and Qi data."
+        assert all(n_ph[i] <= n_ph[i + 1] for i in range(len(n_ph) - 1)), "Data is not sorted by photon number."
+
+        # # check for photon number limits
+        # if n_ph_lims is None:
+        #     n_ph_lims = self.n_ph_lims
+        # else:
+        #     self.n_ph_lims = n_ph_lims
+
+        if n_ph_lims is not None:
+            # slice lists to photon number limits
+            lower_index = next((i for i, val in enumerate(n_ph) if val > n_ph_lims[0]), -1)
+            upper_index = next((i for i, val in enumerate(n_ph) if val < n_ph_lims[1]), -1)
+            # slice data
+            n_ph = n_ph[lower_index:upper_index]
+            Qi = Qi[lower_index:upper_index]
 
         # constants
         hbar = 1.054 * 10 ** (-34)
@@ -1543,10 +1597,13 @@ class ResonatorPowerSweep:
             freq_bin_labels = sample_options[sample]['freq_bin_labels']
             num_resonators = len(freq_bin_labels)
             # check which resonators to plot
-            if sample_options[sample]['resonator_index_to_plot'] != None:
+            if sample_options[sample]['resonator_index_to_plot'] and sample_options[sample]['resonator_index_to_plot'] != None:
                 freqs_to_use = sample_options[sample]['resonator_index_to_plot']
-            elif sample_options[sample]['resonator_index_to_plot'] == None:
+            else:
                 freqs_to_use = range(freq_bin_labels)
+            # check for TLS-fit range
+            if sample_options[sample]['n_ph_lims'] and sample_options[sample]['n_ph_lims'] != None:
+                n_ph_lims = sample_options[sample]['n_ph_lims']
             # determine colour for each resonator
             base_color = base_colors[i]
             # Generate shades by adjusting brightness
@@ -1586,13 +1643,14 @@ class ResonatorPowerSweep:
                             T=sample_options[sample]['T'],
                             Qerr=source.data["Qerr"],
                             bounds=chunk.TLSfit_bounds,
+                            n_ph_lims=n_ph_lims
                         )
                     # do plotting
                     fig_line.line(
                         source=source,
                         x="n_ph",
                         y="Qi",
-                        size=8,
+                        # size=8, 
                         color=shades[i],
                         alpha=0.7,
                         legend_label=f"{sample}: {freq_bin_cur} (Qi = {sph_Qi:.1e})",

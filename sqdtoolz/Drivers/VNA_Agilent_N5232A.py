@@ -11,7 +11,7 @@ from qcodes import (
          
 class VNA_Agilent_N5232A(VisaInstrument):
     def __init__(self, name, address, **kwargs):
-        super().__init__(name, address, terminator='\n', timeout=60, **kwargs)
+        super().__init__(name, address, terminator='\n', timeout=2, **kwargs)
         #By default we are working with the channel number 1, so SENSe<cnum>: if all queries is just SENSe1: ...
         
         # if 'P9373' in self.ask('*IDN?'):

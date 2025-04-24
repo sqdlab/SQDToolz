@@ -115,35 +115,35 @@ class WFMT_ModulationIQ(WaveformTransformation):
     def IQFrequency(self):
         return self._iq_frequency
     @IQFrequency.setter
-    def IQFrequency(self, val):
+    def IQFrequency(self, val: float):
         self._iq_frequency = val
 
     @property
     def IQAmplitude(self):
         return self._iq_amplitude
     @IQAmplitude.setter
-    def IQAmplitude(self, val):
+    def IQAmplitude(self, val: float):
         self._iq_amplitude = val
 
     @property
     def IQAmplitudeFactor(self):
         return self._iq_amplitude_factor
     @IQAmplitudeFactor.setter
-    def IQAmplitudeFactor(self, val):
+    def IQAmplitudeFactor(self, val: float):
         self._iq_amplitude_factor = val
 
     @property
     def IQPhaseOffset(self):
         return self._iq_phase_offset
     @IQPhaseOffset.setter
-    def IQPhaseOffset(self, val):
+    def IQPhaseOffset(self, val: float):
         self._iq_phase_offset = val
 
     @property
     def IQdcOffset(self):
         return self._iq_dc_offsets
     @IQdcOffset.setter
-    def IQdcOffset(self, val):
+    def IQdcOffset(self, val: float):
         assert type(val) is tuple, "IQ DC offset must be given as a tuple."
         self._iq_dc_offsets = val
 
@@ -151,8 +151,7 @@ class WFMT_ModulationIQ(WaveformTransformation):
     def IQUpperSideband(self):
         return self._iq_upper_sb
     @IQUpperSideband.setter
-    def IQUpperSideband(self, boolVal):
-        #TODO: Add type+error checking to all the boolVal, val etc...
+    def IQUpperSideband(self, boolVal: bool):
         self._iq_upper_sb = boolVal
 
     def set_IQ_parameters(self, amp = 1.0, dc_offset = (0.0, 0.0), amplitude_factor = 1.0, phase_offset = 0.0):
@@ -164,7 +163,7 @@ class WFMT_ModulationIQ(WaveformTransformation):
     def initialise_for_new_waveform(self):
         self._cur_t0 = 0.0
 
-    def modify_waveform(self, wfm_pts, fs, t0_ind, ch_index, **kwargs):
+    def modify_waveform(self, wfm_pts: np.ndarray, fs: float, t0_ind: float, ch_index: int, **kwargs):
         t0 = t0_ind / fs
 
         cur_t_off = 0.0

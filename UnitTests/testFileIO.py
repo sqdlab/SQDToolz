@@ -348,5 +348,5 @@ class TestExpFileIO(unittest.TestCase):
 
 if __name__ == '__main__':
     temp = TestExpFileIO()
-    temp.test_WriteArbitraryIndex()
+    temp.test_DataResizing()
     # unittest.main()

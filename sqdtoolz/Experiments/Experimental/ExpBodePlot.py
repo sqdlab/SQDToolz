@@ -58,7 +58,8 @@ class ExpBodePlot(Experiment):
             fig, axs = plt.subplots(nrows=2); axs[0].grid(); axs[1].grid()
             axs[0].set_ylabel('|H| (dB)'); axs[1].set_ylabel('arg(H) (°)'); axs[1].set_xlabel('Frequency')
 
-            axs[0].loglog(freq_sweeps, arr[:,0]**2+arr[:,1]**2, 'r')
+            # axs[0].loglog(freq_sweeps, arr[:,0]**2+arr[:,1]**2, 'r')
+            axs[0].semilogx(freq_sweeps, 10*np.log10(arr[:,0]**2+arr[:,1]**2), 'r')
             angles = np.arctan2(arr[:,1], arr[:,0])
             axs[1].semilogx(freq_sweeps, np.unwrap(angles)/np.pi*180, 'b')
 

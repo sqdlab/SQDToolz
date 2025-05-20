@@ -17,7 +17,7 @@ class GENfuncGen(HALbase):
     def Output(self):
         return self._instr_fgen_output.Output
     @Output.setter
-    def Output(self, val):
+    def Output(self, val: bool):
         self._instr_fgen_output.Output = val
 
     @property
@@ -33,28 +33,28 @@ class GENfuncGen(HALbase):
     def Frequency(self):
         return self._instr_fgen_output.Frequency
     @Frequency.setter
-    def Frequency(self, val):
+    def Frequency(self, val: float):
         self._instr_fgen_output.Frequency = val
 
     @property
     def Amplitude(self):
         return self._instr_fgen_output.Amplitude
     @Amplitude.setter
-    def Amplitude(self, val):
+    def Amplitude(self, val: float):
         self._instr_fgen_output.Amplitude = val
 
     @property
     def Offset(self):
         return self._instr_fgen_output.Offset
     @Offset.setter
-    def Offset(self, val):
+    def Offset(self, val: float):
         self._instr_fgen_output.Offset = val
 
     @property
     def DutyCycle(self):
         return self._instr_fgen_output.DutyCycle
     @DutyCycle.setter
-    def DutyCycle(self, val):
+    def DutyCycle(self, val: float):
         self._instr_fgen_output.DutyCycle = val
 
     def activate(self):

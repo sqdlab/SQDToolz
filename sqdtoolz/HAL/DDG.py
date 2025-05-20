@@ -25,7 +25,7 @@ class DDG(TriggerOutputCompatible, HALbase):
     def RepetitionTime(self):
         return self._instr_ddg.RepetitionTime
     @RepetitionTime.setter
-    def RepetitionTime(self, val):
+    def RepetitionTime(self, val: float):
         self._instr_ddg.RepetitionTime = val
 
     @property

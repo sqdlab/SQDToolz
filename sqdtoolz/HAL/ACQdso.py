@@ -33,14 +33,14 @@ class ACQdso(HALbase):
     def SampleRate(self):
         return self._instr_dso.SampleRate
     @SampleRate.setter
-    def SampleRate(self, sample_rate):
+    def SampleRate(self, sample_rate: float):
         self._instr_dso.SampleRate = sample_rate
 
     @property
     def NumSamples(self):
         return self._instr_dso.NumSamples
     @NumSamples.setter
-    def NumSamples(self, num_points):
+    def NumSamples(self, num_points: int):
         self._instr_dso.NumSamples = num_points
 
     @property

@@ -32,14 +32,14 @@ class GENsmu(HALbase):
     def Voltage(self):
         return self._instr_smu.Voltage
     @Voltage.setter
-    def Voltage(self, val):
+    def Voltage(self, val: float):
         self._instr_smu.Voltage = val
         
     @property
     def Current(self):
         return self._instr_smu.Current
     @Current.setter
-    def Current(self, val):
+    def Current(self, val: float):
         self._instr_smu.Current = val
         
     @property
@@ -54,14 +54,14 @@ class GENsmu(HALbase):
     def ComplianceCurrent(self):
         return self._instr_smu.ComplianceCurrent
     @ComplianceCurrent.setter
-    def ComplianceCurrent(self, val):
+    def ComplianceCurrent(self, val: float):
         self._instr_smu.ComplianceCurrent = val
     
     @property
     def ComplianceVoltage(self):
         return self._instr_smu.ComplianceVoltage
     @ComplianceVoltage.setter
-    def ComplianceVoltage(self, val):
+    def ComplianceVoltage(self, val: float):
         self._instr_smu.ComplianceVoltage = val
         
     @property
@@ -76,14 +76,14 @@ class GENsmu(HALbase):
     def RampRateVoltage(self):
         return self._instr_smu.RampRateVoltage
     @RampRateVoltage.setter
-    def RampRateVoltage(self, val):
+    def RampRateVoltage(self, val: float):
         self._instr_smu.RampRateVoltage = val
 
     @property
     def RampRateCurrent(self):
         return self._instr_smu.RampRateCurrent
     @RampRateCurrent.setter
-    def RampRateCurrent(self, val):
+    def RampRateCurrent(self, val: float):
         self._instr_smu.RampRateCurrent = val
 
     @property
@@ -102,28 +102,28 @@ class GENsmu(HALbase):
     def SweepSampleTime(self):
         return self._instr_smu.SweepSampleTime
     @SweepSampleTime.setter
-    def SweepSampleTime(self, smpl_time_seconds):
+    def SweepSampleTime(self, smpl_time_seconds: float):
         self._instr_smu.SweepSampleTime = smpl_time_seconds
 
     @property
     def SweepSamplePoints(self):
         return self._instr_smu.SweepSamplePoints
     @SweepSamplePoints.setter
-    def SweepSamplePoints(self, smpl_pts):
+    def SweepSamplePoints(self, smpl_pts: int):
         self._instr_smu.SweepSamplePoints = smpl_pts
 
     @property
     def SweepStartValue(self):
         return self._instr_smu.SweepStartValue
     @SweepStartValue.setter
-    def SweepStartValue(self, val):
+    def SweepStartValue(self, val: float):
         self._instr_smu.SweepStartValue = val
 
     @property
     def SweepEndValue(self):
         return self._instr_smu.SweepEndValue
     @SweepEndValue.setter
-    def SweepEndValue(self, val):
+    def SweepEndValue(self, val: float):
         self._instr_smu.SweepEndValue = val
 
     def get_data(self):

@@ -18,49 +18,49 @@ class GENmwSource(HALbase, TriggerInputCompatible, TriggerInput):
     def Output(self):
         return self._instr_mw_output.Output
     @Output.setter
-    def Output(self, val):
+    def Output(self, val: bool):
         self._instr_mw_output.Output = val
         
     @property
     def Power(self):
         return self._instr_mw_output.Power
     @Power.setter
-    def Power(self, val):
+    def Power(self, val: float):
         self._instr_mw_output.Power = val
         
     @property
     def Frequency(self):
         return self._instr_mw_output.Frequency
     @Frequency.setter
-    def Frequency(self, val):
+    def Frequency(self, val: float):
         self._instr_mw_output.Frequency = val
         
     @property
     def Phase(self):
         return self._instr_mw_output.Phase
     @Phase.setter
-    def Phase(self, val):
+    def Phase(self, val: float):
         self._instr_mw_output.Phase = val
         
     @property
     def PhaseModAmplitude(self):
         return self._instr_mw_output.PhaseModAmplitude
     @PhaseModAmplitude.setter
-    def PhaseModAmplitude(self, val):
+    def PhaseModAmplitude(self, val: float):
         self._instr_mw_output.PhaseModAmplitude = val
         
     @property
     def FrequencyModAmplitude(self):
         return self._instr_mw_output.FrequencyModAmplitude
     @FrequencyModAmplitude.setter
-    def FrequencyModAmplitude(self, val):
+    def FrequencyModAmplitude(self, val: float):
         self._instr_mw_output.FrequencyModAmplitude = val
 
     @property
     def AmplitudeModDepth(self):
         return self._instr_mw_output.AmplitudeModDepth
     @AmplitudeModDepth.setter
-    def AmplitudeModDepth(self, val):
+    def AmplitudeModDepth(self, val: float):
         self._instr_mw_output.AmplitudeModDepth = val
         
     @property

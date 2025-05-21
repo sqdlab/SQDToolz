@@ -72,7 +72,8 @@ class ResonatorPowerSweep:
         notebook=False,
         fit_data={},
         with_fit=None,
-        n_ph_lims=[0, 1e10]
+        n_ph_lims=[0, 1e10],
+        TLS_model="mcrae"
     ):
         # initialise data
         self.data_path = data_path
@@ -93,6 +94,7 @@ class ResonatorPowerSweep:
         self.freq_bin_labels = []
         self.do_TLS_fit = with_fit
         self.n_ph_lims = n_ph_lims
+        self.TLS_model = TLS_model
 
         # private class variables
         self._data_file_name = "data.h5"
@@ -130,7 +132,8 @@ class ResonatorPowerSweep:
         additional_attenuation=0,
         print_log="none",
         files_to_ignore=None,
-        power_config_order="last"
+        power_config_order="last",
+        from_text_file=False
     ):
         """
         Searches for and imports all data.h5 files in a given directory into a dictionary. Extracts the VNA power and measurement name corresponding to each data file.
@@ -189,28 +192,29 @@ class ResonatorPowerSweep:
         for root, _, files in os.walk(self.data_path):
             # root_shortened = Path(*Path(root).parts[-3:])
             root_shortened = Path(*Path(root).parts[-2:])
-            # first, check for existing circlefit data
-            circlefit_match = next((f for f in files if "circlefit.txt" in f), None)
-            if circlefit_match:
-                # read circlefit into self.fit_data, skip searching
-                self.fit_data = {} # clear fit_data
-                fit_data_path = os.path.join(root, circlefit_match)
-                with open(fit_data_path, newline='', encoding='utf-8') as f:
-                    reader = csv.DictReader(f, delimiter='\t')  # Tab-delimited
-                    # get headers 
-                    for header in reader.fieldnames:
-                        self.fit_data[header] = []
-                    for row in reader:
+            if from_text_file:
+                # first, check for existing circlefit data
+                circlefit_match = next((f for f in files if "circlefit.txt" in f), None)
+                if circlefit_match:
+                    # read circlefit into self.fit_data, skip searching
+                    self.fit_data = {} # clear fit_data
+                    fit_data_path = os.path.join(root, circlefit_match)
+                    with open(fit_data_path, newline='', encoding='utf-8') as f:
+                        reader = csv.DictReader(f, delimiter='\t')  # Tab-delimited
+                        # get headers 
                         for header in reader.fieldnames:
-                            value = row[header]
-                            try:
-                                # Try to convert to float if possible
-                                self.fit_data[header].append(float(value) if value.replace('.', '', 1).isdigit() else value)
-                            except ValueError:
-                                # If it's not a number, keep it as a string
-                                self.fit_data[header].append(value)
-                print(f'Read {circlefit_match} into self.fit_data')
-                break
+                            self.fit_data[header] = []
+                        for row in reader:
+                            for header in reader.fieldnames:
+                                value = row[header]
+                                try:
+                                    # Try to convert to float if possible
+                                    self.fit_data[header].append(float(value) if value.replace('.', '', 1).isdigit() else value)
+                                except ValueError:
+                                    # If it's not a number, keep it as a string
+                                    self.fit_data[header].append(value)
+                    print(f'Read {circlefit_match} into self.fit_data')
+                    break
             # Check if data.h5 with valid config file exists in the folder
             if files_to_ignore:
                 ignore_match = [(i in str(root_shortened)) for i in files_to_ignore]
@@ -555,7 +559,8 @@ class ResonatorPowerSweep:
             self, 
             save_directory=None,
             n_ph_HP=1e6,
-            do_fit=True
+            do_fit=True,
+            output_name=None
             ):
         '''
         Saves a text file with a complete data summary to the data_path.
@@ -567,7 +572,10 @@ class ResonatorPowerSweep:
             save_path = save_directory
         else:
             save_path = self.save_path
-        export_path = os.path.join(save_path, f"data_summary_{self.name}.txt")
+        if output_name == None:
+            export_path = os.path.join(save_path, f"data_summary_{self.name}.txt")
+        else:
+            export_path = os.path.join(save_path, f"{output_name}_{self.name}.txt")
         col_width = 13
         headers_per_res = ["Qi,LP", "Qi,HP", "Qc med", "Qc range", "f med [Hz]", "f range [Hz]", "F*tanδ", "n_c"]
         headers_stats = ["Qi,LP \tmax", "Qi,LP \tAv +/- SE", "Qi,HP \tmax", "Qi,HP \tAv +/- SE", "Qc    \tAv +/- SE", "Qc    \tmax", "Qc    \tmin", "F*tanδ  Av +/- SE", "F*tanδ  min"]
@@ -617,7 +625,8 @@ class ResonatorPowerSweep:
                                               T=self.T, 
                                               Qerr=res_data["Qerr"], 
                                               bounds=self.TLSfit_bounds, 
-                                              n_ph_lims=self.n_ph_lims)
+                                              n_ph_lims=self.n_ph_lims,
+                                              TLS_model=self.TLS_model)
                 F_tan_delta.append(fit_dict["F_tan_delta"])
                 n_c.append(fit_dict["n_c"])
             else:
@@ -796,7 +805,8 @@ class ResonatorPowerSweep:
                         T=self.T,
                         Qerr=source.data["Qerr"],
                         bounds=self.TLSfit_bounds,
-                        n_ph_lims=self.n_ph_lims
+                        n_ph_lims=self.n_ph_lims,
+                        TLS_model=self.TLS_model
                     )
 
                 # bokeh plot
@@ -880,7 +890,8 @@ class ResonatorPowerSweep:
                             T=self.T,
                             Qerr=source.data["Qerr"],
                             bounds=self.TLSfit_bounds,
-                            n_ph_lims=self.n_ph_lims
+                            n_ph_lims=self.n_ph_lims,
+                            TLS_model=self.TLS_model
                         )
                         self.ax_ph_mpl.plot(
                             n_ph_TLS, TLSfit, color=color, alpha=0.4, linewidth=3
@@ -1235,7 +1246,7 @@ class ResonatorPowerSweep:
     # TLS fit
     @staticmethod
     def TLS_fit(
-        n_ph, Qi, f, T, bounds=None, Qerr=None, print_log=False, print_fit=True, n_ph_lims=None
+        n_ph, Qi, f, T, bounds=None, Qerr=None, print_log=False, print_fit=True, n_ph_lims=None, TLS_model="mcrae"
     ):
         """
         Function for fitting TLS loss model (e.g. in doi: 10.1063/5.0004622) to n_ph vs. Qi. Note: this is a static method (i.e. does not have access to class variables; all arguments must be passed). Fits parameters [F_delta_TLS0, n_c, Q_HP, beta].
@@ -1264,12 +1275,7 @@ class ResonatorPowerSweep:
         assert isinstance(f, (float, int)), "Frequency should be a float or int."
         assert len([n_ph, Qi, Qerr]) > 0, "Please provide n_ph and Qi data."
         assert all(n_ph[i] <= n_ph[i + 1] for i in range(len(n_ph) - 1)), "Data is not sorted by photon number."
-
-        # # check for photon number limits
-        # if n_ph_lims is None:
-        #     n_ph_lims = self.n_ph_lims
-        # else:
-        #     self.n_ph_lims = n_ph_lims
+        assert TLS_model in ["mcrae", "crowley"], "Please choose TLS model from ['mcrae', 'crowley']"
 
         if n_ph_lims is not None:
             # slice lists to photon number limits
@@ -1282,26 +1288,166 @@ class ResonatorPowerSweep:
         # constants
         hbar = 1.054 * 10 ** (-34)
         kB = 1.380649 * 10 ** (-23)
-        numerator = np.tanh((hbar * 2.0 * np.pi * f) / (2 * kB * T))
 
-        # define model
-        def TLS_model(n_ph, F_delta_TLS0, n_c, Q_HP, beta):
-            denominator = (1.0 + (n_ph / n_c)) ** beta
-            delta_TLS = F_delta_TLS0 * (numerator / denominator) + (1 / Q_HP)
-            return delta_TLS ** (-1)
+        if TLS_model == "mcrae":
+            """
+            4 fit parameters, power-dependence only. 
+            From doi: 10.1063/5.0004622 (Mcrae et al. 2020).
+            Parameters: F_delta_TLS0, n_c, Q_HP, beta
+            """
+            numerator = np.tanh((hbar * 2.0 * np.pi * f) / (2 * kB * T))
+            # define model
+            def TLS_model(n_ph, F_delta_TLS0, n_c, Q_HP, beta):
+                denominator = (1.0 + (n_ph / n_c)) ** beta
+                delta_TLS = F_delta_TLS0 * (numerator / denominator) + (1 / Q_HP)
+                return delta_TLS ** (-1)
 
-        # initial guesses
-        init_guesses = [2.0e-6, 1, 1.0e6, 0.5]
-        # default bounds
-        if bounds == None:
-            bounds = ([0, 0.2, 0, 0.0], [1, 1e3, 1e9, 1])
-        else:
-            assert isinstance(
-                bounds, tuple
-            ), "Bounds should be passed as a tuple of lists, with elements corresponding to [F_delta_TLS0, n_c, Q_HP, beta]. The first tuple entry is lower bounds, and the second is upper. e.g. bounds = ([0, 0.2, 0, 0.0], [1, 1e3, 1e9, 1])"
-            assert (
-                len(bounds[0]) == 4
-            ), "Bounds should be passed as a tuple of lists, with elements corresponding to [F_delta_TLS0, n_c, Q_HP, beta]. The first tuple entry is lower bounds, and the second is upper. e.g. bounds = ([0, 0.2, 0, 0.0], [1, 1e3, 1e9, 1])"
+            # initial guesses
+            init_guesses = [2.0e-6, 1, 1.0e6, 0.5]
+            # default bounds
+            if bounds == None:
+                bounds = ([0, 0.2, 0, 0.0], [1, 1e3, 1e9, 1])
+            else:
+                assert isinstance(
+                    bounds, tuple
+                ), "Bounds should be passed as a tuple of lists, with elements corresponding to [F_delta_TLS0, n_c, Q_HP, beta]. The first tuple entry is lower bounds, and the second is upper. e.g. bounds = ([0, 0.2, 0, 0.0], [1, 1e3, 1e9, 1])"
+                assert (
+                    len(bounds[0]) == 4
+                ), "Bounds should be passed as a tuple of lists, with elements corresponding to [F_delta_TLS0, n_c, Q_HP, beta]. The first tuple entry is lower bounds, and the second is upper. e.g. bounds = ([0, 0.2, 0, 0.0], [1, 1e3, 1e9, 1])"
+            # DO FIT
+            # with error bars
+            if Qerr:
+                try:
+                    popt, pcov, infodict, mesg, ier = scipy.optimize.curve_fit(
+                        TLS_model,
+                        xdata=np.array(n_ph),
+                        ydata=np.array(Qi),
+                        p0=init_guesses,
+                        sigma=np.array(Qerr),
+                        bounds=bounds,
+                        full_output=True,
+                    )
+                except:
+                    popt = [0, 0, 0, 0]
+            # without error bars
+            else:
+                try:
+                    popt, pcov, infodict, mesg, ier = scipy.optimize.curve_fit(
+                        TLS_model,
+                        xdata=np.array(n_ph),
+                        ydata=np.array(Qi),
+                        p0=init_guesses,
+                        bounds=bounds,
+                        full_output=True,
+                    )
+                except:
+                    popt = [0, 0, 0, 0]
+            # print info
+            if print_log == True:
+                print(f"TLS fit for resonator at {f*1e-9:.2f} GHz")
+                pprint(infodict)
+                print(f"TLS fit 'mesg' --> {mesg}\n")
+
+            if print_fit == True:
+                print(f"TLS fit ({f*1e-9:.2f} GHz)") if print_log != True else 0
+                print(f"\tF delta_TLS =\t{popt[0]:.2e}")
+                print(f"\tn_c =\t\t{popt[1]:.2f}")
+                print(f"\tQ_HP =\t\t{popt[2]:.2e}")
+                print(f"\tbeta =\t\t{popt[3]:.2f}\n")
+            
+            fit_dict = {
+                "F_tan_delta": popt[0],
+                "n_c": popt[1],
+                "Q_HP": popt[2],
+                "beta": popt[3],
+            }
+
+        elif TLS_model == "crowley":
+            """
+            7 fit parameters, power-dependence only here, but includes temp dependence. 
+            From http://arxiv.org/abs/2301.07848 (from Crowley et al. 2023).
+            Parameters: t_c, Q_TLS0, Q_QP0, Q_other, D, beta1, beta2
+            """
+            omega = 2 * np.pi * f
+            # define model
+            def TLS_model(n_ph, t_c, Q_TLS0, Q_QP0, Q_other, D, beta1, beta2):
+                assert T.any() > 0, f"Temperature {T} is negative. Check your data."
+                # superconducting gap
+                delta_0 = 1.764 * kB * t_c
+                # QP term (T)
+                k0 = kn(0, (hbar * omega)/(2 * kB * T))
+                sinh = np.sinh((hbar * omega)/(2 * kB * T))
+                #numerator = np.exp(delta_0/(kB * T))
+                Q_QP = Q_QP0 * (np.exp(delta_0/(kB * T)) / (sinh * k0))
+                # TLS term (n, T)
+                tanh = np.tanh((hbar * omega)/(2 * kB * T))
+                numerator = np.sqrt(1 + ((n_ph**beta2)/(D * T**beta1)) * np.tanh((hbar * omega)/(2 * kB * T)))
+                Q_TLS = Q_TLS0 * (numerator/tanh)
+                # check validity of fitted Q values
+                assert Q_QP.any() > 0, f"Fitted Q_QP={Q_QP} is negative. Check your data."
+                assert Q_TLS.any() > 0, f"Fitted Q_TLS={Q_TLS} is negative. Check your data."
+                assert Q_other.any() > 0, f"Fitted Q_other={Q_other} is negative. Check your data."
+                # combining all
+                Q_i = ((1/Q_TLS) + (1/Q_QP) + (1/Q_other))**(-1)
+                # return
+                return Q_i
+            # init guesses
+            init_guesses = [1, 1e5, 1e5, 1e6, 1, 0.8, 0.5]
+            # default bounds
+            if bounds == None:
+                bounds = ([0.1, 1e-3, 1e-3, 1e1, 1e-5, 0.01, 0.01], [10, 1e10, 1e10, 1e10, 1e6, 2, 2])
+            else:
+                assert isinstance(
+                    bounds, tuple
+                ), "Bounds should be passed as a tuple of lists, with elements corresponding to [t_c, Q_TLS0, Q_QP0, Q_other, D, beta1, beta2]. The first tuple entry is lower bounds, and the second is upper."
+                assert (
+                    len(bounds[0]) == 7
+                ), "Bounds should be passed as a tuple of lists, with elements corresponding to [t_c, Q_TLS0, Q_QP0, Q_other, D, beta1, beta2]. The first tuple entry is lower bounds, and the second is upper."
+            # with error bars
+            if Qerr:
+                try:
+                    popt, pcov, infodict, mesg, ier = curve_fit(
+                        TLS_model,
+                        xdata=np.array(n_ph),
+                        ydata=np.array(Qi),
+                        p0=init_guesses,
+                        sigma=np.array(Qerr),
+                        bounds=bounds,
+                        full_output=True,
+                    )
+                except: 
+                    popt = [0, 0, 0, 0, 0, 0, 0]
+            # without error bars
+            else:
+                try:
+                    popt, pcov, infodict, mesg, ier = curve_fit(
+                        TLS_model_T_crowley,
+                        xdata=np.array(T),
+                        ydata=np.array(Qi),
+                        p0=init_guesses,
+                        bounds=bounds,
+                        full_output=True,
+                    )
+                except: 
+                    popt = [0, 0, 0, 0, 0, 0, 0]
+            # print info: t_c, Q_TLS0, Q_QP0, Q_other, D, beta1, beta2
+            print(f"TLS fit (f = {f*1e-9:.2f} GHz, n_ph = {n_ph:.0e})")
+            print(f" Tc       = {popt[0]:.2f}")
+            print(f" Q_TLS0   = {popt[1]:.2e}")
+            print(f" Q_QP0    = {popt[2]:.2e}")
+            print(f" Q_other  = {popt[3]:.2e}")
+            print(f" D        = {popt[4]:.2e}")
+            print(f" beta1    = {popt[5]:.2f}")
+            print(f" beta2    = {popt[6]:.2f}")
+            fit_dict = {
+                "t_c": popt[0],
+                "Q_TLS0": popt[1],
+                "Q_QP0": popt[2],
+                "Q_other": popt[3],
+                "D": popt[4],
+                "beta1": popt[5],
+                "beta2": popt[6]
+            }
 
         # check guesses are valid (if not, move within bounds)
         for i, init in enumerate(init_guesses):
@@ -1309,54 +1455,6 @@ class ResonatorPowerSweep:
                 init_guesses[i] = bounds[0][i] + 1e-8
             elif init > bounds[1][i]:
                 init_guesses[i] = bounds[1][i] - 1e-8
-
-        # with error bars
-        if Qerr:
-            try:
-                popt, pcov, infodict, mesg, ier = scipy.optimize.curve_fit(
-                    TLS_model,
-                    xdata=np.array(n_ph),
-                    ydata=np.array(Qi),
-                    p0=init_guesses,
-                    sigma=np.array(Qerr),
-                    bounds=bounds,
-                    full_output=True,
-                )
-            except:
-                popt = [0, 0, 0, 0]
-        # without error bars
-        else:
-            try:
-                popt, pcov, infodict, mesg, ier = scipy.optimize.curve_fit(
-                    TLS_model,
-                    xdata=np.array(n_ph),
-                    ydata=np.array(Qi),
-                    p0=init_guesses,
-                    sigma=np.array(Qerr),
-                    bounds=bounds,
-                    full_output=True,
-                )
-            except:
-                popt = [0, 0, 0, 0]
-        # print info
-        if print_log == True:
-            print(f"TLS fit for resonator at {f*1e-9:.2f} GHz")
-            pprint(infodict)
-            print(f"TLS fit 'mesg' --> {mesg}\n")
-
-        if print_fit == True:
-            print(f"TLS fit ({f*1e-9:.2f} GHz)") if print_log != True else 0
-            print(f"\tF delta_TLS =\t{popt[0]:.2e}")
-            print(f"\tn_c =\t\t{popt[1]:.2f}")
-            print(f"\tQ_HP =\t\t{popt[2]:.2e}")
-            print(f"\tbeta =\t\t{popt[3]:.2f}\n")
-        
-        fit_dict = {
-            "F_tan_delta": popt[0],
-            "n_c": popt[1],
-            "Q_HP": popt[2],
-            "beta": popt[3],
-        }
 
         # return (x, y) tuple of fit data
         return (fit_dict, n_ph, TLS_model(np.array(n_ph), *popt))
@@ -1741,3 +1839,38 @@ class ResonatorPowerSweep:
         l = max(0, min(1, l * factor))  # Adjust lightness
         new_r, new_g, new_b = colorsys.hls_to_rgb(h, l, s)  # Convert back to RGB
         return f"#{int(new_r * 255):02x}{int(new_g * 255):02x}{int(new_b * 255):02x}"  # Convert back to hex
+
+class ResonatorTempSweep:
+    def __init__(
+        self,
+        data_path=None,
+        sample_name=None,
+        temperature=30*1e-3,
+        save_path=None,
+        power_dict={"lowPower" : -132, 
+                    "highPower" : -82,
+                    "default" : -82
+                    },
+        TLSfit_bounds=([0, 0.2, 0, 0.0], [1, 1e3, 1e9, 1]),
+        print_log=False,
+        notebook=False,
+        fit_data={},
+        with_fit=None,
+        n_ph_lims=[0, 1e10]
+    ):
+        # initialise data
+        self.data_path = data_path
+        if save_path == None:
+            self.save_path = data_path
+        else:
+            self.save_path = save_path
+        self.name = sample_name
+        self.power_dict = power_dict
+        self.T = temperature
+        self.TLSfit_bounds = TLSfit_bounds
+        self.print_log = print_log
+        self.data = {}
+        self.fit_data = fit_data
+        self.res_data = {}
+        self.num_resonators = None
+        self.frequencies = []

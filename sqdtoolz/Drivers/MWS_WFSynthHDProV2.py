@@ -190,6 +190,10 @@ class MWS_WFSynthHDProV2(VisaInstrument):
         else:
             super().__init__(name, address, **kwargs)
 
+        self.add_parameter(name='serial', label='Device Serial Number',
+                           get_cmd=partial(self._get_cmd, '-'),
+                           )#get_parser=int) #TODO: Sometimes it returns rubbish like 880\\n880 - perhaps flush buffer?
+
         # Output channels added to both the module for snapshots and internal output sources for use in queries
         self._source_outputs = {}
         self._chan_names = ['RFoutA','RFoutB']

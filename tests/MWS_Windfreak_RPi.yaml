@@ -1,0 +1,5 @@
+instruments:
+  mws_windfreak_rpi:
+    type: sqdtoolz.Drivers.MWS_WFSynthHDProV2_RPi.MWS_WFSynthHDProV2_RPi
+    init:
+      address: 'TCPIP::192.168.1.37::4000::SOCKET'

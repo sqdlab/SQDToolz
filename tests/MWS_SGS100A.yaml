@@ -1,0 +1,17 @@
+instruments:
+  src_sgs1:
+    type: sqdtoolz.Drivers.MWS_SGS100A.MWS_SGS100A
+    address: TCPIP::192.168.1.131::INSTR
+    enable_forced_reconnect: true
+    parameters:
+      ref_osc_source:
+        initial_value: 'EXT' #Can be INT or EXT
+      ref_osc_external_freq:
+        initial_value: '10MHz'  #Can be '10MHz', '100MHz', '1000MHz'
+      trigger_impedance:
+        initial_value: 'G10K'   #Important when using low-amplitude/weakly-driven trigger pulses
+      alc:
+        initial_value: 'OFF'  #Can be ON, OFF, AUTO
+      #Output Channel Parameters
+      RFOUT.output:
+        initial_value: 'OFF'

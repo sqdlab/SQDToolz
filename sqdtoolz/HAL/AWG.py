@@ -45,9 +45,9 @@ class AWGBase(HALbase):
     def NumPts(self):
         return round(self.Duration * self._sample_rate)
 
-    def set_total_time(self, total_time):
+    def set_total_time(self, total_time: float):
         self._total_time = total_time
-    def set_valid_total_time(self, min_time):
+    def set_valid_total_time(self, min_time: float):
         #TODO: Make this more general - e.g. if using a Keysight that requires one set of constraints and
         #a Tektronix on the other channel with a different set of constraints, the valid time must reflect that!!!
         #TODO: May have to change the sample-rate model to be a list of sample-rates? NumPts is a function of sample-rate after all...

@@ -20,14 +20,14 @@ class GENmwSrcAWGchannel(TriggerInput):
     def Frequency(self):
         return self._frequency
     @Frequency.setter
-    def Frequency(self, val):
+    def Frequency(self, val: float):
         self._frequency = val
 
     @property
     def Power(self):
         return self._power
     @Power.setter
-    def Power(self, val):
+    def Power(self, val: float):
         self._power = val
 
     @property

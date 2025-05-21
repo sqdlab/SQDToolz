@@ -16,7 +16,7 @@ class GENatten(HALbase):
     def Attenuation(self):
         return self._instr_atten.Attenuation
     @Attenuation.setter
-    def Attenuation(self, val):
+    def Attenuation(self, val: float):
         self._instr_atten.Attenuation = val
 
     def _get_current_config(self):

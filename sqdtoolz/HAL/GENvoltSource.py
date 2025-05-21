@@ -15,21 +15,21 @@ class GENvoltSource(HALbase):
     def Output(self):
         return self._instr_volt.Output
     @Output.setter
-    def Output(self, val):
+    def Output(self, val: bool):
         self._instr_volt.Output = val
         
     @property
     def Voltage(self):
         return self._instr_volt.Voltage
     @Voltage.setter
-    def Voltage(self, val):
+    def Voltage(self, val: float):
         self._instr_volt.Voltage = val
         
     @property
     def RampRate(self):
         return self._instr_volt.RampRate
     @RampRate.setter
-    def RampRate(self, val):
+    def RampRate(self, val: float):
         self._instr_volt.RampRate = val
 
     def _get_current_config(self):

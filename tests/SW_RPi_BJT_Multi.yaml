@@ -1,0 +1,12 @@
+instruments:
+  sw_rpi:
+    type: sqdtoolz.Drivers.SW_BJT_RPi_Multi.SW_BJT_RPi_Multi
+    init:
+      address: 'TCPIP::192.168.1.6::4000::SOCKET'
+      sw1: {"P0" : 17, "P1" : 27, "P2" : 24, "P3" : 22, "P4" : 23}
+      sw2: {"P0" : 12, "P1" : 16, "P2" : 26, "P3" : 13, "P4" : 6}
+    parameters:
+      sw1.pulse_delay_time:
+        initial_value: 1
+      sw2.pulse_delay_time:
+        initial_value: 1

@@ -430,6 +430,8 @@ class ResonatorPowerSweep:
         self.get_frequency_bins()
         # remove duplicates
         self.remove_duplicates() if remove_duplicates else 0
+        # TODO: check n_ph bug
+        print(self.fit_data['n_ph'])
         # save data to text file
         if save_fit:
             txt_output = os.path.join(self.save_path, f"{self.name}_circlefit.txt")
@@ -502,6 +504,10 @@ class ResonatorPowerSweep:
             self.fit_data = df_sorted[(df_sorted['n_ph'] > n_ph_lims[0]) & (df_sorted['n_ph'] < n_ph_lims[1])]
         else:
             self.fit_data = df_sorted
+        # remove rows with NaN values
+        self.fit_data = self.fit_data.dropna()
+        # remove rows with 0 power (false measurement)
+        self.fit_data = self.fit_data[self.fit_data["power"] != 0]
 
     # get labels for frequency bins
     def get_frequency_bin_labels(self):

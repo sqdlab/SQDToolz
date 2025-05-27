@@ -1888,11 +1888,7 @@ class ResonatorPowerSweep:
         for i, sample in enumerate(sample_options.keys()):
             # create class instance
             chunk = cls(fit_data = pd.DataFrame(data[sample]))
-
-            # # TODO: debugging... works here
-            # print(chunk.fit_data.info())
-            # print(chunk.fit_data.head())
-
+            
             freq_bin_labels = sorted(set(chunk.fit_data["freq bin"]))
             #freq_bin_labels = sample_options[sample]['freq_bin_labels']
             num_resonators = len(freq_bin_labels)
@@ -1909,8 +1905,6 @@ class ResonatorPowerSweep:
             base_color = base_colors[i]
             # Generate shades by adjusting brightness
             shades = [cls.adjust_lightness_bokeh(base_color, 0.8 + 0.2 * i / max(1, num_resonators - 1)) for i in range(num_resonators)]
-            
-            # print(f"Plotting {sample} ({num_resonators} resonators): freq bins {freq_bin_labels}")
 
             # loop through frequency bins
             for j, freq_bin_cur in enumerate(freq_bin_labels):
@@ -2083,38 +2077,3 @@ class ResonatorPowerSweep:
             for key in data
         }
         return sorted_data
-
-# class ResonatorTempSweep:
-#     def __init__(
-#         self,
-#         data_path=None,
-#         sample_name=None,
-#         temperature=30*1e-3,
-#         save_path=None,
-#         power_dict={"lowPower" : -132, 
-#                     "highPower" : -82,
-#                     "default" : -82
-#                     },
-#         TLSfit_bounds=([0, 0.2, 0, 0.0], [1, 1e3, 1e9, 1]),
-#         print_log=False,
-#         notebook=False,
-#         fit_data={},
-#         with_fit=None,
-#         n_ph_lims=[0, 1e10]
-#     ):
-#         # initialise data
-#         self.data_path = data_path
-#         if save_path == None:
-#             self.save_path = data_path
-#         else:
-#             self.save_path = save_path
-#         self.name = sample_name
-#         self.power_dict = power_dict
-#         self.T = temperature
-#         self.TLSfit_bounds = TLSfit_bounds
-#         self.print_log = print_log
-#         self.data = {}
-#         self.fit_data = fit_data
-#         self.res_data = {}
-#         self.num_resonators = None
-#         self.frequencies = []

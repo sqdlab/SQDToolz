@@ -570,9 +570,9 @@ class ResonatorPowerSweep:
         for col in df.columns:
             try:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
-                print(f"Converted column '{col}' to numeric type.")
+                #print(f"Converted column '{col}' to numeric type.")
             except Exception:
-                print(f"Could not convert column '{col}' to numeric type. Keeping it as-is.")
+                #print(f"Could not convert column '{col}' to numeric type. Keeping it as-is.")
                 pass  # Keep non-convertible columns as-is
         # sort by specified axes
         df_sorted = df.sort_values(by=axes_to_sort, ascending=[True]*len(axes_to_sort)).reset_index(drop=True)
@@ -1254,6 +1254,9 @@ class ResonatorPowerSweep:
             freqs_to_use = plot_frequencies
         elif plot_frequencies == None:
             freqs_to_use = range(self.num_resonators)
+        # check column naming conventions
+        if "Qc_dia_corr" in self.fit_data.columns:
+            self.fit_data = self.fit_data.rename(columns={"Qc_dia_corr": "absQc"})
         # bokeh setup
         if backend == "bokeh":
             self.fig_bokeh = figure(

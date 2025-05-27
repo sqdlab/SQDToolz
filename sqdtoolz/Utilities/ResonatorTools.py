@@ -101,6 +101,7 @@ class ResonatorPowerSweep:
         self._data_file_name = "data.h5"
         self._config_file_name = "experiment_configurations.txt"
         self._fitted_data_file_name = "circlefit.txt"
+        self._data_from_text_file = False
 
         # figure
         self.plot_backend = PLOT_BACKEND
@@ -172,6 +173,8 @@ class ResonatorPowerSweep:
         Outputs:
         - self.data                 Dictionary containing measurement data and metadata.
         """
+        if from_text_file == True or isinstance(from_text_file, str):
+            self._data_from_text_file = True
         power_dict = self.power_dict if power_dict == None else 0
         assert power_config_order in ["first", "last"], "power_config_order should be either 'first' or 'last'."
         assert print_log in [
@@ -378,6 +381,8 @@ class ResonatorPowerSweep:
         if not self.fit_data.empty:
             if 'absQc' in self.fit_data.columns:
                 self.fit_data.rename(columns={'absQc': 'Qc_dia_corr'}, inplace=True)
+            # sort self.fit_data
+            self.sort_fit_data(n_ph_lims=n_ph_lims)
             # add frequency binning to help with plotting
             self.get_frequency_bins()
             print(f"Checked self.fit_data which already existed.")
@@ -556,31 +561,32 @@ class ResonatorPowerSweep:
         if "power" in df_sorted.columns:
             df_sorted = df_sorted[df_sorted["power"] != 0]
         self.fit_data = df_sorted
-
-    # # sort data frame along multiple axes
-    # def fit_data_to_sorted_dataframe(self, axes_to_sort=["fr", "power"], n_ph_lims=None):
-    #     fit_data_list = []
-    #     first = True
-    #     for _, measurement_data in self.data.items():
-    #         fit_data_list.append(measurement_data["fit"])
-    #         # get column names for DataFrame
-    #         if first == True:
-    #             columns = measurement_data["fit"].keys()
-    #     # convert to DataFrame
-    #     df = pd.DataFrame(fit_data_list, columns=columns)
-    #     df_sorted = df.sort_values(by=axes_to_sort, ascending=[True, True]).reset_index(
-    #         drop=True
-    #     )
-    #     if n_ph_lims != None:
-    #         assert isinstance(n_ph_lims, list)
-    #         assert len(n_ph_lims) == 2
-    #         self.fit_data = df_sorted[(df_sorted['n_ph'] > n_ph_lims[0]) & (df_sorted['n_ph'] < n_ph_lims[1])]
-    #     else:
-    #         self.fit_data = df_sorted
-    #     # remove rows with NaN values
-    #     self.fit_data = self.fit_data.dropna()
-    #     # remove rows with 0 power (false measurement)
-    #     self.fit_data = self.fit_data[self.fit_data["power"] != 0]
+    
+    def sort_fit_data(self, axes_to_sort=["fr", "power"], n_ph_lims=None):
+        if not isinstance(self.fit_data, pd.DataFrame):
+            self.fit_data = pd.DataFrame(self.fit_data)
+        df = self.fit_data
+        # convert only numeric-looking columns to float
+        for col in df.columns:
+            try:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+                print(f"Converted column '{col}' to numeric type.")
+            except Exception:
+                print(f"Could not convert column '{col}' to numeric type. Keeping it as-is.")
+                pass  # Keep non-convertible columns as-is
+        # sort by specified axes
+        df_sorted = df.sort_values(by=axes_to_sort, ascending=[True]*len(axes_to_sort)).reset_index(drop=True)
+        # apply photon number filtering if needed
+        if n_ph_lims is not None:
+            assert isinstance(n_ph_lims, list) and len(n_ph_lims) == 2
+            if "n_ph" in df_sorted.columns:
+                df_sorted = df_sorted[(df_sorted['n_ph'] > n_ph_lims[0]) & (df_sorted['n_ph'] < n_ph_lims[1])]
+        # remove rows with NaNs in any column used for sorting or analysis
+        df_sorted = df_sorted.dropna(subset=axes_to_sort + (["n_ph"] if n_ph_lims else []))
+        # remove invalid rows (e.g., 0 power)
+        if "power" in df_sorted.columns:
+            df_sorted = df_sorted[df_sorted["power"] != 0]
+        self.fit_data = df_sorted
 
     # get labels for frequency bins
     def get_frequency_bin_labels(self):
@@ -1049,6 +1055,16 @@ class ResonatorPowerSweep:
         as_deviation=True,
         plot_frequencies=None
     ):
+        if self._data_from_text_file == True:
+            print(
+                "Data loaded from text file, so frequency data is not available. "
+                "Please read data from .h5 files to plot frequency."
+            )
+            return
+        # auto set with_errorbars = False if fr_err doesnt exist
+        if "fr_err" not in self.fit_data.columns:
+            with_errorbars = False
+            print("No frequency error data found, setting with_errorbars to False.")
         if backend == None:
             backend = self.plot_backend
         # check backend is valid
@@ -1221,6 +1237,10 @@ class ResonatorPowerSweep:
         ylims=None,
         plot_frequencies=None
     ):
+        # overrun with_errorbars if absQc doesnt exist
+        if self._data_from_text_file == True:
+            with_errorbars = False
+
         if backend == None:
             backend = self.plot_backend
         # check backend is valid
@@ -1274,16 +1294,25 @@ class ResonatorPowerSweep:
                     # add measurement from self.fit_data if in current bin
                     if row["freq bin"] == freq_bin_cur:
                         Qc.append(row["absQc"])
-                        Qc_upper.append(row["absQc"] + row["absQc_err"])
-                        Qc_lower.append(row["absQc"] - row["absQc_err"])
                         n_ph.append(row["n_ph"])
-                        Qc_err.append(row["absQc_err"])
+                        if with_errorbars:
+                            Qc_upper.append(row["absQc"] + row["absQc_err"])
+                            Qc_lower.append(row["absQc"] - row["absQc_err"])
+                            Qc_err.append(row["absQc_err"])
+
                 # convert to ColumnDataSource for Bokeh plotting
-                source = ColumnDataSource(
-                    data=dict(
-                        n_ph=n_ph, Qc=Qc, upper=Qc_upper, lower=Qc_lower, Qc_err=Qc_err
+                if with_errorbars == True:
+                    source = ColumnDataSource(
+                        data=dict(
+                            n_ph=n_ph, Qc=Qc, upper=Qc_upper, lower=Qc_lower, Qc_err=Qc_err
+                        )
                     )
-                )
+                else:
+                    source = ColumnDataSource(
+                        data=dict(
+                            n_ph=n_ph, Qc=Qc
+                        )
+                    )
                 # bokeh
                 if backend == "bokeh":
                     color = self._colourmap[i * len(self._colourmap) // self.num_resonators]

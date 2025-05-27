@@ -239,16 +239,18 @@ class ResonatorPowerSweep:
                         for header in reader.fieldnames:
                             self.fit_data[header] = []
                         for row in reader:
-                            for header in reader.fieldnames:
-                                value = row[header]
-                                try:
-                                    # Try to convert to float if possible
-                                    self.fit_data[header].append(float(value) if value.replace('.', '', 1).isdigit() else value)
-                                except ValueError:
-                                    # If it's not a number, keep it as a string
-                                    self.fit_data[header].append(value)
+                            if not any(ignored in row["measurement name"] for ignored in files_to_ignore):
+                                for header in reader.fieldnames:
+                                    value = row[header]
+                                    try:
+                                        # Try to convert to float if possible
+                                        self.fit_data[header].append(float(value) if value.replace('.', '', 1).isdigit() else value)
+                                    except ValueError:
+                                        # If it's not a number, keep it as a string
+                                        self.fit_data[header].append(value)
+                    self.fit_data = pd.DataFrame(self.fit_data)  # Convert to DataFrame
                     print(f'  Read {circlefit_match} into self.fit_data')
-                    break
+                    return self.fit_data
                 # if circlefit.text is not found, continue
                 else:
                     continue
@@ -568,12 +570,13 @@ class ResonatorPowerSweep:
         df = self.fit_data
         # convert only numeric-looking columns to float
         for col in df.columns:
-            try:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-                #print(f"Converted column '{col}' to numeric type.")
-            except Exception:
-                #print(f"Could not convert column '{col}' to numeric type. Keeping it as-is.")
-                pass  # Keep non-convertible columns as-is
+            if col not in ["freq bin", "measurement name"]:
+                try:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                    #print(f"Converted column '{col}' to numeric type.")
+                except Exception:
+                    #print(f"Could not convert column '{col}' to numeric type. Keeping it as-is.")
+                    pass  # Keep non-convertible columns as-is
         # sort by specified axes
         df_sorted = df.sort_values(by=axes_to_sort, ascending=[True]*len(axes_to_sort)).reset_index(drop=True)
         # apply photon number filtering if needed
@@ -1423,6 +1426,7 @@ class ResonatorPowerSweep:
         # convert to array of floats (if not already)
         n_ph = np.array(n_ph, dtype=float)
         Qi = np.array(Qi, dtype=float)
+        assert isinstance(n_ph[0], float)
 
         # sort Qi, n_ph by n_ph
         sorted_indices = np.argsort(n_ph)
@@ -1435,6 +1439,7 @@ class ResonatorPowerSweep:
             mask = (n_ph > n_ph_lims[0]) & (n_ph < n_ph_lims[1])
             n_ph = n_ph[mask]
             Qi = Qi[mask]
+            print(f"Photon range limited to {n_ph[0]} < n_ph < {n_ph[-1]} for fitting.")
 
         # constants
         hbar = 1.054 * 10 ** (-34)
@@ -1449,7 +1454,6 @@ class ResonatorPowerSweep:
             numerator = np.tanh((hbar * 2.0 * np.pi * f) / (2 * kB * T))
             # define model
             def TLS_model(n_ph, F_delta_TLS0, n_c, Q_HP, beta):
-                assert isinstance(n_ph[0], float)
                 denominator = (1.0 + (n_ph / n_c)) ** beta
                 delta_TLS = F_delta_TLS0 * (numerator / denominator) + (1 / Q_HP)
                 return delta_TLS ** (-1)
@@ -1468,7 +1472,7 @@ class ResonatorPowerSweep:
                 ), "Bounds should be passed as a tuple of lists, with elements corresponding to [F_delta_TLS0, n_c, Q_HP, beta]. The first tuple entry is lower bounds, and the second is upper. e.g. bounds = ([0, 0.2, 0, 0.0], [1, 1e3, 1e9, 1])"
             # DO FIT
             # with error bars
-            if Qerr:
+            if Qerr.any():
                 try:
                     popt, pcov, infodict, mesg, ier = scipy.optimize.curve_fit(
                         TLS_model,
@@ -1747,20 +1751,14 @@ class ResonatorPowerSweep:
         - sample_options        A dictionary containing information pertaining to each sample.
                                 Example:
                                 sample_options = {
-                                    'IQM-05' : {
-                                        'resonator_index_to_plot' : [1, 2, 3, 4, 5],
-                                        'name' : "IQM-05-A",
-                                        'files_to_ignore' : ['IQM-05-A', "141602"],
-                                        'power_dict' : default_power_dict,
-                                        'from_text_file' : True
-                                        },
                                     'IQM-03-01' : {
                                         'resonator_index_to_plot' : [1, 2, 3, 4, 5],
                                         'name' : "IQM-03-01",
                                         'files_to_ignore' : None,
                                         'power_dict' : default_power_dict,
-                                        'from_text_file' : "path/to/file/circlefit.txt"
-                                        }
+                                        'from_text_file' : "path/to/file/circlefit.txt",
+                                        'with_fit' : True
+                                        },
                                     }
         - output_directory      The directory in which to save the plot (string).
         - include_bar_graph     Boolean to include a bar graph of the Qi values.
@@ -1794,10 +1792,10 @@ class ResonatorPowerSweep:
 
             # setup sample options
             sample_path = os.path.join(main_data_directory, sample)
-            from_text = sample_options[sample].get('from_text_file')
+            from_text = sample_options[sample].get('from_text_file', False)
+            additional_attenuation = sample_options[sample].get('additional_attenuation', 0)
             assert os.path.isdir(sample_path), f"Sample directory '{sample_path}' does not exist."
             print(f"{sample}\n Acquiring data...")
-
             # create class instance
             chunk = ResonatorPowerSweep(data_path = sample_path,
                         sample_name = sample,
@@ -1809,20 +1807,23 @@ class ResonatorPowerSweep:
 
             # import from text file if specified
             if isinstance(from_text, str) or from_text == True:
-                chunk.import_data(additional_attenuation=0, 
+                chunk.import_data(additional_attenuation=additional_attenuation, 
                     files_to_ignore=sample_options[sample]['files_to_ignore'],
                     from_text_file=from_text
                     )
-
+                chunk.do_circlefit(remove_duplicates=True, save_fit=False)
             # otherwise, import from directory
             else:
                 # do import and fitting etc. get a dict back
-                chunk.import_data(additional_attenuation=0, 
+                chunk.import_data(additional_attenuation=additional_attenuation, 
                                 files_to_ignore=sample_options[sample]['files_to_ignore'],
                                 from_text_file=False
                                 )
                 chunk.do_circlefit(remove_duplicates=True, save_fit=False)
             
+            # sort dictionary
+            chunk.sort_fit_data(axes_to_sort=["fr", "power"])
+
             # assign dict
             data[sample] = pd.DataFrame(chunk.fit_data)   
             sample_options[sample]['freq_bin_labels'] = chunk.freq_bin_labels
@@ -1888,9 +1889,9 @@ class ResonatorPowerSweep:
             # create class instance
             chunk = cls(fit_data = pd.DataFrame(data[sample]))
 
-            # TODO: debugging... works here
-            print(chunk.fit_data.info())
-            print(chunk.fit_data.head())
+            # # TODO: debugging... works here
+            # print(chunk.fit_data.info())
+            # print(chunk.fit_data.head())
 
             freq_bin_labels = sorted(set(chunk.fit_data["freq bin"]))
             #freq_bin_labels = sample_options[sample]['freq_bin_labels']
@@ -1909,16 +1910,12 @@ class ResonatorPowerSweep:
             # Generate shades by adjusting brightness
             shades = [cls.adjust_lightness_bokeh(base_color, 0.8 + 0.2 * i / max(1, num_resonators - 1)) for i in range(num_resonators)]
             
-            print(f"Plotting {sample} ({num_resonators} resonators): freq bins {freq_bin_labels}")
+            # print(f"Plotting {sample} ({num_resonators} resonators): freq bins {freq_bin_labels}")
 
             # loop through frequency bins
             for j, freq_bin_cur in enumerate(freq_bin_labels):
-
-                print(f"Plotting {sample}: {freq_bin_cur}")
-
                 if j in freqs_to_use:
-                    print(f"Res: {freq_bin_cur}")
-
+                    print(f"Plotting {sample}: {freq_bin_cur}")
                     # initialise plot data for new resonator
                     n_ph, Qi, Qi_upper, Qi_lower, Qerr, Qi_sph = [], [], [], [], [], []
                     f = float(freq_bin_cur.split()[0]) * 1e9  # Hz
@@ -1933,7 +1930,16 @@ class ResonatorPowerSweep:
 
                     # sort lists by n_ph
                     sorted_data = sorted(zip(n_ph, Qi, Qi_upper, Qi_lower, Qerr), key=lambda x: x[0])
-                    n_ph, Qi, Qi_upper, Qi_lower, Qerr = map(list, zip(*sorted_data)) if sorted_data else ([], [], [], [], [])
+                    n_ph, Qi, Qi_upper, Qi_lower, Qerr = map(np.array, zip(*sorted_data)) if sorted_data else ([], [], [], [], [])
+
+                    # filter n_ph and Qi
+                    if n_ph_lims is not None:
+                        mask = (n_ph > n_ph_lims[0]) & (n_ph < n_ph_lims[1])
+                        n_ph = n_ph[mask]
+                        Qi = Qi[mask]
+                        Qi_upper = Qi_upper[mask]
+                        Qi_lower = Qi_lower[mask]
+                        Qerr = Qerr[mask]
 
                     # convert to ColumnDataSource for Bokeh plotting
                     source = ColumnDataSource(
@@ -1949,6 +1955,7 @@ class ResonatorPowerSweep:
 
                     # TLS fit
                     n_ph_TLS, TLSfit = None, None
+                    with_fit = sample_options[sample].get('with_fit', True)
                     if with_fit == True:
                         _, n_ph_TLS, TLSfit = cls.TLS_fit(
                             n_ph=source.data["n_ph"],
@@ -1970,7 +1977,7 @@ class ResonatorPowerSweep:
                         legend_label=f"{sample}: {freq_bin_cur} (Qi = {sph_Qi:.1e})",
                     )
 
-                    fig_line.circle(
+                    fig_line.scatter(
                         source=source,
                         x="n_ph",
                         y="Qi",
@@ -2010,10 +2017,15 @@ class ResonatorPowerSweep:
                         iqr = q3 - q1
                         upper_whisker = min(max(Qi_sph), q3 + 1.5 * iqr)
                         lower_whisker = max(min(Qi_sph), q1 - 1.5 * iqr)
+
+                        # check data
+                        print(f"q1, q2, q3: {q1:.2e}, {q2:.2e}, {q3:.2e}")
+                        print(f"upper whisker: {upper_whisker:.2e}, lower whisker: {lower_whisker:.2e}")
+
                         # prepare data for plot and add to box plot
                         box_source = ColumnDataSource(data=dict(
-                                            sample=sample, q1=q1, q2=q2, q3=q3,
-                                            upper=upper_whisker, lower=lower_whisker
+                                            sample=[sample], q1=[q1], q2=[q2], q3=[q3],
+                                            upper=[upper_whisker], lower=[lower_whisker]
                                         ))
                         fig_box.vbar(x='sample', top='q3', bottom='q1', source=box_source, width=0.5, fill_color=base_color, line_color="black", legend_label=f"{sample}")
                         # Median lines

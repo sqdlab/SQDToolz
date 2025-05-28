@@ -1747,21 +1747,25 @@ class ResonatorPowerSweep:
         Creates a bokeh plot for Qi comparison of multiple resonator samples. 
 
         Inputs:
-        - main_data_directory   The directory in which to search for the data (string).
-        - sample_options        A dictionary containing information pertaining to each sample.
-                                Example:
-                                sample_options = {
-                                    'IQM-03-01' : {
-                                        'resonator_index_to_plot' : [1, 2, 3, 4, 5],
-                                        'name' : "IQM-03-01",
-                                        'files_to_ignore' : None,
-                                        'power_dict' : default_power_dict,
-                                        'from_text_file' : "path/to/file/circlefit.txt",
-                                        'with_fit' : True
-                                        },
-                                    }
-        - output_directory      The directory in which to save the plot (string).
-        - include_bar_graph     Boolean to include a bar graph of the Qi values.
+        - main_data_directory       The directory in which to search for the data (string).
+        - sample_options            A dictionary containing information pertaining to each sample.
+                                    Example:
+                                    sample_options = {
+                                        'IQM-03-01' : {
+                                            'resonator_index_to_plot' : [1, 2, 3, 4, 5],
+                                            'name' : "IQM-03-01",
+                                            'files_to_ignore' : None,
+                                            'power_dict' : default_power_dict,
+                                            'from_text_file' : "path/to/file/circlefit.txt",
+                                            'with_fit' : True
+                                            },
+                                        }
+        - output_directory          The directory in which to save the plot (string).
+        - include_bar_graph         Boolean to include a bar graph of the Qi values, or "only" to plot only the bar graph.
+        - from_text_file            Boolean or string to indicate whether to import data from a text file. 
+                                    If True, uses the default text file name. If a string, uses that as the file name.
+                                    If False, imports data from the directory specified in sample_options.
+        - additional_attenuation    Optional additional attenuation to apply to the data (in dB).
     
         This function handles import and fitting, before passing the data to
         cls.plot_Qi_multisample_bokeh().
@@ -1851,7 +1855,28 @@ class ResonatorPowerSweep:
         show_plot=True,
         save_plot=True,
         ylims=None,
+        shared_axes=True
     ):
+        """
+        Plots Qi vs. photon number for multiple samples using Bokeh. Also includes a bar graph of the average Qi values for each sample.
+        
+        Inputs:
+        - data                      Dictionary containing data for each sample, 
+                                    with keys as sample names and values as DataFrames.
+        - sample_options            Dictionary containing options for each sample, such as 
+                                    resonator indices to plot, frequency bin labels, and whether to include fits.
+        - output_data_directory     Directory to save the plot.
+        - include_bar_graph         Boolean to include a bar graph of the average Qi values. 
+                                    Can also choose "only" to plot only the bar graph.
+        - with_fit                  Boolean to include TLS fits in the plot.
+        - with_errorbars            Boolean to include error bars in the plot.
+        - legend_location           Location of the legend in the plot.
+        - show_plot                 Boolean to show the plot.
+        - save_plot                 Boolean to save the plot.
+        - ylims                     Optional y-axis limits for the plot.
+        - shared_axes               Boolean to share axes between plots.
+        """
+
         assert len(data.keys()) == len(sample_options.keys()), f"Mismatch between data (length {len(data.keys())}) and sample (length {len(sample_options.keys())}) options "
         for sample in data.keys():
             assert isinstance(data[sample], pd.DataFrame)
@@ -1874,6 +1899,7 @@ class ResonatorPowerSweep:
         # bokeh setup - box plot
         fig_box = figure(
             x_range=sample_names,
+            title=r"Single photon Qi",
             width=600,
             height=600,
             y_axis_type="log",
@@ -1888,7 +1914,7 @@ class ResonatorPowerSweep:
         for i, sample in enumerate(sample_options.keys()):
             # create class instance
             chunk = cls(fit_data = pd.DataFrame(data[sample]))
-            
+
             freq_bin_labels = sorted(set(chunk.fit_data["freq bin"]))
             #freq_bin_labels = sample_options[sample]['freq_bin_labels']
             num_resonators = len(freq_bin_labels)
@@ -1907,11 +1933,12 @@ class ResonatorPowerSweep:
             shades = [cls.adjust_lightness_bokeh(base_color, 0.8 + 0.2 * i / max(1, num_resonators - 1)) for i in range(num_resonators)]
 
             # loop through frequency bins
+            Qi_sph = []  # list to store single photon Qi values for each resonator
             for j, freq_bin_cur in enumerate(freq_bin_labels):
                 if j in freqs_to_use:
                     print(f"Plotting {sample}: {freq_bin_cur}")
                     # initialise plot data for new resonator
-                    n_ph, Qi, Qi_upper, Qi_lower, Qerr, Qi_sph = [], [], [], [], [], []
+                    n_ph, Qi, Qi_upper, Qi_lower, Qerr  = [], [], [], [], []
                     f = float(freq_bin_cur.split()[0]) * 1e9  # Hz
                     for _, row in data[sample].iterrows():
                         # add measurement from self.fit_data if in current bin
@@ -2000,58 +2027,74 @@ class ResonatorPowerSweep:
                         fig_line.line(
                             n_ph_TLS, TLSfit, line_color=shades[j], line_alpha=0.2, line_width=3
                     )
-                        
-                    # include optional bar graph
-                    if include_bar_graph:
-                        # calculate per-sample statistics (across all resonators on the sample)
-                        q1, q2, q3 = np.percentile(Qi_sph, [25, 50, 75])
-                        # q1 = qi_stats[0]
-                        # q2 = qi_stats[1]
-                        # q3 = qi_stats[2]
-                        iqr = q3 - q1
-                        upper_whisker = min(max(Qi_sph), q3 + 1.5 * iqr)
-                        lower_whisker = max(min(Qi_sph), q1 - 1.5 * iqr)
 
-                        # check data
-                        print(f"q1, q2, q3: {q1:.2e}, {q2:.2e}, {q3:.2e}")
-                        print(f"upper whisker: {upper_whisker:.2e}, lower whisker: {lower_whisker:.2e}")
+            print(f"Sample {sample} single photon Qi: {Qi_sph} ")
 
-                        # prepare data for plot and add to box plot
-                        box_source = ColumnDataSource(data=dict(
-                                            sample=[sample], q1=[q1], q2=[q2], q3=[q3],
-                                            upper=[upper_whisker], lower=[lower_whisker]
-                                        ))
-                        fig_box.vbar(x='sample', top='q3', bottom='q1', source=box_source, width=0.5, fill_color=base_color, line_color="black", legend_label=f"{sample}")
-                        # Median lines
-                        fig_box.segment('sample', 'q2', 'sample', 'q2', source=box_source, line_width=2, line_color="black")
-                        # Whiskers
-                        fig_box.segment('sample', 'upper', 'sample', 'q3', source=box_source, line_color="black")
-                        fig_box.segment('sample', 'lower', 'sample', 'q1', source=box_source, line_color="black")
+            # box plot - per sample (not per resonator)
+            if include_bar_graph != False:
+                # calculate per-sample statistics (across all resonators on the sample)
+                q1, q2, q3 = np.percentile(Qi_sph, [25, 50, 75])
+                iqr = q3 - q1
+                upper_whisker = min(max(Qi_sph), q3 + 1.5 * iqr)
+                lower_whisker = max(min(Qi_sph), q1 - 1.5 * iqr)
+
+                # check data
+                print(f"q1, q2, q3: {q1:.2e}, {q2:.2e}, {q3:.2e}")
+                print(f"upper whisker: {upper_whisker:.2e}, lower whisker: {lower_whisker:.2e}")
+
+                # prepare data for plot and add to box plot
+                box_source = ColumnDataSource(data=dict(
+                                    sample=[sample], q1=[q1], q2=[q2], q3=[q3],
+                                    upper=[upper_whisker], lower=[lower_whisker]
+                                ))
+                fig_box.vbar(x='sample', top='q3', bottom='q1', source=box_source, width=0.5, fill_color=base_color, alpha=0.5, line_color="black", legend_label=f"{sample}")
+                # Median lines
+                fig_box.segment('sample', 'q2', 'sample', 'q2', source=box_source, line_width=2, line_color="red")
+                # Whiskers
+                fig_box.segment('sample', 'upper', 'sample', 'q3', source=box_source, line_color="black")
+                fig_box.segment('sample', 'lower', 'sample', 'q1', source=box_source, line_color="black")
 
         # legend
         fig_line.legend.location = legend_location
         # title
         fig_line.title = f"Internal Q-factor"
-        if not include_bar_graph:
+        if include_bar_graph == False:
             # show plot
             if show_plot == True:
                 show(fig_line)
+                fig_line.toolbar = None
             # save plot
             if save_plot == True:
+                fig_line.toolbar_location=None
                 export_name = "_".join(list(sample_options.keys()))
-                export_path = os.path.join(output_data_directory, f"Qi_{export_name}.png")
+                export_path = os.path.join(output_data_directory, f"line_{export_name}.png")
                 export.export_png(obj=fig_line, filename=export_path)
                 print(f"Plot saved at {export_path}")
-        elif include_bar_graph:
-            layout = gridplot([[fig_line, fig_box]])
+        elif include_bar_graph == True or include_bar_graph == "both":
+            fig_line.legend.visible = False
+            if shared_axes:
+                fig_box.y_range = fig_line.y_range
+            layout = gridplot([[fig_line, fig_box]], width=600, height=600, toolbar_location=None)
             # show plot
             if show_plot == True:
                 show(layout)
             # save plot
             if save_plot == True:
                 export_name = "_".join(list(sample_options.keys()))
-                export_path = os.path.join(output_data_directory, f"Qi_{export_name}.png")
+                export_path = os.path.join(output_data_directory, f"boxLine_{export_name}.png")
                 export.export_png(obj=layout, filename=export_path)
+                print(f"Plot saved at {export_path}")
+        elif include_bar_graph == "only":
+            # show plot
+            if show_plot == True:
+                show(fig_box)
+                # fig_box.toolbar = None
+            # save plot
+            if save_plot == True:
+                fig_box.toolbar_location=None
+                export_name = "_".join(list(sample_options.keys()))
+                export_path = os.path.join(output_data_directory, f"box_{export_name}.png")
+                export.export_png(obj=fig_box, filename=export_path)
                 print(f"Plot saved at {export_path}")
 
     @staticmethod

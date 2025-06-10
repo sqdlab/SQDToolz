@@ -17,7 +17,7 @@ warnings.filterwarnings("ignore", "Covariance of the parameters could not be est
 # imports for plotting (optional)
 plot_backend = None
 try:
-    from bokeh.models import Whisker, ColumnDataSource, TeeHead, Band, Range1d  # type: ignore
+    from bokeh.models import Whisker, ColumnDataSource, TeeHead, Band, Range1d, FuncTickFormatter, NumeralTickFormatter  # type: ignore
     from bokeh.plotting import figure, show  # type: ignore
     from bokeh.io import output_notebook, export  # type: ignore
     from bokeh.palettes import Viridis256, Category10  # type: ignore
@@ -56,6 +56,17 @@ class ResonatorPowerSweep:
                         a TLS model
         - n_ph_lims     Photon number range to be used for fitting and 
                         plotting
+        - Qi_lims      Limits for Qi values to be used for fitting and
+                        plotting. Defaults to [1e3, 1e8].
+        - TLS_model     Which TLS model to use for fitting. Defaults to "mcrae".
+        - temperature   Temperature of the measurement in Kelvin.
+                        Defaults to 30 mK.
+        - notebook      Boolean to choose whether to use Bokeh notebook
+                        output (default False). If True, Bokeh figures
+                        will not export LaTeX text.
+        - fit_data      Dictionary containing pre-fitted data to be used
+                        for plotting. If provided, it will be used instead
+                        of fitting the data again.
     """
 
     def __init__(
@@ -74,6 +85,7 @@ class ResonatorPowerSweep:
         fit_data={},
         with_fit=None,
         n_ph_lims=[0, 1e10],
+        qi_lims=[1e3, 5e7],
         TLS_model="mcrae"
     ):
         # initialise data
@@ -96,6 +108,7 @@ class ResonatorPowerSweep:
         self.do_TLS_fit = with_fit
         self.n_ph_lims = n_ph_lims
         self.TLS_model = TLS_model
+        self.qi_lims = qi_lims
 
         # private class variables
         self._data_file_name = "data.h5"
@@ -135,7 +148,8 @@ class ResonatorPowerSweep:
         print_log="none",
         files_to_ignore=None,
         power_config_order="last",
-        from_text_file=False
+        from_text_file=False,
+        qi_lims=None
     ):
         """
         Searches for and imports all data.h5 files in a given directory into a dictionary. Extracts the VNA power and measurement name corresponding to each data file.
@@ -191,7 +205,10 @@ class ResonatorPowerSweep:
             assert isinstance(
                 files_to_ignore[0], str
             ), "Entries in list files_to_ignore should be strings, e.g. ['file1', 'file2']."
-
+        if qi_lims == None:
+            qi_lims = self.qi_lims
+        else:
+            self.qi_lims = qi_lims
         if print_log != "none":
             print(f"Importing data from {self.data_path}\n")
 
@@ -213,6 +230,7 @@ class ResonatorPowerSweep:
                             except ValueError:
                                 self.fit_data[header].append(value)
                 self.fit_data = pd.DataFrame(self.fit_data)  # Convert to DataFrame
+                self.trim_fit_data_by_qi(qi_lims=qi_lims)
                 print(f"Read {fit_data_path} into self.fit_data (direct path).")
                 return self.fit_data
             else:
@@ -250,6 +268,7 @@ class ResonatorPowerSweep:
                                         self.fit_data[header].append(value)
                     self.fit_data = pd.DataFrame(self.fit_data)  # Convert to DataFrame
                     print(f'  Read {circlefit_match} into self.fit_data')
+                    self.trim_fit_data_by_qi(qi_lims=qi_lims)
                     return self.fit_data
                 # if circlefit.text is not found, continue
                 else:
@@ -340,6 +359,7 @@ class ResonatorPowerSweep:
                 if print_log != "none":
                     print(f"Invalid\t\t{root_shortened}")
         assert (self.data or self.fit_data), "No valid data found at data_path."
+        self.trim_fit_data_by_qi(qi_lims=qi_lims)
         print("\nData import complete!")
         return self.data
 
@@ -1741,7 +1761,9 @@ class ResonatorPowerSweep:
         sample_options,
         output_directory=None,
         include_bar_graph=True,
-        from_text_file=True
+        from_text_file=True,
+        legend_location="top_right",
+        qi_lims=None
     ):
         """
         Creates a bokeh plot for Qi comparison of multiple resonator samples. 
@@ -1757,15 +1779,18 @@ class ResonatorPowerSweep:
                                             'files_to_ignore' : None,
                                             'power_dict' : default_power_dict,
                                             'from_text_file' : "path/to/file/circlefit.txt",
-                                            'with_fit' : True
+                                            'with_fit' : True,
+                                            'qi_lims' : [1e4, 1e8]
                                             },
                                         }
-        - output_directory          The directory in which to save the plot (string).
-        - include_bar_graph         Boolean to include a bar graph of the Qi values, or "only" to plot only the bar graph.
-        - from_text_file            Boolean or string to indicate whether to import data from a text file. 
-                                    If True, uses the default text file name. If a string, uses that as the file name.
-                                    If False, imports data from the directory specified in sample_options.
-        - additional_attenuation    Optional additional attenuation to apply to the data (in dB).
+            Sample options:
+            - output_directory          The directory in which to save the plot (string).
+            - include_bar_graph         Boolean to include a bar graph of the Qi values, or "only" to plot only the bar graph.
+            - from_text_file            Boolean or string to indicate whether to import data from a text file. 
+                                        If True, uses the default text file name. If a string, uses that as the file name.
+                                        If False, imports data from the directory specified in sample_options.
+            - additional_attenuation    Optional additional attenuation to apply to the data (in dB).
+            - qi_lims                   Qi limits for data import
     
         This function handles import and fitting, before passing the data to
         cls.plot_Qi_multisample_bokeh().
@@ -1798,7 +1823,9 @@ class ResonatorPowerSweep:
             sample_path = os.path.join(main_data_directory, sample)
             from_text = sample_options[sample].get('from_text_file', False)
             additional_attenuation = sample_options[sample].get('additional_attenuation', 0)
-            assert os.path.isdir(sample_path), f"Sample directory '{sample_path}' does not exist."
+            qi_lims = sample_options[sample].get('qi_lims', (1e4, 1e8))
+            if from_text == False:
+                assert os.path.isdir(sample_path), f"Sample directory '{sample_path}' does not exist."
             print(f"{sample}\n Acquiring data...")
             # create class instance
             chunk = ResonatorPowerSweep(data_path = sample_path,
@@ -1807,6 +1834,7 @@ class ResonatorPowerSweep:
                         power_dict= sample_options[sample]['power_dict'],
                         TLSfit_bounds=([0, 10, 0, 0.0], [1, 1e3, 1e9, 1]),
                         print_log=False,
+                        qi_lims=qi_lims
                         )
 
             # import from text file if specified
@@ -1837,7 +1865,9 @@ class ResonatorPowerSweep:
         cls.plot_Qi_multisample_bokeh(data=data, 
                                       sample_options=dict(sample_options), 
                                       output_data_directory=output_directory,
-                                      include_bar_graph=include_bar_graph
+                                      include_bar_graph=include_bar_graph,
+                                      ylims=qi_lims,
+                                      legend_location=legend_location
                                       )
         print(f"Data passed to plot_Qi_multisample_bokeh()")
 
@@ -1851,7 +1881,7 @@ class ResonatorPowerSweep:
         include_bar_graph=True,
         with_fit=True,
         with_errorbars=True,
-        legend_location="bottom_right",
+        legend_location=None,
         show_plot=True,
         save_plot=True,
         ylims=None,
@@ -1893,8 +1923,6 @@ class ResonatorPowerSweep:
             y_axis_label=r"$$Q_i$$",
             x_axis_label=r"Photon number " + r"$$\langle n \rangle$$",
         )
-        if ylims != None:
-            fig_line.y_range = Range1d(ylims[0], ylims[1])
 
         # bokeh setup - box plot
         fig_box = figure(
@@ -1906,6 +1934,7 @@ class ResonatorPowerSweep:
             y_axis_label=r"$$Q_i$$",
             x_axis_label=r"Sample name",
         )
+
         
         # colours
         base_colors = Category10.get(num_samples) or Category10[10][:num_samples] if num_samples <= 10 else Viridis256(num_samples)
@@ -1918,6 +1947,7 @@ class ResonatorPowerSweep:
             freq_bin_labels = sorted(set(chunk.fit_data["freq bin"]))
             #freq_bin_labels = sample_options[sample]['freq_bin_labels']
             num_resonators = len(freq_bin_labels)
+            name = sample_options[sample].get('name', sample)
 
             # check which resonators to plot
             res_idx = sample_options[sample].get('resonator_index_to_plot')
@@ -2002,7 +2032,7 @@ class ResonatorPowerSweep:
                         source=source,
                         x="n_ph",
                         y="Qi",
-                        size=8,
+                        size=4,
                         color=shades[j],
                         fill_color="white",
                         alpha=0.7,
@@ -2015,7 +2045,7 @@ class ResonatorPowerSweep:
                             upper="upper",
                             lower="lower",
                             source=source,
-                            line_color=shades[i],
+                            line_color=shades[j],
                             line_alpha=0.7,
                             line_cap="round",
                             line_width="2",
@@ -2028,8 +2058,6 @@ class ResonatorPowerSweep:
                             n_ph_TLS, TLSfit, line_color=shades[j], line_alpha=0.2, line_width=3
                     )
 
-            print(f"Sample {sample} single photon Qi: {Qi_sph} ")
-
             # box plot - per sample (not per resonator)
             if include_bar_graph != False:
                 # calculate per-sample statistics (across all resonators on the sample)
@@ -2037,27 +2065,44 @@ class ResonatorPowerSweep:
                 iqr = q3 - q1
                 upper_whisker = min(max(Qi_sph), q3 + 1.5 * iqr)
                 lower_whisker = max(min(Qi_sph), q1 - 1.5 * iqr)
-
-                # check data
-                print(f"q1, q2, q3: {q1:.2e}, {q2:.2e}, {q3:.2e}")
-                print(f"upper whisker: {upper_whisker:.2e}, lower whisker: {lower_whisker:.2e}")
-
+                # # check data
+                # print(f"q1, q2, q3: {q1:.2e}, {q2:.2e}, {q3:.2e}")
+                # print(f"upper whisker: {upper_whisker:.2e}, lower whisker: {lower_whisker:.2e}")
                 # prepare data for plot and add to box plot
                 box_source = ColumnDataSource(data=dict(
                                     sample=[sample], q1=[q1], q2=[q2], q3=[q3],
                                     upper=[upper_whisker], lower=[lower_whisker]
                                 ))
-                fig_box.vbar(x='sample', top='q3', bottom='q1', source=box_source, width=0.5, fill_color=base_color, alpha=0.5, line_color="black", legend_label=f"{sample}")
+                fig_box.vbar(x='sample', top='q3', bottom='q1', source=box_source, width=0.5, fill_color=base_color, alpha=0.5, line_color="black", legend_label=f"{name}")
                 # Median lines
-                fig_box.segment('sample', 'q2', 'sample', 'q2', source=box_source, line_width=2, line_color="red")
+                
                 # Whiskers
                 fig_box.segment('sample', 'upper', 'sample', 'q3', source=box_source, line_color="black")
                 fig_box.segment('sample', 'lower', 'sample', 'q1', source=box_source, line_color="black")
+                fig_box.circle('sample', 'q2', source=box_source, size=6, color="black", fill_color="white")
 
         # legend
         fig_line.legend.location = legend_location
+        fig_line.legend.ncols = int(np.floor(num_samples/5) + 1)
         # title
         fig_line.title = f"Internal Q-factor"
+        # increase font sizes
+        fig_line.title.text_font_size = '16pt'
+        fig_line.xaxis.axis_label_text_font_size = '14pt'
+        fig_line.yaxis.axis_label_text_font_size = '14pt'
+        fig_line.xaxis.major_label_text_font_size = '12pt'
+        fig_line.yaxis.major_label_text_font_size = '12pt'
+        fig_box.title.text_font_size = '16pt'
+        fig_box.xaxis.axis_label_text_font_size = '14pt'
+        fig_box.yaxis.axis_label_text_font_size = '14pt'
+        fig_box.xaxis.major_label_text_font_size = '12pt'
+        fig_box.yaxis.major_label_text_font_size = '12pt'
+        fig_box.legend.label_text_font_size = '10pt'
+        if ylims is not None:
+            fig_line.y_range.start = ylims[0]
+            fig_line.y_range.end = ylims[1]
+            fig_box.y_range.start = ylims[0]
+            fig_box.y_range.end = ylims[1]
         if include_bar_graph == False:
             # show plot
             if show_plot == True:
@@ -2072,8 +2117,21 @@ class ResonatorPowerSweep:
                 print(f"Plot saved at {export_path}")
         elif include_bar_graph == True or include_bar_graph == "both":
             fig_line.legend.visible = False
+            # Change font sizes
+            fig_box.legend.location = legend_location
+            fig_box.legend.ncols = int(np.floor(num_samples/5) + 1)
+            fig_box.legend.spacing = 0  # spacing between items
+            if num_samples > 5:
+                fig_box.xaxis.major_label_orientation = 0.785
             if shared_axes:
-                fig_box.y_range = fig_line.y_range
+                if ylims != None:
+                    print(f"Setting shared ylims to {ylims}")
+                    fig_line.y_range.start = ylims[0]
+                    fig_line.y_range.end = ylims[1]
+                    fig_box.y_range.start = ylims[0]
+                    fig_box.y_range.end = ylims[1]
+                else:
+                    fig_box.y_range = fig_line.y_range
             layout = gridplot([[fig_line, fig_box]], width=600, height=600, toolbar_location=None)
             # show plot
             if show_plot == True:
@@ -2086,6 +2144,7 @@ class ResonatorPowerSweep:
                 print(f"Plot saved at {export_path}")
         elif include_bar_graph == "only":
             # show plot
+            fig_box.legend.location = legend_location
             if show_plot == True:
                 show(fig_box)
                 # fig_box.toolbar = None
@@ -2120,3 +2179,25 @@ class ResonatorPowerSweep:
             for key in data
         }
         return sorted_data
+
+    def trim_fit_data_by_qi(self, qi_lims=[1e4, 5e7]):
+        """
+        Trims the fit data to only include entries with Qi values within the specified limits.
+        
+        Inputs:
+        - qi_lims: List of two values specifying the lower and upper limits for Qi.
+        
+        Returns:
+        - None, but modifies self.fit_data in place.
+        """
+        assert isinstance(qi_lims, list) and len(qi_lims) == 2, "qi_lims should be a list of two values."
+        assert qi_lims[0] < qi_lims[1], "Lower limit should be less than upper limit."
+        
+        len_before_trim = len(self.fit_data['Qi_dia_corr'])
+        self.fit_data['Qi_dia_corr'] = pd.to_numeric(self.fit_data['Qi_dia_corr'], errors='coerce')
+        self.fit_data = self.fit_data[
+            (self.fit_data['Qi_dia_corr'] > qi_lims[0]) & 
+            (self.fit_data['Qi_dia_corr'] < qi_lims[1])
+        ]
+        len_after_trim = len(self.fit_data['Qi_dia_corr'])
+        print(f"Trimmed {len_before_trim - len_after_trim} data points for qi range {qi_lims}.")

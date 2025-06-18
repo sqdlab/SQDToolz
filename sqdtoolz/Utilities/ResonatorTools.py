@@ -336,9 +336,12 @@ class ResonatorPowerSweep:
                         measurement_data["raw_data"]["measurement_name"]
                     )
                     fits_completed += 1
+                    meas_name = os.path.basename(os.path.normpath(measurement_name))
                     (
                         print(
-                            f"{fits_completed}\t{re.split(r'[\\/]', measurement_name)[-1]}\t"
+                            #f"{fits_completed}\t{re.split(r'[\\/]', measurement_name)[-1]}\t"
+                            # TODO: check here
+                            f"{fits_completed}\t{meas_name}\t"
                             f"f = {port.fitresults['fr']:.1e}, "
                             f"Qi = {port.fitresults['Qi_dia_corr']:.1e}, "
                             f"P = {measurement_data['raw_data']['power']:.1f} dBm "

@@ -212,7 +212,7 @@ class ResonatorPowerSweep:
         if print_log != "none":
             print(f"Importing data from {self.data_path}\n")
 
-        # direct path to circlefit.txt
+        # IMPORT METHOD: DIRECT PATH FROM TEXT
         if isinstance(from_text_file, str):
             # Direct path to text file
             fit_data_path = from_text_file
@@ -237,13 +237,13 @@ class ResonatorPowerSweep:
                 print(f" Invalid path or missing 'circlefit.txt': {fit_data_path}")
                 print(f" Continuing to search for data.h5 files in {self.data_path}...")
 
-        # Otherwise, loop through each sub-folder
+        # IMPORT METHOD LOOP THROUGH DIRECTORY
         for root, _, files in os.walk(self.data_path):
             root_path = Path(root)
             root_shortened = Path(*root_path.parts[-2:])
             print(f" Checking {root}...")
 
-            # take data from text file if it exists (search for file)
+            # IMPORT METHOD: SEARCH FOR `circlefit.txt` IN DIRECTORY AND IMPORT IF IT EXISTS
             if from_text_file == True:
                 # first, check for existing circlefit data
                 circlefit_match = next((f for f in files if "circlefit.txt" in f), None)
@@ -274,7 +274,7 @@ class ResonatorPowerSweep:
                 else:
                     continue
 
-            # Check if data.h5 with valid config file exists in the folder
+            # IMPORT METHOD: FROM H5 FILE FOUND IN DIRECTORY
             if files_to_ignore:
                 ignore_match = [(i in str(root_shortened)) for i in files_to_ignore]
                 good_file = True not in ignore_match
@@ -359,7 +359,8 @@ class ResonatorPowerSweep:
                 if print_log != "none":
                     print(f"Invalid\t\t{root_shortened}")
         assert (self.data or self.fit_data), "No valid data found at data_path."
-        self.trim_fit_data_by_qi(qi_lims=qi_lims)
+        if from_text_file != False:
+            self.trim_fit_data_by_qi(qi_lims=qi_lims)
         print("\nData import complete!")
         return self.data
 
@@ -400,15 +401,16 @@ class ResonatorPowerSweep:
         """
 
         # exit if fit_data already exists
-        if not self.fit_data.empty:
-            if 'absQc' in self.fit_data.columns:
-                self.fit_data.rename(columns={'absQc': 'Qc_dia_corr'}, inplace=True)
-            # sort self.fit_data
-            self.sort_fit_data(n_ph_lims=n_ph_lims)
-            # add frequency binning to help with plotting
-            self.get_frequency_bins()
-            print(f"Checked self.fit_data which already existed.")
-            return self.fit_data
+        if isinstance(self.fit_data, pd.DataFrame):
+            if not self.fit_data.empty:
+                if 'absQc' in self.fit_data.columns:
+                    self.fit_data.rename(columns={'absQc': 'Qc_dia_corr'}, inplace=True)
+                # sort self.fit_data
+                self.sort_fit_data(n_ph_lims=n_ph_lims)
+                # add frequency binning to help with plotting
+                self.get_frequency_bins()
+                print(f"Checked self.fit_data which already existed.")
+                return self.fit_data
 
         assert (isinstance(expected_qi_lims, (list, tuple))) and (
             len(expected_qi_lims) == 2
@@ -434,7 +436,8 @@ class ResonatorPowerSweep:
             try:
                 port.autofit()
             except:
-                print(f"Fitting {measurement_name} failed.")
+                print(f"Fitting {measurement_name} failed - skipping import.")
+                invalid_data.append(measurement_name)
             else:
                 if circuit_type == "reflection_port":
                     # rename fit results to match notch_port
@@ -1492,7 +1495,7 @@ class ResonatorPowerSweep:
                 ), "Bounds should be passed as a tuple of lists, with elements corresponding to [F_delta_TLS0, n_c, Q_HP, beta]. The first tuple entry is lower bounds, and the second is upper. e.g. bounds = ([0, 0.2, 0, 0.0], [1, 1e3, 1e9, 1])"
             # DO FIT
             # with error bars
-            if Qerr.any():
+            if Qerr is not None and np.any(Qerr):
                 try:
                     popt, pcov, infodict, mesg, ier = scipy.optimize.curve_fit(
                         TLS_model,

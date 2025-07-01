@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.optimize
+from scipy.special import kn
 import os
 import pandas as pd
 import re
@@ -16,15 +17,16 @@ warnings.filterwarnings("ignore", "Covariance of the parameters could not be est
 # imports for plotting (optional)
 plot_backend = None
 try:
-    from bokeh.models import Whisker, ColumnDataSource, TeeHead, Band, Range1d  # type: ignore
-    from bokeh.plotting import figure, show  # type: ignore
-    from bokeh.io import output_notebook, export  # type: ignore
-    from bokeh.palettes import Viridis256, Category10  # type: ignore
-    from bokeh.layouts import gridplot  # type: ignore
-except:
-    warnings.warning("Bokeh not imported. You will have to use mpl for plotting")
+    from bokeh.models import Whisker, ColumnDataSource, TeeHead, Band, Range1d
+    from bokeh.models.formatters import FuncTickFormatter, NumeralTickFormatter
+    from bokeh.plotting import figure, show
+    from bokeh.io import output_notebook, export
+    from bokeh.palettes import Viridis256, Category10, Category20
+    from bokeh.layouts import gridplot
+except Exception as e:
+    import warnings
+    warnings.warn(f"Bokeh not imported: {e}. Requires version 2.4.3.")
     PLOT_BACKEND = "matplotlib"
-    pass
 else:
     PLOT_BACKEND = "bokeh"
 
@@ -55,6 +57,17 @@ class ResonatorPowerSweep:
                         a TLS model
         - n_ph_lims     Photon number range to be used for fitting and 
                         plotting
+        - Qi_lims      Limits for Qi values to be used for fitting and
+                        plotting. Defaults to [1e3, 1e8].
+        - TLS_model     Which TLS model to use for fitting. Defaults to "mcrae".
+        - temperature   Temperature of the measurement in Kelvin.
+                        Defaults to 30 mK.
+        - notebook      Boolean to choose whether to use Bokeh notebook
+                        output (default False). If True, Bokeh figures
+                        will not export LaTeX text.
+        - fit_data      Dictionary containing pre-fitted data to be used
+                        for plotting. If provided, it will be used instead
+                        of fitting the data again.
     """
 
     def __init__(
@@ -67,12 +80,14 @@ class ResonatorPowerSweep:
                     "highPower" : -82,
                     "default" : -82
                     },
-        TLSfit_bounds=([0, 0.2, 0, 0.0], [1, 1e3, 1e9, 1]),
+        TLSfit_bounds=None,
         print_log=False,
         notebook=False,
         fit_data={},
         with_fit=None,
-        n_ph_lims=[0, 1e10]
+        n_ph_lims=[0, 1e10],
+        qi_lims=[1e3, 5e7],
+        TLS_model="mcrae"
     ):
         # initialise data
         self.data_path = data_path
@@ -93,11 +108,14 @@ class ResonatorPowerSweep:
         self.freq_bin_labels = []
         self.do_TLS_fit = with_fit
         self.n_ph_lims = n_ph_lims
+        self.TLS_model = TLS_model
+        self.qi_lims = qi_lims
 
         # private class variables
         self._data_file_name = "data.h5"
         self._config_file_name = "experiment_configurations.txt"
         self._fitted_data_file_name = "circlefit.txt"
+        self._data_from_text_file = False
 
         # figure
         self.plot_backend = PLOT_BACKEND
@@ -111,7 +129,7 @@ class ResonatorPowerSweep:
             self.fig_bokeh = figure(
                 width=1000,
                 height=600,
-                x_axis_label=r"Photon number " + r"$$\langle n \rangle$$",
+                x_axis_label=r"Photon number  ⟨n⟩",
                 y_axis_label=r"$$Q_i$$",
                 y_axis_type="log",
                 x_axis_type="log",
@@ -130,7 +148,9 @@ class ResonatorPowerSweep:
         additional_attenuation=0,
         print_log="none",
         files_to_ignore=None,
-        power_config_order="last"
+        power_config_order="last",
+        from_text_file=False,
+        qi_lims=None
     ):
         """
         Searches for and imports all data.h5 files in a given directory into a dictionary. Extracts the VNA power and measurement name corresponding to each data file.
@@ -162,10 +182,14 @@ class ResonatorPowerSweep:
         - power_config_order        Which power value should we look for in the 
                                     config file? Defaults to 'first', other options
                                     are 'last'.
+        - from_text_file            Boolean to choose whether to read from circlefit.txt 
+                                    if it exists.
 
         Outputs:
         - self.data                 Dictionary containing measurement data and metadata.
         """
+        if from_text_file == True or isinstance(from_text_file, str):
+            self._data_from_text_file = True
         power_dict = self.power_dict if power_dict == None else 0
         assert power_config_order in ["first", "last"], "power_config_order should be either 'first' or 'last'."
         assert print_log in [
@@ -182,36 +206,76 @@ class ResonatorPowerSweep:
             assert isinstance(
                 files_to_ignore[0], str
             ), "Entries in list files_to_ignore should be strings, e.g. ['file1', 'file2']."
-
+        if qi_lims == None:
+            qi_lims = self.qi_lims
+        else:
+            self.qi_lims = qi_lims
         if print_log != "none":
             print(f"Importing data from {self.data_path}\n")
-        # Loop through each sub-folder
-        for root, _, files in os.walk(self.data_path):
-            # root_shortened = Path(*Path(root).parts[-3:])
-            root_shortened = Path(*Path(root).parts[-2:])
-            # first, check for existing circlefit data
-            circlefit_match = next((f for f in files if "circlefit.txt" in f), None)
-            if circlefit_match:
-                # read circlefit into self.fit_data, skip searching
-                self.fit_data = {} # clear fit_data
-                fit_data_path = os.path.join(root, circlefit_match)
+
+        # IMPORT METHOD: DIRECT PATH FROM TEXT
+        if isinstance(from_text_file, str):
+            # Direct path to text file
+            fit_data_path = from_text_file
+            if os.path.isfile(fit_data_path) and "circlefit.txt" in os.path.basename(fit_data_path):
+                self.fit_data = {}  # clear fit_data
                 with open(fit_data_path, newline='', encoding='utf-8') as f:
                     reader = csv.DictReader(f, delimiter='\t')  # Tab-delimited
-                    # get headers 
                     for header in reader.fieldnames:
                         self.fit_data[header] = []
                     for row in reader:
                         for header in reader.fieldnames:
                             value = row[header]
                             try:
-                                # Try to convert to float if possible
                                 self.fit_data[header].append(float(value) if value.replace('.', '', 1).isdigit() else value)
                             except ValueError:
-                                # If it's not a number, keep it as a string
                                 self.fit_data[header].append(value)
-                print(f'Read {circlefit_match} into self.fit_data')
-                break
-            # Check if data.h5 with valid config file exists in the folder
+                self.fit_data = pd.DataFrame(self.fit_data)  # Convert to DataFrame
+                self.trim_fit_data_by_qi(qi_lims=qi_lims)
+                print(f"Read {fit_data_path} into self.fit_data (direct path).")
+                return self.fit_data
+            else:
+                print(f" Invalid path or missing 'circlefit.txt': {fit_data_path}")
+                print(f" Continuing to search for data.h5 files in {self.data_path}...")
+
+        # IMPORT METHOD LOOP THROUGH DIRECTORY
+        for root, _, files in os.walk(self.data_path):
+            root_path = Path(root)
+            root_shortened = Path(*root_path.parts[-2:])
+            print(f" Checking {root}...")
+
+            # IMPORT METHOD: SEARCH FOR `circlefit.txt` IN DIRECTORY AND IMPORT IF IT EXISTS
+            if from_text_file == True:
+                # first, check for existing circlefit data
+                circlefit_match = next((f for f in files if "circlefit.txt" in f), None)
+                if circlefit_match:
+                    # read circlefit into self.fit_data, skip searching
+                    self.fit_data = {} # clear fit_data
+                    fit_data_path = os.path.join(root, circlefit_match)
+                    with open(fit_data_path, newline='', encoding='utf-8') as f:
+                        reader = csv.DictReader(f, delimiter='\t')  # Tab-delimited
+                        # get headers 
+                        for header in reader.fieldnames:
+                            self.fit_data[header] = []
+                        for row in reader:
+                            if not any(ignored in row["measurement name"] for ignored in files_to_ignore):
+                                for header in reader.fieldnames:
+                                    value = row[header]
+                                    try:
+                                        # Try to convert to float if possible
+                                        self.fit_data[header].append(float(value) if value.replace('.', '', 1).isdigit() else value)
+                                    except ValueError:
+                                        # If it's not a number, keep it as a string
+                                        self.fit_data[header].append(value)
+                    self.fit_data = pd.DataFrame(self.fit_data)  # Convert to DataFrame
+                    print(f'  Read {circlefit_match} into self.fit_data')
+                    self.trim_fit_data_by_qi(qi_lims=qi_lims)
+                    return self.fit_data
+                # if circlefit.text is not found, continue
+                else:
+                    continue
+
+            # IMPORT METHOD: FROM H5 FILE FOUND IN DIRECTORY
             if files_to_ignore:
                 ignore_match = [(i in str(root_shortened)) for i in files_to_ignore]
                 good_file = True not in ignore_match
@@ -296,7 +360,9 @@ class ResonatorPowerSweep:
                 if print_log != "none":
                     print(f"Invalid\t\t{root_shortened}")
         assert (self.data or self.fit_data), "No valid data found at data_path."
-        print("Data import complete.")
+        if from_text_file != False:
+            self.trim_fit_data_by_qi(qi_lims=qi_lims)
+        print("\nData import complete!")
         return self.data
 
     # do circlefit
@@ -335,6 +401,18 @@ class ResonatorPowerSweep:
                             each measurement.
         """
 
+        # exit if fit_data already exists
+        if isinstance(self.fit_data, pd.DataFrame):
+            if not self.fit_data.empty:
+                if 'absQc' in self.fit_data.columns:
+                    self.fit_data.rename(columns={'absQc': 'Qc_dia_corr'}, inplace=True)
+                # sort self.fit_data
+                self.sort_fit_data(n_ph_lims=n_ph_lims)
+                # add frequency binning to help with plotting
+                self.get_frequency_bins()
+                print(f"Checked self.fit_data which already existed.")
+                return self.fit_data
+
         assert (isinstance(expected_qi_lims, (list, tuple))) and (
             len(expected_qi_lims) == 2
         ), "expected_qi_lims should be a list or tuple of length two (min, max)."
@@ -359,7 +437,8 @@ class ResonatorPowerSweep:
             try:
                 port.autofit()
             except:
-                print(f"Fitting {measurement_name} failed.")
+                print(f"Fitting {measurement_name} failed - skipping import.")
+                invalid_data.append(measurement_name)
             else:
                 if circuit_type == "reflection_port":
                     # rename fit results to match notch_port
@@ -393,9 +472,10 @@ class ResonatorPowerSweep:
                         measurement_data["raw_data"]["measurement_name"]
                     )
                     fits_completed += 1
+                    filename_only = re.split(r'[\\/]', measurement_name)[-1]
                     (
                         print(
-                            f"{fits_completed}\t{re.split(r'[\\/]', measurement_name)[-1]}\t"
+                            f"{fits_completed}\t{filename_only}\t"
                             f"f = {port.fitresults['fr']:.1e}, "
                             f"Qi = {port.fitresults['Qi_dia_corr']:.1e}, "
                             f"P = {measurement_data['raw_data']['power']:.1f} dBm "
@@ -478,39 +558,80 @@ class ResonatorPowerSweep:
                 * 1e3
             )
 
-    # sort data frame along multiple axes
+    # sort along axes
     def fit_data_to_sorted_dataframe(self, axes_to_sort=["fr", "power"], n_ph_lims=None):
         fit_data_list = []
         first = True
         for _, measurement_data in self.data.items():
             fit_data_list.append(measurement_data["fit"])
-            # get column names for DataFrame
-            if first == True:
+            if first:
                 columns = measurement_data["fit"].keys()
+                first = False
         # convert to DataFrame
         df = pd.DataFrame(fit_data_list, columns=columns)
-        df_sorted = df.sort_values(by=axes_to_sort, ascending=[True, True]).reset_index(
-            drop=True
-        )
-        if n_ph_lims != None:
-            assert isinstance(n_ph_lims, list)
-            assert len(n_ph_lims) == 2
-            self.fit_data = df_sorted[(df_sorted['n_ph'] > n_ph_lims[0]) & (df_sorted['n_ph'] < n_ph_lims[1])]
-        else:
-            self.fit_data = df_sorted
+        # convert only numeric-looking columns to float
+        for col in df.columns:
+            try:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+            except Exception:
+                pass  # Keep non-convertible columns as-is
+        # sort by specified axes
+        df_sorted = df.sort_values(by=axes_to_sort, ascending=[True]*len(axes_to_sort)).reset_index(drop=True)
+        # apply photon number filtering if needed
+        if n_ph_lims is not None:
+            assert isinstance(n_ph_lims, list) and len(n_ph_lims) == 2
+            if "n_ph" in df_sorted.columns:
+                df_sorted = df_sorted[(df_sorted['n_ph'] > n_ph_lims[0]) & (df_sorted['n_ph'] < n_ph_lims[1])]
+        # remove rows with NaNs in any column used for sorting or analysis
+        df_sorted = df_sorted.dropna(subset=axes_to_sort + (["n_ph"] if n_ph_lims else []))
+        # remove invalid rows (e.g., 0 power)
+        if "power" in df_sorted.columns:
+            df_sorted = df_sorted[df_sorted["power"] != 0]
+        self.fit_data = df_sorted
+    
+    def sort_fit_data(self, axes_to_sort=["fr", "power"], n_ph_lims=None):
+        if not isinstance(self.fit_data, pd.DataFrame):
+            self.fit_data = pd.DataFrame(self.fit_data)
+        df = self.fit_data
+        # convert only numeric-looking columns to float
+        for col in df.columns:
+            if col not in ["freq bin", "measurement name"]:
+                try:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                    #print(f"Converted column '{col}' to numeric type.")
+                except Exception:
+                    #print(f"Could not convert column '{col}' to numeric type. Keeping it as-is.")
+                    pass  # Keep non-convertible columns as-is
+        # sort by specified axes
+        df_sorted = df.sort_values(by=axes_to_sort, ascending=[True]*len(axes_to_sort)).reset_index(drop=True)
+        # apply photon number filtering if needed
+        if n_ph_lims is not None:
+            assert isinstance(n_ph_lims, list) and len(n_ph_lims) == 2
+            if "n_ph" in df_sorted.columns:
+                df_sorted = df_sorted[(df_sorted['n_ph'] > n_ph_lims[0]) & (df_sorted['n_ph'] < n_ph_lims[1])]
+        # remove rows with NaNs in any column used for sorting or analysis
+        df_sorted = df_sorted.dropna(subset=axes_to_sort + (["n_ph"] if n_ph_lims else []))
+        # remove invalid rows (e.g., 0 power)
+        if "power" in df_sorted.columns:
+            df_sorted = df_sorted[df_sorted["power"] != 0]
+        self.fit_data = df_sorted
 
     # get labels for frequency bins
     def get_frequency_bin_labels(self):
-        freq_list_rounded = self.fit_data["fr"].multiply(1e-9).round(2)
+        freq_list = np.array(self.fit_data["fr"], dtype=float)
+        freq_list_rounded = (freq_list * 1e-9).round(2)
         freq_bins = list(set(freq_list_rounded))
         self.num_resonators = len(freq_bins)
         freq_bins.sort()
         self.freq_bin_labels = [f"{i:.2f} GHz" for i in freq_bins]
+        print(f"Detected {len(self.freq_bin_labels)} frequency bins: {self.freq_bin_labels}")
         assert len(self.freq_bin_labels) == self.num_resonators, "Bin labelling failed."
         return self.freq_bin_labels
 
     # search for frequencies and create bins
     def get_frequency_bins(self):
+        # Ensure 'fr' is float
+        self.fit_data["fr"] = pd.to_numeric(self.fit_data["fr"], errors='coerce')
         self.get_frequency_bin_labels()
         assert (
             self.num_resonators
@@ -555,19 +676,30 @@ class ResonatorPowerSweep:
             self, 
             save_directory=None,
             n_ph_HP=1e6,
-            do_fit=True
+            do_fit=True,
+            output_name=None,
+            include_resonators=None
             ):
         '''
         Saves a text file with a complete data summary to the data_path.
         '''
+
+        if include_resonators == None:
+            include_resonators = list(range(self.num_resonators))
         
         do_fit = self.do_TLS_fit if self.do_TLS_fit != None else 0
+
+        # double check frequency bins set
+        assert self.freq_bin_labels, "Frequency bin labels not set. Run get_frequency_bins() first."
 
         if save_directory != None:
             save_path = save_directory
         else:
             save_path = self.save_path
-        export_path = os.path.join(save_path, f"data_summary_{self.name}.txt")
+        if output_name == None:
+            export_path = os.path.join(save_path, f"data_summary_{self.name}.txt")
+        else:
+            export_path = os.path.join(save_path, f"{output_name}_{self.name}.txt")
         col_width = 13
         headers_per_res = ["Qi,LP", "Qi,HP", "Qc med", "Qc range", "f med [Hz]", "f range [Hz]", "F*tanδ", "n_c"]
         headers_stats = ["Qi,LP \tmax", "Qi,LP \tAv +/- SE", "Qi,HP \tmax", "Qi,HP \tAv +/- SE", "Qc    \tAv +/- SE", "Qc    \tmax", "Qc    \tmin", "F*tanδ  Av +/- SE", "F*tanδ  min"]
@@ -584,66 +716,78 @@ class ResonatorPowerSweep:
         Qi_HP = []
         F_tan_delta = []
         n_c = []
-        Qc = np.array(self.fit_data["Qc_dia_corr"])
+        if "Qc_dia_corr" in self.fit_data.columns:
+            Qc = np.array(self.fit_data["Qc_dia_corr"])
+        elif "absQc" in self.fit_data.columns:
+            Qc = np.array(self.fit_data["absQc"])
 
+        counter = 0
         for i, freq_bin_cur in enumerate(self.freq_bin_labels):
+            print(f"Gathering data for {freq_bin_cur} resonator...")
+            if (include_resonators != None) and (i in include_resonators):
+                res_data = self.isolate_resonator_data(freq_bin_cur)
+                # print(f"res data\n{pd.DataFrame(res_data)}")
 
-            res_data = self.isolate_resonator_data(freq_bin_cur)
+                LP_indx = self.find_photon_number_index(
+                    data=res_data, photon_number=1
+                )
+                Qi_LP.append(np.array(res_data["Qi"])[LP_indx])
+                print(f" LP index: {LP_indx:<3}, Qi_LP: {np.array(res_data['Qi'])[LP_indx]}")
 
-            LP_indx = self.find_photon_number_index(
-                data=self.fit_data, search_key="n_ph", photon_number=1
-            )
-            Qi_LP.append(np.array(res_data["Qi"])[LP_indx])
-            # get high power Qi
-            HP_indx = self.find_photon_number_index(
-                data=self.fit_data, search_key="n_ph", photon_number=n_ph_HP
-            )
-            # adjust HP_indx if it is outside the measured range of n_ph
-            if HP_indx > len(np.array(res_data["Qi"])):
-                HP_indx = len(np.array(res_data["Qi"])) - 1
-            Qi_HP.append(np.array(res_data["Qi"])[HP_indx])
+                # get high power Qi
+                HP_indx = self.find_photon_number_index(
+                    data=res_data, photon_number="maximum"
+                )
 
-            # calculate per-resonator values
-            f_av = self.filtered_mean_iqr(res_data["f"])
-            Qc_av = self.filtered_mean_iqr(res_data["Qc"]) 
-            f_range = self.filtered_mean_iqr(res_data["f"], filtered_range=True)
-            Qc_range = self.filtered_mean_iqr(res_data["Qc"], filtered_range=True)
+                # adjust HP_indx if it is outside the measured range of n_ph
+                if HP_indx > len(np.array(res_data["Qi"])):
+                    HP_indx = len(np.array(res_data["Qi"])) - 1
+                Qi_HP.append(np.array(res_data["Qi"])[HP_indx])
+                print(f" HP index: {HP_indx:<3}, Qi_HP: {np.array(res_data['Qi'])[HP_indx]}")
 
-            if do_fit:
-                # calculate F*tanδ
-                fit_dict, _, _ = self.TLS_fit(res_data["n_ph"], 
-                                              res_data["Qi"], 
-                                              f=f_av, 
-                                              T=self.T, 
-                                              Qerr=res_data["Qerr"], 
-                                              bounds=self.TLSfit_bounds, 
-                                              n_ph_lims=self.n_ph_lims)
-                F_tan_delta.append(fit_dict["F_tan_delta"])
-                n_c.append(fit_dict["n_c"])
-            else:
-                F_tan_delta.append(0)
-                n_c.append(0)
+                # calculate per-resonator values
+                f_av = self.filtered_mean_iqr(res_data["f"])
+                Qc_av = self.filtered_mean_iqr(res_data["Qc"]) 
+                f_range = self.filtered_mean_iqr(res_data["f"], filtered_range=True)
+                Qc_range = self.filtered_mean_iqr(res_data["Qc"], filtered_range=True)
 
-            # print to file
-            vals = [Qi_LP[i], Qi_HP[i], Qc_av, Qc_range, f_av, f_range, F_tan_delta[i], n_c[i]]
-            with open(export_path, "a") as file:
-                file.write("".join(f"{val:<{col_width}.2e}" for val in vals) + "\n")
+                if do_fit:
+                    # calculate F*tanδ
+                    fit_dict, _, _ = self.TLS_fit(np.array(res_data["n_ph"], dtype=float), 
+                                                np.array(res_data["Qi"], dtype=float), 
+                                                f=f_av, 
+                                                T=self.T, 
+                                                # Qerr=res_data["Qerr"], 
+                                                bounds=self.TLSfit_bounds, 
+                                                n_ph_lims=self.n_ph_lims,
+                                                TLS_model=self.TLS_model)
+                    F_tan_delta.append(fit_dict["F_tan_delta"])
+                    n_c.append(fit_dict["n_c"])
+                else:
+                    F_tan_delta.append(0)
+                    n_c.append(0)
+
+                # print to file
+                vals = [Qi_LP[counter], Qi_HP[counter], Qc_av, Qc_range, f_av, f_range, F_tan_delta[counter], n_c[counter]]
+                with open(export_path, "a") as file:
+                    file.write("".join(f"{float(val):<{col_width}.2e}" for val in vals) + "\n")
+                counter += 1
 
         # calculate statistical values
-        Qi_LP_max = np.max(Qi_LP)
-        Qi_LP_av = self.filtered_mean_iqr(Qi_LP)
-        Qi_LP_SE = np.std(Qi_LP, ddof=1) / np.sqrt(len(Qi_LP))
-        Qi_HP_max = np.max(Qi_HP)
-        Qi_HP_av = self.filtered_mean_iqr(Qi_HP)
-        Qi_HP_SE = np.std(Qi_HP, ddof=1) / np.sqrt(len(Qi_HP))
-        Qc_av = self.filtered_mean_iqr(Qc)
-        Qc_SE = self.filtered_mean_iqr(Qc, filtered_SE=True)
-        Qc_max = np.max(Qc)
-        Qc_min = np.min(Qc)
+        Qi_LP_max = np.max(np.array(Qi_LP, dtype=float))
+        Qi_LP_av = self.filtered_mean_iqr(np.array(Qi_LP))
+        Qi_LP_SE = np.std(np.array(Qi_LP, dtype=float), ddof=1) / np.sqrt(len(Qi_LP))
+        Qi_HP_max = np.max(np.array(Qi_HP, dtype=float))
+        Qi_HP_av = self.filtered_mean_iqr(np.array(Qi_HP))
+        Qi_HP_SE = np.std(np.array(Qi_HP, dtype=float), ddof=1) / np.sqrt(len(Qi_HP))
+        Qc_av = self.filtered_mean_iqr(np.array(Qc, dtype=float))
+        Qc_SE = self.filtered_mean_iqr(np.array(Qc, dtype=float), filtered_SE=True)
+        Qc_max = np.max(np.array(Qc, dtype=float))
+        Qc_min = np.min(np.array(Qc, dtype=float))
         if do_fit:
-            F_tan_delta_av = self.filtered_mean_iqr(F_tan_delta)
-            F_tan_delta_SE = self.filtered_mean_iqr(F_tan_delta, filtered_SE=True)
-            F_tan_delta_min = np.min(F_tan_delta)
+            F_tan_delta_av = self.filtered_mean_iqr(np.array(F_tan_delta))
+            F_tan_delta_SE = self.filtered_mean_iqr(np.array(F_tan_delta), filtered_SE=True)
+            F_tan_delta_min = np.min(np.array(F_tan_delta, dtype=float))
         else:
             F_tan_delta_av = 0
             F_tan_delta_SE = 0
@@ -672,7 +816,9 @@ class ResonatorPowerSweep:
     
     @staticmethod
     def filtered_mean_iqr(data, filtered_range=False, filtered_SE=False):
-        data = np.array(data)  # Convert to NumPy array
+        data = pd.to_numeric(pd.Series(data), errors='coerce')
+        data = data.dropna()                         
+        data = np.array(data, dtype=float)  # Convert to NumPy array
         q1, q3 = np.percentile(data, [25, 75])  # First & third quartiles
         iqr = q3 - q1  # Interquartile range
         lower_bound = q1 - 1.5 * iqr
@@ -692,14 +838,22 @@ class ResonatorPowerSweep:
         # initialise plot data for new resonator
         n_ph, Qi, Qc, f, Qerr = [], [], [], [], []
         frequency = float(freq_bin_label.split()[0]) * 1e9  # Hz
+        if "absQc" in self.fit_data.columns:
+            Qc_col = "absQc"
+        elif "Qc_dia_corr" in self.fit_data.columns:
+            Qc_col = "Qc_dia_corr"
         for _, row in self.fit_data.iterrows():
             # add measurement from self.fit_data if in current bin
             if row["freq bin"] == freq_bin_label:
                 n_ph.append(row["n_ph"])
                 Qi.append(row["Qi_dia_corr"])
-                Qc.append(row["Qc_dia_corr"])
+                Qc.append(row[Qc_col])
                 f.append(row['fr'])
                 Qerr.append(row["Qi_dia_corr_err"])
+        # Sort the data by n_ph
+        n_ph = np.array(n_ph, dtype=float)
+        sorted_data = sorted(zip(n_ph, Qi, Qc, f, Qerr), key=lambda x: x[0])
+        n_ph, Qi, Qc, f, Qerr = zip(*sorted_data) if sorted_data else ([], [], [], [], [])
         return dict(n_ph=n_ph, Qi=Qi, Qc=Qc, f=f, Qerr=Qerr)
 
     # Qi vs photon number
@@ -715,9 +869,9 @@ class ResonatorPowerSweep:
         ylims=None,
         plot_frequencies=None
     ):
-        
-        with_fit = self.do_TLS_fit if self.do_TLS_fit != None else 0
 
+        with_fit = self.do_TLS_fit if self.do_TLS_fit != None else 0
+        assert self.freq_bin_labels, "Frequency bin labels not set. Run get_frequency_bins() first."
         assert isinstance(self.fit_data, pd.DataFrame)
         if backend == None:
             backend = self.plot_backend
@@ -737,7 +891,7 @@ class ResonatorPowerSweep:
                 x_axis_type="log",
                 y_axis_type="log",
                 y_axis_label=r"$$Q_i$$",
-                x_axis_label=r"Photon number " + r"$$\langle n \rangle$$",
+                x_axis_label=r"Photon number  ⟨n⟩",
             )
             self._colourmap = Viridis256
             if ylims != None:
@@ -773,8 +927,8 @@ class ResonatorPowerSweep:
                     if row["freq bin"] == freq_bin_cur:
                         n_ph.append(row["n_ph"])
                         Qi.append(row["Qi_dia_corr"])
-                        Qi_upper.append(row["Qi_dia_corr"] + row["Qi_dia_corr_err"])
-                        Qi_lower.append(row["Qi_dia_corr"] - row["Qi_dia_corr_err"])
+                        Qi_upper.append(float(row["Qi_dia_corr"]) + float(row["Qi_dia_corr_err"]))
+                        Qi_lower.append(float(row["Qi_dia_corr"]) - float(row["Qi_dia_corr_err"]))
                         Qerr.append(row["Qi_dia_corr_err"])
                 # convert to ColumnDataSource for Bokeh plotting
                 source = ColumnDataSource(
@@ -782,7 +936,7 @@ class ResonatorPowerSweep:
                 )
                 # get single photon Qi
                 sph_indx = self.find_photon_number_index(
-                    data=source.data, search_key="n_ph"
+                    data=source.data, photon_number=1
                 )
                 sph_Qi = np.array(source.data["Qi"])[sph_indx]
 
@@ -796,13 +950,14 @@ class ResonatorPowerSweep:
                         T=self.T,
                         Qerr=source.data["Qerr"],
                         bounds=self.TLSfit_bounds,
-                        n_ph_lims=self.n_ph_lims
+                        n_ph_lims=self.n_ph_lims,
+                        TLS_model=self.TLS_model
                     )
 
                 # bokeh plot
                 if backend == "bokeh":
-                    # do plotting
                     color = self._colourmap[i * len(self._colourmap) // self.num_resonators]
+                    # do plotting
                     self.fig_bokeh.scatter(
                         source=source,
                         x="n_ph",
@@ -880,7 +1035,8 @@ class ResonatorPowerSweep:
                             T=self.T,
                             Qerr=source.data["Qerr"],
                             bounds=self.TLSfit_bounds,
-                            n_ph_lims=self.n_ph_lims
+                            n_ph_lims=self.n_ph_lims,
+                            TLS_model=self.TLS_model
                         )
                         self.ax_ph_mpl.plot(
                             n_ph_TLS, TLSfit, color=color, alpha=0.4, linewidth=3
@@ -927,6 +1083,16 @@ class ResonatorPowerSweep:
         as_deviation=True,
         plot_frequencies=None
     ):
+        if self._data_from_text_file == True:
+            print(
+                "Data loaded from text file, so frequency data is not available. "
+                "Please read data from .h5 files to plot frequency."
+            )
+            return
+        # auto set with_errorbars = False if fr_err doesnt exist
+        if "fr_err" not in self.fit_data.columns:
+            with_errorbars = False
+            print("No frequency error data found, setting with_errorbars to False.")
         if backend == None:
             backend = self.plot_backend
         # check backend is valid
@@ -944,7 +1110,7 @@ class ResonatorPowerSweep:
             self.fig_bokeh = figure(
                 title=f"{self.name}: Frequency",
                 x_axis_type="log",
-                x_axis_label="Photon number " + r"$$\langle n \rangle$$",
+                x_axis_label="Photon number " + "⟨n⟩",
                 width=1000,
                 height=600,
             )
@@ -1099,6 +1265,10 @@ class ResonatorPowerSweep:
         ylims=None,
         plot_frequencies=None
     ):
+        # overrun with_errorbars if absQc doesnt exist
+        if self._data_from_text_file == True:
+            with_errorbars = False
+
         if backend == None:
             backend = self.plot_backend
         # check backend is valid
@@ -1112,6 +1282,9 @@ class ResonatorPowerSweep:
             freqs_to_use = plot_frequencies
         elif plot_frequencies == None:
             freqs_to_use = range(self.num_resonators)
+        # check column naming conventions
+        if "Qc_dia_corr" in self.fit_data.columns:
+            self.fit_data = self.fit_data.rename(columns={"Qc_dia_corr": "absQc"})
         # bokeh setup
         if backend == "bokeh":
             self.fig_bokeh = figure(
@@ -1121,7 +1294,7 @@ class ResonatorPowerSweep:
                 x_axis_type="log",
                 y_axis_type="log",
                 y_axis_label=r"$$Q_c$$",
-                x_axis_label=r"Photon number " + r"$$\langle n \rangle$$",
+                x_axis_label=r"Photon number  ⟨n⟩",
             )
             self._colourmap = Viridis256
             if ylims != None:
@@ -1152,16 +1325,25 @@ class ResonatorPowerSweep:
                     # add measurement from self.fit_data if in current bin
                     if row["freq bin"] == freq_bin_cur:
                         Qc.append(row["absQc"])
-                        Qc_upper.append(row["absQc"] + row["absQc_err"])
-                        Qc_lower.append(row["absQc"] - row["absQc_err"])
                         n_ph.append(row["n_ph"])
-                        Qc_err.append(row["absQc_err"])
+                        if with_errorbars:
+                            Qc_upper.append(row["absQc"] + row["absQc_err"])
+                            Qc_lower.append(row["absQc"] - row["absQc_err"])
+                            Qc_err.append(row["absQc_err"])
+
                 # convert to ColumnDataSource for Bokeh plotting
-                source = ColumnDataSource(
-                    data=dict(
-                        n_ph=n_ph, Qc=Qc, upper=Qc_upper, lower=Qc_lower, Qc_err=Qc_err
+                if with_errorbars == True:
+                    source = ColumnDataSource(
+                        data=dict(
+                            n_ph=n_ph, Qc=Qc, upper=Qc_upper, lower=Qc_lower, Qc_err=Qc_err
+                        )
                     )
-                )
+                else:
+                    source = ColumnDataSource(
+                        data=dict(
+                            n_ph=n_ph, Qc=Qc
+                        )
+                    )
                 # bokeh
                 if backend == "bokeh":
                     color = self._colourmap[i * len(self._colourmap) // self.num_resonators]
@@ -1235,7 +1417,7 @@ class ResonatorPowerSweep:
     # TLS fit
     @staticmethod
     def TLS_fit(
-        n_ph, Qi, f, T, bounds=None, Qerr=None, print_log=False, print_fit=True, n_ph_lims=None
+        n_ph, Qi, f, T, bounds=None, Qerr=None, print_log=False, print_fit=True, n_ph_lims=None, TLS_model="mcrae"
     ):
         """
         Function for fitting TLS loss model (e.g. in doi: 10.1063/5.0004622) to n_ph vs. Qi. Note: this is a static method (i.e. does not have access to class variables; all arguments must be passed). Fits parameters [F_delta_TLS0, n_c, Q_HP, beta].
@@ -1261,47 +1443,195 @@ class ResonatorPowerSweep:
         """
 
         assert isinstance(T, (float, int)), "Temperature should be a float or int."
+        assert T > 0, "Temperature should be greater than 0 K."
         assert isinstance(f, (float, int)), "Frequency should be a float or int."
         assert len([n_ph, Qi, Qerr]) > 0, "Please provide n_ph and Qi data."
+        assert TLS_model in ["mcrae", "crowley"], "Please choose TLS model from ['mcrae', 'crowley']"
+
+        # convert to array of floats (if not already)
+        n_ph = np.array(n_ph, dtype=float)
+        Qi = np.array(Qi, dtype=float)
+        assert isinstance(n_ph[0], float)
+
+        # sort Qi, n_ph by n_ph
+        sorted_indices = np.argsort(n_ph)
+        n_ph = n_ph[sorted_indices]
+        Qi = Qi[sorted_indices]
         assert all(n_ph[i] <= n_ph[i + 1] for i in range(len(n_ph) - 1)), "Data is not sorted by photon number."
 
-        # # check for photon number limits
-        # if n_ph_lims is None:
-        #     n_ph_lims = self.n_ph_lims
-        # else:
-        #     self.n_ph_lims = n_ph_lims
-
+        # filter n_ph lims
         if n_ph_lims is not None:
-            # slice lists to photon number limits
-            lower_index = next((i for i, val in enumerate(n_ph) if val > n_ph_lims[0]), -1)
-            upper_index = next((i for i, val in enumerate(n_ph) if val < n_ph_lims[1]), -1)
-            # slice data
-            n_ph = n_ph[lower_index:upper_index]
-            Qi = Qi[lower_index:upper_index]
+            mask = (n_ph > n_ph_lims[0]) & (n_ph < n_ph_lims[1])
+            n_ph = n_ph[mask]
+            Qi = Qi[mask]
+            print(f"Photon range limited to {n_ph[0]} < n_ph < {n_ph[-1]} for fitting.")
 
         # constants
         hbar = 1.054 * 10 ** (-34)
         kB = 1.380649 * 10 ** (-23)
-        numerator = np.tanh((hbar * 2.0 * np.pi * f) / (2 * kB * T))
 
-        # define model
-        def TLS_model(n_ph, F_delta_TLS0, n_c, Q_HP, beta):
-            denominator = (1.0 + (n_ph / n_c)) ** beta
-            delta_TLS = F_delta_TLS0 * (numerator / denominator) + (1 / Q_HP)
-            return delta_TLS ** (-1)
+        if TLS_model == "mcrae":
+            """
+            4 fit parameters, power-dependence only. 
+            From doi: 10.1063/5.0004622 (Mcrae et al. 2020).
+            Parameters: F_delta_TLS0, n_c, Q_HP, beta
+            """
+            numerator = np.tanh((hbar * 2.0 * np.pi * f) / (2 * kB * T))
+            # define model
+            def TLS_model(n_ph, F_delta_TLS0, n_c, Q_HP, beta):
+                denominator = (1.0 + (n_ph / n_c)) ** beta
+                delta_TLS = F_delta_TLS0 * (numerator / denominator) + (1 / Q_HP)
+                return delta_TLS ** (-1)
 
-        # initial guesses
-        init_guesses = [2.0e-6, 1, 1.0e6, 0.5]
-        # default bounds
-        if bounds == None:
-            bounds = ([0, 0.2, 0, 0.0], [1, 1e3, 1e9, 1])
-        else:
-            assert isinstance(
-                bounds, tuple
-            ), "Bounds should be passed as a tuple of lists, with elements corresponding to [F_delta_TLS0, n_c, Q_HP, beta]. The first tuple entry is lower bounds, and the second is upper. e.g. bounds = ([0, 0.2, 0, 0.0], [1, 1e3, 1e9, 1])"
-            assert (
-                len(bounds[0]) == 4
-            ), "Bounds should be passed as a tuple of lists, with elements corresponding to [F_delta_TLS0, n_c, Q_HP, beta]. The first tuple entry is lower bounds, and the second is upper. e.g. bounds = ([0, 0.2, 0, 0.0], [1, 1e3, 1e9, 1])"
+            # initial guesses
+            init_guesses = [2.0e-6, 1, 1.0e6, 0.5]
+            # default bounds
+            if bounds == None:
+                bounds = ([1e-10, 1e-10, 10, 1e-10], [1, 1e6, 1e10, 1])
+            else:
+                assert isinstance(
+                    bounds, tuple
+                ), "Bounds should be passed as a tuple of lists, with elements corresponding to [F_delta_TLS0, n_c, Q_HP, beta]. The first tuple entry is lower bounds, and the second is upper. e.g. bounds = ([0, 0.2, 0, 0.0], [1, 1e3, 1e9, 1])"
+                assert (
+                    len(bounds[0]) == 4
+                ), "Bounds should be passed as a tuple of lists, with elements corresponding to [F_delta_TLS0, n_c, Q_HP, beta]. The first tuple entry is lower bounds, and the second is upper. e.g. bounds = ([0, 0.2, 0, 0.0], [1, 1e3, 1e9, 1])"
+            # DO FIT
+            # with error bars
+            if Qerr is not None and np.any(Qerr):
+                try:
+                    popt, pcov, infodict, mesg, ier = scipy.optimize.curve_fit(
+                        TLS_model,
+                        xdata=np.array(n_ph),
+                        ydata=np.array(Qi),
+                        p0=init_guesses,
+                        sigma=np.array(Qerr),
+                        bounds=bounds,
+                        full_output=True,
+                    )
+                except:
+                    popt = [0, 0, 0, 0]
+            # without error bars
+            else:
+                try:
+                    popt, pcov, infodict, mesg, ier = scipy.optimize.curve_fit(
+                        TLS_model,
+                        xdata=np.array(n_ph),
+                        ydata=np.array(Qi),
+                        p0=init_guesses,
+                        bounds=bounds,
+                        full_output=True,
+                    )
+                except:
+                    popt = [0, 0, 0, 0]
+            # print info
+            if print_log == True:
+                print(f"TLS fit for resonator at {f*1e-9:.2f} GHz")
+                pprint(infodict)
+                print(f"TLS fit 'mesg' --> {mesg}\n")
+
+            if print_fit == True:
+                print(f"TLS fit ({f*1e-9:.2f} GHz)")
+                print(f" F delta_TLS = {popt[0]:.2e}")
+                print(f" n_c         = {popt[1]:.2f}")
+                print(f" Q_HP        = {popt[2]:.2e}")
+                print(f" beta        = {popt[3]:.2f}\n")
+            
+            fit_dict = {
+                "F_tan_delta": popt[0],
+                "n_c": popt[1],
+                "Q_HP": popt[2],
+                "beta": popt[3],
+            }
+
+        elif TLS_model == "crowley":
+            """
+            7 fit parameters, power-dependence only here, but includes temp dependence. 
+            From http://arxiv.org/abs/2301.07848 (from Crowley et al. 2023).
+            Parameters: t_c, Q_TLS0, Q_QP0, Q_other, D, beta1, beta2
+            """
+            omega = 2 * np.pi * f
+            # define model
+            def TLS_model(n_ph, t_c, Q_TLS0, Q_QP0, Q_other, D, beta1, beta2):
+                if isinstance(T, (list)):
+                    assert T.any() > 0, f"Temperature {T} is negative. Check your data."
+                else:
+                    assert T > 0, f"Temperature {T} is negative. Check your data."
+                # superconducting gap
+                delta_0 = 1.764 * kB * t_c
+                # QP term (T)
+                k0 = kn(0, (hbar * omega)/(2 * kB * T))
+                sinh = np.sinh((hbar * omega)/(2 * kB * T))
+                #numerator = np.exp(delta_0/(kB * T))
+                Q_QP = Q_QP0 * (np.exp(delta_0/(kB * T)) / (sinh * k0))
+                # TLS term (n, T)
+                tanh = np.tanh((hbar * omega)/(2 * kB * T))
+                numerator = np.sqrt(1 + ((n_ph**beta2)/(D * T**beta1)) * np.tanh((hbar * omega)/(2 * kB * T)))
+                Q_TLS = Q_TLS0 * (numerator/tanh)
+                # check validity of fitted Q values
+                assert Q_QP.any() > 0, f"Fitted Q_QP={Q_QP} is negative. Check your data."
+                assert Q_TLS.any() > 0, f"Fitted Q_TLS={Q_TLS} is negative. Check your data."
+                assert Q_other.any() > 0, f"Fitted Q_other={Q_other} is negative. Check your data."
+                # combining all
+                Q_i = ((1/Q_TLS) + (1/Q_QP) + (1/Q_other))**(-1)
+                # return
+                return Q_i
+            # init guesses
+            init_guesses = [1, 1e5, 1e5, 1e6, 1, 0.8, 0.5]
+            # default bounds
+            if bounds == None:
+                bounds = ([0.1, 1e-3, 1e-3, 1e1, 1e-5, 0.01, 0.01], [10, 1e10, 1e10, 1e10, 1e6, 2, 2])
+            else:
+                assert isinstance(
+                    bounds, tuple
+                ), "Bounds should be passed as a tuple of lists, with elements corresponding to [t_c, Q_TLS0, Q_QP0, Q_other, D, beta1, beta2]. The first tuple entry is lower bounds, and the second is upper."
+                assert (
+                    len(bounds[0]) == 7
+                ), "Bounds should be passed as a tuple of lists, with elements corresponding to [t_c, Q_TLS0, Q_QP0, Q_other, D, beta1, beta2]. The first tuple entry is lower bounds, and the second is upper."
+            # with error bars
+            if Qerr:
+                try:
+                    popt, pcov, infodict, mesg, ier = curve_fit(
+                        TLS_model,
+                        xdata=np.array(n_ph),
+                        ydata=np.array(Qi),
+                        p0=init_guesses,
+                        sigma=np.array(Qerr),
+                        bounds=bounds,
+                        full_output=True,
+                    )
+                except: 
+                    popt = [0, 0, 0, 0, 0, 0, 0]
+            # without error bars
+            else:
+                try:
+                    popt, pcov, infodict, mesg, ier = curve_fit(
+                        TLS_model,
+                        xdata=np.array(T),
+                        ydata=np.array(Qi),
+                        p0=init_guesses,
+                        bounds=bounds,
+                        full_output=True,
+                    )
+                except: 
+                    popt = [0, 0, 0, 0, 0, 0, 0]
+            # print info: t_c, Q_TLS0, Q_QP0, Q_other, D, beta1, beta2
+            print(f"TLS fit (f = {f*1e-9:.2f} GHz)")
+            print(f" Tc       = {popt[0]:.2f}")
+            print(f" Q_TLS0   = {popt[1]:.2e}")
+            print(f" Q_QP0    = {popt[2]:.2e}")
+            print(f" Q_other  = {popt[3]:.2e}")
+            print(f" D        = {popt[4]:.2e}")
+            print(f" beta1    = {popt[5]:.2f}")
+            print(f" beta2    = {popt[6]:.2f}")
+            fit_dict = {
+                "t_c": popt[0],
+                "Q_TLS0": popt[1],
+                "Q_QP0": popt[2],
+                "Q_other": popt[3],
+                "D": popt[4],
+                "beta1": popt[5],
+                "beta2": popt[6]
+            }
 
         # check guesses are valid (if not, move within bounds)
         for i, init in enumerate(init_guesses):
@@ -1310,56 +1640,8 @@ class ResonatorPowerSweep:
             elif init > bounds[1][i]:
                 init_guesses[i] = bounds[1][i] - 1e-8
 
-        # with error bars
-        if Qerr:
-            try:
-                popt, pcov, infodict, mesg, ier = scipy.optimize.curve_fit(
-                    TLS_model,
-                    xdata=np.array(n_ph),
-                    ydata=np.array(Qi),
-                    p0=init_guesses,
-                    sigma=np.array(Qerr),
-                    bounds=bounds,
-                    full_output=True,
-                )
-            except:
-                popt = [0, 0, 0, 0]
-        # without error bars
-        else:
-            try:
-                popt, pcov, infodict, mesg, ier = scipy.optimize.curve_fit(
-                    TLS_model,
-                    xdata=np.array(n_ph),
-                    ydata=np.array(Qi),
-                    p0=init_guesses,
-                    sigma=np.array(Qerr),
-                    bounds=bounds,
-                    full_output=True,
-                )
-            except:
-                popt = [0, 0, 0, 0]
-        # print info
-        if print_log == True:
-            print(f"TLS fit for resonator at {f*1e-9:.2f} GHz")
-            pprint(infodict)
-            print(f"TLS fit 'mesg' --> {mesg}\n")
-
-        if print_fit == True:
-            print(f"TLS fit ({f*1e-9:.2f} GHz)") if print_log != True else 0
-            print(f"\tF delta_TLS =\t{popt[0]:.2e}")
-            print(f"\tn_c =\t\t{popt[1]:.2f}")
-            print(f"\tQ_HP =\t\t{popt[2]:.2e}")
-            print(f"\tbeta =\t\t{popt[3]:.2f}\n")
-        
-        fit_dict = {
-            "F_tan_delta": popt[0],
-            "n_c": popt[1],
-            "Q_HP": popt[2],
-            "beta": popt[3],
-        }
-
         # return (x, y) tuple of fit data
-        return (fit_dict, n_ph, TLS_model(np.array(n_ph), *popt))
+        return (fit_dict, n_ph, TLS_model(np.array(n_ph, dtype=np.float64), *popt))
 
     # Function to generate a unique file name by incrementing if file exists
     def get_unique_filename(self, directory=None, base_filename="fitted_data"):
@@ -1410,11 +1692,27 @@ class ResonatorPowerSweep:
             ), f"'{required_subkey}' is missing in '{key}'"
 
     @staticmethod
-    def find_photon_number_index(data: dict, search_key="n_ph", photon_number=1):
-        assert search_key in data.keys()
-        index, value = min(
-            enumerate(data[search_key]), key=lambda x: abs(x[1] - photon_number)
-        )
+    def find_photon_number_index(data: dict, photon_number=1):
+        assert "n_ph" in data and "Qi" in data, "Data must contain keys 'n_ph' and 'Qi'."
+
+        photon_number_array = np.array(data["n_ph"], dtype=float)
+        Qi_array = np.array(data["Qi"], dtype=float)
+
+        if isinstance(photon_number, (float, int)):
+            # Find indices of photon numbers greater than the given value
+            candidates = [(i, val) for i, val in enumerate(photon_number_array) if val > photon_number]
+            if not candidates:
+                raise ValueError(f"No photon numbers greater than {photon_number} found.")
+            # Choose the closest one above threshold
+            index, value = min(candidates, key=lambda x: abs(x[1] - photon_number))
+        elif photon_number == "maximum":
+            # Index of photon number with the **maximum Qi**
+            index = np.argmax(Qi_array)
+        elif photon_number == "minimum":
+            # Index of photon number with the **minimum Qi**
+            index = np.argmin(Qi_array)
+        else:
+            raise ValueError(f"Invalid photon_number argument: {photon_number}")
         return index
 
     @staticmethod
@@ -1467,30 +1765,39 @@ class ResonatorPowerSweep:
         main_data_directory,
         sample_options,
         output_directory=None,
-        include_bar_graph=True
+        include_bar_graph=True,
+        from_text_file=True,
+        legend_location="top_right",
+        qi_lims=None,
+        name_prefix=None
     ):
         """
         Creates a bokeh plot for Qi comparison of multiple resonator samples. 
 
         Inputs:
-        - main_data_directory   The directory in which to search for the data (string).
-        - sample_options        A dictionary containing information pertaining to each sample.
-                                Example:
-                                sample_options = {
-                                    'IQM-05' : {
-                                        'resonator_index_to_plot' : [1, 2, 3, 4, 5],
-                                        'name' : "IQM-05-A",
-                                        'files_to_ignore' : ['IQM-05-A', "141602"],
-                                        'power_dict' : default_power_dict
-                                        },
-                                    'IQM-03-01' : {
-                                        'resonator_index_to_plot' : [1, 2, 3, 4, 5],
-                                        'name' : "IQM-03-01",
-                                        'files_to_ignore' : None,
-                                        'power_dict' : default_power_dict
+        - main_data_directory       The directory in which to search for the data (string).
+        - sample_options            A dictionary containing information pertaining to each sample.
+                                    Example:
+                                    sample_options = {
+                                        'IQM-03-01' : {
+                                            'resonator_index_to_plot' : [1, 2, 3, 4, 5],
+                                            'name' : "IQM-03-01",
+                                            'files_to_ignore' : None,
+                                            'power_dict' : default_power_dict,
+                                            'from_text_file' : "path/to/file/circlefit.txt",
+                                            'with_fit' : True,
+                                            'qi_lims' : [1e4, 1e8]
+                                            },
                                         }
-                                    }
-
+            Sample options:
+            - output_directory          The directory in which to save the plot (string).
+            - include_bar_graph         Boolean to include a bar graph of the Qi values, or "only" to plot only the bar graph.
+            - from_text_file            Boolean or string to indicate whether to import data from a text file. 
+                                        If True, uses the default text file name. If a string, uses that as the file name.
+                                        If False, imports data from the directory specified in sample_options.
+            - additional_attenuation    Optional additional attenuation to apply to the data (in dB).
+            - qi_lims                   Qi limits for data import
+    
         This function handles import and fitting, before passing the data to
         cls.plot_Qi_multisample_bokeh().
         """
@@ -1517,32 +1824,59 @@ class ResonatorPowerSweep:
         print(f'Multi-sample plot: {list(sample_options.keys())}\n')
         data = {key: {} for key in sample_options.keys()}
         for sample in sample_options.keys():
+
+            # setup sample options
             sample_path = os.path.join(main_data_directory, sample)
-            assert os.path.isdir(sample_path), f"Sample directory '{sample_path}' does not exist."
-            print(f"{sample}\n Starting data acquisition and fitting...")
-            # set data path, fitting parameters, and line attenuations
-            chunk = cls(data_path = sample_path,
-                                    sample_name = sample,
-                                    temperature = 26e-3,
-                                    power_dict= sample_options[sample]['power_dict'],
-                                    TLSfit_bounds=([0, 10, 0, 0.0], [1, 1e3, 1e9, 1]),
-                                    print_log=False,
-                                    )
-            # do fitting etc. get a dict back
-            chunk.import_data(additional_attenuation=0, 
-                        files_to_ignore=sample_options[sample]['files_to_ignore']
+            from_text = sample_options[sample].get('from_text_file', False)
+            additional_attenuation = sample_options[sample].get('additional_attenuation', 0)
+            qi_lims = sample_options[sample].get('qi_lims', (1e4, 1e8))
+            if from_text == False:
+                assert os.path.isdir(sample_path), f"Sample directory '{sample_path}' does not exist."
+            print(f"{sample}\n Acquiring data...")
+            # create class instance
+            chunk = ResonatorPowerSweep(data_path = sample_path,
+                        sample_name = sample,
+                        temperature = 26e-3,
+                        power_dict= sample_options[sample]['power_dict'],
+                        TLSfit_bounds=([0, 10, 0, 0.0], [1, 1e3, 1e9, 1]),
+                        print_log=False,
+                        qi_lims=qi_lims
                         )
-            chunk.do_circlefit(remove_duplicates=True, save_fit=False)
+
+            # import from text file if specified
+            if isinstance(from_text, str) or from_text == True:
+                chunk.import_data(additional_attenuation=additional_attenuation, 
+                    files_to_ignore=sample_options[sample]['files_to_ignore'],
+                    from_text_file=from_text
+                    )
+                chunk.do_circlefit(remove_duplicates=True, save_fit=False)
+            # otherwise, import from directory
+            else:
+                # do import and fitting etc. get a dict back
+                chunk.import_data(additional_attenuation=additional_attenuation, 
+                                files_to_ignore=sample_options[sample]['files_to_ignore'],
+                                from_text_file=False
+                                )
+                chunk.do_circlefit(remove_duplicates=True, save_fit=False)
+            
+            # sort dictionary
+            chunk.sort_fit_data(axes_to_sort=["fr", "power"])
+
             # assign dict
-            data[sample] = chunk.fit_data   
+            data[sample] = pd.DataFrame(chunk.fit_data)   
             sample_options[sample]['freq_bin_labels'] = chunk.freq_bin_labels
             print("\n")
-        # pass to plotting function
+
+        # pass multi-sample data to plotting function
         cls.plot_Qi_multisample_bokeh(data=data, 
                                       sample_options=dict(sample_options), 
                                       output_data_directory=output_directory,
-                                      include_bar_graph=include_bar_graph
+                                      include_bar_graph=include_bar_graph,
+                                      ylims=qi_lims,
+                                      legend_location=legend_location,
+                                      name_prefix=name_prefix,
                                       )
+        print(f"Data passed to plot_Qi_multisample_bokeh()")
 
     @classmethod
     # Qi vs photon number (static) and bar-graph with sample statistics
@@ -1554,11 +1888,33 @@ class ResonatorPowerSweep:
         include_bar_graph=True,
         with_fit=True,
         with_errorbars=True,
-        legend_location="bottom_right",
+        legend_location=None,
         show_plot=True,
         save_plot=True,
         ylims=None,
+        shared_axes=True,
+        name_prefix=None
     ):
+        """
+        Plots Qi vs. photon number for multiple samples using Bokeh. Also includes a bar graph of the average Qi values for each sample.
+        
+        Inputs:
+        - data                      Dictionary containing data for each sample, 
+                                    with keys as sample names and values as DataFrames.
+        - sample_options            Dictionary containing options for each sample, such as 
+                                    resonator indices to plot, frequency bin labels, and whether to include fits.
+        - output_data_directory     Directory to save the plot.
+        - include_bar_graph         Boolean to include a bar graph of the average Qi values. 
+                                    Can also choose "only" to plot only the bar graph.
+        - with_fit                  Boolean to include TLS fits in the plot.
+        - with_errorbars            Boolean to include error bars in the plot.
+        - legend_location           Location of the legend in the plot.
+        - show_plot                 Boolean to show the plot.
+        - save_plot                 Boolean to save the plot.
+        - ylims                     Optional y-axis limits for the plot.
+        - shared_axes               Boolean to share axes between plots.
+        """
+
         assert len(data.keys()) == len(sample_options.keys()), f"Mismatch between data (length {len(data.keys())}) and sample (length {len(sample_options.keys())}) options "
         for sample in data.keys():
             assert isinstance(data[sample], pd.DataFrame)
@@ -1573,47 +1929,60 @@ class ResonatorPowerSweep:
             x_axis_type="log",
             y_axis_type="log",
             y_axis_label=r"$$Q_i$$",
-            x_axis_label=r"Photon number " + r"$$\langle n \rangle$$",
+            x_axis_label=r"Photon number  ⟨n⟩",
         )
-        if ylims != None:
-            fig_line.y_range = Range1d(ylims[0], ylims[1])
+
         # bokeh setup - box plot
         fig_box = figure(
             x_range=sample_names,
+            title=r"Single photon Qi",
             width=600,
             height=600,
             y_axis_type="log",
             y_axis_label=r"$$Q_i$$",
             x_axis_label=r"Sample name",
         )
+
         
         # colours
-        base_colors = Category10.get(num_samples) or Category10[10][:num_samples] if num_samples <= 10 else Viridis256(num_samples)
+        if num_samples <= 10:
+            base_colors = Category10[num_samples]
+        elif num_samples <= 20:
+            base_colors = Category20[num_samples]
+        else:
+            indices = np.linspace(0, 255, num_samples).astype(int)
+            base_colors = [Viridis256[i] for i in indices]
         
         # loop through each sample
         for i, sample in enumerate(sample_options.keys()):
             # create class instance
             chunk = cls(fit_data = pd.DataFrame(data[sample]))
-            freq_bin_labels = sample_options[sample]['freq_bin_labels']
+
+            freq_bin_labels = sorted(set(chunk.fit_data["freq bin"]))
+            #freq_bin_labels = sample_options[sample]['freq_bin_labels']
             num_resonators = len(freq_bin_labels)
+            name = sample_options[sample].get('name', sample)
+
             # check which resonators to plot
-            if sample_options[sample]['resonator_index_to_plot'] and sample_options[sample]['resonator_index_to_plot'] != None:
-                freqs_to_use = sample_options[sample]['resonator_index_to_plot']
+            res_idx = sample_options[sample].get('resonator_index_to_plot')
+            if res_idx is not None:
+                freqs_to_use = res_idx
             else:
                 freqs_to_use = range(freq_bin_labels)
-            # check for TLS-fit range
-            if sample_options[sample]['n_ph_lims'] and sample_options[sample]['n_ph_lims'] != None:
-                n_ph_lims = sample_options[sample]['n_ph_lims']
+            # check for optional TLS-fit range
+            n_ph_lims = sample_options[sample].get('n_ph_lims')
             # determine colour for each resonator
             base_color = base_colors[i]
             # Generate shades by adjusting brightness
             shades = [cls.adjust_lightness_bokeh(base_color, 0.8 + 0.2 * i / max(1, num_resonators - 1)) for i in range(num_resonators)]
-            
+
             # loop through frequency bins
-            for i, freq_bin_cur in enumerate(freq_bin_labels):
-                if i in freqs_to_use:
+            Qi_sph = []  # list to store single photon Qi values for each resonator
+            for j, freq_bin_cur in enumerate(freq_bin_labels):
+                if j in freqs_to_use:
+                    print(f"Plotting {sample}: {freq_bin_cur}")
                     # initialise plot data for new resonator
-                    n_ph, Qi, Qi_upper, Qi_lower, Qerr, Qi_sph = [], [], [], [], [], []
+                    n_ph, Qi, Qi_upper, Qi_lower, Qerr  = [], [], [], [], []
                     f = float(freq_bin_cur.split()[0]) * 1e9  # Hz
                     for _, row in data[sample].iterrows():
                         # add measurement from self.fit_data if in current bin
@@ -1621,20 +1990,37 @@ class ResonatorPowerSweep:
                             n_ph.append(row["n_ph"])
                             Qi.append(row["Qi_dia_corr"])
                             Qi_upper.append(row["Qi_dia_corr"] + row["Qi_dia_corr_err"])
-                            Qi_lower.append(row["Qi_dia_corr"] - row["Qi_dia_corr_err"])
+                            Qi_lower.append(float(row["Qi_dia_corr"]) - float(row["Qi_dia_corr_err"]))
                             Qerr.append(row["Qi_dia_corr_err"])
+
+                    # sort lists by n_ph
+                    sorted_data = sorted(zip(n_ph, Qi, Qi_upper, Qi_lower, Qerr), key=lambda x: x[0])
+                    n_ph, Qi, Qi_upper, Qi_lower, Qerr = map(np.array, zip(*sorted_data)) if sorted_data else ([], [], [], [], [])
+
+                    # filter n_ph and Qi
+                    if n_ph_lims is not None:
+                        mask = (n_ph > n_ph_lims[0]) & (n_ph < n_ph_lims[1])
+                        n_ph = n_ph[mask]
+                        Qi = Qi[mask]
+                        Qi_upper = Qi_upper[mask]
+                        Qi_lower = Qi_lower[mask]
+                        Qerr = Qerr[mask]
+
                     # convert to ColumnDataSource for Bokeh plotting
                     source = ColumnDataSource(
                         data=dict(n_ph=n_ph, Qi=Qi, upper=Qi_upper, lower=Qi_lower, Qerr=Qerr)
                     )
+
                     # get single photon Qi
                     sph_indx = cls.find_photon_number_index(
-                        data=source.data, search_key="n_ph"
+                        data=source.data
                     )
                     sph_Qi = np.array(source.data["Qi"])[sph_indx]
                     Qi_sph.append(sph_Qi)
+
                     # TLS fit
                     n_ph_TLS, TLSfit = None, None
+                    with_fit = sample_options[sample].get('with_fit', True)
                     if with_fit == True:
                         _, n_ph_TLS, TLSfit = cls.TLS_fit(
                             n_ph=source.data["n_ph"],
@@ -1651,17 +2037,17 @@ class ResonatorPowerSweep:
                         x="n_ph",
                         y="Qi",
                         # size=8, 
-                        color=shades[i],
+                        color=shades[j],
                         alpha=0.7,
                         legend_label=f"{sample}: {freq_bin_cur} (Qi = {sph_Qi:.1e})",
                     )
 
-                    fig_line.circle(
+                    fig_line.scatter(
                         source=source,
                         x="n_ph",
                         y="Qi",
-                        size=8,
-                        color=shades[i],
+                        size=4,
+                        color=shades[j],
                         fill_color="white",
                         alpha=0.7,
                     )
@@ -1673,62 +2059,115 @@ class ResonatorPowerSweep:
                             upper="upper",
                             lower="lower",
                             source=source,
-                            line_color=shades[i],
+                            line_color=shades[j],
                             line_alpha=0.7,
                             line_cap="round",
                             line_width="2",
-                            upper_head=TeeHead(line_color=shades[i], line_alpha=0.7, size=6),
-                            lower_head=TeeHead(line_color=shades[i], line_alpha=0.7, size=6),
+                            upper_head=TeeHead(line_color=shades[j], line_alpha=0.7, size=6),
+                            lower_head=TeeHead(line_color=shades[j], line_alpha=0.7, size=6),
                         )
                         fig_line.add_layout(errorbars)
                     if with_fit == True:
                         fig_line.line(
-                            n_ph_TLS, TLSfit, line_color=shades[i], line_alpha=0.2, line_width=3
+                            n_ph_TLS, TLSfit, line_color=shades[j], line_alpha=0.2, line_width=3
                     )
-            if include_bar_graph:
+
+            # box plot - per sample (not per resonator)
+            if include_bar_graph != False:
                 # calculate per-sample statistics (across all resonators on the sample)
                 q1, q2, q3 = np.percentile(Qi_sph, [25, 50, 75])
-                # q1 = qi_stats[0]
-                # q2 = qi_stats[1]
-                # q3 = qi_stats[2]
                 iqr = q3 - q1
                 upper_whisker = min(max(Qi_sph), q3 + 1.5 * iqr)
                 lower_whisker = max(min(Qi_sph), q1 - 1.5 * iqr)
+                # # check data
+                # print(f"q1, q2, q3: {q1:.2e}, {q2:.2e}, {q3:.2e}")
+                # print(f"upper whisker: {upper_whisker:.2e}, lower whisker: {lower_whisker:.2e}")
                 # prepare data for plot and add to box plot
                 box_source = ColumnDataSource(data=dict(
-                                    sample=sample, q1=q1, q2=q2, q3=q3,
-                                    upper=upper_whisker, lower=lower_whisker
+                                    sample=[sample], q1=[q1], q2=[q2], q3=[q3],
+                                    upper=[upper_whisker], lower=[lower_whisker]
                                 ))
-                fig_box.vbar(x='sample', top='q3', bottom='q1', source=source, width=0.5, fill_color=base_color, line_color="black", legend_label=f"{sample}")
+                fig_box.vbar(x='sample', top='q3', bottom='q1', source=box_source, width=0.5, fill_color=base_color, alpha=0.5, line_color="black", legend_label=f"{name}")
                 # Median lines
-                fig_box.segment('sample', 'q2', 'sample', 'q2', source=source, line_width=2, line_color="black")
+                
                 # Whiskers
-                fig_box.segment('sample', 'upper', 'sample', 'q3', source=source, line_color="black")
-                fig_box.segment('sample', 'lower', 'sample', 'q1', source=source, line_color="black")
+                fig_box.segment('sample', 'upper', 'sample', 'q3', source=box_source, line_color="black")
+                fig_box.segment('sample', 'lower', 'sample', 'q1', source=box_source, line_color="black")
+                fig_box.circle('sample', 'q2', source=box_source, size=6, color="black", fill_color="white")
+
         # legend
         fig_line.legend.location = legend_location
+        #fig_line.legend.ncols = int(np.floor(num_samples/5) + 1) # TODO: figure out columns? 
         # title
         fig_line.title = f"Internal Q-factor"
-        if not include_bar_graph:
+        # increase font sizes
+        fig_line.title.text_font_size = '16pt'
+        fig_line.xaxis.axis_label_text_font_size = '14pt'
+        fig_line.yaxis.axis_label_text_font_size = '14pt'
+        fig_line.xaxis.major_label_text_font_size = '12pt'
+        fig_line.yaxis.major_label_text_font_size = '12pt'
+        fig_box.title.text_font_size = '16pt'
+        fig_box.xaxis.axis_label_text_font_size = '14pt'
+        fig_box.yaxis.axis_label_text_font_size = '14pt'
+        fig_box.xaxis.major_label_text_font_size = '12pt'
+        fig_box.yaxis.major_label_text_font_size = '12pt'
+        fig_box.legend.label_text_font_size = '10pt'
+        if ylims is not None:
+            fig_line.y_range.start = ylims[0]
+            fig_line.y_range.end = ylims[1]
+            fig_box.y_range.start = ylims[0]
+            fig_box.y_range.end = ylims[1]
+        if include_bar_graph == False:
             # show plot
             if show_plot == True:
                 show(fig_line)
+                fig_line.toolbar = None
             # save plot
             if save_plot == True:
-                export_name = "_".join(list(sample_options.keys()))
-                export_path = os.path.join(output_data_directory, f"Qi_{export_name}.png")
+                fig_line.toolbar_location=None
+                export_name = name_prefix + "_".join(list(sample_options.keys()))
+                export_path = os.path.join(output_data_directory, f"line_{export_name}.png")
                 export.export_png(obj=fig_line, filename=export_path)
                 print(f"Plot saved at {export_path}")
-        elif include_bar_graph:
-            layout = gridplot([[fig_line, fig_box]])
+        elif include_bar_graph == True or include_bar_graph == "both":
+            fig_line.legend.visible = False
+            # Change font sizes
+            fig_box.legend.location = legend_location
+            # fig_box.legend.ncols = int(np.floor(num_samples/5) + 1) # TODO: fix
+            fig_box.legend.spacing = 0  # spacing between items
+            if num_samples > 5:
+                fig_box.xaxis.major_label_orientation = 0.785
+            if shared_axes:
+                if ylims != None:
+                    print(f"Setting shared ylims to {ylims}")
+                    fig_line.y_range.start = ylims[0]
+                    fig_line.y_range.end = ylims[1]
+                    fig_box.y_range.start = ylims[0]
+                    fig_box.y_range.end = ylims[1]
+                else:
+                    fig_box.y_range = fig_line.y_range
+            layout = gridplot([[fig_line, fig_box]], width=600, height=600, toolbar_location=None)
             # show plot
             if show_plot == True:
                 show(layout)
             # save plot
             if save_plot == True:
-                export_name = "_".join(list(sample_options.keys()))
-                export_path = os.path.join(output_data_directory, f"Qi_{export_name}.png")
+                export_name = name_prefix + "_".join(list(sample_options.keys()))
+                export_path = os.path.join(output_data_directory, f"boxLine_{export_name}.png")
                 export.export_png(obj=layout, filename=export_path)
+                print(f"Plot saved at {export_path}")
+        elif include_bar_graph == "only":
+            # show plot
+            fig_box.legend.location = legend_location
+            if show_plot == True:
+                show(fig_box)
+                # fig_box.toolbar = None
+            # save plot
+            if save_plot == True:
+                fig_box.toolbar_location=None
+                export_name = name_prefix + "_".join(list(sample_options.keys()))
+                export_path = os.path.join(output_data_directory, f"box_{export_name}.png")
+                export.export_png(obj=fig_box, filename=export_path)
                 print(f"Plot saved at {export_path}")
 
     @staticmethod
@@ -1741,3 +2180,38 @@ class ResonatorPowerSweep:
         l = max(0, min(1, l * factor))  # Adjust lightness
         new_r, new_g, new_b = colorsys.hls_to_rgb(h, l, s)  # Convert back to RGB
         return f"#{int(new_r * 255):02x}{int(new_g * 255):02x}{int(new_b * 255):02x}"  # Convert back to hex
+    
+
+    def sort_dict_by_key(data: dict, sort_key="n_ph"):
+        # Ensure the sort key exists
+        assert sort_key in data, f"'{sort_key}' not found in dictionary."
+        # Get sort indices from the sort_key
+        sort_indices = np.argsort(np.array(data[sort_key], dtype=float))
+        # Sort each entry in the dictionary using those indices
+        sorted_data = {
+            key: [data[key][i] for i in sort_indices]
+            for key in data
+        }
+        return sorted_data
+
+    def trim_fit_data_by_qi(self, qi_lims=[1e4, 5e7]):
+        """
+        Trims the fit data to only include entries with Qi values within the specified limits.
+        
+        Inputs:
+        - qi_lims: List of two values specifying the lower and upper limits for Qi.
+        
+        Returns:
+        - None, but modifies self.fit_data in place.
+        """
+        assert isinstance(qi_lims, list) and len(qi_lims) == 2, "qi_lims should be a list of two values."
+        assert qi_lims[0] < qi_lims[1], "Lower limit should be less than upper limit."
+        
+        len_before_trim = len(self.fit_data['Qi_dia_corr'])
+        self.fit_data['Qi_dia_corr'] = pd.to_numeric(self.fit_data['Qi_dia_corr'], errors='coerce')
+        self.fit_data = self.fit_data[
+            (self.fit_data['Qi_dia_corr'] > qi_lims[0]) & 
+            (self.fit_data['Qi_dia_corr'] < qi_lims[1])
+        ]
+        len_after_trim = len(self.fit_data['Qi_dia_corr'])
+        print(f"Trimmed {len_before_trim - len_after_trim} data points for qi range {qi_lims}.")

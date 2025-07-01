@@ -17,15 +17,16 @@ warnings.filterwarnings("ignore", "Covariance of the parameters could not be est
 # imports for plotting (optional)
 plot_backend = None
 try:
-    from bokeh.models import Whisker, ColumnDataSource, TeeHead, Band, Range1d, FuncTickFormatter, NumeralTickFormatter  # type: ignore
-    from bokeh.plotting import figure, show  # type: ignore
-    from bokeh.io import output_notebook, export  # type: ignore
-    from bokeh.palettes import Viridis256, Category10  # type: ignore
-    from bokeh.layouts import gridplot  # type: ignore
-except:
-    warnings.warning("Bokeh not imported. You will have to use mpl for plotting")
+    from bokeh.models import Whisker, ColumnDataSource, TeeHead, Band, Range1d
+    from bokeh.models.formatters import FuncTickFormatter, NumeralTickFormatter
+    from bokeh.plotting import figure, show
+    from bokeh.io import output_notebook, export
+    from bokeh.palettes import Viridis256, Category10, Category20
+    from bokeh.layouts import gridplot
+except Exception as e:
+    import warnings
+    warnings.warn(f"Bokeh not imported: {e}. Requires version 2.4.3.")
     PLOT_BACKEND = "matplotlib"
-    pass
 else:
     PLOT_BACKEND = "bokeh"
 
@@ -128,7 +129,7 @@ class ResonatorPowerSweep:
             self.fig_bokeh = figure(
                 width=1000,
                 height=600,
-                x_axis_label=r"Photon number " + r"$$\langle n \rangle$$",
+                x_axis_label=r"Photon number  ⟨n⟩",
                 y_axis_label=r"$$Q_i$$",
                 y_axis_type="log",
                 x_axis_type="log",
@@ -471,9 +472,10 @@ class ResonatorPowerSweep:
                         measurement_data["raw_data"]["measurement_name"]
                     )
                     fits_completed += 1
+                    filename_only = re.split(r'[\\/]', measurement_name)[-1]
                     (
                         print(
-                            f"{fits_completed}\t{re.split(r'[\\/]', measurement_name)[-1]}\t"
+                            f"{fits_completed}\t{filename_only}\t"
                             f"f = {port.fitresults['fr']:.1e}, "
                             f"Qi = {port.fitresults['Qi_dia_corr']:.1e}, "
                             f"P = {measurement_data['raw_data']['power']:.1f} dBm "
@@ -889,7 +891,7 @@ class ResonatorPowerSweep:
                 x_axis_type="log",
                 y_axis_type="log",
                 y_axis_label=r"$$Q_i$$",
-                x_axis_label=r"Photon number " + r"$$\langle n \rangle$$",
+                x_axis_label=r"Photon number  ⟨n⟩",
             )
             self._colourmap = Viridis256
             if ylims != None:
@@ -954,8 +956,8 @@ class ResonatorPowerSweep:
 
                 # bokeh plot
                 if backend == "bokeh":
-                    # do plotting
                     color = self._colourmap[i * len(self._colourmap) // self.num_resonators]
+                    # do plotting
                     self.fig_bokeh.scatter(
                         source=source,
                         x="n_ph",
@@ -1108,7 +1110,7 @@ class ResonatorPowerSweep:
             self.fig_bokeh = figure(
                 title=f"{self.name}: Frequency",
                 x_axis_type="log",
-                x_axis_label="Photon number " + r"$$\langle n \rangle$$",
+                x_axis_label="Photon number " + "⟨n⟩",
                 width=1000,
                 height=600,
             )
@@ -1292,7 +1294,7 @@ class ResonatorPowerSweep:
                 x_axis_type="log",
                 y_axis_type="log",
                 y_axis_label=r"$$Q_c$$",
-                x_axis_label=r"Photon number " + r"$$\langle n \rangle$$",
+                x_axis_label=r"Photon number  ⟨n⟩",
             )
             self._colourmap = Viridis256
             if ylims != None:
@@ -1766,7 +1768,8 @@ class ResonatorPowerSweep:
         include_bar_graph=True,
         from_text_file=True,
         legend_location="top_right",
-        qi_lims=None
+        qi_lims=None,
+        name_prefix=None
     ):
         """
         Creates a bokeh plot for Qi comparison of multiple resonator samples. 
@@ -1870,7 +1873,8 @@ class ResonatorPowerSweep:
                                       output_data_directory=output_directory,
                                       include_bar_graph=include_bar_graph,
                                       ylims=qi_lims,
-                                      legend_location=legend_location
+                                      legend_location=legend_location,
+                                      name_prefix=name_prefix,
                                       )
         print(f"Data passed to plot_Qi_multisample_bokeh()")
 
@@ -1888,7 +1892,8 @@ class ResonatorPowerSweep:
         show_plot=True,
         save_plot=True,
         ylims=None,
-        shared_axes=True
+        shared_axes=True,
+        name_prefix=None
     ):
         """
         Plots Qi vs. photon number for multiple samples using Bokeh. Also includes a bar graph of the average Qi values for each sample.
@@ -1924,7 +1929,7 @@ class ResonatorPowerSweep:
             x_axis_type="log",
             y_axis_type="log",
             y_axis_label=r"$$Q_i$$",
-            x_axis_label=r"Photon number " + r"$$\langle n \rangle$$",
+            x_axis_label=r"Photon number  ⟨n⟩",
         )
 
         # bokeh setup - box plot
@@ -1940,7 +1945,13 @@ class ResonatorPowerSweep:
 
         
         # colours
-        base_colors = Category10.get(num_samples) or Category10[10][:num_samples] if num_samples <= 10 else Viridis256(num_samples)
+        if num_samples <= 10:
+            base_colors = Category10[num_samples]
+        elif num_samples <= 20:
+            base_colors = Category20[num_samples]
+        else:
+            indices = np.linspace(0, 255, num_samples).astype(int)
+            base_colors = [Viridis256[i] for i in indices]
         
         # loop through each sample
         for i, sample in enumerate(sample_options.keys()):
@@ -2086,7 +2097,7 @@ class ResonatorPowerSweep:
 
         # legend
         fig_line.legend.location = legend_location
-        fig_line.legend.ncols = int(np.floor(num_samples/5) + 1)
+        #fig_line.legend.ncols = int(np.floor(num_samples/5) + 1) # TODO: figure out columns? 
         # title
         fig_line.title = f"Internal Q-factor"
         # increase font sizes
@@ -2114,7 +2125,7 @@ class ResonatorPowerSweep:
             # save plot
             if save_plot == True:
                 fig_line.toolbar_location=None
-                export_name = "_".join(list(sample_options.keys()))
+                export_name = name_prefix + "_".join(list(sample_options.keys()))
                 export_path = os.path.join(output_data_directory, f"line_{export_name}.png")
                 export.export_png(obj=fig_line, filename=export_path)
                 print(f"Plot saved at {export_path}")
@@ -2122,7 +2133,7 @@ class ResonatorPowerSweep:
             fig_line.legend.visible = False
             # Change font sizes
             fig_box.legend.location = legend_location
-            fig_box.legend.ncols = int(np.floor(num_samples/5) + 1)
+            # fig_box.legend.ncols = int(np.floor(num_samples/5) + 1) # TODO: fix
             fig_box.legend.spacing = 0  # spacing between items
             if num_samples > 5:
                 fig_box.xaxis.major_label_orientation = 0.785
@@ -2141,7 +2152,7 @@ class ResonatorPowerSweep:
                 show(layout)
             # save plot
             if save_plot == True:
-                export_name = "_".join(list(sample_options.keys()))
+                export_name = name_prefix + "_".join(list(sample_options.keys()))
                 export_path = os.path.join(output_data_directory, f"boxLine_{export_name}.png")
                 export.export_png(obj=layout, filename=export_path)
                 print(f"Plot saved at {export_path}")
@@ -2154,7 +2165,7 @@ class ResonatorPowerSweep:
             # save plot
             if save_plot == True:
                 fig_box.toolbar_location=None
-                export_name = "_".join(list(sample_options.keys()))
+                export_name = name_prefix + "_".join(list(sample_options.keys()))
                 export_path = os.path.join(output_data_directory, f"box_{export_name}.png")
                 export.export_png(obj=fig_box, filename=export_path)
                 print(f"Plot saved at {export_path}")

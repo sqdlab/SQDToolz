@@ -12,3 +12,6 @@ class VNA_Keysight_P9373A(VNA_Agilent_N5232A):
     @ElecDelayTime.setter
     def ElecDelayTime(self, val):
         pass
+
+    def _set_aux_off(self):
+        pass

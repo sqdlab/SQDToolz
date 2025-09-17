@@ -11,7 +11,7 @@ from qcodes import (
          
 class VNA_Agilent_N5232A(VisaInstrument):
     def __init__(self, name, address, **kwargs):
-        super().__init__(name, address, terminator='\n', timeout=2, **kwargs)
+        super().__init__(name, address, terminator='\n', timeout=20, **kwargs)
         #By default we are working with the channel number 1, so SENSe<cnum>: if all queries is just SENSe1: ...
         
         # if 'P9373' in self.ask('*IDN?'):
@@ -357,7 +357,10 @@ class VNA_Agilent_N5232A(VisaInstrument):
             self.write('TRIG:CHAN:AUX ON')
             self.write('CONTrol:SIGNal:TRIGger:ATBA 1') #Accept Trigger before Armed! 
         else:
-            self.write('TRIG:CHAN:AUX OFF')
+            self._set_aux_off()
+
+    def _set_aux_off(self):
+        self.write('TRIG:CHAN:AUX OFF')
 
     def ask(self, *args, **kwargs):
         got_data_without_errors = False

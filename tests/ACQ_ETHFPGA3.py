@@ -12,7 +12,7 @@ from sqdtoolz.HAL.Processors.FPGA.FPGA_FIR import FPGA_FIR
 from sqdtoolz.HAL.Processors.FPGA.FPGA_Decimation import FPGA_Decimation
 from sqdtoolz.HAL.Processors.FPGA.FPGA_Mean import FPGA_Mean
 from sqdtoolz.HAL.Processors.FPGA.FPGA_Integrate import FPGA_Integrate
-6
+
 import numpy as np
 import scipy.signal
 from sqdtoolz.Variable import*

@@ -13,19 +13,16 @@ instruments:
     init:
       gpib_slot: 2
   smu:
-    driver: sqdtoolz.Drivers.SMU_B2901A
-    type: SMU_B2901A
+    type: sqdtoolz.Drivers.SMU_B2901A.SMU_B2901A
     address: 'TCPIP::192.168.1.201::INSTR'
     enable_forced_reconnect: true    
   fpga1:
-    driver: sqdtoolz.Drivers.ACQ_ETH_FPGA
-    type: ETHFPGA
+    type: sqdtoolz.Drivers.ACQ_ETH_FPGA.ETHFPGA
     init:
-      uri: 'Z:/DataAnalysis/Notebooks/qcodes/FPGA_Rack1_URI.txt'
+      uri: 'Z:\DataAnalysis\Notebooks\qcodes\FPGA_SD_Rack_URI.txt'
 
   pulser:
-    driver: sqdtoolz.Drivers.DDG_DG645
-    type: DG645
+    type: sqdtoolz.Drivers.DDG_DG645.DG645
     address: 'TCPIP::192.168.1.120'
     enable_forced_reconnect: true
     parameters:
@@ -53,8 +50,7 @@ instruments:
         initial_value: 10.0e-9
   
   sgs_qubit:
-    driver: sqdtoolz.Drivers.MWS_SGS100A
-    type: MWS_SGS100A
+    type: sqdtoolz.Drivers.MWS_SGS100A.MWS_SGS100A
     address: TCPIP::192.168.1.118
     enable_forced_reconnect: true
     parameters:
@@ -83,8 +79,7 @@ instruments:
         initial_value: 'EXT'
   
   sgs_resonator:
-    driver: sqdtoolz.Drivers.MWS_SGS100A
-    type: MWS_SGS100A
+    type: sqdtoolz.Drivers.MWS_SGS100A.MWS_SGS100A
     address: TCPIP::192.168.1.110
     enable_forced_reconnect: true
     parameters:
@@ -114,8 +109,7 @@ instruments:
   
 
   sgs_dnc:
-    driver: sqdtoolz.Drivers.MWS_SGS100A
-    type: MWS_SGS100A
+    type: sqdtoolz.Drivers.MWS_SGS100A.MWS_SGS100A
     address: TCPIP::192.168.1.112
     enable_forced_reconnect: true
     parameters:
@@ -146,8 +140,7 @@ instruments:
 
 
   awg5014C:
-      driver: sqdtoolz.Drivers.AWG5014C
-      type: AWG5014C
+      type: sqdtoolz.Drivers.AWG5014C.AWG5014C
       address: 'TCPIP::192.168.1.100::INSTR'
       enable_forced_reconnect: true
       parameters:

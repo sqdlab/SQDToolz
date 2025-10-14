@@ -1783,8 +1783,9 @@ class ResonatorPowerSweep:
         from_text_file=True,
         legend_location="top_right",
         qi_lims=None,
-        name_prefix=None
-    ):
+        name_prefix=None,
+        for_publication="double column"
+        ):
         """
         Creates a bokeh plot for Qi comparison of multiple resonator samples. 
 
@@ -1815,6 +1816,8 @@ class ResonatorPowerSweep:
         This function handles import and fitting, before passing the data to
         cls.plot_Qi_multisample_bokeh().
         """
+        if for_publication is not False:
+            assert for_publication in ["double column", "single column"], "Please choose 'double column' or 'single column' for publication format, or False."
         # default values
         default_power_dict = {"lowPower" : -132, 
                               "highPower" : -82,
@@ -1889,6 +1892,7 @@ class ResonatorPowerSweep:
                                       ylims=qi_lims,
                                       legend_location=legend_location,
                                       name_prefix=name_prefix,
+                                      for_publication=for_publication
                                       )
         print(f"Data passed to plot_Qi_multisample_bokeh()")
 
@@ -1907,7 +1911,8 @@ class ResonatorPowerSweep:
         save_plot=True,
         ylims=None,
         shared_axes=True,
-        name_prefix=None
+        name_prefix=None,
+        for_publication=None
     ):
         """
         Plots Qi vs. photon number for multiple samples using Bokeh. Also includes a bar graph of the average Qi values for each sample.
@@ -1927,6 +1932,7 @@ class ResonatorPowerSweep:
         - save_plot                 Boolean to save the plot.
         - ylims                     Optional y-axis limits for the plot.
         - shared_axes               Boolean to share axes between plots.
+        - for_publication           Has built in figure re-sizing for single- or double-column 300dpi figures.
         """
 
         assert len(data.keys()) == len(sample_options.keys()), f"Mismatch between data (length {len(data.keys())}) and sample (length {len(sample_options.keys())}) options "
@@ -1936,30 +1942,37 @@ class ResonatorPowerSweep:
         num_samples = len(data.keys())
         sample_names = list(data.keys())
 
+        # Choose width
+        width_px = 2008 if for_publication=="single column" else 1004
+        height_px = int(width_px * 0.6)  # Aspect ratio ~0.6, adjust as needed
+
         # bokeh setup - Qi vs. n_ph
         fig_line = figure(
-            width=600,
-            height=600,
+            width=int(width_px/2),
+            height=height_px,
             x_axis_type="log",
             y_axis_type="log",
-            y_axis_label=r"$$Q_i$$",
-            x_axis_label=r"Photon number  ⟨n⟩",
+            y_axis_label=r"Qi",
+            x_axis_label=r"Photon number ⟨n⟩",
+            output_backend="svg"
         )
 
         # bokeh setup - box plot
         fig_box = figure(
             x_range=sample_names,
             title=r"Single photon Qi",
-            width=600,
-            height=600,
+            width=int(width_px/2),
+            height=height_px,
             y_axis_type="log",
-            y_axis_label=r"$$Q_i$$",
+            y_axis_label=r"Qi",
             x_axis_label=r"Sample name",
+            output_backend="svg"
         )
-
         
         # colours
-        if num_samples <= 10:
+        if num_samples == 1:
+            base_colors = [Category10[10][0]]
+        elif num_samples <= 10:
             base_colors = Category10[num_samples]
         elif num_samples <= 20:
             base_colors = Category20[num_samples]
@@ -2056,16 +2069,16 @@ class ResonatorPowerSweep:
                             bounds=chunk.TLSfit_bounds,
                             n_ph_lims=n_ph_lims
                         )
-                    # do plotting
-                    fig_line.line(
-                        source=source,
-                        x="n_ph",
-                        y="Qi",
-                        # size=8, 
-                        color=shades[j],
-                        alpha=0.7,
-                        legend_label=f"{sample}: {freq_bin_cur} (Qi = {sph_Qi:.1e})",
-                    )
+                    # # do plotting
+                    # fig_line.line(
+                    #     source=source,
+                    #     x="n_ph",
+                    #     y="Qi",
+                    #     # size=8, 
+                    #     color=shades[j],
+                    #     alpha=0.7,
+                    #     legend_label=f"{sample}: {freq_bin_cur} (Qi = {sph_Qi:.1e})",
+                    # )
 
                     fig_line.scatter(
                         source=source,
@@ -2094,7 +2107,7 @@ class ResonatorPowerSweep:
                         fig_line.add_layout(errorbars)
                     if with_fit == True:
                         fig_line.line(
-                            n_ph_TLS, TLSfit, line_color=shades[j], line_alpha=0.2, line_width=3
+                            n_ph_TLS, TLSfit, line_color=shades[j], line_alpha=0.6, line_width=2
                     )
 
             # box plot - per sample (not per resonator)
@@ -2126,6 +2139,13 @@ class ResonatorPowerSweep:
         # title
         fig_line.title = f"Internal Q-factor"
         # increase font sizes
+        # fig_line.yaxis.axis_label_text_font = "Helvetica"
+        # fig_line.xaxis.axis_label_text_font = "Helvetica"
+        # fig_line.yaxis.major_label_text_font = "Helvetica"
+        # fig_line.xaxis.major_label_text_font = "Helvetica"
+        # fig_box.legend.label_text_font = "Helvetica"
+        # fig_line.title.text_font = "Helvetica"
+
         fig_line.title.text_font_size = '16pt'
         fig_line.xaxis.axis_label_text_font_size = '14pt'
         fig_line.yaxis.axis_label_text_font_size = '14pt'
@@ -2171,15 +2191,15 @@ class ResonatorPowerSweep:
                     fig_box.y_range.end = ylims[1]
                 else:
                     fig_box.y_range = fig_line.y_range
-            layout = gridplot([[fig_line, fig_box]], width=600, height=600, toolbar_location=None)
+            layout = gridplot([[fig_line, fig_box]], toolbar_location=None)
             # show plot
             if show_plot == True:
                 show(layout)
             # save plot
             if save_plot == True:
                 export_name = name_prefix + "_".join(list(sample_options.keys()))
-                export_path = os.path.join(output_data_directory, f"boxLine_{export_name}.png")
-                export.export_png(obj=layout, filename=export_path)
+                export_path = os.path.join(output_data_directory, f"boxLine_{export_name}.svg")
+                export.export_svg(obj=layout, filename=export_path)
                 print(f"Plot saved at {export_path}")
         elif include_bar_graph == "only":
             # show plot
@@ -2191,8 +2211,8 @@ class ResonatorPowerSweep:
             if save_plot == True:
                 fig_box.toolbar_location=None
                 export_name = name_prefix + "_".join(list(sample_options.keys()))
-                export_path = os.path.join(output_data_directory, f"box_{export_name}.png")
-                export.export_png(obj=fig_box, filename=export_path)
+                export_path = os.path.join(output_data_directory, f"box_{export_name}.svg")
+                export.export_svg(obj=fig_box, filename=export_path)
                 print(f"Plot saved at {export_path}")
 
     @staticmethod

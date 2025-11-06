@@ -1,0 +1,12 @@
+instruments:
+  zi_boxes:
+    type: sqdtoolz.Drivers.ZILabOneQ.ZILabOneQ
+    init:
+      address: "127.0.0.1"
+      port: "8004"
+      setup_yaml: "tests/ZI_Basic_ZI.yaml"
+    # parameters:
+    #   AWG.CH1.trig_src:
+    #     initial_value: 'NONE' #'TRG1'
+    #   AWG.CH2.trig_src:
+    #     initial_value: 'NONE' #'TRG1'

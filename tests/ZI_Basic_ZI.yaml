@@ -1,0 +1,13 @@
+instruments:
+  HDAWG:
+  - address: DEV9140
+    uid: hdawg0
+  SHFQC:
+  - address: DEV12663
+    uid: shfqc0
+  PQSC:
+  - address: DEV10246
+    uid: pqsc
+# connections:
+#   pqsc:
+#     - external_clock_signal

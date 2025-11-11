@@ -7,7 +7,6 @@ import numpy as np
 
 class SOFTpid(HALbase):
     def __init__(self, hal_name, lab, VAR_Measure, VAR_OutputSet, Kp, Ki, Kd, **kwargs):
-        #NOTE: the driver is presumed to be a single-pole many-throw switch (i.e. only one circuit route at a time).
         HALbase.__init__(self, hal_name)
 
         #These are transient properties that shouldn't be stored in the laboratory configurations - can be foudn in last experiment however...
@@ -32,6 +31,7 @@ class SOFTpid(HALbase):
 
     @classmethod
     def fromConfigDict(cls, config_dict, lab):
+        #TODO: This is severely wrong - it won't properly load/save configurations - fix this...
         return cls(config_dict["Name"], lab, config_dict["instrument"])
 
     @property
@@ -89,10 +89,6 @@ class SOFTpid(HALbase):
     @FilterDerivTaps.setter
     def FilterDerivTaps(self, val):
         self._filt_deriv_taps = val
-
-
-    def get_possible_contacts(self):
-        return self._switch_contacts[:]
 
     def _get_current_config(self):
         ret_dict = {

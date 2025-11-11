@@ -1,8 +1,9 @@
-from sqdtoolz.HAL.HALbase import*
+from sqdtoolz.HAL.HALbase import HALbase
+from sqdtoolz.HAL.ZI.ZIbase import ZIbase
 import laboneq.simple as lbeqs
 from laboneq_applications.qpu_types.tunable_transmon import TunableTransmonQubit
 
-class ZIQubit(HALbase):
+class ZIQubit(HALbase, ZIbase):
     def __init__(self, qubit_name, lab, instr_zi_boxes, zi_instr_phys_drive:tuple[str, str], zi_instr_phys_measure:tuple[str, str], zi_instr_phys_acquire:tuple[str, str], zi_phys_flux=("",""), zi_type="TunableTransmonQubit"):
         HALbase.__init__(self, qubit_name)
         
@@ -118,7 +119,7 @@ class ZIQubit(HALbase):
 
             self._zi_qops = TunableTransmonOperations()
 
-    def _get_zi_qubit_params(self):
+    def get_ZI_parameters(self):
         return self._zi_qubit, self._zi_qops
 
     def _get_current_config(self):

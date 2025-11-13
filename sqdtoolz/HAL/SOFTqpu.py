@@ -49,11 +49,12 @@ class SOFTqpu(HALbase, ZIbase):
         leQubits = []
         leQops = []
         for m in range(len(self._qubits)):
-            assert isinstance(self._qubits[m], ZIbase), f"The qubit on index {m} is not a ZI-compatible qubit HAL."
-            qubit, qop = self._qubits[m].get_ZI_parameters()
+            cur_qubit = self._lab._get_resolved_obj(self._qubits[m])
+            assert isinstance(cur_qubit, ZIbase), f"The qubit on index {m} is not a ZI-compatible qubit HAL."
+            qubit, qop = cur_qubit.get_ZI_parameters()
             leQubits.append(qubit)
             leQops.append(qop)
-        leQPU = laboneq.dsl.quantum.QPU(leQubits, quantum_operations=leQops)
+        leQPU = laboneq.dsl.quantum.QPU(leQubits, quantum_operations=leQops[0]) #TODO: Look up why this doesn't work with a list properly...
         for m in range(len(self._qubit_couplings)):
             qubit1 = self._qubits[self._qubit_couplings[m][0]].Name
             qubit2 = self._qubits[self._qubit_couplings[m][1]].Name
@@ -63,14 +64,15 @@ class SOFTqpu(HALbase, ZIbase):
                 cur_cpl = self._lab._get_resolved_obj(self._qubit_couplings[m][2])
                 assert isinstance(hal_obj, ZIbase), f"The qubit coupling {cur_cpl.Name} between qubits {qubit1} and {qubit2} is not a ZI-compatible qubit HAL."
                 leQPU.topology.add_edge(cur_cpl.Name, qubit1, qubit2, quantum_elements=cur_cpl.get_ZI_parameters())
-        return leQPU
+        return leQPU, leQubits
 
     def _resolve_qubit_index(self, qubit_id):
         if isinstance(qubit_id, int):
             assert qubit_id < len(self._qubits) and qubit_id >= 0, f"Qubit index {qubit_id} is out of range given the number of qubits."
             return qubit_id
         for m in range(len(self._qubits)):
-            if self._qubits[m].Name==qubit_id:
+            cur_qubit = self._lab._get_resolved_obj(self._qubits[m])
+            if cur_qubit.Name==qubit_id:
                 return m
         assert False, f"Qubit \"{qubit_id}\" does not exist."
 

@@ -1,13 +1,14 @@
 from sqdtoolz.HAL.HALbase import HALbase
 from sqdtoolz.HAL.ZI.ZIbase import ZIbase
 import laboneq.simple as lbeqs
-from laboneq_applications.qpu_types.tunable_transmon import TunableTransmonQubit
+from laboneq_applications.qpu_types.tunable_transmon import TunableTransmonQubit, TunableTransmonOperations
 
 class ZIQubit(HALbase, ZIbase):
     def __init__(self, qubit_name, lab, instr_zi_boxes, zi_instr_phys_drive:tuple[str, str], zi_instr_phys_measure:tuple[str, str], zi_instr_phys_acquire:tuple[str, str], zi_phys_flux=("",""), zi_type="TunableTransmonQubit"):
         HALbase.__init__(self, qubit_name)
         
         lab._register_HAL(self)
+        self._instr_id = instr_zi_boxes
         self._instr_zi = lab._get_instrument(instr_zi_boxes)
         self._zi_instr_phys_drive = zi_instr_phys_drive
         self._zi_instr_phys_measure = zi_instr_phys_measure
@@ -46,11 +47,12 @@ class ZIQubit(HALbase, ZIbase):
     def _setup_zi_connections(self):
         #Collate required connections
         conns = []
+        qubit_name = self.Name
         conns.append((self._zi_instr_phys_measure[0], lbeqs.create_connection(to_signal=f"{qubit_name}/measure", ports=self._zi_instr_phys_measure[1], type="iq"), "measure"))
         conns.append((self._zi_instr_phys_acquire[0], lbeqs.create_connection(to_signal=f"{qubit_name}/acquire", ports=self._zi_instr_phys_acquire[1], type="acquire"), "acquire"))
         conns.append((self._zi_instr_phys_drive[0], lbeqs.create_connection(to_signal=f"{qubit_name}/drive", ports=self._zi_instr_phys_drive[1], type="iq"), "drive"))
-        if self._zi_phys_flux[0] != "":
-            conns.append((self._zi_phys_flux[0], lbeqs.create_connection(to_signal=f"{qubit_name}/flux", ports=self._zi_phys_flux[1], type="rf"), "flux"))
+        if self._zi_instr_phys_flux[0] != "":
+            conns.append((self._zi_instr_phys_flux[0], lbeqs.create_connection(to_signal=f"{qubit_name}/flux", ports=self._zi_instr_phys_flux[1], type="rf"), "flux"))
 
         #Initialise or redo connections
         for cur_connection in conns:
@@ -73,6 +75,7 @@ class ZIQubit(HALbase, ZIbase):
         #Only recreate the ZI Qubit object if the qubit type has changed or doesn't exist yet
         if hasattr(self, "qubit_type"):
             if self._qubit_type != qubit_type:
+                qubit_name = self.Name
                 print(f"Warning: The qubit type for {qubit_name} has changed from {self._qubit_type} to {qubit_type}. The qubit parameters will now be erased and reset!")  #TODO: Maybe look into transferrable ones later?
                 self._qubit_type = qubit_type
             else:
@@ -116,6 +119,11 @@ class ZIQubit(HALbase, ZIbase):
             self.ReadoutAmplitude = 0.1
             self.ResetTime = 10e-6
             self.ReadoutLO = 7e9
+            #TODO: Check again; it appears these need to be set for otherwise it's a NoneType and throws an error upon experiment execution...
+            self.DriveLO = 5e9
+            self.DriveGE = 5.2e9
+            self.DriveEF = 5.1e9
+            self.ReadoutFrequency = 7.0e9
 
             self._zi_qops = TunableTransmonOperations()
 
@@ -125,7 +133,7 @@ class ZIQubit(HALbase, ZIbase):
     def _get_current_config(self):
         ret_dict = {
             'Name' : self.Name,
-            'instrument' : self._instr_zi,
+            'instrument' : self._instr_id,
             'Type' : self.__class__.__name__,
             'ManualActivation' : self.ManualActivation,
             'ZI_phys_drive' : self._zi_instr_phys_drive,

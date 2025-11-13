@@ -13,6 +13,9 @@ from sqdtoolz.HAL.GENswitchTrig import*
 from sqdtoolz.HAL.ACQvna import*
 from sqdtoolz.HAL.GENatten import*
 from sqdtoolz.HAL.GENsmu import*
+from sqdtoolz.HAL.ZI.ZIQubit import ZIQubit
+from sqdtoolz.HAL.ZI.ZIACQ import ZIACQ
+from sqdtoolz.HAL.SOFTqpu import SOFTqpu
 from sqdtoolz.HAL.Processors.ProcessorCPU import*
 try:
     from sqdtoolz.HAL.Processors.ProcessorGPU import*

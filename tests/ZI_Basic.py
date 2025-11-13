@@ -1,16 +1,36 @@
+import numpy as np
 from sqdtoolz.Experiment import Experiment
 from sqdtoolz.HAL.GENmwSource import*
 from sqdtoolz.ExperimentConfiguration import*
 from sqdtoolz.Laboratory import*
 
 from sqdtoolz.HAL.ZI.ZIQubit import ZIQubit
+from sqdtoolz.HAL.ZI.ZIACQ import ZIACQ
+from sqdtoolz.HAL.SOFTqpu import SOFTqpu
+from sqdtoolz.Experiments.Experimental.ExpZIqubit import ExpZIqubit
+
 
 lab = Laboratory(instr_config_file = "tests/ZI_Basic.yaml", save_dir = "mySaves\\")
 
 lab.load_instrument('zi_boxes')
 ZIQubit('Qubit1', lab, 'zi_boxes', ('shfqc0', 'SGCHANNELS/0/OUTPUT'), ('shfqc0', 'QACHANNELS/0/OUTPUT'), ('shfqc0', 'QACHANNELS/0/INPUT'))
 ZIQubit('Qubit1', lab, 'zi_boxes', ('shfqc0', 'SGCHANNELS/1/OUTPUT'), ('shfqc0', 'QACHANNELS/0/OUTPUT'), ('shfqc0', 'QACHANNELS/0/INPUT'))
-Gen
+
+SOFTqpu('QPU', lab)
+lab.HAL('QPU').add_qubit(lab.HAL('Qubit1'))
+
+ZIACQ('ZIacq', lab, 'zi_boxes')
+
+from laboneq_applications.experiments import (
+    qubit_spectroscopy,
+    qubit_spectroscopy_amplitude,
+)
+
+ExperimentConfiguration('ZI', lab, 0, [], 'ZIacq')
+
+exp = ExpZIqubit('test', lab.CONFIG('ZI'), qubit_spectroscopy, lab.HAL('QPU'), ['Qubit1'], frequencies=[np.linspace(5.8e9, 6.2e9, 101)])
+lab.run_single(exp)
+a=0
 
 # lab.load_instrument('MW_IF')
 

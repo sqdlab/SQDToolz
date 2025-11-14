@@ -30,14 +30,23 @@ class ExpZIqubit(Experiment):
         logging_store = LoggingStore()
         logging_store.activate()
         leSession = leACQ._get_ZI_session()
-        leSession.connect(do_emulation=True)
-        exp_workflow = self._workflow_module.experiment_workflow(
-            session=leSession,
-            qpu=leQPU,
-            qubits=leQubits,
-            options=options,
-            **self._args
-        )
+        leSession.connect(do_emulation=False)
+        try:#TODO: Don't do this...
+            exp_workflow = self._workflow_module.experiment_workflow(
+                session=leSession,
+                qpu=leQPU,
+                qubits=leQubits,
+                options=options,
+                **self._args
+            )
+        except:
+            exp_workflow = self._workflow_module.experiment_workflow(
+                session=leSession,
+                qpu=leQPU,
+                qubit=leQubits[0],
+                options=options,
+                **self._args
+            )
         self._expt_config._hal_ACQ._cur_workflow = exp_workflow
         
         kwargs['skip_init_instruments'] = True

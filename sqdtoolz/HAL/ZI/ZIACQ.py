@@ -70,7 +70,7 @@ class ZIACQ(HALbase, ZIbase):
     @property
     def AcquisitionMode(self):
         if self._zi_opts['acquisition_type'] == lbeqs.AcquisitionType.INTEGRATION:
-            return "INTEGTRATION"
+            return "INTEGRATION"
         elif self._zi_opts['acquisition_type'] == lbeqs.AcquisitionType.RAW:
             return "RAW"
         elif self._zi_opts['acquisition_type'] == lbeqs.AcquisitionType.SPECTROSCOPY:
@@ -83,8 +83,8 @@ class ZIACQ(HALbase, ZIbase):
             return "DEFAULT"
     @AcquisitionMode.setter
     def AcquisitionMode(self, averaging_mode: str):
-        if averaging_mode == "INTEGTRATION":
-            self._zi_opts['acquisition_type'] = lbeqs.AcquisitionType.INTEGTRATION 
+        if averaging_mode == "INTEGRATION":
+            self._zi_opts['acquisition_type'] = lbeqs.AcquisitionType.INTEGRATION 
         elif averaging_mode == "RAW":
             self._zi_opts['acquisition_type'] = lbeqs.AcquisitionType.RAW 
         elif averaging_mode == "SPECTROSCOPY":

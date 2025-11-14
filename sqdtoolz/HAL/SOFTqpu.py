@@ -54,6 +54,7 @@ class SOFTqpu(HALbase, ZIbase):
             qubit, qop = cur_qubit.get_ZI_parameters()
             leQubits.append(qubit)
             leQops.append(qop)
+            qop.detach_qpu()
         leQPU = laboneq.dsl.quantum.QPU(leQubits, quantum_operations=leQops[0]) #TODO: Look up why this doesn't work with a list properly...
         for m in range(len(self._qubit_couplings)):
             qubit1 = self._qubits[self._qubit_couplings[m][0]].Name

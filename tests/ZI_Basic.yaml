@@ -4,7 +4,19 @@ instruments:
     init:
       address: "127.0.0.1"
       port: "8004"
-      setup_yaml: "tests/ZI_Basic_ZI.yaml"
+      setup_yaml:
+        hdawg0:
+          address: DEV9140
+          type: HDAWG
+          device_options: HDAWG8
+        shfqc0:
+          address: DEV12663
+          type: SHFQC
+          device_options: SHFQC/PLUS/QC6CH
+        pqsc:
+          address: DEV10246
+          type: PQSC
+          device_options: PQSC
     # parameters:
     #   AWG.CH1.trig_src:
     #     initial_value: 'NONE' #'TRG1'

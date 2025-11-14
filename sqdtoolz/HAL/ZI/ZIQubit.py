@@ -108,10 +108,10 @@ class ZIQubit(HALbase, ZIbase):
                 'ResetTime':'reset_delay_length',
                 'T1GE':'ge_T1',
                 'T2GE':'ge_T2',
-                'T2*GE':'ge_T2_star',
+                'T2GE_star':'ge_T2_star',
                 'T1EF':'ef_T1',
                 'T2EF':'ef_T2',
-                'T2*EF':'ef_T2_star'
+                'T2EF_star':'ef_T2_star'
             }
 
             #Setup some default values

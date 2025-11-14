@@ -9,6 +9,7 @@ The following constructs exist to handle interfacing with the ZI products:
 
 - [ZIQubit](#ziqubit)
 - [SOFTqpu](#softqpu)
+- [ZIACQ](#ziacq)
 
 ## ZIQubit
 
@@ -22,3 +23,16 @@ This wraps over the qubit objects (e.g. `TunableTransmonQubit`) provided by ZI (
 ## SOFTqpu
 
 Although this is a general object used to house a network of qubits and couplings (can be multiple between any two qubits), it implements `ZIbase` to ensure that it can integrate with the ZI objects. Specifically, it has the ability to export a *QPU topology* object for use with the ZI *workflows*.
+
+## ZIACQ
+
+This is a light wrapper that must be supplied as the acquisition HAL in the `ExperimentConfiguration` object. It is there to:
+
+- Handles parameters related to acquisition (such as `NumRepetitions` and `RepetitionTime`) and postprocessing (such as `AcquisitionMode`). A few of these parameters can be set to `'DEFAULT'` so that the experiment's default options (i.e. appropriately choosing the correct ones) can be chosen
+- Handles the data acquisition and translation into the *SQDToolz* HDF5 format
+
+It has an attribute `_cur_workflow` that is set to `None` when `init_instruments()` calls its `_set_current_config()`. It must be set by the `Experiment` object (after this function call) to some workflow module (e.g. `qubit_spectroscopy` from the *LabOneQ* applications library). The `get_data()` call then runs this workflow to extract the returned data.
+
+## ExpZIqubit
+
+This is written as a light wrapper to ZI experiment workflows that utilise ZI qubit and QPU objects.

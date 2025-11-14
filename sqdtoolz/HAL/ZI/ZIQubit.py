@@ -40,7 +40,11 @@ class ZIQubit(HALbase, ZIbase):
 
     def __setattr__(self, name, value):
         if '_param_mappings' in self.__dict__ and name in self._param_mappings:
-            return setattr(self._zi_qubit.parameters, self._param_mappings[name], value)
+            if name == 'ReadoutPower':
+                assert value >= -30 and value <= 10 and value % 5 == 0, "ReadoutPower must be within [-30dBm,10dBm] in steps of 5dB"
+            if name == 'DrivePower':
+                assert value >= -30 and value <= 10 and value % 5 == 0, "DrivePower must be within [-30dBm,10dBm] in steps of 5dB"
+            setattr(self._zi_qubit.parameters, self._param_mappings[name], value)
         else:
             self.__dict__[name] = value
 
@@ -90,6 +94,7 @@ class ZIQubit(HALbase, ZIbase):
 
             self._param_mappings = {
                 'DriveLO':'drive_lo_frequency',
+                'DrivePower':'drive_range',
                 'DriveGE':'resonance_frequency_ge',
                 'DriveEF':'resonance_frequency_ef',
                 'DriveGEAmplitudeX':'ge_drive_amplitude_pi',
@@ -101,6 +106,7 @@ class ZIQubit(HALbase, ZIbase):
                 'DriveEFTime':'ef_drive_length',
                 'DriveEFPulse':'ef_drive_pulse',
                 'ReadoutLO':'readout_lo_frequency',
+                'ReadoutPower':'readout_range_out',
                 'ReadoutFrequency':'readout_resonator_frequency',
                 'ReadoutAmplitude':'readout_amplitude',
                 'ReadoutTime':'readout_length',
@@ -119,6 +125,7 @@ class ZIQubit(HALbase, ZIbase):
             self.ReadoutAmplitude = 0.1
             self.ResetTime = 10e-6
             self.ReadoutLO = 7e9
+            self.ReadoutPower = -10
             #TODO: Check again; it appears these need to be set for otherwise it's a NoneType and throws an error upon experiment execution...
             self.DriveLO = 5e9
             self.DriveGE = 5.2e9

@@ -18,8 +18,12 @@ class ZIQubit(HALbase, ZIbase):
         allowed_qubit_types = ["TunableTransmonQubit"]
         assert zi_type in allowed_qubit_types, f"Qubit type must be any of: {allowed_qubit_types}"
 
+        self._flux_dc = 0
+        self._flux_cal_obj = None
+
         self._setup_zi_connections()
         self._setup_zi_qubit(zi_type)
+
 
     @classmethod
     def fromConfigDict(cls, config_dict, lab):
@@ -27,14 +31,21 @@ class ZIQubit(HALbase, ZIbase):
                    config_dict['ZI_phys_drive'],
                    config_dict['ZI_phys_measure'],
                    config_dict['ZI_phys_acquire'],
-                   config_dict.get('ZI_phys_flux', ("",""),
-                   config_dict['ZI_qubit_type']))
+                   config_dict.get('ZI_phys_flux', ("","")),
+                   config_dict['ZI_qubit_type'])
 
     def __getattr__(self, name):
         if name in self.__dict__:
             return self.__dict__[name]
         elif '_param_mappings' in self.__dict__ and name in self._param_mappings:
+            if name == 'FluxDC':
+                if self._flux_cal_obj != None:
+                    return self._flux_cal_obj.voltage_offset
+                else:
+                    return self._flux_dc
             return getattr(self._zi_qubit.parameters, self._param_mappings[name])
+        elif '_param_mappings_local' in self.__dict__ and name in self._param_mappings_local:
+            return self._param_mappings_local[name]
         else:
             raise AttributeError(f"The ZIQubit object does not have an attribute/property '{name}'")
 
@@ -44,7 +55,15 @@ class ZIQubit(HALbase, ZIbase):
                 assert value >= -30 and value <= 10 and value % 5 == 0, "ReadoutPower must be within [-30dBm,10dBm] in steps of 5dB"
             if name == 'DrivePower':
                 assert value >= -30 and value <= 10 and value % 5 == 0, "DrivePower must be within [-30dBm,10dBm] in steps of 5dB"
+            if name == 'FluxDC':
+                self._flux_dc = value
+                if self._zi_instr_phys_flux != "":
+                    setattr(self._zi_qubit.parameters, self._param_mappings[name], value)
+                    self._instr_zi.device_setup.set_calibration(self._zi_qubit.calibration())
+                    lbeqs.Session(self._instr_zi.device_setup).connect(do_emulation=False)
             setattr(self._zi_qubit.parameters, self._param_mappings[name], value)
+        elif '_param_mappings_local' in self.__dict__ and name in self._param_mappings_local:
+            self._param_mappings_local[name] = value
         else:
             self.__dict__[name] = value
 
@@ -75,9 +94,13 @@ class ZIQubit(HALbase, ZIbase):
             #
             self._instr_zi.device_setup.add_connections(cur_connection[0], cur_connection[1])
 
+        #For the flux line, just initialise it so that voltage offsets can be set etc...
+        if self._zi_instr_phys_flux[0] != "":
+            self._instr_zi.device_setup.set_calibration(lbeqs.Calibration({self._instr_zi.device_setup.logical_signal_groups[f"{qubit_name}"].logical_signals["flux"].path: lbeqs.SignalCalibration(delay_signal=0, voltage_offset=0.0) }))
+
     def _setup_zi_qubit(self, qubit_type):
         #Only recreate the ZI Qubit object if the qubit type has changed or doesn't exist yet
-        if hasattr(self, "qubit_type"):
+        if hasattr(self, "_qubit_type"):
             if self._qubit_type != qubit_type:
                 qubit_name = self.Name
                 print(f"Warning: The qubit type for {qubit_name} has changed from {self._qubit_type} to {qubit_type}. The qubit parameters will now be erased and reset!")  #TODO: Maybe look into transferrable ones later?
@@ -91,6 +114,12 @@ class ZIQubit(HALbase, ZIbase):
             self._zi_qubit = TunableTransmonQubit.from_device_setup(self._instr_zi.device_setup, qubit_uids=[self.Name])[0]
             self._zi_qubit.parameters.ge_drive_pulse["sigma"] = 0.25
             self._zi_qubit.parameters.readout_range_out = -10
+
+            self._param_mappings_local = {
+                'ReadoutQi': 1,
+                'ReadoutQc': 1,
+                'ReadoutQl': 1
+            }
 
             self._param_mappings = {
                 'DriveLO':'drive_lo_frequency',
@@ -117,7 +146,8 @@ class ZIQubit(HALbase, ZIbase):
                 'T2GE_star':'ge_T2_star',
                 'T1EF':'ef_T1',
                 'T2EF':'ef_T2',
-                'T2EF_star':'ef_T2_star'
+                'T2EF_star':'ef_T2_star',
+                'FluxDC': 'flux_offset_voltage'
             }
 
             #Setup some default values
@@ -151,17 +181,24 @@ class ZIQubit(HALbase, ZIbase):
             }
         for cur_param in self._param_mappings:
             ret_dict[cur_param] = getattr(self, cur_param)
+        for cur_param in self._param_mappings_local:
+            ret_dict[cur_param] = getattr(self, cur_param)
         return ret_dict
 
     def _set_current_config(self, dict_config, lab):
-        assert dict_config['Type'] == self.__class__.__name__, 'Cannot set configuration to a ZI-Qubit with a configuration that is of type ' + dict_config['Type']
-        self.ManualActivation = dict_config.get('ManualActivation', False)
+        assert dict_config.pop('Type') == self.__class__.__name__, 'Cannot set configuration to a ZI-Qubit with a configuration that is of type ' + dict_config['Type']
+        self.ManualActivation = dict_config.pop('ManualActivation', False)
+        dict_config.pop('instrument')
+        dict_config.pop('Name')
 
-        self._zi_instr_phys_drive = dict_config['ZI_phys_drive']
-        self._zi_instr_phys_measure = dict_config['ZI_phys_measure']
-        self._zi_instr_phys_acquire = dict_config['ZI_phys_acquire']
-        self._zi_instr_phys_flux = dict_config['ZI_phys_flux']
-        self._qubit_typ = dict_config['ZI_qubit_type']
+        self._zi_instr_phys_drive = dict_config.pop('ZI_phys_drive')
+        self._zi_instr_phys_measure = dict_config.pop('ZI_phys_measure')
+        self._zi_instr_phys_acquire = dict_config.pop('ZI_phys_acquire')
+        self._zi_instr_phys_flux = dict_config.pop('ZI_phys_flux')
+        self._qubit_type = dict_config.pop('ZI_qubit_type')
 
         self._setup_zi_connections()
-        self._setup_zi_qubit(dict_config['ZI_qubit_type'])
+        self._setup_zi_qubit(self._qubit_type)
+        
+        for cur_param in dict_config:
+            setattr(self, cur_param, dict_config[cur_param])

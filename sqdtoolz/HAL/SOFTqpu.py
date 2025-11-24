@@ -20,7 +20,7 @@ class SOFTqpu(HALbase, ZIbase):
 
     @classmethod
     def fromConfigDict(cls, config_dict, lab):
-        return cls(config_dict["Name"], lab, config_dict=config_dict["instrument"])
+        return cls(config_dict["Name"], lab, config_dict=config_dict)
 
     def add_qubit(self, hal_obj:HALbase|ExperimentSpecification):
         self._qubits.append(self._lab._resolve_sqdobj_tree(hal_obj))
@@ -35,7 +35,10 @@ class SOFTqpu(HALbase, ZIbase):
 
     def get_qubit(self, qubit_id: str|int):
         return self._qubits[self._resolve_qubit_index(qubit_id)]
-    
+
+    def get_qubit_obj(self, qubit_id: str|int):
+        return self._lab._get_resolved_obj(self._qubits[self._resolve_qubit_index(qubit_id)])
+ 
     def get_qubit_couplings(self, qubit1: str|int, qubit2: str|int):
         qubit1 = self._resolve_qubit_index(qubit1)
         qubit2 = self._resolve_qubit_index(qubit2)

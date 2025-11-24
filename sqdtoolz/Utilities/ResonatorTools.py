@@ -1728,7 +1728,7 @@ class ResonatorPowerSweep:
         print(f"Fit data written to {output_path}")
 
     @staticmethod
-    def single_circlefit(freq_data, i_vals, q_vals, power_dBm, expected_qi_lims=(0, 1e8)):
+    def single_circlefit(freq_data, i_vals, q_vals, power_dBm, expected_qi_lims=(0, 1e8), dont_plot=False, save_path=""):
         """
         Method for a single circlefit. Returns fit results as a dictionary.
         """
@@ -1755,8 +1755,40 @@ class ResonatorPowerSweep:
                 n_ph = port.get_photons_in_resonator(power_dBm, unit='dBm', diacorr=True)
                 Qc = port.fitresults['absQc']
                 # write fit results to plot and save
-                port.plotall(save_path="circlefit.pdf", 
-                             text=f"$Q_i=${Qi:.1e} $\\pm$ {Qi_err:.1e}, $\\langle n \\rangle ={n_ph:.1e}$")
+                if not dont_plot or save_path != "":
+                    text=f"$Q_i=${Qi:.1e} $\\pm$ {Qi_err:.1e}, $\\langle n \\rangle ={n_ph:.1e}$"
+                    real = port.z_data_raw.real
+                    imag = port.z_data_raw.imag
+                    real2 = port.z_data_sim.real
+                    imag2 = port.z_data_sim.imag
+                    #
+                    fig, axs = plt.subplots(ncols=3); fig.set_figwidth(15)
+                    fig.suptitle(text)
+                    
+                    axs[0].plot(real,imag,label='rawdata')
+                    axs[0].plot(real2,imag2,label='fit')
+                    axs[0].set_xlabel('Re(S21)')
+                    axs[0].set_ylabel('Im(S21)')
+                    axs[0].legend()
+                    #
+                    axs[1].plot(port.f_data*1e-9,np.absolute(port.z_data_raw),label='rawdata')
+                    axs[1].plot(port.f_data*1e-9,np.absolute(port.z_data_sim),label='fit')
+                    axs[1].set_xlabel('f (GHz)')
+                    axs[1].set_ylabel('|S21|')
+                    axs[1].legend()
+                    #
+                    axs[2].plot(port.f_data*1e-9,np.angle(port.z_data_raw),label='rawdata')
+                    axs[2].plot(port.f_data*1e-9,np.angle(port.z_data_sim),label='fit')
+                    axs[2].set_xlabel('f (GHz)')
+                    axs[2].set_ylabel('arg(|S21|)')
+                    axs[2].legend()
+                    #
+                    if save_path != "":
+                        assert(save_path.endswith((".jpg", ".png", ".pdf"))), 'Provide a file extension: .jpg, .png, or .pdf for your save_path.'
+                        fig.savefig(save_path)                   
+                else:
+                    fig = None
+                port.fitresults['fig'] = fig
                 return port.fitresults
             else:
                 print(f"Fitted Qi value outside of range (Qi, fitted: {port.fitresults['Qi_dia_corr_err']}).")

@@ -18,7 +18,7 @@ class ZIACQ(HALbase, ZIbase):
                 'averaging_mode': "DEFAULT",
                 'acquisition_type': "DEFAULT",
                 #TODO: Consider adding RepetitionMode.FASTEST. For now 0 implies AUTO and >0 implies CONSTANT RepetitionTime
-                'repetition_mode': lbeqs.RepetitionMode.AUTO,
+                'repetition_mode': lbeqs.RepetitionMode.FASTEST,
                 'repetition_time': 5e-6
             }
         self._cur_workflow = None
@@ -36,14 +36,14 @@ class ZIACQ(HALbase, ZIbase):
 
     @property
     def RepetitionTime(self):
-        if self._zi_opts['repetition_mode'] == lbeqs.RepetitionMode.AUTO:
+        if self._zi_opts['repetition_mode'] == lbeqs.RepetitionMode.FASTEST:
             return 0
         elif self._zi_opts['repetition_mode'] == lbeqs.RepetitionMode.CONSTANT:
             return self._zi_opts['repetition_time']
     @RepetitionTime.setter
     def RepetitionTime(self, rep_time: float):
         if rep_time == 0.0:
-            self._zi_opts['repetition_mode'] = lbeqs.RepetitionMode.AUTO
+            self._zi_opts['repetition_mode'] = lbeqs.RepetitionMode.FASTEST
         else:
             self._zi_opts['repetition_mode'] = lbeqs.RepetitionMode.CONSTANT
             self._zi_opts['repetition_time'] = float(rep_time)
@@ -122,9 +122,20 @@ class ZIACQ(HALbase, ZIbase):
 
         self._cur_workflow = None   #This will be called in init_instruments
 
+    def _process_data_dict(self, data_array, dest_dict, prefix=""):
+        if data_array.dtype == np.complex128:
+            dest_dict[prefix+'real'] = np.real(data_array)
+            dest_dict[prefix+'imag'] = np.imag(data_array)
+        else:
+            dest_dict[prefix+'values'] = data_array
+
     def get_data(self):
         assert self._cur_workflow != None, "ZIACQ must not be in a CONFIG run in a non-ZI compatible experiment. For example, ExpZIqubit would be fine."
         workflow_results = self._cur_workflow.run()
+        self._temp = workflow_results
+        ##debugging###
+        print(workflow_results.output)
+        ############
         datasets = [x for x in workflow_results.output.data._prefixes]
         #Basically store in secondary datasets while leaving data.h5 blank...
         ret_val = {'data': {
@@ -133,18 +144,50 @@ class ZIACQ(HALbase, ZIbase):
                     'misc' : {}
                 }}
         for cur_dataset in datasets:
-            cur_res = workflow_results.output.data[datasets[0]].result
-            ret_val[cur_dataset] = {
-                    'parameters' : cur_res.axis_name,
-                    'data' : {},
-                    'parameter_values': {}
-                }
-            for m,cur_axis in enumerate(cur_res.axis_name):
-                ret_val[cur_dataset]['parameter_values'][cur_axis] = cur_res.axis[m]
-            if cur_res.data.dtype == np.complex128:
-                ret_val[cur_dataset]['data'] = {'real': np.real(cur_res.data), 'imag': np.imag(cur_res.data)}  #TODO: Need to revisit this for discriminated datasets?
+            #TODO Broken for dispersive shift due to tree structure
+            if 'e' in [x for x in workflow_results.output.data[datasets[0]].result]:
+                for i in ['e','g']:
+                    cur_res = workflow_results.output.data[datasets[0]].result[i]
+                    ret_val[str(cur_dataset) + '_' + i] = {
+                            #TODO: They allow multiple mappings to a given axis; this is a bit of a hack...
+                            'parameters' : [(x[0] if isinstance(x, list) else x) for x in cur_res.axis_name],
+                            'data' : {},
+                            'parameter_values': {}
+                        }
+                    for m,cur_axis in enumerate(cur_res.axis_name):
+                        #TODO: Again they allow multiple mappings to a given axis; this is a bit of a hack...
+                        if isinstance(cur_axis, list):
+                            cur_axis_name = cur_axis[0]
+                        else:
+                            cur_axis_name = cur_axis
+                        ret_val[str(cur_dataset) + '_' + i]['parameter_values'][cur_axis_name] = (cur_res.axis[m][0] if isinstance(cur_res.axis[m], list) else cur_res.axis[m])
+                    self._process_data_dict(cur_res.data, ret_val[str(cur_dataset) + '_' + i]['data'])
             else:
-                ret_val[cur_dataset]['data'] = {'values': cur_res}
+                cur_res = workflow_results.output.data[datasets[0]].result
+                ret_val[cur_dataset] = {
+                        #TODO: They allow multiple mappings to a given axis; this is a bit of a hack...
+                        'parameters' : [(x[0] if isinstance(x, list) else x) for x in cur_res.axis_name],
+                        'data' : {},
+                        'parameter_values': {}
+                    }
+                for m,cur_axis in enumerate(cur_res.axis_name):
+                    #TODO: Again they allow multiple mappings to a given axis; this is a bit of a hack...
+                    if isinstance(cur_axis, list):
+                        cur_axis_name = cur_axis[0]
+                    else:
+                        cur_axis_name = cur_axis
+                    ret_val[cur_dataset]['parameter_values'][cur_axis_name] = (cur_res.axis[m][0] if isinstance(cur_res.axis[m], list) else cur_res.axis[m])
+                self._process_data_dict(cur_res.data, ret_val[cur_dataset]['data'])
+                    
+            if 'cal_trace' in workflow_results.output.data[datasets[0]]:
+                cur_cal_traces = workflow_results.output.data[datasets[0]].cal_trace
+                ret_val[cur_dataset + '_calib'] = {
+                        'parameters' : ['count'],
+                        'data' : {},
+                        'parameter_values': {}
+                    }
+                for state in cur_cal_traces:
+                    self._process_data_dict(cur_cal_traces[state].data, ret_val[cur_dataset + '_calib']['data'], prefix=state)
 
         return ret_val
 

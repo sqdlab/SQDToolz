@@ -1,6 +1,8 @@
 from sqdtoolz.Experiment import Experiment
 from sqdtoolz.HAL.ZI.ZIACQ import ZIACQ
-from laboneq.workflow.logbook import LoggingStore
+from laboneq.workflow.logbook import LoggingStore, DEFAULT_LOGGING_STORE, FolderStore
+import logging
+from laboneq.laboneq_logging import set_log_dir
 
 class ExpZIqubit(Experiment):
     def __init__(self, name, expt_config, workflow_module, hal_QPU, qubit_ids, **kwargs):
@@ -38,10 +40,20 @@ class ExpZIqubit(Experiment):
         #Get associated ZI Qubit objects
         leQubits = [leQubits[x] for x in leQubitInds]
         
-        logging_store = LoggingStore()
-        logging_store.activate()
+        set_log_dir(file_path)
+        # lePythonLogs = logging.basicConfig(filename=file_path + 'app.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+        DEFAULT_LOGGING_STORE.deactivate()
+        # logging_store = LoggingStore(logger=lePythonLogs, rich=True)
+        # logging_store.activate()
+        leLogger = logging.getLogger("laboneq")
+
+        # folder_store = FolderStore(file_path)
+        # folder_store.activate()
         leSession = leACQ._get_ZI_session()
         leSession.connect(do_emulation=False)
+        for handler in leLogger.handlers:
+            if isinstance(handler, logging.StreamHandler):
+                leLogger.removeHandler(handler)
         try:#TODO: Don't do this...
             exp_workflow = self._workflow_module.experiment_workflow(
                 session=leSession,
@@ -64,7 +76,9 @@ class ExpZIqubit(Experiment):
 
         leData = super()._run(file_path, sweep_vars, **kwargs)
 
-        logging_store.deactivate()  #TODO: Figure out how to access/store this metadata...
+        # folder_store.deactivate()
+        # logging_store.deactivate()
+        
         return leData
 
     def _post_process(self, data):

@@ -134,7 +134,7 @@ class ZIACQ(HALbase, ZIbase):
         workflow_results = self._cur_workflow.run()
         self._temp = workflow_results
         ##debugging###
-        print(workflow_results.output)
+        # print(workflow_results.output)
         ############
         datasets = [x for x in workflow_results.output.data._prefixes]
         #Basically store in secondary datasets while leaving data.h5 blank...
@@ -145,7 +145,7 @@ class ZIACQ(HALbase, ZIbase):
                 }}
         for cur_dataset in datasets:
             #TODO Broken for dispersive shift due to tree structure
-            if 'e' in [x for x in workflow_results.output.data[datasets[0]].result]:
+            if hasattr(workflow_results.output.data[datasets[0]].result, 'e'):
                 for i in ['e','g']:
                     cur_res = workflow_results.output.data[datasets[0]].result[i]
                     ret_val[str(cur_dataset) + '_' + i] = {

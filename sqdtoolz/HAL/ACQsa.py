@@ -69,6 +69,16 @@ class ACQsa(HALbase):
     def AveragesNum(self, val):
         self._instr_sa.AveragesNum = val
 
+    @property
+    def IntegrationTime(self):
+        if hasattr(self._instr_sa, 'IntegrationTime'):
+            return self._instr_sa.IntegrationTime
+        return 0
+    @IntegrationTime.setter
+    def IntegrationTime(self, val):
+        if hasattr(self._instr_sa, 'IntegrationTime'):
+            self._instr_sa.IntegrationTime = val
+
     def set_data_processor(self, proc_obj):
         self.data_processor = proc_obj
 
@@ -87,12 +97,12 @@ class ACQsa(HALbase):
             'Processor' : proc_name
             }
         #Not adding in FrequencyCentre and FrequencySpan to avoid strange contradictions...
-        self.pack_properties_to_dict(['FrequencyStart', 'FrequencyEnd', 'SweepPoints', 'AveragesNum', 'AveragesEnable', 'Bandwidth'], ret_dict)
+        self.pack_properties_to_dict(['FrequencyStart', 'FrequencyEnd', 'SweepPoints', 'AveragesNum', 'AveragesEnable', 'Bandwidth', 'IntegrationTime'], ret_dict)
         return ret_dict
 
     def _set_current_config(self, dict_config, lab):
         assert dict_config['Type'] == self.__class__.__name__, 'Cannot set configuration to a VNA with a configuration that is of type ' + dict_config['Type']
-        for cur_prop in ['FrequencyStart', 'FrequencyEnd', 'SweepPoints', 'AveragesNum', 'AveragesEnable', 'Bandwidth']:
+        for cur_prop in ['FrequencyStart', 'FrequencyEnd', 'SweepPoints', 'AveragesNum', 'AveragesEnable', 'Bandwidth', 'IntegrationTime']:
             setattr(self, cur_prop, dict_config[cur_prop])
         if dict_config['Processor'] != '':
             self.data_processor = lab.PROC(dict_config['Processor'])

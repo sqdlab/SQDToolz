@@ -23,6 +23,7 @@ from sqdtoolz.ExperimentSweeps import*
 import numpy as np
 import shutil
 import os.path
+import time
 
 import unittest
 
@@ -808,6 +809,7 @@ class TestSweeps(unittest.TestCase):
         assert self.arr_equality(np.array(exp.last_rec_params.param_vals[0]), np.arange(0,3,1)), "Reverse sweeping experiment in 1D did not produce the right parameter values."
         res.release()
         exp.last_rec_params.release()
+        time.sleep(2)
         #
         #Check basic parameter storage with 1D reverse sweep...
         exp = Experiment("test", self.lab.CONFIG('testConf'))
@@ -824,6 +826,7 @@ class TestSweeps(unittest.TestCase):
         assert self.arr_equality(np.array(exp.last_rec_params.param_vals[0]), np.arange(0,3,1)), "Reverse sweeping experiment in 1D did not produce the right parameter values."
         res.release()
         exp.last_rec_params.release()
+        time.sleep(2)
         #
         #Check basic parameter storage with 2D reverse sweep...
         exp = Experiment("test", self.lab.CONFIG('testConf'))
@@ -841,6 +844,7 @@ class TestSweeps(unittest.TestCase):
         assert self.arr_equality(np.array(exp.last_rec_params.param_vals[1]), np.arange(1,5,1)), "Reverse sweeping experiment in 2D did not produce the right parameter values."
         res.release()
         exp.last_rec_params.release()
+        time.sleep(2)
         #
         #Check basic parameter storage with 2D reverse sweep...
         exp = Experiment("test", self.lab.CONFIG('testConf'))
@@ -858,6 +862,7 @@ class TestSweeps(unittest.TestCase):
         assert self.arr_equality(np.array(exp.last_rec_params.param_vals[1]), np.arange(1,5,1)), "Reverse sweeping experiment in 2D did not produce the right parameter values."
         res.release()
         exp.last_rec_params.release()
+        time.sleep(2)
 
         shutil.rmtree('test_save_dir')
         self.cleanup()
@@ -881,6 +886,7 @@ class TestSweeps(unittest.TestCase):
         exp.last_data_aux.release()
         exp.last_rec_params.release()
         exp.last_rec_params_aux.release()
+        time.sleep(2)
         #
         #Check basic parameter storage with 1D auxiliary sweep...
         exp = Experiment("test", self.lab.CONFIG('testConf'))
@@ -898,6 +904,11 @@ class TestSweeps(unittest.TestCase):
         assert self.arr_equality(np.diff(np.concatenate([arr[:,2], arrA[:,2]])), np.ones(6)), "Auxiliary sweeping experiment in 1D did not store the data in correct order."
         assert self.arr_equality(np.array(exp.last_rec_params.param_vals[0]), np.arange(0,3,1)), "Auxiliary sweeping experiment in 1D did not store the correct data for param_vals."
         assert self.arr_equality(np.array(exp.last_rec_params_aux.param_vals[0]), np.arange(3,-1,-1)), "Auxiliary sweeping experiment in 1D did not store the correct data for param_vals."
+        res.release()
+        exp.last_data_aux.release()
+        exp.last_rec_params.release()
+        exp.last_rec_params_aux.release()
+        time.sleep(2)
         #
         #Check basic parameter storage with 2D auxiliary sweep...
         exp = Experiment("test", self.lab.CONFIG('testConf'))
@@ -921,6 +932,7 @@ class TestSweeps(unittest.TestCase):
         exp.last_data_aux.release()
         exp.last_rec_params.release()
         exp.last_rec_params_aux.release()
+        time.sleep(2)
         #
         #Check basic parameter storage with 2D auxiliary sweep...
         exp = Experiment("test", self.lab.CONFIG('testConf'))
@@ -944,6 +956,7 @@ class TestSweeps(unittest.TestCase):
         exp.last_data_aux.release()
         exp.last_rec_params.release()
         exp.last_rec_params_aux.release()
+        time.sleep(2)
 
         shutil.rmtree('test_save_dir')
         self.cleanup()
@@ -984,6 +997,7 @@ class TestSweeps(unittest.TestCase):
                 ts_exps += [ ts[m][n][0][0][0] ]
         assert np.sum(np.diff(ts_exps)/1e6) >= 8, "The time-stamps do not differ by at least 1s per experimental trace."
         res.release()
+        time.sleep(2)
 
         #
         #Check again on a complete cold reload

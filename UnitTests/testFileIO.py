@@ -69,7 +69,7 @@ class TestExpFileIO(unittest.TestCase):
             self.lab.VAR('test_var').Value = 7+m
             exp = Experiment("test", self.lab.CONFIG('testConf'))
             res = self.lab.run_single(exp, [(self.lab.VAR("myFreq"), np.arange(3))])
-            time.sleep(2)
+            time.sleep(1)
         self.lab.group_close()
         #
         reader = FileIODirectory.fromReader(res)
@@ -85,7 +85,7 @@ class TestExpFileIO(unittest.TestCase):
         assert self.arr_equality(var_dicts['myFreq'], np.array([2]*4)), "FileIODirectory failed to parse in VARs correctly."
         assert 'testAmpl' in var_dicts, "FileIODirectory failed to parse in VARs correctly."
         assert self.arr_equality(var_dicts['testAmpl'], np.arange(0,4,1)), "FileIODirectory failed to parse in VARs correctly."
-        time.sleep(2)
+        time.sleep(1)
         #
         res.release()
         res = None
@@ -106,9 +106,8 @@ class TestExpFileIO(unittest.TestCase):
         assert self.arr_equality(res.param_many_one_maps['testAmal']['param_vals'][0], np.array([1,3,5])), "FileIOReader failed to parse a many-one sweeping variable."
         assert self.arr_equality(res.param_many_one_maps['testAmal']['param_vals'][1], np.array([2,4,6])), "FileIOReader failed to parse a many-one sweeping variable."
         assert self.arr_equality(exp.last_rec_params.get_numpy_array(), np.array([[1,2],[3,4],[5,6]]))
-        time.sleep(2)
-        exp.last_rec_params.release()
-        res.release()
+        time.sleep(1)
+        exp.close_all_read_files()
         #
         #Test with one simple one-many variable and a normal variable - and check it sets correctly via rec_params
         exp = Experiment("test", self.lab.CONFIG('testConf'))
@@ -122,7 +121,7 @@ class TestExpFileIO(unittest.TestCase):
         assert self.arr_equality(res.param_many_one_maps['testAmal']['param_vals'][1], np.array([2,4,6])), "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
         assert res.param_names[:2] == ['testAmal', 'test_var'], "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
         assert self.arr_equality(exp.last_rec_params.get_numpy_array(), np.array([[[1,2]]*4,[[3,4]]*4,[[5,6]]*4])), "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
-        time.sleep(2)
+        time.sleep(1)
         exp.last_rec_params.release()
         res.release()
         #
@@ -138,9 +137,8 @@ class TestExpFileIO(unittest.TestCase):
         assert self.arr_equality(res.param_many_one_maps['testAmal']['param_vals'][1], np.array([2,4,6])), "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
         assert res.param_names[:2] == ['test_var', 'testAmal'], "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
         assert self.arr_equality(exp.last_rec_params.get_numpy_array(), np.array([[[1,2],[3,4],[5,6]]]*4)), "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
-        time.sleep(2)
-        exp.last_rec_params.release()
-        res.release()
+        time.sleep(1)
+        exp.close_all_read_files()
         #
         #Test with one normal variable and two one-many variables - and check it sets correctly via rec_params
         VariableInternal('test_var2', self.lab, 0)
@@ -167,12 +165,9 @@ class TestExpFileIO(unittest.TestCase):
         #
         assert res.param_names[:3] == ['testAmal', 'test_var', 'testAmal2'], "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
         assert self.arr_equality(exp.last_rec_params.get_numpy_array(), np.array([[[[y, y+1, x, x+1, x+2] for x in np.arange(11,23,3)]]*4 for y in np.arange(1,7,2)])), "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
-        time.sleep(2)
+        time.sleep(1)
+        exp.close_all_read_files()
         #
-        #
-        exp.last_rec_params.release()
-        res.release()
-        res = None
         self.cleanup()
     
     def test_NonUniformSampling(self):

@@ -174,6 +174,7 @@ class FileIOWriter:
             self._hf.close()
             self._hf = None
             self._data_array_shape = None
+            self._meas_chs = []
 
     @staticmethod
     def write_file_direct(filepath, data_array, param_names, param_vals, dep_param_names, **kwargs):

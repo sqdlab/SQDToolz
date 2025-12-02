@@ -47,3 +47,9 @@ The mechanics of sweeping, running cascaded experiments (to put grouped experime
 - The SPEC parameters are set **after** the engine first sets all instrument HAL parameters. Thus, any settings in the `ExperimentSpecification` objects will overwrite linked HAL parameters.
 - The `LaboratoryConfiguration.txt` file stores the HAL parameters right in the end; so the instrument settings will correspond to the final sweeping point.
 - Most experiments store the points dynamically on finishing a given sweeping point. As its done in SWMR mode, one may view/analyse the data with realtime live-plotting tools such as [SQDViz](https://github.com/sqdlab/SQDViz).
+
+Note that the `Experiment` object holds some `FileIOReader` objects (that is, handles to the created data files) for easy querying/access. To release all of these handles (e.g. when trying to delete the files etc.), run:
+
+```python
+exp.close_all_read_files()
+```

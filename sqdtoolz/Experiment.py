@@ -16,6 +16,8 @@ class Experiment:
         self._name = name
         self._expt_config = expt_config
         self.last_rec_params = None
+        self.last_rec_params_aux = None
+        self.last_data_aux = None
         self._cur_filewriters = {}
         self._cur_fileread_paths = {}
         self._file_readers = {}
@@ -270,7 +272,7 @@ class Experiment:
         if len(aux_sweep) > 0:
             self.last_data_aux = FileIOReader(file_path + data_file_name_aux)   #TODO: Document storage of FileIOReaders via attributes in Experiment
 
-        return FileIOReader(file_path + data_file_name)
+        return self._file_readers['data']
 
 
     def _store_datapkt(self, data_pkt, sweep_vars2, sweepEx, rev_ind, ind_coord, primary_file, aux_file, aux_sweep):
@@ -383,3 +385,17 @@ class Experiment:
         if not isinstance(self._sweep_grids, np.ndarray):
             return {}
         return {x : self._sweep_grids[self._cur_ind_coord][ind] for ind, x in enumerate(self._cur_names)}
+
+    def close_all_read_files(self):
+        file_names = [x for x in self._file_readers]
+        for cur_fileio_reader in file_names:
+            self._file_readers.pop(cur_fileio_reader).release()
+        if self.last_rec_params:
+            self.last_rec_params.release()
+            self.last_rec_params = None
+        if self.last_rec_params_aux:
+            self.last_rec_params_aux.release()
+            self.last_rec_params_aux = None
+        if self.last_data_aux:
+            self.last_data_aux.release()
+            self.last_data_aux = None

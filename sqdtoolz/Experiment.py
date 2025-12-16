@@ -272,7 +272,12 @@ class Experiment:
         if len(aux_sweep) > 0:
             self.last_data_aux = FileIOReader(file_path + data_file_name_aux)   #TODO: Document storage of FileIOReaders via attributes in Experiment
 
-        return self._file_readers['data']
+        if self._data_file_index >= 0:
+            main_data_file_name = f'data{self._data_file_index}'
+        else:
+            main_data_file_name = 'data'
+
+        return self._file_readers[main_data_file_name]
 
 
     def _store_datapkt(self, data_pkt, sweep_vars2, sweepEx, rev_ind, ind_coord, primary_file, aux_file, aux_sweep):

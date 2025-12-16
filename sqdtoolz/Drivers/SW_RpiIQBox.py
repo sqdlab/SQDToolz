@@ -31,3 +31,11 @@ class SW_RpiIQBox(SW_BJT_RPi):
 
     def get_all_switch_contacts(self):
         return ["Pmix", "Pmeas"]
+
+    def get_idn(self):
+        return {
+            "vendor": "SQDLab",
+            "model": "RPiQBox",
+            "serial": "NA",
+            "firmware": "NA",
+        }

@@ -1,0 +1,135 @@
+instruments:
+  vna:
+    type: sqdtoolz.Drivers.VNA_Agilent_N5232A.VNA_Agilent_N5232A
+    address: 'TCPIP::192.168.1.202::INSTR'
+    enable_forced_reconnect: true
+  
+  stahl_volt:
+    type: sqdtoolz.Drivers.VOLT_Stahl_16CH.VOLT_Stahl_16CH
+    address: 'ASRL3'
+  
+  DDG:
+    type: sqdtoolz.Drivers.DDG_DG645.DG645
+    address: 'TCPIP::192.168.1.42::INSTR'
+    enable_forced_reconnect: true
+  
+  Tabor:
+    type: sqdtoolz.Drivers.Tabor_P2584M.Tabor_P2584M
+    init:
+      pxi_chassis: 0
+      pxi_slot: 3
+    parameters:
+      ref_osc_src:
+        initial_value: 'EXT'
+      ref_osc_freq:
+        initial_value: 10e6
+      AWG.CH1.trig_src:
+        initial_value: 'TRG1'   #'TRG1' if it is to be triggered externally
+      AWG.CH2.trig_src:
+        initial_value: 'TRG1'   #'TRG1' if it is to be triggered externally
+
+  src_res:
+    type: sqdtoolz.Drivers.MWS_SGS100A.MWS_SGS100A
+    address: TCPIP::192.168.1.119::INSTR
+    enable_forced_reconnect: true
+    parameters:
+      ref_osc_source:
+        initial_value: 'EXT' #Can be INT or EXT
+      ref_osc_external_freq:
+        initial_value: '10MHz'   #Can be '10MHz', '100MHz', '1000MHz'
+      ref_osc_output_freq:
+        initial_value: '1000MHz'  #Can be '10MHz', '100MHz', '1000MHz'
+      alc:
+        initial_value: 'OFF'  #Can be ON, OFF, AUTO
+      trigger_impedance:
+        initial_value: 'G10K' #Important when using low-amplitude/weakly-driven trigger pulses
+      #Output Channel Parameters
+      RFOUT.output:
+        initial_value: 'OFF'
+  
+  src_qubit:
+    type: sqdtoolz.Drivers.MWS_SGS100A.MWS_SGS100A
+    address: TCPIP::192.168.1.8::INSTR
+    enable_forced_reconnect: true
+    parameters:
+      ref_osc_source:
+        initial_value: 'EXT' #Can be INT or EXT
+      ref_osc_output_freq:
+        initial_value: '1000MHz'  #Can be '10MHz', '100MHz', '1000MHz'
+      ref_osc_external_freq:
+        initial_value: '1000MHz'  #Can be '10MHz', '100MHz', '1000MHz'
+      alc:
+        initial_value: 'OFF'  #Can be ON, OFF, AUTO
+      trigger_impedance:
+        initial_value: 'G10K' #Important when using low-amplitude/weakly-driven trigger pulses
+      #Output Channel Parameters
+      RFOUT.output:
+        initial_value: 'OFF'
+  
+  src_dnc:
+    type: sqdtoolz.Drivers.MWS_SGS100A.MWS_SGS100A
+    address: TCPIP::192.168.1.109::INSTR
+    enable_forced_reconnect: true
+    parameters:
+      ref_osc_source:
+        initial_value: 'EXT' #Can be INT or EXT
+      ref_osc_output_freq:
+        initial_value: '1000MHz'  #Can be '10MHz', '100MHz', '1000MHz'
+      ref_osc_external_freq:
+        initial_value: '1000MHz'  #Can be '10MHz', '100MHz', '1000MHz'
+      alc:
+        initial_value: 'OFF'  #Can be ON, OFF, AUTO
+      trigger_impedance:
+        initial_value: 'G10K' #Important when using low-amplitude/weakly-driven trigger pulses
+      #Output Channel Parameters
+      RFOUT.output:
+        initial_value: 'OFF'
+  sw_rpi:
+    type: sqdtoolz.Drivers.SW_RpiIQBox.SW_RpiIQBox
+    address: 'TCPIP::192.168.1.19::4000::SOCKET'
+    parameters:
+      pulse_delay_time:
+        initial_value: 1
+  src_smb:
+    type: sqdtoolz.Drivers.MWS_SMB100A.MWS_SMB100A
+    address: TCPIP::192.168.1.111::INSTR
+    enable_forced_reconnect: true
+    parameters:
+      ref_osc_source:
+        initial_value: 'EXT' #Can be INT or EXT
+      ref_osc_external_freq:
+        initial_value: '10MHz'
+      alc:
+        initial_value: 'OFF'  #Can be ON, OFF, AUTO
+      #Output Channel Parameters
+      RFOUT.output:
+        initial_value: 'OFF'
+      RFOUT.frequency:
+        initial_value: 1.25e9
+      RFOUT.phase:
+        initial_value: 0.0
+      RFOUT.power:
+        initial_value: 0
+      RFOUT.pulsemod_source:
+        initial_value: 'EXT'
+
+  MWS_Windfreak:
+    type: sqdtoolz.Drivers.MWS_WFSynthHDProV2.MWS_WFSynthHDProV2
+    address: 'COM5'
+    enable_forced_reconnect: true
+    parameters:
+      EXT_REF_frequency:
+        initial_value: 10e6 
+
+  MWS_Windfreak_RO:
+    driver: sqdtoolz.Drivers.MWS_WFSynthHDProV2
+    type: MWS_WFSynthHDProV2
+    address: 'COM6'
+    enable_forced_reconnect: true
+    parameters:
+      EXT_REF_frequency:
+        initial_value: 10e6
+      RFoutA.REF_Source:
+        initial_value: 'EXT'
+      RFoutB.REF_Source:
+        initial_value: 'EXT'

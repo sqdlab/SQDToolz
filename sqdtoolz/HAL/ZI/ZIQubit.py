@@ -147,7 +147,9 @@ class ZIQubit(HALbase, ZIbase):
                 'T1EF':'ef_T1',
                 'T2EF':'ef_T2',
                 'T2EF_star':'ef_T2_star',
-                'FluxDC': 'flux_offset_voltage'
+                'FluxDC': 'flux_offset_voltage',
+                'QubitSpecAmplitude': 'spectroscopy_amplitude',
+                'QubitSpecTime': 'spectroscopy_length'
             }
 
             #Setup some default values

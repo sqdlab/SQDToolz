@@ -7,6 +7,15 @@ from laboneq.laboneq_logging import set_log_dir
 import inspect
 from laboneq.workflow.tasks import compile_experiment
 from laboneq.pulse_sheet_viewer import pulse_sheet_viewer
+#
+from laboneq.simulator.output_simulator import OutputSimulator
+from sqdtoolz.Utilities.Miscellaneous import Miscellaneous
+from bokeh.plotting import figure, save
+from bokeh.models import ColumnDataSource
+from bokeh.layouts import gridplot
+from bokeh.resources import CDN
+from bokeh.embed import file_html
+import numpy as np
 
 class ExpZIqubit(Experiment):
     def __init__(self, name, expt_config, workflow_module, hal_QPU, qubit_ids, **kwargs):
@@ -78,6 +87,68 @@ class ExpZIqubit(Experiment):
             compiled_exp = compile_experiment(leSession, temp_exp)
         if print_pulse_sheet:
             pulse_sheet_viewer.show_pulse_sheet(file_path+'timing_diagram', compiled_exp)
+            output_sim = OutputSimulator(compiled_exp)
+            max_time = output_sim.max_output_length
+            #
+            #Get all pulses/signals from the experiment
+            dict_data = {}
+            for cur_qubit in leQubits:
+                cur_signals = cur_qubit.signals
+                for cur_signal in cur_signals:
+                    cur_logical_signal = cur_signals[cur_signal]
+                    cur_phys_channel_uid = leACQ._instr_zi.device_setup.logical_signal_by_uid(cur_logical_signal).physical_channel
+                    #
+                    cur_name = cur_logical_signal 
+                    if hasattr(cur_phys_channel_uid, 'calibration'):
+                        if hasattr(cur_phys_channel_uid.calibration, 'local_oscillator'):
+                            if hasattr(cur_phys_channel_uid.calibration.local_oscillator, 'frequency'):
+                                cur_freq = cur_phys_channel_uid.calibration.local_oscillator.frequency
+                                if cur_freq > 0:
+                                    cur_name += f' (LO={Miscellaneous.get_units(cur_freq)}Hz)'
+                    dict_data[cur_name] = output_sim.get_snippet(cur_phys_channel_uid, 0, max_time)
+            #
+            #Use Bokeh to plot it in a nice HTML format
+            # Build channel dict
+            channels = {}
+            for cur_ch in dict_data:
+                ch = {'time': dict_data[cur_ch].time}
+                if dict_data[cur_ch].wave.dtype == np.dtype('complex128'):
+                    ch['real'] = np.real(dict_data[cur_ch].wave)
+                    ch['imag'] = np.imag(dict_data[cur_ch].wave)
+                else:
+                    ch['value'] = dict_data[cur_ch].wave
+                channels[cur_ch] = ch
+            plots = []
+            for name, data in channels.items():
+                plot_kwargs = {}
+                if plots:
+                    plot_kwargs['x_range'] = plots[0].x_range
+                p = figure(title=name, x_axis_label="Time", y_axis_label="Value",
+                        tools="pan,xwheel_zoom,box_zoom,reset,save",
+                        active_scroll='xwheel_zoom',
+                        sizing_mode="stretch_width", height=200,
+                        **plot_kwargs)
+                if 'value' in data:
+                    source = ColumnDataSource({'time': data['time'], 'value': data['value']})
+                    p.line(x="time", y="value", source=source,
+                        line_width=2, color='black', legend_label="value")
+                else:
+                    source_real = ColumnDataSource({'time': data['time'], 'real': data['real']})
+                    source_imag = ColumnDataSource({'time': data['time'], 'imag': data['imag']})
+                    p.line(x="time", y="real", source=source_real,
+                        line_width=2, color='red', legend_label="real")
+                    p.line(x="time", y="imag", source=source_imag,
+                        line_width=2, color='blue', legend_label="imag")
+                p.legend.click_policy = "hide"
+                plots.append(p)
+            grid = gridplot([[p] for p in plots],
+                            sizing_mode="stretch_both",
+                            merge_tools=True)
+            html = file_html(grid, CDN, "Channels")
+            html = html.replace("<body>", """<body style="margin:0;padding:0;overflow:hidden;background:#fff;">""")
+            with open(file_path+'timing_diagram_raw.html', "w") as f:
+                f.write(html)
+
         if print_est_time:      
             print(f"Expected Runtime: {compiled_exp.estimated_runtime:.3f}s")
 

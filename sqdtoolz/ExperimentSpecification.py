@@ -2,7 +2,7 @@ from calendar import c
 from sqdtoolz.Variable import*
 import json
 
-import pkg_resources
+from importlib.resources import files
 from sqdtoolz import ExperimentSpecifications
 import os
 
@@ -128,7 +128,7 @@ class ExperimentSpecification:
 
     @staticmethod
     def _get_avail_SPEC_templates():
-        template_dir = pkg_resources.resource_filename('sqdtoolz.ExperimentSpecifications', '')
+        template_dir = str(files('sqdtoolz.ExperimentSpecifications'))
         template_dir = template_dir.replace('\\','/')+'/'
 
         templates = [pos_json for pos_json in os.listdir(template_dir) if pos_json.endswith('.json')]

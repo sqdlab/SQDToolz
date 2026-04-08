@@ -1,3 +1,6 @@
+import os
+os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
+
 import h5py
 import os.path
 import json
@@ -233,7 +236,7 @@ class FileIOReader:
     def __init__(self, filepath):
         self.file_path = filepath
         self.folder_path = os.path.dirname(filepath)
-        self.hdf5_file = h5py.File(filepath, 'r', libver='latest', swmr=True)
+        self.hdf5_file = h5py.File(filepath, 'r', libver='latest', swmr=True, locking=False)
         self.dset = self.hdf5_file["data"]
         if 'timeStamps' in self.hdf5_file:
             self.dsetTS = self.hdf5_file["timeStamps"]

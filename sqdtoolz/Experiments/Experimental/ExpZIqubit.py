@@ -89,7 +89,7 @@ class ExpZIqubit(Experiment):
         if print_pulse_sheet:
             pulse_sheet_viewer.show_pulse_sheet(file_path+'timing_diagram', compiled_exp)
             output_sim = OutputSimulator(compiled_exp)
-            max_time = output_sim.max_output_length
+            max_time = kwargs.get('raw_pulse_sheet_duration', output_sim.max_output_length)
             #
             #Get all pulses/signals from the experiment
             dict_data = {}

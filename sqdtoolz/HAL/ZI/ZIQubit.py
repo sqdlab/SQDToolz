@@ -119,12 +119,12 @@ class ZIQubit(HALbase, ZIbase):
                 'ReadoutQi': 1,
                 'ReadoutQc': 1,
                 'ReadoutQl': 1,
-                'ChiGE': 0,
                 'ReadoutKappa': 0,
                 'ThermalPhotonNum': 0
             }
 
             self._param_mappings = {
+                'ChiGE': 'ge_chi_shift',
                 'DriveLO':'drive_lo_frequency',
                 'DrivePower':'drive_range',
                 'DriveGE':'resonance_frequency_ge',

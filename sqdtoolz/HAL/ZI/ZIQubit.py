@@ -118,7 +118,10 @@ class ZIQubit(HALbase, ZIbase):
             self._param_mappings_local = {
                 'ReadoutQi': 1,
                 'ReadoutQc': 1,
-                'ReadoutQl': 1
+                'ReadoutQl': 1,
+                'ChiGE': 0,
+                'ReadoutKappa': 0,
+                'ThermalPhotonNum': 0
             }
 
             self._param_mappings = {
@@ -136,6 +139,7 @@ class ZIQubit(HALbase, ZIbase):
                 'DriveEFPulse':'ef_drive_pulse',
                 'ReadoutLO':'readout_lo_frequency',
                 'ReadoutPower':'readout_range_out',
+                'ReadoutInputRange':'readout_range_in',
                 'ReadoutFrequency':'readout_resonator_frequency',
                 'ReadoutAmplitude':'readout_amplitude',
                 'ReadoutTime':'readout_length',

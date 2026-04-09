@@ -47,7 +47,8 @@ class ExpZIqubit(Experiment):
             getattr(options, 'use_cal_traces')(self._normalise_data)
         if hasattr(options, 'transition'):
             getattr(options, 'transition')(self._transition)
-        options.close_figures(not self._plot_ZI)
+        if hasattr(options, 'close_figures'):
+            options.close_figures(not self._plot_ZI)
 
         leQPU, leQubits = self._hal_QPU.get_ZI_parameters()
         #Get integer indices of the qubits to select (from names, integers or a mix of both)
@@ -162,6 +163,10 @@ class ExpZIqubit(Experiment):
 
         self._expt_config._hal_ACQ._cur_workflow = exp_workflow
         
+        if kwargs.pop('debug_skip_experiment', False):
+            print('Not running experiment')
+            return
+
         kwargs['skip_init_instruments'] = True
 
         leData = super()._run(file_path, sweep_vars, **kwargs)

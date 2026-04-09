@@ -148,6 +148,7 @@ class ZIQubit(HALbase, ZIbase):
                 'T2EF':'ef_T2',
                 'T2EF_star':'ef_T2_star',
                 'FluxDC': 'flux_offset_voltage',
+                'FluxRange' : 'flux_range',
                 'QubitSpecAmplitude': 'spectroscopy_amplitude',
                 'QubitSpecTime': 'spectroscopy_length'
             }
@@ -163,6 +164,8 @@ class ZIQubit(HALbase, ZIbase):
             self.DriveGE = 5.2e9
             self.DriveEF = 5.1e9
             self.ReadoutFrequency = 7.0e9
+            #TODO set FluxRange automatically to minimum above current FluxDC
+            self.FluxRange = 1
 
             self._zi_qops = TunableTransmonOperations()
 

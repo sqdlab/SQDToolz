@@ -50,7 +50,7 @@ class ExpZIqubit(Experiment):
         if hasattr(options, 'close_figures'):
             options.close_figures(not self._plot_ZI)
 
-        leQPU, leQubits = self._hal_QPU.get_ZI_parameters()
+        leQPU, leQubits, leQcouplers = self._hal_QPU.get_ZI_parameters()
         #Get integer indices of the qubits to select (from names, integers or a mix of both)
         leQubitInds = [self._hal_QPU._resolve_qubit_index(x) for x in self._qubit_ids]
         #Get associated ZI Qubit objects
@@ -66,7 +66,7 @@ class ExpZIqubit(Experiment):
         # folder_store = FolderStore(file_path)
         # folder_store.activate()
         leSession = leACQ._get_ZI_session()
-        leSession.connect(do_emulation=False)
+        leSession.connect(do_emulation=kwargs.get('debug_skip_experiment',False))
         for handler in leLogger.handlers:
             if isinstance(handler, logging.StreamHandler):
                 leLogger.removeHandler(handler)

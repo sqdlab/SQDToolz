@@ -171,7 +171,7 @@ class ZIQubit(HALbase, ZIbase):
             #TODO set FluxRange automatically to minimum above current FluxDC
             self.FluxRange = 1
 
-            self._zi_qops = TunableTransmonOperations()
+            self._zi_qops = TunableTransmonOperations
 
     def get_ZI_parameters(self):
         return self._zi_qubit, self._zi_qops

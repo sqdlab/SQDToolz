@@ -27,7 +27,7 @@ The `QuantumOperations` class is useful in that it can call upon a custom 1QG/2Q
 - Have `sqdtoolz.HAL.ZI.QuantumElements` directory store a bunch of classes written purely in the ZI-format
 - Have the lightest HAL that simply links to the required parameters:
     - The `QuantumElement` class is taken upon instantiation (it stores the name of this class etc.). This implies that the HAL must manually import all the classes for otherwise, it cannot instantiate them on cold-reloading etc.
-    - It creates the HAL properties off the attributes found in the associated `QuantumParameters` class
+    - It creates the HAL **properties off the capitalised attributes** found in the associated `QuantumParameters` class
 - This object is later passed as the coupling to the QPU
 
 

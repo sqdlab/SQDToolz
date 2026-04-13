@@ -20,7 +20,7 @@ ZIQubit('Qubit1', lab, 'zi_boxes', ('shfqc0', 'SGCHANNELS/0/OUTPUT'), ('shfqc0',
 ZIQubit('Qubit2', lab, 'zi_boxes', ('shfqc0', 'SGCHANNELS/1/OUTPUT'), ('shfqc0', 'QACHANNELS/0/OUTPUT'), ('shfqc0', 'QACHANNELS/0/INPUT'), ('hdawg0', 'SIGOUTS/1'))
 
 ZIQuantumElement('Cpl12', lab, TunableTransmonCouplerFixed, flux='Qubit1/flux')
-lab.HAL('Cpl12').QubitFlux = 'Qubit1'
+# lab.HAL('Cpl12').QubitFlux = 'Qubit1'
 
 SOFTqpu('QPU', lab)
 lab.HAL('QPU').add_qubit(lab.HAL('Qubit1'))
@@ -40,10 +40,11 @@ from sqdtoolz.Experiments.Experimental.ZI import calibrate_tunable_transmon_fixe
 
 ExperimentConfiguration('ZI', lab, 0, [], 'ZIacq')
 
+
 exp = ExpZIqubit('test', lab.CONFIG('ZI'), calibrate_tunable_transmon_fixed_coupler, lab.HAL('QPU'),
                  ['Qubit1', 'Qubit2'],
-                 amplitudes=np.linspace(0.1, 1.0, 5),
-                 wait_times=np.arange(1e-9, 10e-9, 2e-9))
+                 amplitudes=np.linspace(-0.85, -0.95, 30),
+                 wait_times=np.linspace(1e-9, 1000e-9, 30))
 lab.run_single(exp, debug_skip_experiment=True)
 a=0
 

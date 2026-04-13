@@ -249,7 +249,7 @@ def create_experiment(
                 the_coupler = cur_qelem
         assert the_coupler != None, f"Could not find a suitable \'TunableTransmonCouplerFixed\' coupler for qubits \'{qubits[0]}\' and \'{qubits[1]}\'. Maybe provide coupler_name explicitly."
     else:
-        the_coupler = zi_qpu[coupler_name]
+        the_coupler = qpu[coupler_name]
         assert isinstance(the_coupler, TunableTransmonCouplerFixed), f"The coupler \'{coupler_name}\' is not a \'TunableTransmonCouplerFixed\' type."
 
     ampls_sweep_pars = SweepParameter(f"flux_amplitude", amplitudes, axis_name=f"flux_amplitude")
@@ -287,10 +287,11 @@ def create_experiment(
                     #     dsl.play(signal=qubits[0].signals['flux'], pulse=lbeqs.pulse_library.const(length=1e-6), amplitude=1.0 )
 
                     with dsl.section(name="main_measure", alignment=SectionAlignment.LEFT):
-                        sec = qop.measure(qubits[0], dsl.handles.result_handle(qubits[0].uid))
-                        # Fix the length of the measure section
-                        sec.length = max_measure_section_length
-                        qop.passive_reset(qubits[0])
+                        for q in qubits:
+                            sec = qop.measure(q, dsl.handles.result_handle(q.uid))
+                            # Fix the length of the measure section
+                            sec.length = max_measure_section_length
+                            qop.passive_reset(q)
 
         if opts.use_cal_traces:
             qop.calibration_traces.omit_section(

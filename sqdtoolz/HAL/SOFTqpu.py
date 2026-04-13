@@ -67,7 +67,7 @@ class SOFTqpu(HALbase, ZIbase):
         leQcouplers = []
         for m in range(len(self._qubit_couplings)):
             cur_hal_cpl = self._lab._get_resolved_obj( self._qubit_couplings[m][2] )
-            assert isinstance(cur_hal_cpl, ZIbase), f"The coupling on definded on index {m} is not a ZI-compatible qubit HAL."
+            assert isinstance(cur_hal_cpl, ZIbase), f"The coupling on defined on index {m} is not a ZI-compatible qubit HAL."
             cpl, qop = cur_hal_cpl.get_ZI_parameters()
             leQcouplers.append(cpl)
             already_exists = False

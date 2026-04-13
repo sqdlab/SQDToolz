@@ -21,7 +21,7 @@ class ZIQuantumElement(HALbase, ZIbase):
 
     @classmethod
     def fromConfigDict(cls, config_dict, lab):
-        return cls(config_dict['Name'], lab, globals()[dict_config['ZI_QuantumElement']], **dict_config['ZI_QuantumElementEx'])
+        return cls(config_dict['Name'], lab, globals()[config_dict['ZI_QuantumElement']], **config_dict['ZI_QuantumElementEx'])
 
     def __getattr__(self, name):
         if name in self.__dict__:

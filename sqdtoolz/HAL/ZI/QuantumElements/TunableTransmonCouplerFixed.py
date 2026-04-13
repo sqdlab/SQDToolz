@@ -10,7 +10,7 @@ from laboneq.simple import *
 
 @attrs.define(kw_only=True)
 class TunableTransmonCouplerFixedParameters(QuantumParameters):
-    QubitFlux: str = ''
+    # QubitFlux: str = ''
     Amplitude: float = 0.5
     Length: float = 100e-9
     Pulse: dict = attrs.field(factory=lambda: {"function": "gaussian_square"})
@@ -32,10 +32,11 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
         pulse_parameters = {"function": "gaussian_square", "sigma": 0.5}
         flux_pulse = dsl.create_pulse(pulse_parameters, name="flux_pulse")
 
-        assert q.parameters.QubitFlux != '', "Must set QubitFlux in the coupler."
+        # assert q.parameters.QubitFlux != '', "Must set QubitFlux in the coupler."
 
         dsl.play(
-            self.qpu[q.parameters.QubitFlux].signals['flux'],
+            # self.qpu[q.parameters.QubitFlux].signals['flux'],
+            q.signals['flux'],
             amplitude=amplitude,
             length=length,
             pulse=flux_pulse,
@@ -46,12 +47,13 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
         self,
         q: TunableTransmonCouplerFixed,
         qubit_name_control: str,
-        amplitude: float | SweepParameter,
-        length: float | SweepParameter,
         phase: float = 0.0,
     ) -> None:
         pulse_parameters = {"function": "gaussian_square", "sigma": 0.5}
         flux_pulse = dsl.create_pulse(pulse_parameters, name="flux_pulse")
+
+        amplitude = q.parameters.Amplitude
+        length = q.parameters.Length
 
         dsl.play(
             q.signals["flux"],

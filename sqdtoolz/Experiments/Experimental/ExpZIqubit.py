@@ -152,10 +152,11 @@ class ExpZIqubit(Experiment):
                 p.legend.click_policy = "hide"
                 plots.append(p)
             grid = gridplot([[p] for p in plots],
-                            sizing_mode="stretch_both",
+                            sizing_mode="stretch_width",
                             merge_tools=True)
             html = file_html(grid, CDN, "Channels")
-            html = html.replace("<body>", """<body style="margin:0;padding:0;overflow:hidden;background:#fff;">""")
+            html = html.replace("height: 100%;", "min-height: 100%;")
+            html = html.replace("display: flow-root;", "")
             with open(file_path+'timing_diagram_raw.html', "w") as f:
                 f.write(html)
 

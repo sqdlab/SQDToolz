@@ -96,7 +96,7 @@ class ZIACQ(HALbase, ZIbase):
         elif averaging_mode == "DEFAULT":
             self._zi_opts['acquisition_type'] = "DEFAULT"
         else:
-            assert False, "AcquisitionMode must be \'INTEGTRATION\', \'RAW\', \'SPECTROSCOPY\' (HW frequency sweep), \'SPECTROSCOPY_PSD\', \'DISCRIMINATION\' or \'DEFAULT\'"
+            assert False, "AcquisitionMode must be \'INTEGRATION\', \'RAW\', \'SPECTROSCOPY\' (HW frequency sweep), \'SPECTROSCOPY_PSD\', \'DISCRIMINATION\' or \'DEFAULT\'"
 
     def get_ZI_parameters(self):
         return {x:self._zi_opts[x] for x in self._zi_opts if self._zi_opts[x] != "DEFAULT"}

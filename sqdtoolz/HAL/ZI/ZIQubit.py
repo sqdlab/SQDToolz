@@ -74,6 +74,7 @@ class ZIQubit(HALbase, ZIbase):
         conns.append((self._zi_instr_phys_measure[0], lbeqs.create_connection(to_signal=f"{qubit_name}/measure", ports=self._zi_instr_phys_measure[1], type="iq"), "measure"))
         conns.append((self._zi_instr_phys_acquire[0], lbeqs.create_connection(to_signal=f"{qubit_name}/acquire", ports=self._zi_instr_phys_acquire[1], type="acquire"), "acquire"))
         conns.append((self._zi_instr_phys_drive[0], lbeqs.create_connection(to_signal=f"{qubit_name}/drive", ports=self._zi_instr_phys_drive[1], type="iq"), "drive"))
+        conns.append((self._zi_instr_phys_drive[0], lbeqs.create_connection(to_signal=f"{qubit_name}/drive_ef", ports=self._zi_instr_phys_drive[1], type="iq"), "drive_ef"))
         if self._zi_instr_phys_flux[0] != "":
             conns.append((self._zi_instr_phys_flux[0], lbeqs.create_connection(to_signal=f"{qubit_name}/flux", ports=self._zi_instr_phys_flux[1], type="rf"), "flux"))
 

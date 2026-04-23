@@ -84,7 +84,7 @@ class ExpZIqubit(Experiment):
             temp_exp = self._workflow_module.create_experiment(
                         leQPU,
                         **qubit_kwarg,
-                        options=options,
+                        options=options.base._task_options['create_experiment'],    #TODO: Look into pitfalls here, but it needs to be converted into actual options here anyway...
                         **self._args)
             compiled_exp = compile_experiment(leSession, temp_exp)
         if print_pulse_sheet:

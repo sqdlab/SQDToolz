@@ -35,6 +35,7 @@ zi_qpu, zi_qubits, z_qcouplers = lab.HAL('QPU').get_ZI_parameters()
 # plt.show()
 
 ZIACQ('ZIacq', lab, 'zi_boxes')
+lab.HAL('ZIacq').NumRepetitions = 2048
 
 from sqdtoolz.Experiments.Experimental.ZI import calibrate_tunable_transmon_fixed_coupler
 

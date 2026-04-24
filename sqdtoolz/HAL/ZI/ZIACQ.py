@@ -54,6 +54,8 @@ class ZIACQ(HALbase, ZIbase):
             return "AverageBeforeSweep"
         elif self._zi_opts['averaging_mode'] == lbeqs.AveragingMode.CYCLIC:
             return "SweepBeforeAverage"
+        elif self._zi_opts['averaging_mode'] == lbeqs.AveragingMode.SINGLE_SHOT:
+            return "SingleShot"
         elif self._zi_opts['averaging_mode'] == "DEFAULT":
             return "DEFAULT"
     @AveragingOrder.setter
@@ -62,6 +64,8 @@ class ZIACQ(HALbase, ZIbase):
             self._zi_opts['averaging_mode'] = lbeqs.AveragingMode.SEQUENTIAL
         elif averaging_mode == "SweepBeforeAverage":
             self._zi_opts['averaging_mode'] = lbeqs.AveragingMode.CYCLIC
+        elif averaging_mode == "SingleShot":
+            self._zi_opts['averaging_mode'] = lbeqs.AveragingMode.SINGLE_SHOT
         elif averaging_mode == "DEFAULT":
             self._zi_opts['averaging_mode'] = "DEFAULT"
         else:

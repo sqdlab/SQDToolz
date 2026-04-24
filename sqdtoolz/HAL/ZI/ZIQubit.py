@@ -145,6 +145,7 @@ class ZIQubit(HALbase, ZIbase):
                 'ReadoutTime':'readout_length',
                 'ReadoutPad':'readout_integration_delay',
                 'ResetTime':'reset_delay_length',
+                'IntegrationTime':'readout_integration_length',
                 'T1GE':'ge_T1',
                 'T2GE':'ge_T2',
                 'T2GE_star':'ge_T2_star',

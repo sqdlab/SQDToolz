@@ -15,6 +15,7 @@ from sqdtoolz.HAL.GENatten import*
 from sqdtoolz.HAL.GENsmu import*
 from sqdtoolz.HAL.ZI.ZIQubit import ZIQubit
 from sqdtoolz.HAL.ZI.ZIACQ import ZIACQ
+from sqdtoolz.HAL.ZI.ZIQuantumElement import ZIQuantumElement   #TODO: Okay refactor this to be more automated...
 from sqdtoolz.HAL.SOFTqpu import SOFTqpu
 from sqdtoolz.HAL.Processors.ProcessorCPU import*
 try:

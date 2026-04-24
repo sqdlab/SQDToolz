@@ -74,6 +74,7 @@ class ZIQubit(HALbase, ZIbase):
         conns.append((self._zi_instr_phys_measure[0], lbeqs.create_connection(to_signal=f"{qubit_name}/measure", ports=self._zi_instr_phys_measure[1], type="iq"), "measure"))
         conns.append((self._zi_instr_phys_acquire[0], lbeqs.create_connection(to_signal=f"{qubit_name}/acquire", ports=self._zi_instr_phys_acquire[1], type="acquire"), "acquire"))
         conns.append((self._zi_instr_phys_drive[0], lbeqs.create_connection(to_signal=f"{qubit_name}/drive", ports=self._zi_instr_phys_drive[1], type="iq"), "drive"))
+        conns.append((self._zi_instr_phys_drive[0], lbeqs.create_connection(to_signal=f"{qubit_name}/drive_ef", ports=self._zi_instr_phys_drive[1], type="iq"), "drive_ef"))
         if self._zi_instr_phys_flux[0] != "":
             conns.append((self._zi_instr_phys_flux[0], lbeqs.create_connection(to_signal=f"{qubit_name}/flux", ports=self._zi_instr_phys_flux[1], type="rf"), "flux"))
 
@@ -119,12 +120,12 @@ class ZIQubit(HALbase, ZIbase):
                 'ReadoutQi': 1,
                 'ReadoutQc': 1,
                 'ReadoutQl': 1,
-                'ChiGE': 0,
                 'ReadoutKappa': 0,
                 'ThermalPhotonNum': 0
             }
 
             self._param_mappings = {
+                'ChiGE': 'ge_chi_shift',
                 'DriveLO':'drive_lo_frequency',
                 'DrivePower':'drive_range',
                 'DriveGE':'resonance_frequency_ge',
@@ -153,6 +154,7 @@ class ZIQubit(HALbase, ZIbase):
                 'T2EF':'ef_T2',
                 'T2EF_star':'ef_T2_star',
                 'FluxDC': 'flux_offset_voltage',
+                'FluxRange' : 'flux_range',
                 'QubitSpecAmplitude': 'spectroscopy_amplitude',
                 'QubitSpecTime': 'spectroscopy_length'
             }
@@ -168,8 +170,10 @@ class ZIQubit(HALbase, ZIbase):
             self.DriveGE = 5.2e9
             self.DriveEF = 5.1e9
             self.ReadoutFrequency = 7.0e9
+            #TODO set FluxRange automatically to minimum above current FluxDC
+            self.FluxRange = 1
 
-            self._zi_qops = TunableTransmonOperations()
+            self._zi_qops = TunableTransmonOperations
 
     def get_ZI_parameters(self):
         return self._zi_qubit, self._zi_qops

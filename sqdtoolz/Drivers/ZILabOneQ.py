@@ -7,7 +7,7 @@ import numpy as np
 
 class ZILabOneQ(Instrument):
     """
-    Driver for the Windfreak SynthHD PRO v2.
+    Driver for the Zurich Instruments boxes
     """
     def __init__(self, name, address, port, setup_yaml, **kwargs):
         Instrument.__init__(self, name, **kwargs)

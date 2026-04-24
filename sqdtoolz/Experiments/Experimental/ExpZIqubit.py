@@ -11,7 +11,7 @@ from laboneq.pulse_sheet_viewer import pulse_sheet_viewer
 from laboneq.simulator.output_simulator import OutputSimulator
 from sqdtoolz.Utilities.Miscellaneous import Miscellaneous
 from bokeh.plotting import figure, save
-from bokeh.models import ColumnDataSource
+from bokeh.models import ColumnDataSource, WheelZoomTool, PanTool, BoxZoomTool, ResetTool
 from bokeh.layouts import gridplot
 from bokeh.resources import CDN
 from bokeh.embed import file_html
@@ -47,9 +47,10 @@ class ExpZIqubit(Experiment):
             getattr(options, 'use_cal_traces')(self._normalise_data)
         if hasattr(options, 'transition'):
             getattr(options, 'transition')(self._transition)
-        options.close_figures(not self._plot_ZI)
+        if hasattr(options, 'close_figures'):
+            options.close_figures(not self._plot_ZI)
 
-        leQPU, leQubits = self._hal_QPU.get_ZI_parameters()
+        leQPU, leQubits, leQcouplers = self._hal_QPU.get_ZI_parameters()
         #Get integer indices of the qubits to select (from names, integers or a mix of both)
         leQubitInds = [self._hal_QPU._resolve_qubit_index(x) for x in self._qubit_ids]
         #Get associated ZI Qubit objects
@@ -65,7 +66,7 @@ class ExpZIqubit(Experiment):
         # folder_store = FolderStore(file_path)
         # folder_store.activate()
         leSession = leACQ._get_ZI_session()
-        leSession.connect(do_emulation=False)
+        leSession.connect(do_emulation=kwargs.get('debug_skip_experiment',False))
         for handler in leLogger.handlers:
             if isinstance(handler, logging.StreamHandler):
                 leLogger.removeHandler(handler)
@@ -83,12 +84,13 @@ class ExpZIqubit(Experiment):
             temp_exp = self._workflow_module.create_experiment(
                         leQPU,
                         **qubit_kwarg,
+                        options=options.base._task_options['create_experiment'],    #TODO: Look into pitfalls here, but it needs to be converted into actual options here anyway...
                         **self._args)
             compiled_exp = compile_experiment(leSession, temp_exp)
         if print_pulse_sheet:
             pulse_sheet_viewer.show_pulse_sheet(file_path+'timing_diagram', compiled_exp)
             output_sim = OutputSimulator(compiled_exp)
-            max_time = output_sim.max_output_length
+            max_time = kwargs.get('raw_pulse_sheet_duration', output_sim.max_output_length)
             #
             #Get all pulses/signals from the experiment
             dict_data = {}
@@ -107,7 +109,7 @@ class ExpZIqubit(Experiment):
                                     cur_name += f' (LO={Miscellaneous.get_units(cur_freq)}Hz)'
                     dict_data[cur_name] = output_sim.get_snippet(cur_phys_channel_uid, 0, max_time)
             #
-            #Use Bokeh to plot it in a nice HTML format
+            #Use Bokeh to plot it in a nice HTML format (ctrl for x-zoom)
             # Build channel dict
             channels = {}
             for cur_ch in dict_data:
@@ -123,11 +125,20 @@ class ExpZIqubit(Experiment):
                 plot_kwargs = {}
                 if plots:
                     plot_kwargs['x_range'] = plots[0].x_range
-                p = figure(title=name, x_axis_label="Time", y_axis_label="Value",
-                        tools="pan,xwheel_zoom,box_zoom,reset,save",
-                        active_scroll='xwheel_zoom',
-                        sizing_mode="stretch_width", height=200,
-                        **plot_kwargs)
+                #
+                wheel_zoom = WheelZoomTool(dimensions="width")
+                wheel_zoom.modifiers = {"ctrl": True}
+                p = figure(
+                    title=name, x_axis_label="Time (s)", y_axis_label="Value",
+                    tools="",
+                    active_scroll=wheel_zoom,
+                    sizing_mode="stretch_width", height=200,
+                    **plot_kwargs)
+                p.add_tools(
+                    PanTool(dimensions="width"),
+                    wheel_zoom,
+                    BoxZoomTool(dimensions="width"),
+                    ResetTool())
                 if 'value' in data:
                     source = ColumnDataSource({'time': data['time'], 'value': data['value']})
                     p.line(x="time", y="value", source=source,
@@ -142,10 +153,11 @@ class ExpZIqubit(Experiment):
                 p.legend.click_policy = "hide"
                 plots.append(p)
             grid = gridplot([[p] for p in plots],
-                            sizing_mode="stretch_both",
+                            sizing_mode="stretch_width",
                             merge_tools=True)
             html = file_html(grid, CDN, "Channels")
-            html = html.replace("<body>", """<body style="margin:0;padding:0;overflow:hidden;background:#fff;">""")
+            html = html.replace("height: 100%;", "min-height: 100%;")
+            html = html.replace("display: flow-root;", "")
             with open(file_path+'timing_diagram_raw.html', "w") as f:
                 f.write(html)
 
@@ -162,6 +174,10 @@ class ExpZIqubit(Experiment):
 
         self._expt_config._hal_ACQ._cur_workflow = exp_workflow
         
+        if kwargs.pop('debug_skip_experiment', False):
+            print('Not running experiment')
+            return
+
         kwargs['skip_init_instruments'] = True
 
         leData = super()._run(file_path, sweep_vars, **kwargs)

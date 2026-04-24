@@ -100,7 +100,7 @@ class ZIACQ(HALbase, ZIbase):
         elif averaging_mode == "DEFAULT":
             self._zi_opts['acquisition_type'] = "DEFAULT"
         else:
-            assert False, "AcquisitionMode must be \'INTEGTRATION\', \'RAW\', \'SPECTROSCOPY\' (HW frequency sweep), \'SPECTROSCOPY_PSD\', \'DISCRIMINATION\' or \'DEFAULT\'"
+            assert False, "AcquisitionMode must be \'INTEGRATION\', \'RAW\', \'SPECTROSCOPY\' (HW frequency sweep), \'SPECTROSCOPY_PSD\', \'DISCRIMINATION\' or \'DEFAULT\'"
 
     def get_ZI_parameters(self):
         return {x:self._zi_opts[x] for x in self._zi_opts if self._zi_opts[x] != "DEFAULT"}
@@ -149,9 +149,9 @@ class ZIACQ(HALbase, ZIbase):
                 }}
         for cur_dataset in datasets:
             #TODO Broken for dispersive shift due to tree structure
-            if hasattr(workflow_results.output.data[datasets[0]].result, 'e'):
+            if hasattr(workflow_results.output.data[cur_dataset].result, 'e'):
                 for i in ['e','g']:
-                    cur_res = workflow_results.output.data[datasets[0]].result[i]
+                    cur_res = workflow_results.output.data[cur_dataset].result[i]
                     ret_val[str(cur_dataset) + '_' + i] = {
                             #TODO: They allow multiple mappings to a given axis; this is a bit of a hack...
                             'parameters' : [(x[0] if isinstance(x, list) else x) for x in cur_res.axis_name],
@@ -167,7 +167,7 @@ class ZIACQ(HALbase, ZIbase):
                         ret_val[str(cur_dataset) + '_' + i]['parameter_values'][cur_axis_name] = (cur_res.axis[m][0] if isinstance(cur_res.axis[m], list) else cur_res.axis[m])
                     self._process_data_dict(cur_res.data, ret_val[str(cur_dataset) + '_' + i]['data'])
             else:
-                cur_res = workflow_results.output.data[datasets[0]].result
+                cur_res = workflow_results.output.data[cur_dataset].result
                 ret_val[cur_dataset] = {
                         #TODO: They allow multiple mappings to a given axis; this is a bit of a hack...
                         'parameters' : [(x[0] if isinstance(x, list) else x) for x in cur_res.axis_name],
@@ -183,8 +183,8 @@ class ZIACQ(HALbase, ZIbase):
                     ret_val[cur_dataset]['parameter_values'][cur_axis_name] = (cur_res.axis[m][0] if isinstance(cur_res.axis[m], list) else cur_res.axis[m])
                 self._process_data_dict(cur_res.data, ret_val[cur_dataset]['data'])
                     
-            if 'cal_trace' in workflow_results.output.data[datasets[0]]:
-                cur_cal_traces = workflow_results.output.data[datasets[0]].cal_trace
+            if 'cal_trace' in workflow_results.output.data[cur_dataset]:
+                cur_cal_traces = workflow_results.output.data[cur_dataset].cal_trace
                 ret_val[cur_dataset + '_calib'] = {
                         'parameters' : ['count'],
                         'data' : {},

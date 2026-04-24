@@ -29,9 +29,9 @@ class SOFTqpu(HALbase, ZIbase):
         qubit1 = self._resolve_qubit_index(qubit1)
         qubit2 = self._resolve_qubit_index(qubit2)
         if isinstance(hal_obj, HALbase):
-            self._qubits.append((qubit1, qubit2, self._lab._resolve_sqdobj_tree(hal_obj)))
+            self._qubit_couplings.append((qubit1, qubit2, self._lab._resolve_sqdobj_tree(hal_obj)))
         else:
-            self._qubits.append((qubit1, qubit2, hal_obj))
+            self._qubit_couplings.append((qubit1, qubit2, hal_obj))
 
     def get_qubit(self, qubit_id: str|int):
         return self._qubits[self._resolve_qubit_index(qubit_id)]
@@ -50,25 +50,45 @@ class SOFTqpu(HALbase, ZIbase):
 
     def get_ZI_parameters(self):
         leQubits = []
+        leQelems = []
         leQops = []
         for m in range(len(self._qubits)):
             cur_qubit = self._lab._get_resolved_obj(self._qubits[m])
             assert isinstance(cur_qubit, ZIbase), f"The qubit on index {m} is not a ZI-compatible qubit HAL."
             qubit, qop = cur_qubit.get_ZI_parameters()
             leQubits.append(qubit)
-            leQops.append(qop)
-            qop.detach_qpu()
-        leQPU = laboneq.dsl.quantum.QPU(leQubits, quantum_operations=leQops[0]) #TODO: Look up why this doesn't work with a list properly...
+            already_exists = False
+            for cur_op in leQops:
+                if type(cur_op) == type(qop):
+                    already_exists = True
+                    break
+            if not already_exists:
+                leQops.append(qop)
+        leQcouplers = []
         for m in range(len(self._qubit_couplings)):
-            qubit1 = self._qubits[self._qubit_couplings[m][0]].Name
-            qubit2 = self._qubits[self._qubit_couplings[m][1]].Name
+            cur_hal_cpl = self._lab._get_resolved_obj( self._qubit_couplings[m][2] )
+            assert isinstance(cur_hal_cpl, ZIbase), f"The coupling on defined on index {m} is not a ZI-compatible qubit HAL."
+            cpl, qop = cur_hal_cpl.get_ZI_parameters()
+            leQcouplers.append(cpl)
+            already_exists = False
+            for cur_op in leQops:
+                if cur_op.__name__ == qop.__name__: #These are classes - hence using __name__ as opposed to type...
+                    already_exists = True
+                    break
+            if not already_exists:
+                leQops.append(qop)
+        leQPU = laboneq.dsl.quantum.QPU(leQubits + leQcouplers, quantum_operations=leQops)
+        for m in range(len(self._qubit_couplings)):
+            qubit1 = self._lab._get_resolved_obj(self._qubits[self._qubit_couplings[m][0]]).Name
+            qubit2 = self._lab._get_resolved_obj(self._qubits[self._qubit_couplings[m][1]]).Name
             if isinstance(self._qubit_couplings[m][2], str):
                 leQPU.topology.add_edge(self._qubit_couplings[m][2], qubit1, qubit2)
             else:
                 cur_cpl = self._lab._get_resolved_obj(self._qubit_couplings[m][2])
-                assert isinstance(hal_obj, ZIbase), f"The qubit coupling {cur_cpl.Name} between qubits {qubit1} and {qubit2} is not a ZI-compatible qubit HAL."
-                leQPU.topology.add_edge(cur_cpl.Name, qubit1, qubit2, quantum_elements=cur_cpl.get_ZI_parameters())
-        return leQPU, leQubits
+                assert isinstance(cur_cpl, ZIbase), f"The qubit coupling {cur_cpl.Name} between qubits {qubit1} and {qubit2} is not a ZI-compatible qubit HAL."
+                cpl, qop = cur_cpl.get_ZI_parameters()
+                leQPU.topology.add_edge(cur_cpl.Name, qubit1, qubit2, quantum_element=cpl)
+        return leQPU, leQubits, leQcouplers
 
     def _resolve_qubit_index(self, qubit_id):
         if isinstance(qubit_id, int):

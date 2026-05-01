@@ -76,17 +76,63 @@ class ExpZIqubit(Experiment):
         
         sig = inspect.signature(self._workflow_module.create_experiment)
         zi_exp_params = list(sig.parameters.keys())
-        if 'qubit' in zi_exp_params:
+        sig = inspect.signature(self._workflow_module.experiment_workflow._func)    #This is the function that uses the workflow decorator to create the workflow... Otherwise it just retursn 'args' and 'kwargs'
+        zi_wfw_params = list(sig.parameters.keys())
+        if 'qubit' in zi_exp_params:    #TODO: Refactor and use the zi_wfw or zi_exp as appropriate. It is a bit too hacky right now...
             qubit_kwarg = {'qubit': leQubits[0]}
         else:
             qubit_kwarg = {'qubits': leQubits}
 
-        if 'states' in self._args and not ('states' in zi_exp_params):
-            if 'state' in zi_exp_params:
-                pass
+        execution_time = 0
+        if 'states' in self._args and not ('states' in zi_exp_params) and 'state' in zi_exp_params:
+            #A hack that is probably find - could dive deeper, but it shouldn't be the typical use-case...abs
+            temp_states = self._args.pop('states')
+            for cur_state in temp_states:
+                self._args['state'] = cur_state
+                execution_time += self._estimate_experiment_params(kwargs,leSession,leQPU,leQubits,qubit_kwarg,options,file_path, f'_{cur_state}')
+            self._args.pop('state')
+            self._args['states'] = temp_states
+        else:
+            execution_time = self._estimate_experiment_params(kwargs,leSession,leQPU,leQubits,qubit_kwarg,options,file_path)
+        #Another hack for the case where they iterate once per qubit in the experiment for a given workflow...
+        if 'qubits' in zi_wfw_params and not ('qubits' in zi_exp_params) and 'qubit' in zi_exp_params:
+            execution_time *= len(leQubits)
+            qubit_kwarg = {'qubits': leQubits}
 
-        print_pulse_sheet = kwargs.pop('print_pulse_sheet',True)
-        print_est_time =  kwargs.pop('print_estimated_execution_time',True)
+        if kwargs.get('print_estimated_execution_time',True):
+            print(f"Expected Runtime: {execution_time:.3f}s")
+        
+        exp_workflow = self._workflow_module.experiment_workflow(
+            session=leSession,
+            qpu=leQPU,
+            **qubit_kwarg,
+            options=options,
+            **self._args
+        )
+
+        self._expt_config._hal_ACQ._cur_workflow = exp_workflow
+        
+        if kwargs.pop('debug_skip_experiment', False):
+            print('Not running experiment')
+            return
+
+        kwargs['skip_init_instruments'] = True
+
+        leData = super()._run(file_path, sweep_vars, **kwargs)
+
+        # folder_store.deactivate()
+        # logging_store.deactivate()
+        
+        return leData
+
+    def _post_process(self, data):
+        pass
+
+    def _estimate_experiment_params(self, kwargs,leSession,leQPU,leQubits,qubit_kwarg,options,file_path, file_name_suffix=''):
+        print_pulse_sheet = kwargs.get('print_pulse_sheet',True)
+        print_est_time =  kwargs.get('print_estimated_execution_time',True)
+        leACQ = self._expt_config._hal_ACQ
+        compiled_exp = None
         if print_pulse_sheet or print_est_time:
             temp_exp = self._workflow_module.create_experiment(
                         leQPU,
@@ -165,34 +211,12 @@ class ExpZIqubit(Experiment):
             html = file_html(grid, CDN, "Channels")
             html = html.replace("height: 100%;", "min-height: 100%;")
             html = html.replace("display: flow-root;", "")
-            with open(file_path+'timing_diagram_raw.html', "w") as f:
+            with open(file_path+f'timing_diagram_raw{file_name_suffix}.html', "w") as f:
                 f.write(html)
 
-        if print_est_time:      
-            print(f"Expected Runtime: {compiled_exp.estimated_runtime:.3f}s")
+        if compiled_exp:
+            return compiled_exp.estimated_runtime
+        else:
+            return -1
 
-        exp_workflow = self._workflow_module.experiment_workflow(
-            session=leSession,
-            qpu=leQPU,
-            **qubit_kwarg,
-            options=options,
-            **self._args
-        )
 
-        self._expt_config._hal_ACQ._cur_workflow = exp_workflow
-        
-        if kwargs.pop('debug_skip_experiment', False):
-            print('Not running experiment')
-            return
-
-        kwargs['skip_init_instruments'] = True
-
-        leData = super()._run(file_path, sweep_vars, **kwargs)
-
-        # folder_store.deactivate()
-        # logging_store.deactivate()
-        
-        return leData
-
-    def _post_process(self, data):
-        pass

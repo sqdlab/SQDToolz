@@ -49,6 +49,9 @@ class ExpZIqubit(Experiment):
             getattr(options, 'transition')(self._transition)
         if hasattr(options, 'close_figures'):
             options.close_figures(not self._plot_ZI)
+        for x in [y for y in self._args]:
+            if hasattr(options, x):
+                getattr(options, x)(self._args.pop(x))
 
         leQPU, leQubits, leQcouplers = self._hal_QPU.get_ZI_parameters()
         #Get integer indices of the qubits to select (from names, integers or a mix of both)
@@ -77,7 +80,11 @@ class ExpZIqubit(Experiment):
             qubit_kwarg = {'qubit': leQubits[0]}
         else:
             qubit_kwarg = {'qubits': leQubits}
-        
+
+        if 'states' in self._args and not ('states' in zi_exp_params):
+            if 'state' in zi_exp_params:
+                pass
+
         print_pulse_sheet = kwargs.pop('print_pulse_sheet',True)
         print_est_time =  kwargs.pop('print_estimated_execution_time',True)
         if print_pulse_sheet or print_est_time:

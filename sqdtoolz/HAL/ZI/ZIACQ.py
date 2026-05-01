@@ -28,6 +28,10 @@ class ZIACQ(HALbase, ZIbase):
         return cls(config_dict['Name'], lab, config_dict['instrument'])
 
     @property
+    def IsACQhal(self):
+        return True
+
+    @property
     def NumRepetitions(self):
         return self._zi_opts['count']
     @NumRepetitions.setter
@@ -149,10 +153,27 @@ class ZIACQ(HALbase, ZIbase):
                 }}
         for cur_dataset in datasets:
             #TODO Broken for dispersive shift due to tree structure
-            if hasattr(workflow_results.output.data[cur_dataset].result, 'e'):
-                for i in ['e','g']:
-                    cur_res = workflow_results.output.data[cur_dataset].result[i]
-                    ret_val[str(cur_dataset) + '_' + i] = {
+            if hasattr(workflow_results.output.data[cur_dataset], 'result'):
+                if hasattr(workflow_results.output.data[cur_dataset].result, 'e'):
+                    for i in ['e','g']:
+                        cur_res = workflow_results.output.data[cur_dataset].result[i]
+                        ret_val[str(cur_dataset) + '_' + i] = {
+                                #TODO: They allow multiple mappings to a given axis; this is a bit of a hack...
+                                'parameters' : [(x[0] if isinstance(x, list) else x) for x in cur_res.axis_name],
+                                'data' : {},
+                                'parameter_values': {}
+                            }
+                        for m,cur_axis in enumerate(cur_res.axis_name):
+                            #TODO: Again they allow multiple mappings to a given axis; this is a bit of a hack...
+                            if isinstance(cur_axis, list):
+                                cur_axis_name = cur_axis[0]
+                            else:
+                                cur_axis_name = cur_axis
+                            ret_val[str(cur_dataset) + '_' + i]['parameter_values'][cur_axis_name] = (cur_res.axis[m][0] if isinstance(cur_res.axis[m], list) else cur_res.axis[m])
+                        self._process_data_dict(cur_res.data, ret_val[str(cur_dataset) + '_' + i]['data'])
+                else:
+                    cur_res = workflow_results.output.data[cur_dataset].result
+                    ret_val[cur_dataset] = {
                             #TODO: They allow multiple mappings to a given axis; this is a bit of a hack...
                             'parameters' : [(x[0] if isinstance(x, list) else x) for x in cur_res.axis_name],
                             'data' : {},
@@ -164,24 +185,8 @@ class ZIACQ(HALbase, ZIbase):
                             cur_axis_name = cur_axis[0]
                         else:
                             cur_axis_name = cur_axis
-                        ret_val[str(cur_dataset) + '_' + i]['parameter_values'][cur_axis_name] = (cur_res.axis[m][0] if isinstance(cur_res.axis[m], list) else cur_res.axis[m])
-                    self._process_data_dict(cur_res.data, ret_val[str(cur_dataset) + '_' + i]['data'])
-            else:
-                cur_res = workflow_results.output.data[cur_dataset].result
-                ret_val[cur_dataset] = {
-                        #TODO: They allow multiple mappings to a given axis; this is a bit of a hack...
-                        'parameters' : [(x[0] if isinstance(x, list) else x) for x in cur_res.axis_name],
-                        'data' : {},
-                        'parameter_values': {}
-                    }
-                for m,cur_axis in enumerate(cur_res.axis_name):
-                    #TODO: Again they allow multiple mappings to a given axis; this is a bit of a hack...
-                    if isinstance(cur_axis, list):
-                        cur_axis_name = cur_axis[0]
-                    else:
-                        cur_axis_name = cur_axis
-                    ret_val[cur_dataset]['parameter_values'][cur_axis_name] = (cur_res.axis[m][0] if isinstance(cur_res.axis[m], list) else cur_res.axis[m])
-                self._process_data_dict(cur_res.data, ret_val[cur_dataset]['data'])
+                        ret_val[cur_dataset]['parameter_values'][cur_axis_name] = (cur_res.axis[m][0] if isinstance(cur_res.axis[m], list) else cur_res.axis[m])
+                    self._process_data_dict(cur_res.data, ret_val[cur_dataset]['data'])
                     
             if 'cal_trace' in workflow_results.output.data[cur_dataset]:
                 cur_cal_traces = workflow_results.output.data[cur_dataset].cal_trace

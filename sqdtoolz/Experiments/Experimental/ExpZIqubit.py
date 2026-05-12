@@ -83,24 +83,25 @@ class ExpZIqubit(Experiment):
         else:
             qubit_kwarg = {'qubits': leQubits}
 
-        execution_time = 0
-        if 'states' in self._args and not ('states' in zi_exp_params) and 'state' in zi_exp_params:
-            #A hack that is probably find - could dive deeper, but it shouldn't be the typical use-case...abs
-            temp_states = self._args.pop('states')
-            for cur_state in temp_states:
-                self._args['state'] = cur_state
-                execution_time += self._estimate_experiment_params(kwargs,leSession,leQPU,leQubits,qubit_kwarg,options,file_path, f'_{cur_state}')
-            self._args.pop('state')
-            self._args['states'] = temp_states
-        else:
-            execution_time = self._estimate_experiment_params(kwargs,leSession,leQPU,leQubits,qubit_kwarg,options,file_path)
-        #Another hack for the case where they iterate once per qubit in the experiment for a given workflow...
-        if 'qubits' in zi_wfw_params and not ('qubits' in zi_exp_params) and 'qubit' in zi_exp_params:
-            execution_time *= len(leQubits)
-            qubit_kwarg = {'qubits': leQubits}
+        if not kwargs.get('quick_query',False):
+            execution_time = 0
+            if 'states' in self._args and not ('states' in zi_exp_params) and 'state' in zi_exp_params:
+                #A hack that is probably find - could dive deeper, but it shouldn't be the typical use-case...abs
+                temp_states = self._args.pop('states')
+                for cur_state in temp_states:
+                    self._args['state'] = cur_state
+                    execution_time += self._estimate_experiment_params(kwargs,leSession,leQPU,leQubits,qubit_kwarg,options,file_path, f'_{cur_state}')
+                self._args.pop('state')
+                self._args['states'] = temp_states
+            else:
+                execution_time = self._estimate_experiment_params(kwargs,leSession,leQPU,leQubits,qubit_kwarg,options,file_path)
+            #Another hack for the case where they iterate once per qubit in the experiment for a given workflow...
+            if 'qubits' in zi_wfw_params and not ('qubits' in zi_exp_params) and 'qubit' in zi_exp_params:
+                execution_time *= len(leQubits)
+                qubit_kwarg = {'qubits': leQubits}
 
-        if kwargs.get('print_estimated_execution_time',True):
-            print(f"Expected Runtime: {execution_time:.3f}s")
+            if kwargs.get('print_estimated_execution_time',True):
+                print(f"Expected Runtime: {execution_time:.3f}s")
         
         exp_workflow = self._workflow_module.experiment_workflow(
             session=leSession,
@@ -115,6 +116,10 @@ class ExpZIqubit(Experiment):
         if kwargs.pop('debug_skip_experiment', False):
             print('Not running experiment')
             return
+
+        if kwargs.get('quick_query',False):
+            self._expt_config.prepare_instruments()
+            return self._expt_config.get_data()
 
         kwargs['skip_init_instruments'] = True
 

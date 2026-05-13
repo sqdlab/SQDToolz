@@ -24,7 +24,6 @@ class ExpZIRes(ExpZIqubit):
         self._param_fano = kwargs.pop('param_fano', None)
         self._dont_plot = kwargs.pop('dont_plot', False)
         self._xUnits = kwargs.pop('plot_x_units', 'Hz')
-
         self._hal_QPU = hal_QPU
 
         super().__init__(name, expt_config, resonator_spectroscopy, hal_QPU, [qubit_id], **kwargs)
@@ -70,9 +69,14 @@ class ExpZIRes(ExpZIqubit):
             if self._param_offset:
                 self._param_offset.Value = dpkt['offset']
             if self._param_fano:
-                self._param_offset.Value = dpkt['FanoFac']
+                self._param_fano.Value = dpkt['FanoFac']
         elif self._fit_type == "Full":
-            dpkt = ResonatorPowerSweep.single_circlefit(data_x, data_i, data_q, power_dBm=-100, dont_plot=self._dont_plot)
+            if self._hal_QPU.get_qubit_obj(self._qubit_dataset).ReadoutLineAttenuation_dB:
+                atten = self._hal_QPU.get_qubit_obj(self._qubit_dataset).ReadoutLineAttenuation_dB
+                readout_pwr = self._hal_QPU.get_qubit_obj(self._qubit_dataset).ReadoutPower + 20*np.log10(self._hal_QPU.get_qubit_obj(self._qubit_dataset).ReadoutAmplitude)
+                dpkt = ResonatorPowerSweep.single_circlefit(data_x, data_i, data_q, power_dBm=atten + readout_pwr, dont_plot=self._dont_plot)
+            else:
+                dpkt = ResonatorPowerSweep.single_circlefit(data_x, data_i, data_q, power_dBm=-100, dont_plot=self._dont_plot)
             #Commit to parameters...
             if self._update_qubit:
                 cur_qubit = self._hal_QPU.get_qubit_obj(self._qubit_dataset)

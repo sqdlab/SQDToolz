@@ -1756,7 +1756,7 @@ class ResonatorPowerSweep:
                 Qc = port.fitresults['absQc']
                 # write fit results to plot and save
                 if not dont_plot or save_path != "":
-                    text=f"$Q_i=${Qi:.1e} $\\pm$ {Qi_err:.1e}, $\\langle n \\rangle ={n_ph:.1e}$"
+                    text=f"$Q_i=${Qi:.1e} $\\pm$ {Qi_err:.1e}, $\\langle n \\rangle =${n_ph:.1e}, $f_r=${port.fitresults['fr']*1e-9:.4f} GHz"
                     real = port.z_data_raw.real
                     imag = port.z_data_raw.imag
                     real2 = port.z_data_sim.real

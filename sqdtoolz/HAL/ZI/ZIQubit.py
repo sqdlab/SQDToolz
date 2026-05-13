@@ -121,7 +121,8 @@ class ZIQubit(HALbase, ZIbase):
                 'ReadoutQc': 1,
                 'ReadoutQl': 1,
                 'ReadoutKappa': 0,
-                'ThermalPhotonNum': 0
+                'ThermalPhotonNum': 0,
+                'ReadoutLineAttenuation_dB': -70
             }
 
             self._param_mappings = {

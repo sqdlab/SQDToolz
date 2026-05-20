@@ -20,12 +20,19 @@ class ZILabOneQ(Instrument):
 
         leBoxes = []
         for cur_uid in setup_yaml:
+            options = {
+                'address':setup_yaml[cur_uid]['address'],
+                'device_options':setup_yaml[cur_uid]['device_options']
+                }
             if setup_yaml[cur_uid]['type'] == 'SHFQC':
-                leBoxes.append(lbeqs.SHFQC(uid=cur_uid, address=setup_yaml[cur_uid]['address'], device_options=setup_yaml[cur_uid]['device_options']))
+                if 'reference_clock_source' in setup_yaml[cur_uid]:
+                    options['reference_clock_source'] = setup_yaml[cur_uid]['reference_clock_source']
+                print(options)
+                leBoxes.append(lbeqs.SHFQC(uid=cur_uid, **options))
             elif setup_yaml[cur_uid]['type'] == 'HDAWG':
-                leBoxes.append(lbeqs.HDAWG(uid=cur_uid, address=setup_yaml[cur_uid]['address'], device_options=setup_yaml[cur_uid]['device_options']))
+                leBoxes.append(lbeqs.HDAWG(uid=cur_uid, **options))
             elif setup_yaml[cur_uid]['type'] == 'PQSC':
-                leBoxes.append(lbeqs.PQSC(uid=cur_uid, address=setup_yaml[cur_uid]['address'], device_options=setup_yaml[cur_uid]['device_options']))
+                leBoxes.append(lbeqs.PQSC(uid=cur_uid, **options))
         self.device_setup.add_instruments(*leBoxes)
 
         # self.device_setup = lbeqs.DeviceSetup.from_yaml(filepath = setup_yaml, server_host=address, server_port=port)

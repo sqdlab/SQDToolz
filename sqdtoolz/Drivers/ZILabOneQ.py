@@ -27,7 +27,6 @@ class ZILabOneQ(Instrument):
             if setup_yaml[cur_uid]['type'] == 'SHFQC':
                 if 'reference_clock_source' in setup_yaml[cur_uid]:
                     options['reference_clock_source'] = setup_yaml[cur_uid]['reference_clock_source']
-                print(options)
                 leBoxes.append(lbeqs.SHFQC(uid=cur_uid, **options))
             elif setup_yaml[cur_uid]['type'] == 'HDAWG':
                 leBoxes.append(lbeqs.HDAWG(uid=cur_uid, **options))

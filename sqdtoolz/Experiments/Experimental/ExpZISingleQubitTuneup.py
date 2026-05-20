@@ -72,7 +72,7 @@ class ExpZISingleQubitTuneup:
             assert not 't1_max' in kwargs, "Do not supply 't1_max' if supplying 't1_times'"
             assert not 't1_points' in kwargs, "Do not supply 't1_points' if supplying 't1_times'"
         else:
-            max_t1_time = kwargs.pop('t1_max', 2e-6)
+            max_t1_time = kwargs.pop('t1_max', 100e-6)
             max_t1_points = kwargs.pop('t1_points', 40)
             self._t1_times = np.linspace(0,max_t1_time, max_t1_points)
 
@@ -87,6 +87,7 @@ class ExpZISingleQubitTuneup:
         exp = ExpZIRes(f'res_spec_{self._qubit_id}', self._expt_config, self._qpu, self._qubit_id, frequencies=self._res_freq_range, is_trough=self._res_trough, fit_type="Full")
         lab.run_single(exp)
         #
+        #TODO: Second -30dBm smaller spanned qubit spec.
         self._qubit.DrivePower = self._qubit_spec_LO_power
         exp = ExpZIqubit(f'qubit_spec_{self._qubit_id}', self._expt_config, qubit_spectroscopy, self._qpu, [self._qubit_id], frequencies=[self._qubit_freq_range], ZI_plot=True, update=True)
         lab.run_single(exp)

@@ -14,6 +14,8 @@ class ExpZIResFluxSweep(ExpZIqubit):
 
         self._update_qubit = kwargs.pop('update_qubit_params', True)
 
+        self._dont_show_plot = kwargs.pop('dont_show_plot', False)
+
         self._is_trough = kwargs.pop('is_trough', True)
         self._dont_plot = kwargs.pop('dont_plot', False)
         self._xUnits = kwargs.pop('plot_x_units', 'Hz')
@@ -59,21 +61,34 @@ class ExpZIResFluxSweep(ExpZIqubit):
         opt_flux = soln.x
         sweet_freq = spl(opt_flux)*norm_fac
 
-        fig, ax = plt.subplots(1); fig.set_figwidth(15)
-        ax.pcolor(freq_vals, flux_vals, ampl)
-        ax.plot(spl(flux_vals)*norm_fac, flux_vals, 'w-')
-        ax.plot(res_freqs, flux_vals, 'wo')
-        ax.plot([sweet_freq], [opt_flux], 'ro')
-        ax.set_title(f"{self._qubit_id} sweet spot: f={sweet_freq*1e-9:.4f} GHz, FluxDC={opt_flux:.4f} V")
-        ax.set_xlabel('Frequency (Hz)')
-        ax.set_ylabel('Flux (V)')
+        fitted_data = {
+            'raw_fit_freqs': res_freqs,
+            'smoothed_fit_freqs': spl(flux_vals)*norm_fac,
+            'sweet_freq_flux': np.array([sweet_freq, opt_flux])
+        }
+        np.save(self._file_path + 'fitted_data.npy', fitted_data)
 
         if not self._dont_plot:
-            fig.show()
+            fig, ax = plt.subplots(1); fig.set_figwidth(15)
+            ExpZIResFluxSweep.plot_fitted_results(ax, self._qubit_id, freq_vals, flux_vals, ampl, fitted_data)
+            if not self._dont_show_plot:
+                fig.show()
+            else:
+                plt.close(fig)
             fig.savefig(self._file_path + 'fitted_plot.png')
 
         self._opt_flux_val = opt_flux
     
+    @staticmethod
+    def plot_fitted_results(ax, qubit_id, freq_vals, flux_vals, ampl, fitted_data):
+        ax.pcolor(freq_vals, flux_vals, ampl)
+        ax.plot(fitted_data['smoothed_fit_freqs'], flux_vals, 'w-')
+        ax.plot(fitted_data['raw_fit_freqs'], flux_vals, 'wo')
+        ax.plot([fitted_data['sweet_freq_flux'][0]], [fitted_data['sweet_freq_flux'][1]], 'ro')
+        ax.set_title(f"{qubit_id} sweet spot: f={fitted_data['sweet_freq_flux'][0]*1e-9:.4f} GHz, FluxDC={fitted_data['sweet_freq_flux'][1]:.4f} V")
+        ax.set_xlabel('Frequency (Hz)')
+        ax.set_ylabel('Flux (V)')
+
     def update_qubit(self):
         assert self._opt_flux_val != None, "Must run an experiment before updating qubit parameters."
         self._hal_QPU.get_qubit_obj(self._qubit_id).FluxDC = self._opt_flux_val

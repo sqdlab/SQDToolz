@@ -29,7 +29,7 @@ from laboneq_applications.experiments import (
 ExperimentConfiguration('ZI', lab, 0, [], 'ZIacq')
 
 exp = ExpZIqubit('test', lab.CONFIG('ZI'), qubit_spectroscopy, lab.HAL('QPU'), ['Qubit1'], frequencies=[np.linspace(5.8e9, 6.2e9, 101)])
-lab.run_single(exp)
+lab.run_single(exp, debug_skip_experiment=True, disable_ZI_logging=True)
 a=0
 
 # lab.load_instrument('MW_IF')

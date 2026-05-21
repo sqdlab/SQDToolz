@@ -59,6 +59,10 @@ class ExpZIqubit(Experiment):
         #Get associated ZI Qubit objects
         leQubits = [leQubits[x] for x in leQubitInds]
         
+        logging.disable(logging.NOTSET)
+        if kwargs.get('disable_ZI_logging', False):
+            logging.disable(logging.CRITICAL)
+
         set_log_dir(file_path)
         # lePythonLogs = logging.basicConfig(filename=file_path + 'app.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
         DEFAULT_LOGGING_STORE.deactivate()
@@ -127,7 +131,8 @@ class ExpZIqubit(Experiment):
 
         # folder_store.deactivate()
         # logging_store.deactivate()
-        
+        logging.disable(logging.NOTSET)
+
         return leData
 
     def _post_process(self, data):

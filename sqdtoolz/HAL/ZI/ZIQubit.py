@@ -2,6 +2,7 @@ from sqdtoolz.HAL.HALbase import HALbase
 from sqdtoolz.HAL.ZI.ZIbase import ZIbase
 import laboneq.simple as lbeqs
 from laboneq_applications.qpu_types.tunable_transmon import TunableTransmonQubit, TunableTransmonOperations
+import logging
 
 class ZIQubit(HALbase, ZIbase):
     def __init__(self, qubit_name, lab, instr_zi_boxes, zi_instr_phys_drive:tuple[str, str], zi_instr_phys_measure:tuple[str, str], zi_instr_phys_acquire:tuple[str, str], zi_phys_flux=("",""), zi_type="TunableTransmonQubit"):
@@ -60,7 +61,10 @@ class ZIQubit(HALbase, ZIbase):
                 if self._zi_instr_phys_flux != "":
                     setattr(self._zi_qubit.parameters, self._param_mappings[name], value)
                     self._instr_zi.device_setup.set_calibration(self._zi_qubit.calibration())
+                    cur_log_lvl = logging.root.manager.disable
+                    logging.disable(logging.CRITICAL)
                     lbeqs.Session(self._instr_zi.device_setup).connect(do_emulation=False)
+                    logging.disable(cur_log_lvl)
             setattr(self._zi_qubit.parameters, self._param_mappings[name], value)
         elif '_param_mappings_local' in self.__dict__ and name in self._param_mappings_local:
             self._param_mappings_local[name] = value

@@ -214,6 +214,7 @@ def create_experiment(
                 with dsl.section(name=f"main_drive_seq{seq}", alignment=SectionAlignment.RIGHT):
                     for m,q in enumerate(qubits):
                         for cur_gate in gate_lists[seq][m]:
+                            _,params = q.transition_parameters('ge')
                             if isinstance(cur_gate, (tuple, list)):
                                 assert len(cur_gate) == 2, "Arbitrary rotations must be specified as a tuple - e.g. ('Rx',0.02)."
                                 if cur_gate[0] == 'Rz':
@@ -227,15 +228,15 @@ def create_experiment(
                             elif cur_gate == 'X':
                                 qop.rx(q,np.pi)
                             elif cur_gate == 'X/2':
-                                qop.rx(q,np.pi/2)
+                                qop.x90(q)
                             elif cur_gate == '-X/2':
-                                qop.rx(q,-np.pi/2)
+                                qop.rx(q, -np.pi/2, amplitude=-params['amplitude_pi2'])
                             elif cur_gate == 'Y':
                                 qop.ry(q,np.pi)
                             elif cur_gate == 'Y/2':
-                                qop.ry(q,np.pi/2)
+                                qop.y90(q)
                             elif cur_gate == '-Y/2':
-                                qop.ry(q,-np.pi/2)
+                                qop.ry(q, -np.pi/2, amplitude=-params['amplitude_pi2'])
                             elif cur_gate == 'Z':
                                 qop.rz(q,np.pi)
                             elif cur_gate == 'Z/2':

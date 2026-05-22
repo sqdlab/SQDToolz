@@ -16,6 +16,8 @@ from bokeh.layouts import gridplot
 from bokeh.resources import CDN
 from bokeh.embed import file_html
 import numpy as np
+#
+from sqdtoolz.Utilities.DataIQNormalise import DataIQNormalise
 
 class ExpZIqubit(Experiment):
     def __init__(self, name, expt_config, workflow_module, hal_QPU, qubit_ids, **kwargs):
@@ -228,5 +230,13 @@ class ExpZIqubit(Experiment):
             return compiled_exp.estimated_runtime
         else:
             return -1
+
+    @staticmethod
+    def normalise_qubit_data(fileioreader_calib, transition):
+        arrCalib = fileioreader_calib.get_numpy_array()
+        cur_state_inds0 = [m for m,x in enumerate(fileioreader_calib.dep_params) if x.startswith(transition[0])]
+        cur_state_inds1 = [m for m,x in enumerate(fileioreader_calib.dep_params) if x.startswith(transition[1])]
+        dnorm = DataIQNormalise(arrCalib[:,cur_state_inds0], arrCalib[:,cur_state_inds1])
+        return dnorm
 
 

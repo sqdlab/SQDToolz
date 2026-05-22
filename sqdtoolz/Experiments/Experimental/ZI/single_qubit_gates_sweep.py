@@ -199,19 +199,19 @@ def create_experiment(
         repetition_time=opts.repetition_time,
         reset_oscillator_phase=opts.reset_oscillator_phase,
     ):
-        if opts.active_reset:
-            qop.active_reset(
-                qubits,
-                active_reset_states=opts.active_reset_states,
-                number_resets=opts.active_reset_repetitions,
-                measure_section_length=max_measure_section_length,
-            )
-        else:
-            for q in qubits:
-                qop.passive_reset(q)
         with dsl.section(name="main", alignment=SectionAlignment.RIGHT):
             for seq in range(len(gate_lists)):
-                with dsl.section(name="main_drive", alignment=SectionAlignment.RIGHT):
+                if opts.active_reset:
+                    qop.active_reset(
+                        qubits,
+                        active_reset_states=opts.active_reset_states,
+                        number_resets=opts.active_reset_repetitions,
+                        measure_section_length=max_measure_section_length,
+                    )
+                else:
+                    for q in qubits:
+                        qop.passive_reset(q)
+                with dsl.section(name=f"main_drive_seq{seq}", alignment=SectionAlignment.RIGHT):
                     for m,q in enumerate(qubits):
                         for cur_gate in gate_lists[seq][m]:
                             if isinstance(cur_gate, (tuple, list)):
@@ -247,12 +247,14 @@ def create_experiment(
                                 qop.ry(q,np.pi/2)
 
 
-                with dsl.section(name="main_measure", alignment=SectionAlignment.LEFT):
+                with dsl.section(name=f"main_measure_seq{seq}", alignment=SectionAlignment.LEFT):
                     for q in qubits:
                         sec = qop.measure(q, dsl.handles.result_handle(q.uid))
                         # Fix the length of the measure section
                         sec.length = max_measure_section_length
 
+        for q in qubits:
+            qop.passive_reset(q)
         if opts.use_cal_traces:
             qop.calibration_traces.omit_section(
                 qubits=qubits,

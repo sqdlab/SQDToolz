@@ -54,7 +54,7 @@ class ExpZISingleQubitTuneup:
         else:
             self._rabi_ampls = np.linspace(0,1,kwargs.pop('rabi_points',30))
         #
-        self._ramsey_fast_detuning = kwargs.pop('ramsey_fast_detuning', 1e6)
+        self._ramsey_fast_detuning = kwargs.pop('ramsey_fast_detuning', 2e6)
         if 'ramsey_fast_times' in kwargs:
             self._ramsey_fast_times = kwargs.pop('ramsey_fast_times')
             assert not 'ramsey_fast_max' in kwargs, "Do not supply 'ramsey_fast_max' if supplying 'ramsey_fast_times'"
@@ -184,7 +184,7 @@ class ExpZISingleQubitTuneup:
         data_x = leData.param_vals[0]
         ExpZIRamsey.plot_fitted_results(ax, data_x, fitted_data['amplitude_raw'], fitted_data, True)
         sigFigs = 4
-        ax.set_title(f"Ramsey Δ={Miscellaneous.get_units(self._ramsey_fast_detuning,4)}Hz, f={Miscellaneous.get_units(fitted_data['frequency'],4)}Hz, T2*={Miscellaneous.get_units(fitted_data['T2*'],4)}s")
+        ax.set_title(f"Ramsey Δ={Miscellaneous.get_units(self._ramsey_fast_detuning,4)}Hz, f={Miscellaneous.get_units(fitted_data['frequency'],4)}Hz")
         exp.update_qubits() #TODO: Add error-checking here to slam brakes if necessary
         #
         #Slow

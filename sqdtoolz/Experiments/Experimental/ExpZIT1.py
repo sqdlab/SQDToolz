@@ -11,12 +11,14 @@ class ExpZIT1(ExpZIqubit):
         self._hal_QPU = hal_QPU
 
         self._dont_show_plot = kwargs.pop('dont_show_plot', False)
+        self._fit_vals = []
 
         self._expect_rise = kwargs.pop('expect_rise', False)    #Only for unnormalised fitting
 
         super().__init__(name, expt_config, lifetime_measurement, hal_QPU, qubit_ids, **kwargs)
     
     def _post_process(self, data):
+        self._fit_vals = []
         for qubit_dataset in self._qubit_datasets:          
             leData = self.retrieve_last_dataset(qubit_dataset)
             arr = leData.get_numpy_array()
@@ -25,12 +27,7 @@ class ExpZIT1(ExpZIqubit):
             dfit = DFitExponential()
             if self._normalise_data:
                 #Get calibration data
-                calib_file = qubit_dataset + '_calib'
-                leDataCalib = self.retrieve_last_dataset(calib_file)
-                arrCalib = leDataCalib.get_numpy_array()
-                cur_state_inds0 = [m for m,x in enumerate(leDataCalib.dep_params) if x.startswith(self._transition[0])]
-                cur_state_inds1 = [m for m,x in enumerate(leDataCalib.dep_params) if x.startswith(self._transition[1])]
-                dnorm = DataIQNormalise(arrCalib[:,cur_state_inds0], arrCalib[:,cur_state_inds1])
+                dnorm = ExpZIqubit.normalise_qubit_data(self.retrieve_last_dataset(qubit_dataset+'_calib'), self._transition)
                 #
                 fig, axs = plt.subplots(ncols=2, gridspec_kw={'width_ratios':[2,1]})
                 fig.set_figheight(5); fig.set_figwidth(15)
@@ -40,13 +37,14 @@ class ExpZIT1(ExpZIqubit):
                 data_y = np.sqrt(arr[:,0]**2 + arr[:,1]**2)
                 dpkt = dfit.get_fitted_plot(data_x, data_y, rise=self._expect_rise, dontplot=True)
 
-            dpkt['fit_data'] = {'amplitude': dpkt['fit_data'], 'amplitude_raw': data_y, 'T1': dpkt['decay_time']}
+            dpkt['fit_data'] = {'amplitude': dpkt['fit_data'], 'amplitude_raw': data_y, 'T1': dpkt['decay_time'], 'qubit_name':qubit_dataset}
 
             if self._normalise_data:
                 ExpZIT1.plot_fitted_results(axs[0], data_x, data_y, dpkt['fit_data'], self._normalise_data)
             else:
                 fig, ax = plt.subplots(1)
                 ExpZIT1.plot_fitted_results(ax, data_x, data_y, dpkt['fit_data'], self._normalise_data)
+                ax.set_title(f"{qubit_dataset} T1: {Miscellaneous.get_units(dpkt['fit_data']['T1'],4)}s")
 
             fig.savefig(self._file_path + f'fitted_plot_{qubit_dataset}.png')
             if not self._dont_show_plot:
@@ -56,6 +54,9 @@ class ExpZIT1(ExpZIqubit):
             #
             if 'fit_data' in dpkt:
                 np.save(self._file_path + f'fitted_data_{qubit_dataset}.npy', dpkt['fit_data'])
+            #TODO: Generalise it for EF later
+            self._fit_vals.append({'qubit_obj': self._hal_QPU.get_qubit_obj(qubit_dataset), 'T1':dpkt['decay_time']})
+
 
     @staticmethod
     def plot_fitted_results(ax, data_x, data_y, fitted_results:dict, data_normalised:bool):
@@ -68,3 +69,10 @@ class ExpZIT1(ExpZIqubit):
         ax.plot(data_x/norm_fac, data_y, 'kx')
         ax.plot(data_x/norm_fac, fitted_results['amplitude'], 'r-')
         ax.set_xlabel(f'Wait Times ({norm_prefix}s)')
+        ax.set_title(f"{fitted_results['qubit_name']} T1: {Miscellaneous.get_units(fitted_results['T1'],4)}s")
+
+    def update_qubits(self):
+        assert len(self._fit_vals) > 0, "Must run T1 Experiment before qubits can be updated."
+        while len(self._fit_vals) > 0:
+            cur_fit = self._fit_vals.pop(0)           
+            cur_fit['qubit_obj'].T1GE = float(cur_fit['T1'])

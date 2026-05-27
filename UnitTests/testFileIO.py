@@ -107,6 +107,7 @@ class TestExpFileIO(unittest.TestCase):
         assert self.arr_equality(res.param_many_one_maps['testAmal']['param_vals'][1], np.array([2,4,6])), "FileIOReader failed to parse a many-one sweeping variable."
         assert self.arr_equality(exp.last_rec_params.get_numpy_array(), np.array([[1,2],[3,4],[5,6]]))
         time.sleep(1)
+        exp.close_all_read_files()
         #
         #Test with one simple one-many variable and a normal variable - and check it sets correctly via rec_params
         exp = Experiment("test", self.lab.CONFIG('testConf'))
@@ -121,6 +122,8 @@ class TestExpFileIO(unittest.TestCase):
         assert res.param_names[:2] == ['testAmal', 'test_var'], "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
         assert self.arr_equality(exp.last_rec_params.get_numpy_array(), np.array([[[1,2]]*4,[[3,4]]*4,[[5,6]]*4])), "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
         time.sleep(1)
+        exp.last_rec_params.release()
+        res.release()
         #
         #Test with one normal variable and one one-many variable - and check it sets correctly via rec_params
         exp = Experiment("test", self.lab.CONFIG('testConf'))
@@ -135,6 +138,7 @@ class TestExpFileIO(unittest.TestCase):
         assert res.param_names[:2] == ['test_var', 'testAmal'], "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
         assert self.arr_equality(exp.last_rec_params.get_numpy_array(), np.array([[[1,2],[3,4],[5,6]]]*4)), "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
         time.sleep(1)
+        exp.close_all_read_files()
         #
         #Test with one normal variable and two one-many variables - and check it sets correctly via rec_params
         VariableInternal('test_var2', self.lab, 0)
@@ -162,11 +166,8 @@ class TestExpFileIO(unittest.TestCase):
         assert res.param_names[:3] == ['testAmal', 'test_var', 'testAmal2'], "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
         assert self.arr_equality(exp.last_rec_params.get_numpy_array(), np.array([[[[y, y+1, x, x+1, x+2] for x in np.arange(11,23,3)]]*4 for y in np.arange(1,7,2)])), "FileIOReader failed to parse a many-one sweeping variable when combined with a normal sweeping variable."
         time.sleep(1)
+        exp.close_all_read_files()
         #
-        #
-        exp.last_rec_params.release()
-        res.release()
-        res = None
         self.cleanup()
     
     def test_NonUniformSampling(self):

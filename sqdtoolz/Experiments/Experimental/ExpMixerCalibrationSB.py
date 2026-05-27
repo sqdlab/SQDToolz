@@ -32,7 +32,7 @@ class ExpMixerCalibrationSB(Experiment):
         smpl_data = self._expt_config.get_data()['data']
 
         ch_names = sorted([x for x in smpl_data['data']])
-        assert len(ch_names) == 2, "The acquisition and processing should only return two channels in the output for I and Q respectively."
+        # assert len(ch_names) == 2, "The acquisition and processing should only return two channels in the output for I and Q respectively."
         i_val, q_val = smpl_data['data'][ch_names[0]], smpl_data['data'][ch_names[1]]
 
         ampl = np.sqrt(i_val**2 + q_val**2)

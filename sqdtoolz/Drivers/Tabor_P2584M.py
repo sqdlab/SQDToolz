@@ -1863,3 +1863,12 @@ class Tabor_P2584M(Instrument):
         # if not resp.startswith('0'):
         #     print('ERROR: "{0}" {1}.\n'.format(resp, msg))
         assert resp.startswith('0'), 'ERROR: "{0}" {1}.'.format(resp, msg)
+
+    def get_idn(self):
+        return {
+            "vendor": "Tabor",
+            "model": "P2584M",
+            "serial": "NA",
+            "firmware": "NA",
+        }
+

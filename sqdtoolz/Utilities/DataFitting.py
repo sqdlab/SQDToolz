@@ -33,6 +33,7 @@ class DFitPeakLorentzian:
             popt, pcov = scipy.optimize.curve_fit(func, data_x, data_y, [a0, w0, x00, c0],
                                              bounds=([0, np.abs(data_x[1]-data_x[0]), xMin, -np.inf], [1.2*a0, 0.9*(xMax - xMin), xMax, np.inf]))
 
+        fit_data = func(data_x, *popt)
         fig = None
         if not dontplot:
             if axs == None:
@@ -40,7 +41,7 @@ class DFitPeakLorentzian:
             else:
                 fig = axs.get_figure()
             axs.plot(data_x, data_y, 'kx')
-            axs.plot(data_x, func(data_x, *popt), 'r-')
+            axs.plot(data_x, fit_data, 'r-')
             axs.set_xlabel(xLabel)
             axs.set_ylabel(yLabel)
             axs.set_title(f"Centre: {Miscellaneous.get_units(popt[2])}{xUnits}, Width: {Miscellaneous.get_units(popt[1])}{xUnits}")
@@ -50,7 +51,8 @@ class DFitPeakLorentzian:
             'width' : popt[1],
             'centre' : popt[2],
             'offset' : popt[3],
-            'fig'   : fig
+            'fig'   : fig,
+            'fit_data': fit_data
         }
 
         return datapkt
@@ -114,6 +116,7 @@ class DFitFanoResonance:
             yMinimum = func(x1, popt[0], b, w, x0, popt[4])
             yMaximum = func(x2, popt[0], b, w, x0, popt[4])
 
+        fit_data = func(data_x, *popt)
         fig = None
         if not dontplot:
             if axs == None:
@@ -121,7 +124,7 @@ class DFitFanoResonance:
             else:
                 fig = axs.get_figure()
             axs.plot(data_x, data_y, 'kx')
-            axs.plot(data_x, func(data_x, *popt), 'r-')
+            axs.plot(data_x, fit_data, 'r-')
             axs.set_xlabel(xLabel)
             axs.set_ylabel(yLabel)
             axs.set_title(f"Min X: {Miscellaneous.get_units(xMinimum)}{xUnits}, Width: {Miscellaneous.get_units(popt[2])}{xUnits}")
@@ -136,7 +139,8 @@ class DFitFanoResonance:
             'xMaximum': xMaximum,
             'yMinimum': yMinimum,
             'yMaximum': yMaximum,
-            'fig'   : fig
+            'fig'   : fig,
+            'fit_data': fit_data
         }
 
         return datapkt
@@ -178,13 +182,14 @@ class DFitExponential:
             popt, pcov = scipy.optimize.curve_fit(func, data_x, data_y, [a0, c0, tau0],
                                              bounds=([0, yMin, 0.01*tau0], [2.0*a0, yMax, tau0*10]))
 
+        fit_data = func(data_x, *popt)
         if not dontplot:
             if axs == None:
                 fig, axs = plt.subplots(1)
             else:
                 fig = axs.get_figure()
             axs.plot(data_x, data_y, 'kx')
-            axs.plot(data_x, func(data_x, *popt), 'r-')
+            axs.plot(data_x, fit_data, 'r-')
             axs.set_xlabel(xLabel)
             axs.set_ylabel(yLabel)
         else:
@@ -194,7 +199,8 @@ class DFitExponential:
             'amplitude' : np.abs(popt[0]),
             'offset' : popt[1],
             'decay_time' : popt[2],
-            'fig'   : fig
+            'fig'   : fig,
+            'fit_data': fit_data
         }
 
         return datapkt
@@ -232,6 +238,7 @@ class DFitSinusoid:
                                             bounds=([0.1*a0, -5/(xMax-xMin), 0.5/(xMax-xMin),       -np.pi, yMin],
                                                     [1.2*a0,  5/(xMax-xMin), 0.5/np.abs(np.min(dx)), np.pi, yMax]))
 
+        fit_data = func(data_x, *popt)
         fig = None
         if not dontplot:
             if axs == None:
@@ -239,7 +246,7 @@ class DFitSinusoid:
             else:
                 fig = axs.get_figure()
             axs.plot(data_x, data_y, 'kx')
-            axs.plot(data_x, func(data_x, *popt), 'r-')
+            axs.plot(data_x, fit_data, 'r-')
             axs.set_xlabel(xLabel)
             axs.set_ylabel(yLabel)
 
@@ -249,7 +256,8 @@ class DFitSinusoid:
             'frequency' : popt[2],
             'phase'     : popt[3],
             'offset'    : popt[4],
-            'fig'   : fig
+            'fig'   : fig,
+            'fit_data': fit_data
         }
 
         return datapkt

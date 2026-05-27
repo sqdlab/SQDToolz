@@ -581,7 +581,7 @@ class TEProteusAdmin(object):
         '''
         slotInfPtr = self._tep_get_slot_info(np.uint32(slot_id))
         if slotInfPtr:
-            max_resp_len = np.int(256)
+            max_resp_len = int(256)
             resp_buf = ct.create_string_buffer(max_resp_len)
 
             max_resp_len = np.uint32(max_resp_len)
@@ -598,7 +598,7 @@ class TEProteusAdmin(object):
         '''
         slotInfPtr = self._tep_get_slot_info(np.uint32(slot_id))
         if slotInfPtr:
-            max_resp_len = np.int(256)
+            max_resp_len = int(256)
             resp_buf = ct.create_string_buffer(max_resp_len)
 
             max_resp_len = np.uint32(max_resp_len)
@@ -781,7 +781,7 @@ class TEProteusInst(object):
         '''
         scpi_str = str(scpi_str).encode()
         str_ptr = ct.c_char_p(scpi_str)
-        max_resp_len = np.int(max_resp_len)
+        max_resp_len = int(max_resp_len)
         resp_buf = ct.create_string_buffer(max_resp_len)
         max_resp_len = np.uint32(max_resp_len)
 
@@ -829,7 +829,7 @@ class TEProteusInst(object):
             cmd = scpi_str.encode()
 
         str_ptr = ct.c_char_p(cmd)
-        max_resp_len = np.int(64)
+        max_resp_len = int(64)
         resp_buf = ct.create_string_buffer(max_resp_len)
         max_resp_len = np.uint32(max_resp_len)
 
@@ -888,7 +888,7 @@ class TEProteusInst(object):
         :param chan_num: the channel-number.
         :returns: None.
         '''
-        chan_num = np.int32(chan_num)
+        chan_num = int32(chan_num)
         # pylint: disable=protected-access
         self._streamptr = \
             self._admin._tep_get_write_stream_intf(self._instptr, chan_num)
@@ -969,8 +969,8 @@ class TEProteusInst(object):
         '''
 
         p_dat = bin_dat.ctypes.data_as(ct.POINTER(ct.c_ubyte))
-        offs = np.int64(bytes_offs)
-        tmo = np.int32(usec_wait)
+        offs = int64(bytes_offs)
+        tmo = int32(usec_wait)
 
         # pylint: disable=protected-access
         return self._admin.\

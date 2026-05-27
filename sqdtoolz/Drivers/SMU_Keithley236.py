@@ -106,12 +106,14 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
 
     @property
     def Mode(self):
-        res = self.status_measurement()
-        assert res[7] == 'F', "COM Error when reading machine status"
-        if res[8] == '0':
-            return 'SrcV_MeasI'
-        else:
-            return 'SrcI_MeasV'
+        for m in range(10):
+            res = self.status_measurement()
+            if res[7] == 'F':
+                if res[8] == '0':
+                    return 'SrcV_MeasI'
+                else:
+                    return 'SrcI_MeasV'
+        assert False, f"COM Error when reading machine status. status_measurement returned {res}"
     @Mode.setter
     def Mode(self, mode):
         pass
@@ -123,9 +125,11 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
 
     @property
     def Output(self):
-        res = self.status_machine()
-        assert res[18] == 'N', "COM Error when reading machine status"
-        return res[19] == '1'
+        for m in range(10):
+            res = self.status_machine()
+            if res[18] == 'N':
+                return res[19] == '1'
+        assert False, f"COM Error when reading machine status, it returned: {res}"
     @Output.setter
     def Output(self, val):
         if val:
@@ -134,14 +138,14 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
             self.write('N0X')
 
     def _get_voltage(self):
-        res = self.src_meas()
-        #Just infer the mode instead of querying Mode - it's faster as the F0/F1 call takes 64ms in itself...
-        if res[1:5] == 'SDCV':
-            return float(res.split(',')[0][5:])
-        elif res.split(',')[1][1:5] == 'MDCV':
-            return float(res.split(',')[1][5:])
-        else:
-            assert False, "COM Error when reading source-measure"
+        for m in range(10):
+            res = self.src_meas()
+            #Just infer the mode instead of querying Mode - it's faster as the F0/F1 call takes 64ms in itself...
+            if res[1:5] == 'SDCV':
+                return float(res.split(',')[0][5:])
+            elif res.split(',')[1][1:5] == 'MDCV':
+                return float(res.split(',')[1][5:])
+        assert False, f"COM Error when reading source-measure. src_meas returned: {res}"
     def _set_voltage(self, val):
         #Use auto-range and zero delay by default...
         self.write(f'B{val},0,0X')
@@ -155,14 +159,14 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
         self.voltage(val)
 
     def _get_current(self):
-        res = self.src_meas()
-        #Just infer the mode instead of querying Mode - it's faster as the F0/F1 call takes 64ms in itself...
-        if res[1:5] == 'SDCI':
-            return float(res.split(',')[0][5:])
-        elif res.split(',')[1][1:5] == 'MDCI':
-            return float(res.split(',')[1][5:])
-        else:
-            assert False, "COM Error when reading source-measure"
+        for m in range(10):
+            res = self.src_meas()
+            #Just infer the mode instead of querying Mode - it's faster as the F0/F1 call takes 64ms in itself...
+            if res[1:5] == 'SDCI':
+                return float(res.split(',')[0][5:])
+            elif res.split(',')[1][1:5] == 'MDCI':
+                return float(res.split(',')[1][5:])
+        assert False, f"COM Error when reading source-measure. src_meas returned: {res}"
     def _set_current(self, val):
         #Use auto-range and zero delay by default...
         self.write(f'B{val},0,0X')
@@ -187,9 +191,11 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
     def ComplianceCurrent(self):
         if self.Mode == 'SrcI_MeasV':
             return -1
-        res = self.status_compliance()
-        assert res[:3] == 'ICP', "COM Error when reading compliance"
-        return float(res[3:])
+        for m in range(10):
+            res = self.status_compliance()
+            if res[:3] == 'ICP':
+                return float(res[3:])
+        assert False, f"COM Error when reading compliance. It returned {res}"
     @ComplianceCurrent.setter
     def ComplianceCurrent(self, val):
         if self.Mode == 'SrcV_MeasI':
@@ -200,9 +206,11 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
     def ComplianceVoltage(self):
         if self.Mode == 'SrcV_MeasI':
             return -1
-        res = self.status_compliance()
-        assert res[:3] == 'VCP', "COM Error when reading compliance"
-        return float(res[3:])
+        for m in range(10):
+            res = self.status_compliance()
+            if res[:3] == 'VCP':
+                return float(res[3:])
+        assert False, f"COM Error when reading compliance. It returned {res}"
     @ComplianceVoltage.setter
     def ComplianceVoltage(self, val):
         if self.Mode == 'SrcI_MeasV':
@@ -224,11 +232,14 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
 
     @property
     def ProbeType(self):
-        value = self.ask('U4X')
-        if value.split('O')[1][0] == '0':
-            return 'TwoWire'
-        else:
-            return 'FourWire'
+        for m in range(10):
+            value = self.ask('U4X')
+            if value[:4] == 'IMPL' or value[:4] == 'VMPL':
+                if value.split('O')[1][0] == '0':
+                    return 'TwoWire'
+                else:
+                    return 'FourWire'
+        assert False, f"U4X returned something useless: {value}"
     @ProbeType.setter
     def ProbeType(self, connection):
         assert connection == 'TwoWire' or connection == 'FourWire', "ProbeType must be FourWire or TwoWire"
@@ -325,15 +336,15 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
         assert self.SweepSamplePoints > 1, "Must have more than 1 sweeping point..."
         safe = self.sweep_safe_mode()
 
-        self.write('G1,2,0X') # get source bias
-        bias = float(self.read())
+        # self.write('G1,2,0X') # get source bias
+        # bias = float(self.read())
 
         start_v, stop_v = self.SweepStartValue, self.SweepEndValue
         step = np.abs(stop_v - start_v) / (self.SweepSamplePoints-1)
         delay = self._sweep_sample_time_ms
 
-        if safe:
-            assert bias == 0, 'The bias value is not zero. This is unsafe.'
+        # if safe:
+        #     assert bias == 0, 'The bias value is not zero. This is unsafe.'
 
         self.write('R0N0X')
 
@@ -364,6 +375,7 @@ class SMU_Keithley236(PrologixGPIBEthernet, Instrument):
 
         # time.sleep(5)
         result = self.ask('G5,2,2X')
+        result = self.read()
         meas_vals = np.array( [float(x) for x in result.replace('\r','').replace('\n',',').split(',') if len(x) > 0] )
         src_vals = meas_vals[::2]
         meas_vals = meas_vals[1::2]

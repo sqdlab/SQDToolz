@@ -126,6 +126,14 @@ class ETHFPGA(Instrument):
         self._num_samples = 1
         self._last_dsp_state = None
 
+    def get_idn(self):
+        return {
+            "vendor": "ETH",
+            "model": str(self.__class__),
+            "serial": "NA",
+            "firmware": "NA"
+        }
+
     def _set_default(self,  app_name = 'TVMODEV02'):
         self._set_app(app_name)
 

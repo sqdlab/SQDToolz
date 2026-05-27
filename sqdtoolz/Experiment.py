@@ -16,7 +16,11 @@ class Experiment:
         self._name = name
         self._expt_config = expt_config
         self.last_rec_params = None
+        self.last_rec_params_aux = None
+        self.last_data_aux = None
         self._cur_filewriters = {}
+        self._cur_fileread_paths = {}
+        self._file_readers = {}
         self._file_path = None
 
     @property
@@ -36,6 +40,7 @@ class Experiment:
             return
         data_file = FileIOWriter(self._file_path + data_file_name + '.h5', store_timestamps=self._store_timestamps, **fileio_options)
         self._cur_filewriters[data_file_name] = data_file
+        self._cur_fileread_paths[data_file_name] = self._file_path + data_file_name + '.h5'
         return data_file, data_file_name + '.h5'
 
     def retrieve_last_aux_dataset(self, dset_name):
@@ -43,6 +48,10 @@ class Experiment:
         fname = self._file_path + dset_name + '.h5'
         assert os.path.exists(fname), f"The dataset {dset_name} was not generated in the last experiment run and thus, does not exist."
         return FileIOReader(fname)
+
+    def retrieve_last_dataset(self, dset_name):
+        assert dset_name in self._file_readers, f"There is no dataset named {dset_name}"
+        return self._file_readers[dset_name]
 
     def _setup_progress_bar(self, **kwargs):
         self._ping_iteration = kwargs.get('ping_iteration')
@@ -243,9 +252,14 @@ class Experiment:
                     self._update_progress_bar((ind_coord+1)/self._sweep_grids.shape[0])
 
         #Close all data files
+        self._file_readers = {}
         for cur_file in self._cur_filewriters:
             self._cur_filewriters[cur_file].close()
+            if cur_file in self._file_readers:
+                self._file_readers[cur_file].close()
+            self._file_readers[cur_file] = FileIOReader(self._cur_fileread_paths[cur_file])
         self._cur_filewriters.clear()
+        self._cur_fileread_paths.clear()
         
         if len(rec_params) > 0:
             self.last_rec_params = FileIOReader(file_path + rec_param_file_name)
@@ -258,7 +272,12 @@ class Experiment:
         if len(aux_sweep) > 0:
             self.last_data_aux = FileIOReader(file_path + data_file_name_aux)   #TODO: Document storage of FileIOReaders via attributes in Experiment
 
-        return FileIOReader(file_path + data_file_name)
+        if self._data_file_index >= 0:
+            main_data_file_name = f'data{self._data_file_index}'
+        else:
+            main_data_file_name = 'data'
+
+        return self._file_readers[main_data_file_name]
 
 
     def _store_datapkt(self, data_pkt, sweep_vars2, sweepEx, rev_ind, ind_coord, primary_file, aux_file, aux_sweep):
@@ -371,3 +390,17 @@ class Experiment:
         if not isinstance(self._sweep_grids, np.ndarray):
             return {}
         return {x : self._sweep_grids[self._cur_ind_coord][ind] for ind, x in enumerate(self._cur_names)}
+
+    def close_all_read_files(self):
+        file_names = [x for x in self._file_readers]
+        for cur_fileio_reader in file_names:
+            self._file_readers.pop(cur_fileio_reader).release()
+        if self.last_rec_params:
+            self.last_rec_params.release()
+            self.last_rec_params = None
+        if self.last_rec_params_aux:
+            self.last_rec_params_aux.release()
+            self.last_rec_params_aux = None
+        if self.last_data_aux:
+            self.last_data_aux.release()
+            self.last_data_aux = None

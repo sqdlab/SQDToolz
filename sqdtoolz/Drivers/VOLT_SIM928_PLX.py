@@ -36,11 +36,13 @@ class SIM928_ChannelModule(InstrumentChannel):
                         set_cmd=self._set_ramp_rate)
 
     def _get_voltage(self):
-        try:
-            result = float(self._parent._ask_module(self.slot_num, 'VOLT?'))
-        except ValueError:
-            result = self._get_voltage()
-        return result
+        result = 0
+        for m in range(1000):    
+            try:
+                result = float(self._parent._ask_module(self.slot_num, 'VOLT?'))
+            except ValueError:
+                continue
+            return result
 
     def _set_voltage(self, voltage):
         """

@@ -1,0 +1,90 @@
+from sqdtoolz.Experiments.Experimental.ExpZIqubit import ExpZIqubit
+from sqdtoolz.Utilities.DataIQNormalise import DataIQNormalise
+import matplotlib.pyplot as plt
+import matplotlib
+from sqdtoolz.Utilities.DataFitting import*
+from sqdtoolz.Utilities.ResonatorTools import ResonatorPowerSweep
+from laboneq_applications.experiments import dispersive_shift
+from scipy.optimize import fsolve
+
+class ExpZIDispersive(ExpZIqubit):
+    def __init__(self, name, expt_config, hal_QPU, qubit_ids, **kwargs):
+        #TODO: pass states
+        self._qubit_datasets = qubit_ids
+        self._hal_QPU = hal_QPU
+        self._dont_show_plot = kwargs.get('dont_show_plot', False)
+        self._iq_indices = kwargs.pop('iq_indices', [0,1])
+        self._is_trough = kwargs.pop('is_trough', False)
+        self._fit_type = kwargs.pop('fit_type', 'Default')  #Default, Fano, Full
+        #assert self._is_trough or (not self._is_trough and not self._fit_res_fano), "Fano resonance fitting only supports troughs at the moment."
+        self._dont_plot = kwargs.pop('dont_plot', False)
+        self._xUnits = kwargs.pop('plot_x_units', 'Hz')
+        self._states = kwargs.get('states', 'ge')
+        self._chi = kwargs.pop('chi', None)
+        self._calc_thermal_photons = kwargs.pop('calc_thermal_photons', False)
+        self._update_params = kwargs.get('update', True)
+
+        super().__init__(name, expt_config, dispersive_shift, hal_QPU, qubit_ids, **kwargs)
+    
+    def _post_process(self, data):
+        if self._states == 'ge':
+            for qubit in self._qubit_datasets:
+                g_qubit_dataset = qubit + '_g'
+                e_qubit_dataset = qubit + '_e'
+                g_data = self.retrieve_last_dataset(g_qubit_dataset)
+                e_data = self.retrieve_last_dataset(e_qubit_dataset)
+                assert len(g_data.param_names), "The sweep should only be 1D."
+                assert len(e_data.param_names), "The sweep should only be 1D."
+                g_arr, e_arr = g_data.get_numpy_array(), e_data.get_numpy_array()
+                g_data_x, e_data_x = g_data.param_vals[0], e_data.param_vals[0]
+                g_data_i, e_data_i = g_arr[:,self._iq_indices[0]], e_arr[:,self._iq_indices[0]]
+                g_data_q, e_data_q = g_arr[:,self._iq_indices[1]], e_arr[:,self._iq_indices[1]]
+                g_data_y, e_data_y  = np.sqrt(g_arr[:,self._iq_indices[0]]**2 + g_arr[:,self._iq_indices[1]]**2),np.sqrt(e_arr[:,self._iq_indices[0]]**2 + e_arr[:,self._iq_indices[1]]**2)
+
+                if self._fit_type == "Default":
+                    dfit = DFitPeakLorentzian()
+                    pwr = self._hal_QPU.get_qubit_obj(qubit).ReadoutLineAttenuation_dB
+                    g_dpkt = ResonatorPowerSweep.single_circlefit(g_data_x, g_data_i, g_data_q, power_dBm=pwr, dont_plot=True)
+                    e_dpkt = ResonatorPowerSweep.single_circlefit(e_data_x, e_data_i, e_data_q, power_dBm=pwr, dont_plot=True)
+                    if e_dpkt and g_dpkt:
+                        #Commit to parameters...
+                        chi = (e_dpkt['fr'] - g_dpkt['fr'])/2
+                    else:
+                        chi = 0
+                        print("Fit failed, so chi was not updated.")
+                if self._calc_thermal_photons:
+                    try:
+                        Ql = self._hal_QPU.get_qubit_obj(qubit).ReadoutQl
+                        omega_r = (self._hal_QPU.get_qubit_obj(qubit).ReadoutFrequency)*2*np.pi
+                        kappa = 1/Ql/omega_r
+                        T2 = self._hal_QPU.get_qubit_obj(qubit).T2GE
+                    except:
+                        print(f"Could not calculate thermal photon number: T2GE measurement required first.")
+                    def nThermal_from_T2star(n):
+                        eq1 = 1/T2 - 4*chi**2*n/(kappa)*(n+1)
+                        return eq1
+                    n_th = fsolve(nThermal_from_T2star, 0.001)
+                    # print(f"Estimate thermal photons: {solution}")
+                if self._update_params:
+                    cur_qubit = self._hal_QPU.get_qubit_obj(qubit)
+                    if e_dpkt and g_dpkt:
+                        cur_qubit.ChiGE = chi
+                    if self._calc_thermal_photons:
+                        cur_qubit.ReadoutKappa = kappa
+                        cur_qubit.ThermalPhotonNum = float(np.atleast_1d(n_th)[0])
+                if not self._dont_plot:
+                    fig, ax = plt.subplots()
+                    ax.plot(g_data_x*1e-9, g_data_y, label=f"g ({g_dpkt['fr']*1e-9:.4f} GHz)")
+                    ax.plot(e_data_x*1e-9, e_data_y, label=f"e ({e_dpkt['fr']*1e-9:.4f} GHz)")
+                    ax.legend()
+                    ax.set_xlabel("f (GHz)")
+                    ax.set_ylabel(r"$|S_{21}|$")
+                    ax.xaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, _: f'{x:.4f}'))
+                    if e_dpkt and g_dpkt:
+                        ax.axvline(g_dpkt['fr']*1e-9, lw=1, ls='dashed', alpha=0.5, c='tab:blue')
+                        ax.axvline(e_dpkt['fr']*1e-9, lw=1, ls='dashed', alpha=0.5, c='tab:orange')
+                        ax.set_title(r"$\chi_{ge}=$"+f"{chi*1e-6:.3f} MHz")
+                    fig.show()
+                    fig.savefig(self._file_path + 'dispersive_shift_ge.png')
+                    # g_dpkt['fig'].show()
+                    # g_dpkt['fig'].savefig(self._file_path + 'fitted_plot.png')

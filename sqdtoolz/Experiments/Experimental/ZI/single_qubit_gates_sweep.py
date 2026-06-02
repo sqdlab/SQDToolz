@@ -62,6 +62,7 @@ def experiment_workflow(
     qpu: QPU,
     qubits: QuantumElements | list[str] | str,
     gate_lists: list[list[list]],
+    coordinate_system: str = 'RH',
     # TODO: Update the type hint for the temporary_parameters argument when the new
     # qubit class is available. Same for other experiment workflows.
     temporary_parameters: dict[str | tuple[str, str, str], dict | QuantumParameters]
@@ -97,6 +98,8 @@ def experiment_workflow(
             The final sliced dimension for a given qubit can include strings (e.g. 'X',
             'Y', '-Z/2' etc.) or tuples for arbitrary rotations in radians (e.g. ('Rx',0.1),
             ('Rz',-0.2) etc.)
+        coordinate_system:
+            Coordinate system to use for x, y and z axes - either LH or RH for left/right handed.
         temporary_parameters:
             The temporary parameters with which to update the quantum elements and
             topology edges. For quantum elements, the dictionary key is the quantum
@@ -119,7 +122,8 @@ def experiment_workflow(
     exp = create_experiment(
         temp_qpu,
         qubits,
-        gate_lists
+        gate_lists,
+        coordinate_system
         # quarter_time=quarter_time,
     )
     compiled_exp = compile_experiment(session, exp)
@@ -138,6 +142,7 @@ def create_experiment(
     qpu: QPU,
     qubits: QuantumElements,
     gate_lists: list[list[list]],
+    coordinate_system: str = 'RH',
     options: TuneupExperimentOptions | None = None,
 ) -> Experiment:
     """Creates an Amplitude Rabi experiment Workflow.
@@ -154,6 +159,8 @@ def create_experiment(
             The final sliced dimension for a given qubit can include strings (e.g. 'X',
             'Y', '-Z/2' etc.) or tuples for arbitrary rotations in radians (e.g. ('Rx',0.1),
             ('Rz',-0.2) etc.)
+        coordinate_system:
+            Coordinate system to use for x, y and z axes - either LH or RH for left/right handed.
         options:
             The options for building the experiment.
             See [TuneupExperimentOptions] and [BaseExperimentOptions] for
@@ -240,9 +247,15 @@ def create_experiment(
                             elif cur_gate == 'Z':
                                 qop.rz(q,np.pi)
                             elif cur_gate == 'Z/2':
-                                qop.rz(q,np.pi/2)
+                                if coordinate_system == 'RH':
+                                    qop.rz(q,-np.pi/2)
+                                else:
+                                    qop.rz(q,np.pi/2)
                             elif cur_gate == '-Z/2':
-                                qop.rz(q,-np.pi/2)
+                                if coordinate_system == 'RH':
+                                   qop.rz(q,np.pi/2)
+                                else:
+                                   qop.rz(q,-np.pi/2)
                             elif cur_gate == 'H':
                                 qop.rz(q,np.pi)
                                 qop.ry(q,np.pi/2)

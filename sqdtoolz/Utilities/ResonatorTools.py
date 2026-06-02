@@ -1728,7 +1728,7 @@ class ResonatorPowerSweep:
         print(f"Fit data written to {output_path}")
 
     @staticmethod
-    def single_circlefit(freq_data, i_vals, q_vals, power_dBm, expected_qi_lims=(0, 1e8), dont_plot=False, save_path=""):
+    def single_circlefit(freq_data, i_vals, q_vals, power_dBm, expected_qi_lims=(0, 1e8), dont_plot=False, save_path="", pass_fits=True):
         """
         Method for a single circlefit. Returns fit results as a dictionary.
         """
@@ -1789,6 +1789,8 @@ class ResonatorPowerSweep:
                 else:
                     fig = None
                 port.fitresults['fig'] = fig
+                if pass_fits:
+                    port.fitresults['fit_data'] = port.z_data_sim
                 return port.fitresults
             else:
                 print(f"Fitted Qi value outside of range (Qi, fitted: {port.fitresults['Qi_dia_corr_err']}).")

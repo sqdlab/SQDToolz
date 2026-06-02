@@ -15,14 +15,16 @@ class ExpZIDispersive(ExpZIqubit):
         self._dont_show_plot = kwargs.get('dont_show_plot', False)
         self._iq_indices = kwargs.pop('iq_indices', [0,1])
         self._is_trough = kwargs.pop('is_trough', False)
-        self._fit_type = kwargs.pop('fit_type', 'Default')  #Default, Fano, Full
-        #assert self._is_trough or (not self._is_trough and not self._fit_res_fano), "Fano resonance fitting only supports troughs at the moment."
+        self._fit_type = kwargs.pop('fit_type', 'Circlefit')  #Default, Fano, Full
+        assert self._is_trough or (not self._is_trough and not self._fit_type=='Fano'), "Fano resonance fitting only supports troughs at the moment."
         self._dont_plot = kwargs.pop('dont_plot', False)
         self._xUnits = kwargs.pop('plot_x_units', 'Hz')
         self._states = kwargs.get('states', 'ge')
         self._chi = kwargs.pop('chi', None)
         self._calc_thermal_photons = kwargs.pop('calc_thermal_photons', False)
         self._update_params = kwargs.get('update', True)
+
+        assert self._fit_type in ['Circlefit', 'Minimum'], "Choose fit_type 'Circlefit' or 'Minimum'."
 
         super().__init__(name, expt_config, dispersive_shift, hal_QPU, qubit_ids, **kwargs)
     
@@ -40,18 +42,25 @@ class ExpZIDispersive(ExpZIqubit):
                 g_data_i, e_data_i = g_arr[:,self._iq_indices[0]], e_arr[:,self._iq_indices[0]]
                 g_data_q, e_data_q = g_arr[:,self._iq_indices[1]], e_arr[:,self._iq_indices[1]]
                 g_data_y, e_data_y  = np.sqrt(g_arr[:,self._iq_indices[0]]**2 + g_arr[:,self._iq_indices[1]]**2),np.sqrt(e_arr[:,self._iq_indices[0]]**2 + e_arr[:,self._iq_indices[1]]**2)
-
-                if self._fit_type == "Default":
-                    dfit = DFitPeakLorentzian()
-                    pwr = self._hal_QPU.get_qubit_obj(qubit).ReadoutLineAttenuation_dB
-                    g_dpkt = ResonatorPowerSweep.single_circlefit(g_data_x, g_data_i, g_data_q, power_dBm=pwr, dont_plot=True)
-                    e_dpkt = ResonatorPowerSweep.single_circlefit(e_data_x, e_data_i, e_data_q, power_dBm=pwr, dont_plot=True)
+                #
+                pwr = self._hal_QPU.get_qubit_obj(qubit).ReadoutLineAttenuation_dB
+                g_dpkt = ResonatorPowerSweep.single_circlefit(g_data_x, g_data_i, g_data_q, power_dBm=pwr, dont_plot=True, pass_fits=True)
+                e_dpkt = ResonatorPowerSweep.single_circlefit(e_data_x, e_data_i, e_data_q, power_dBm=pwr, dont_plot=True, pass_fits=True)
+                #
+                if self._fit_type == "Circlefit":
                     if e_dpkt and g_dpkt:
-                        #Commit to parameters...
                         chi = (e_dpkt['fr'] - g_dpkt['fr'])/2
+                        target_f = e_dpkt['fr'] + chi
                     else:
                         chi = 0
+                        target_f = None
                         print("Fit failed, so chi was not updated.")
+                elif self._fit_type == "Minimum":
+                    g_min_f = g_data_x[np.argmin(g_data_y)]
+                    e_min_f = e_data_x[np.argmin(e_data_y)]
+                    chi = (e_min_f - g_min_f)/2
+                    target_f = e_min_f + chi
+                #
                 if self._calc_thermal_photons:
                     try:
                         Ql = self._hal_QPU.get_qubit_obj(qubit).ReadoutQl
@@ -67,6 +76,8 @@ class ExpZIDispersive(ExpZIqubit):
                     # print(f"Estimate thermal photons: {solution}")
                 if self._update_params:
                     cur_qubit = self._hal_QPU.get_qubit_obj(qubit)
+                    if target_f:
+                        cur_qubit.ReadoutFrequency = target_f
                     if e_dpkt and g_dpkt:
                         cur_qubit.ChiGE = chi
                     if self._calc_thermal_photons:
@@ -74,17 +85,24 @@ class ExpZIDispersive(ExpZIqubit):
                         cur_qubit.ThermalPhotonNum = float(np.atleast_1d(n_th)[0])
                 if not self._dont_plot:
                     fig, ax = plt.subplots()
-                    ax.plot(g_data_x*1e-9, g_data_y, label=f"g ({g_dpkt['fr']*1e-9:.4f} GHz)")
-                    ax.plot(e_data_x*1e-9, e_data_y, label=f"e ({e_dpkt['fr']*1e-9:.4f} GHz)")
+                    ax.plot(g_data_x*1e-9, g_data_y, label=f"g ({g_dpkt['fr']*1e-9:.4f} GHz)", c='tab:blue')
+                    ax.plot(e_data_x*1e-9, e_data_y, label=f"e ({e_dpkt['fr']*1e-9:.4f} GHz)", c='tab:orange')                
+                    if e_dpkt and g_dpkt:
+                        ax.plot(g_data_x*1e-9, np.absolute(g_dpkt['fit_data']), c='tab:blue', ls='dashed')
+                        ax.plot(e_data_x*1e-9, np.absolute(e_dpkt['fit_data']), c='tab:orange', ls='dashed')
+                        if self._fit_type == 'Circlefit':
+                            ax.axvline(g_dpkt['fr']*1e-9, lw=1, ls='dashed', alpha=0.5, c='tab:blue')
+                            ax.axvline(e_dpkt['fr']*1e-9, lw=1, ls='dashed', alpha=0.5, c='tab:orange')
+                    if self._fit_type == "Minimum":
+                        ax.axvline(g_min_f*1e-9, lw=1, ls='dashed', alpha=0.5, c='tab:blue')
+                        ax.axvline(e_min_f*1e-9, lw=1, ls='dashed', alpha=0.5, c='tab:orange')
+                    if chi != 0:
+                        ax.set_title(f"{qubit} " + r"$\chi_{ge}=$"+f"{chi*1e-6:.3f} MHz")
+                    else:
+                        ax.set_title(f"{qubit}")
                     ax.legend()
                     ax.set_xlabel("f (GHz)")
                     ax.set_ylabel(r"$|S_{21}|$")
                     ax.xaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, _: f'{x:.4f}'))
-                    if e_dpkt and g_dpkt:
-                        ax.axvline(g_dpkt['fr']*1e-9, lw=1, ls='dashed', alpha=0.5, c='tab:blue')
-                        ax.axvline(e_dpkt['fr']*1e-9, lw=1, ls='dashed', alpha=0.5, c='tab:orange')
-                        ax.set_title(r"$\chi_{ge}=$"+f"{chi*1e-6:.3f} MHz")
                     fig.show()
                     fig.savefig(self._file_path + 'dispersive_shift_ge.png')
-                    # g_dpkt['fig'].show()
-                    # g_dpkt['fig'].savefig(self._file_path + 'fitted_plot.png')

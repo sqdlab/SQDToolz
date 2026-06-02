@@ -148,6 +148,7 @@ class ZIQubit(HALbase, ZIbase):
                 'ReadoutInputRange':'readout_range_in',
                 'ReadoutFrequency':'readout_resonator_frequency',
                 'ReadoutAmplitude':'readout_amplitude',
+                'ReadoutKernelType':'readout_integration_kernels_type',
                 'ReadoutTime':'readout_length',
                 'ReadoutPad':'readout_integration_delay',
                 'ResetTime':'reset_delay_length',

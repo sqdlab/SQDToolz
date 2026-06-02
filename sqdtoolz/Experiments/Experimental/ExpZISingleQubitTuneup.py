@@ -155,7 +155,7 @@ class ExpZISingleQubitTuneup:
         #
         self._qubit.DrivePower = self._qubit_time_domain_LO_power
         self._qubit.DriveGEAmplitudeX = 1.0
-        self._qubit.DriveGEAmplitudeXon2 = 0.5
+        self._qubit.DriveGEAmplitudeXon2 = 0.5  
         exp = ExpZIRabi(f'rabi_pre_cal_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], amplitudes=[self._rabi_ampls], update=self._update_live, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots, use_cal_traces=False)
         lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages)
         exp = ExpZIRabi(f'rabi_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], amplitudes=[self._rabi_ampls], update=self._update_live, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)

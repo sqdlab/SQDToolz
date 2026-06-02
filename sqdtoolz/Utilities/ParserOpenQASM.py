@@ -200,12 +200,12 @@ class _ParserOpenQASM:
     def p_functioncall(self, p):
         '''statement : functionsignature params SEMICOLON
         '''
-        p[0] = ('functioncall', {'name':p[1], 'arguments':p[2]})
+        p[0] = ('functioncall', {'type':'function', 'name':p[1], 'qargs':p[2]})
 
     def p_functioncall_global(self, p):
         '''statement : functionsignature indexedparams SEMICOLON
         '''
-        p[0] = ('functioncall', {'name':p[1], 'arguments':p[2]})
+        p[0] = ('functioncall', {'type':'function', 'name':p[1], 'qargs':p[2]})
     
     def p_version(self, p):
         '''globalstatement : VERSION NUMBER SEMICOLON
@@ -245,14 +245,14 @@ class _ParserOpenQASM:
                             |  ID LARRAY NUMBER RARRAY ASSIGN MEASURE ID LARRAY NUMBER RARRAY SEMICOLON
         '''
         if len(p) == 5:
-            p[0] = ('measure', p[4], p[1])
+            p[0] = ('measure', {'type':'measure', 'qargs':[p[4]], 'store':p[1]})
         elif len(p) == 8:
             if p[2] == '[':
-                p[0] = ('measure', p[7], (p[1], p[3]))
+                p[0] = ('measure', {'type':'measure', 'qargs':[p[7]], 'store':(p[1], p[3])})
             else:
-                p[0] = ('measure', (p[4], p[6]), p[1])
+                p[0] = ('measure', {'type':'measure', 'qargs':[(p[4], p[6])], 'store':p[1]})
         else:
-            p[0] = ('measure', (p[7], p[9]), (p[1], p[3]))
+            p[0] = ('measure', {'type':'measure', 'qargs':[(p[7], p[9])], 'store':(p[1], p[3])})
     #
     #NOTE: The measurement tuples are: (Qubit to Measure, Classical Register to Store)
     def p_measure_old(self, p):
@@ -262,14 +262,14 @@ class _ParserOpenQASM:
                             |  MEASURE ID LARRAY NUMBER RARRAY ASSIGNOLD ID LARRAY NUMBER RARRAY SEMICOLON
         '''
         if len(p) == 5:
-            p[0] = ('measure', p[2], p[4])
+            p[0] = ('measure', {'type':'measure', 'qargs':[p[2]], 'store':p[4]})
         elif len(p) == 8:
             if p[3] == '[':
-                p[0] = ('measure', (p[2], p[4]), p[7])
+                p[0] = ('measure', {'type':'measure', 'qargs':[(p[2], p[4])], 'store':p[7]})
             else:
-                p[0] = ('measure', p[2], (p[4], p[6]))
+                p[0] = ('measure', {'type':'measure', 'qargs':[p[2]], 'store':(p[4], p[6])})
         else:
-            p[0] = ('measure', (p[2], p[4]), (p[7], p[9]))
+            p[0] = ('measure', {'type':'measure', 'qargs':[(p[2], p[4])], 'store':(p[7], p[9])})
 
 
     def p_statements(self, p):
@@ -341,16 +341,7 @@ class ParserOpenQASM:
             self._parse_file(cur_file)
         self.compiled_operations = self._final_compile()
 
-    def _get_include_tree(self, cur_includes_stack: List[str], overall_includes: List[str], source_dirs: List[str]):
-        current_file = cur_includes_stack[-1]
-        cur_includes = self._extract_includes(current_file, source_dirs)
-        for cur_include in cur_includes:
-            assert not cur_include in cur_includes_stack, f"There is a circular dependency with {cur_include}."
-            self._get_include_tree(cur_includes_stack + [cur_include], overall_includes, source_dirs)
-        overall_includes.append(current_file)
-        return
-
-    def _extract_includes(self, file_path: str, source_dirs: List[str]):
+    def _find_file(self, file_path, source_dirs):
         if not os.path.exists(file_path):
             found = False
             for cur_source_dir in source_dirs:
@@ -360,6 +351,19 @@ class ParserOpenQASM:
                     found = True
                     break
             assert found, f"Could not find file {file_path}"
+        return file_path
+
+    def _get_include_tree(self, cur_includes_stack: List[str], overall_includes: List[str], source_dirs: List[str]):
+        current_file = cur_includes_stack[-1]
+        cur_includes = self._extract_includes(current_file, source_dirs)
+        for cur_include in cur_includes:
+            assert not cur_include in cur_includes_stack, f"There is a circular dependency with {cur_include}."
+            self._get_include_tree(cur_includes_stack + [cur_include], overall_includes, source_dirs)
+        overall_includes.append(self._find_file(current_file, source_dirs))
+        return
+
+    def _extract_includes(self, file_path: str, source_dirs: List[str]):
+        file_path = self._find_file(file_path, source_dirs)
         #################
         lines = self._open_file_strip_comments(file_path)
         lines = "".join(lines).replace('\n','').split(';')
@@ -401,6 +405,8 @@ class ParserOpenQASM:
             elif statement[0] == 'dec_bit':
                 self._bits.append((statement[1], statement[2]))
             elif statement[0] == 'functioncall':
+                self._operations.append(statement[1])
+            elif statement[0] == 'measure':
                 self._operations.append(statement[1])
     
     def _eval_expression(self, expr, wildcards):
@@ -460,7 +466,7 @@ class ParserOpenQASM:
         for cur_func in self._gate_defs[func_name]['function']:
             #Basically iterating over potential ctrl/negctrl etc...
             new_func = {'name': self._evaluate_func_signature(cur_func[1]['name'],input_wildcards),
-                        'arguments': [output_wildcards[x] for x in cur_func[1]['arguments']]}
+                        'qargs': [output_wildcards[x] for x in cur_func[1]['qargs']]}
             sub_func.append(new_func)
         return sub_func
 
@@ -468,10 +474,10 @@ class ParserOpenQASM:
     def _eval_func(self, dict_operation):
         if len(dict_operation['name']) == 1:
             if dict_operation['name'][0][0] == 'U':
-                return [{'name': [(dict_operation['name'][0][0], dict_operation['name'][0][1])], 'arguments': dict_operation['arguments']}]
+                return [{'type': 'function', 'name': [(dict_operation['name'][0][0], dict_operation['name'][0][1])], 'qargs': dict_operation['qargs']}]
             else:
                 assert dict_operation['name'][0][0] in self._gate_defs, f"The gate operation {dict_operation['name'][0][0]} is undefined."
-                temp_func_list = self._replace_func_with_arguments(*dict_operation['name'][0], dict_operation['arguments'])
+                temp_func_list = self._replace_func_with_arguments(*dict_operation['name'][0], dict_operation['qargs'])
                 ret_list = []
                 for cur_func in temp_func_list:
                     ret_list += self._eval_func(cur_func)
@@ -495,7 +501,7 @@ class ParserOpenQASM:
             else:
                 assert cur_func[0] in self._gate_defs, f"Function {cur_func[0]} is undefined."
                 assert len(self._gate_defs[cur_func[0]]['output_args']) == 1, f"The function {cur_func[0]} is not a single-qubit unitary!"
-                temp_func_list = self._replace_func_with_arguments(*cur_func, dict_operation['arguments'])
+                temp_func_list = self._replace_func_with_arguments(*cur_func, dict_operation['qargs'])
                 func_sign_args = []
                 for cur_func in temp_func_list:
                     func_sign_args += self._eval_func(cur_func)
@@ -503,7 +509,7 @@ class ParserOpenQASM:
                 for cur_func in func_sign_args:
                     le_list = [x for x in new_sign_list]
                     le_list[found_ind] = cur_func['name'][0]
-                    ret_list.append({'name': le_list, 'arguments': dict_operation['arguments']})
+                    ret_list.append({'type': 'function', 'name': le_list, 'qargs': dict_operation['qargs']})
                     
                 return ret_list
         
@@ -523,15 +529,26 @@ class ParserOpenQASM:
         #Process operations
         ops = []
         for cur_op in self._operations:
-            ops += self._eval_func(cur_op)
+            if cur_op['type'] == 'function':
+                ops += self._eval_func(cur_op)
+            elif cur_op['type'] == 'measure':
+                ops.append(cur_op)
         #Check qubit registers are valid
         for cur_op in ops:
-            for cur_qubit_arg in cur_op['arguments']:
+            for cur_qubit_arg in cur_op['qargs']:
                 if isinstance(cur_qubit_arg, (list, tuple)):
                     assert cur_qubit_arg[1] < qubit_reg_offset_and_size[cur_qubit_arg[0]][1], f"Index of qubit {cur_qubit_arg[0]}[{cur_qubit_arg[1]}] exceeds register size of {qubit_reg_offset_and_size[cur_qubit_arg[0]][1]}."
+            # if cur_op['type'] == 'measure':
+            #     if isinstance(cur_op['qubit'], (list, tuple)):
+            #         assert cur_op['qubit'][1] < qubit_reg_offset_and_size[cur_op['qubit'][0]][1], f"Index of qubit {cur_op['qubit'][0]}[{cur_op['qubit'][1]}] exceeds register size of {qubit_reg_offset_and_size[cur_op['qubit'][0]][1]}."                    
+                #TODO: Validate classical register sizes as well...
+                # if isinstance(cur_op['store'], (list, tuple)):
+                #     assert cur_op['store'][1] < qubit_reg_offset_and_size[cur_op['store'][0]][1], f"Index of qubit {cur_op['store'][0]}[{cur_op['store'][1]}] exceeds register size of {qubit_reg_offset_and_size[cur_op['store'][0]][1]}."                    
+
         #Note that the format of ops is a list of gates where each element is a dictionary with keys:
         #   name - a list of controls with exactly one unitary in the list
         #   arguments - the target qubits upon which to apply the controlled unitary gates
+        #Except if it's a measure type, in which case it has 'qubit' and 'store' keys for the qubit and classical registers respectively.
         return ops
     
     def get_axis_angle_from_unitary(self, unitary_angles):
@@ -602,7 +619,7 @@ class ParserOpenQASM:
         for op_ind,cur_op in enumerate(self.compiled_operations):
             cur_col = leCols[op_ind%len(leCols)]
             cur_qubit_indices = []
-            for m,cur_qubit in enumerate(cur_op['arguments']):
+            for m,cur_qubit in enumerate(cur_op['qargs']):
                 if isinstance(cur_qubit, tuple):
                     cur_qubit_indices.append(self._qubit_reg_offset_and_size[cur_qubit[0]][0] + cur_qubit[1])
                 else:
@@ -616,7 +633,9 @@ class ParserOpenQASM:
 
             for m,x in enumerate(cur_qubit_indices):
                 qubit_positions[x] = cur_pos
-                if isinstance(cur_op['name'][m], tuple):
+                if cur_op['type'] == 'measure':
+                    self._plot_gate(ax, qubit_positions[x], x, '∅', cur_col)
+                elif isinstance(cur_op['name'][m], tuple):
                     if cur_op['name'][m][0] == 'U':
                         axis, angle = self.get_axis_angle_from_unitary(cur_op['name'][m][1])
                         self._plot_gate(ax, qubit_positions[x], x, self.normalise_name(axis, angle), cur_col)
@@ -632,7 +651,7 @@ class ParserOpenQASM:
         a=0
         
 
-poqasm = ParserOpenQASM('qpe.qasm',[])
-poqasm.plot()
-plt.show()
-a=0
+# poqasm = ParserOpenQASM('qpe.qasm',[])
+# poqasm.plot()
+# plt.show()
+# a=0

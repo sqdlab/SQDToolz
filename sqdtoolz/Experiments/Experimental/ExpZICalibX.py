@@ -5,6 +5,7 @@ from sqdtoolz.Utilities.DataFitting import*
 from sqdtoolz.Utilities.Miscellaneous import Miscellaneous
 from sqdtoolz.Experiments.Experimental.ZI import single_qubit_gates_sweep
 import scipy.optimize
+from sqdtoolz.Utilities.DataFitting import DFitSinusoid
 
 class ExpZICalibX(ExpZIqubit):
     def __init__(self, name, expt_config, hal_QPU, qubit_ids, calib_denominator=1, **kwargs):
@@ -47,17 +48,27 @@ class ExpZICalibX(ExpZIqubit):
             n_vals = self._n_vals
             if self._calib_denominator == 2:
                 def func(x):
-                    return ( 1-(np.cos(n_vals * (1+x[0]/100)*np.pi/2 / 2))**2 -0.5 )*np.exp(-n_vals/(x[1]*100))+0.5
+                    return np.sin((n_vals-1) * (1+x[0]/100)*np.pi/2)*np.exp(-(n_vals-1)/(x[1]*100))/2+0.5
                 fit_data = {'Gate': 'X/2'}
+                dFit = DFitSinusoid()
+                dpkt = dFit.get_fitted_plot(data_x[1::4], pop_probs[1::4], dontplot=True)
+                x0 = [dpkt['frequency']*100 * 4,(1/dpkt['decay_rate']) / 100]
             elif self._calib_denominator == 1:
                 def func(x):
-                    return ( 1-(np.cos(n_vals * (1+x[0]/100)*np.pi / 2))**2 -0.5 )*np.exp(-n_vals/(x[1]*100))+0.5
+                    return np.cos((n_vals-1) * (1+x[0]/100)*np.pi)*np.exp(-(n_vals-1)/(x[1]*100))/2+0.5
                 fit_data = {'Gate': 'X'}
+                #Fit to every 2nd one - i.e. technically the identity operation...
+                dFit = DFitSinusoid()
+                dpkt = dFit.get_fitted_plot(data_x[::2], pop_probs[::2], dontplot=True)
+                x0 = [dpkt['frequency']*100 * 2,(1/dpkt['decay_rate']) / 100]
+            if x0[1] <= 0:
+                x0[1] = 2
+
             def cost_func(x):
                 resid = pop_probs - func(x)
                 return np.sum(resid**2)
 
-            sol = scipy.optimize.minimize(cost_func, [0.0,2], bounds=((-10,10),(0.1,5)), method='Nelder-Mead')
+            sol = scipy.optimize.minimize(cost_func, x0, bounds=((-10,10),(0.1,5)), method='Nelder-Mead')
             fit_data['Corr_Fac_Pct'] = sol.x[0]
             fit_data['Gate_Decay_per_100'] = sol.x[1]
             fit_data['Gate_Corr_Fac'] = float(1/(1+sol.x[0]/100))

@@ -29,6 +29,7 @@ class ExpZISingleQubitTuneup:
         self._individual_plots = kwargs.pop('individual_plots', False)
         self._update_live = kwargs.pop('update_params_live', True)
         self._enable_ZI_log_messages = kwargs.pop('enable_ZI_log_messages', False)
+        self._assume_detuned_above = kwargs.pop('ramsey_assume_detuned_above', True)
         #
         if 'res_freq_range' in kwargs:
             self._res_freq_range = kwargs.pop('res_freq_range')
@@ -86,7 +87,8 @@ class ExpZISingleQubitTuneup:
     def run(self, lab):
         fig = plt.figure(layout="constrained"); fig.set_figwidth(12); fig.set_figheight(12)
         gs = matplotlib.gridspec.GridSpec(5, 2, figure=fig)
-    
+        fig.suptitle(f"Tuneup {self._qubit_id}", fontsize=16, fontweight='bold')
+        #
         lab.group_open(self._name)
         #
         #FLUX SWEEP
@@ -182,7 +184,7 @@ class ExpZISingleQubitTuneup:
         fitted_data = np.load(exp._file_path + f"fitted_data_{self._qubit_id}.npy", allow_pickle=True).item()
         arr = leData.get_numpy_array()
         data_x = leData.param_vals[0]
-        ExpZIRamsey.plot_fitted_results(ax, data_x, fitted_data['amplitude_raw'], fitted_data, True)
+        ExpZIRamsey.plot_fitted_results(ax, data_x, fitted_data['amplitude_raw'], self._qubit_id, fitted_data, True)
         sigFigs = 4
         ax.set_title(f"Ramsey Δ={Miscellaneous.get_units(self._ramsey_fast_detuning,4)}Hz, f={Miscellaneous.get_units(fitted_data['frequency'],4)}Hz")
         exp.update_qubits() #TODO: Add error-checking here to slam brakes if necessary
@@ -196,10 +198,10 @@ class ExpZISingleQubitTuneup:
         fitted_data = np.load(exp._file_path + f"fitted_data_{self._qubit_id}.npy", allow_pickle=True).item()
         arr = leData.get_numpy_array()
         data_x = leData.param_vals[0]
-        ExpZIRamsey.plot_fitted_results(ax, data_x, fitted_data['amplitude_raw'], fitted_data, True)
+        ExpZIRamsey.plot_fitted_results(ax, data_x, fitted_data['amplitude_raw'], self._qubit_id, fitted_data, True)
         sigFigs = 4
         ax.set_title(f"Ramsey Δ={Miscellaneous.get_units(self._ramsey_slow_detuning,4)}Hz, f={Miscellaneous.get_units(fitted_data['frequency'],4)}Hz, T2*={Miscellaneous.get_units(fitted_data['T2*'],4)}s")
-        exp.update_qubits() #TODO: Add error-checking here to slam brakes if necessary
+        exp.update_qubits(assume_detuned_above=self._assume_detuned_above) #TODO: Add error-checking here to slam brakes if necessary
         ##############################
         #
         #T1

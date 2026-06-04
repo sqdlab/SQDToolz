@@ -22,6 +22,8 @@ class ZIACQ(HALbase, ZIbase):
                 'repetition_time': 5e-6
             }
         self._cur_workflow = None
+        if not hasattr(self, '_leSession'):
+            self._leSession = lbeqs.Session(self._instr_zi.device_setup)
 
     @classmethod
     def fromConfigDict(cls, config_dict, lab):
@@ -203,5 +205,5 @@ class ZIACQ(HALbase, ZIbase):
 
 
     def _get_ZI_session(self):
-        return lbeqs.Session(self._instr_zi.device_setup)
+        return self._leSession
 

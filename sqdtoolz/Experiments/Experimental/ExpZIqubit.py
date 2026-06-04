@@ -75,6 +75,7 @@ class ExpZIqubit(Experiment):
         # folder_store = FolderStore(file_path)
         # folder_store.activate()
         leSession = leACQ._get_ZI_session()
+        leSession.disconnect()
         leSession.connect(do_emulation=kwargs.get('debug_skip_experiment',False))
         for handler in leLogger.handlers:
             if isinstance(handler, logging.StreamHandler):
@@ -121,9 +122,13 @@ class ExpZIqubit(Experiment):
 
         self._expt_config._hal_ACQ._cur_workflow = exp_workflow
         
+        emulate = kwargs.pop('debug_skip_experiment__run', False)
         if kwargs.pop('debug_skip_experiment', False):
-            print('Not running experiment')
-            return
+            if not emulate:
+                print('Not running experiment')
+                return
+            else:
+                print('ZI Emulating experiment')
 
         if kwargs.get('quick_query',False):
             self._expt_config.prepare_instruments()
@@ -136,6 +141,8 @@ class ExpZIqubit(Experiment):
         # folder_store.deactivate()
         # logging_store.deactivate()
         logging.disable(logging.NOTSET)
+
+        leSession.disconnect()
 
         return leData
 

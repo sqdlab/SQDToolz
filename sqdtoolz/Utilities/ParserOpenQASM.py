@@ -1,345 +1,164 @@
-from typing import List
 import os
 import re
-import ply.lex
-import ply.yacc
+import openqasm3
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatch
 
-class _ParserOpenQASM:
-    # literals = r'=<>,.^"'
-    reserved = {
-        'gate' : 'GATE',
-        'OPENQASM' : 'VERSION',
-        'if' : 'IF',
-        'else' : 'ELSE',
-        'for' : 'FOR',
-        'int' : 'INT',
-        'opaque' : 'OPAQUE',
-        'save_statevector' : 'SAVE_STATEVECTOR',
-        'qubit' : 'QUBIT',
-        'bit' : 'BIT',
-        'measure' : 'MEASURE',
-        'ctrl' : 'CONTROL',
-        'negctrl' : 'NEGCONTROL'
-        }
-    tokens = (
-        'ID',
-        'NUMBER',
-        'LBRACKET',
-        'RBRACKET',
-        'COMMA',
-        'LBRACE',
-        'RBRACE',
-        'SEMICOLON',
-        'LARRAY',
-        'RARRAY',
-
-        'PLUS',
-        'MINUS',
-        'MULTIPLY',
-        'DIVIDE',
-        'ASSIGN',
-        'ASSIGNOLD',
-        'ATCTRL'
-        ) + tuple(reserved.values())
-    t_ignore  = ' \t' #QASM is uses semi-colons, so new-lines are meaningless...
-    #
-    t_LBRACKET = r'\('
-    t_RBRACKET = r'\)'
-    t_COMMA = r','
-    t_LBRACE = r'\{'
-    t_RBRACE = r'\}'
-    t_SEMICOLON = r';'
-    t_LARRAY = r'\['
-    t_RARRAY = r'\]'
-    t_PLUS = r'\+'
-    t_MINUS = r'-'
-    t_MULTIPLY = r'\*'
-    t_DIVIDE = r'/'
-    t_ASSIGN = r'='
-    t_ASSIGNOLD = r'->'
-    t_ATCTRL = r'@'
-
-
-    def t_ID(self, t):
-        r'[a-zA-Zα-ωΑ-Ω][a-zA-Z_0-9]*'
-        t.type = self.reserved.get(t.value, 'ID')  # Check for reserved words
-        return t
-
-    def t_NUMBER(self,t):
-        r'[.]?[+-]?\d+\.?\d*'
-        try:
-            t.value = int(t.value)
-        except:
-            t.value = float(t.value)
-        return t
-
-    def t_newline(self, t):
-        r'\n+'
-        self.lineno += len(t.value)     #i.e. if there are multiple new-lines...
-
-    # Error handling rule
-    def t_error(self, t):
-        print(f"Illegal character '{t.value[0]}' in line {self.lineno}")
-        t.lexer.skip(1)
-
-
-    precedence = (
-        ('left', 'PLUS', 'MINUS'),
-        ('left', 'MULTIPLY', 'DIVIDE'),
-    )
-    start='program'
-
-    def p_gatedec(self, p):
-        '''gatedec : GATE ID params LBRACE statements RBRACE
-                    | GATE ID LBRACKET params RBRACKET params LBRACE statements RBRACE
-        '''
-        if len(p) == 7:
-            p[0] = ('gatedec', p[2], [], p[3], p[5])
-        else:
-            p[0] = ('gatedec', p[2], p[4], p[6], p[8])
-
-    def p_params(self, p):
-        '''params : ID
-                | ID COMMA params
-        '''
-        if len(p) == 2:
-            p[0] = [p[1]]
-        else:
-            p[0] = [p[1]] + p[3]
-
-    def p_ctrl_params_func_signature1(self, p):
-        '''functionsignature : ID
-                | ID LBRACKET expressions RBRACKET
-                | ID LBRACKET expressions RBRACKET ATCTRL functionsignature
-        '''
-        if len(p) == 2:
-            p[0] = [(p[1], [])]
-        elif len(p) == 5:
-            p[0] = [(p[1], p[3])]
-        else:
-            p[0] = [(p[1], p[3])] + p[6]
-
-    def p_ctrl_params_func_signature2(self, p):
-        '''functionsignature :
-                | CONTROL
-                | NEGCONTROL
-                | CONTROL LBRACKET NUMBER RBRACKET
-                | NEGCONTROL LBRACKET NUMBER RBRACKET
-                | CONTROL ATCTRL functionsignature
-                | NEGCONTROL ATCTRL functionsignature
-                | CONTROL LBRACKET NUMBER RBRACKET ATCTRL functionsignature
-                | NEGCONTROL LBRACKET NUMBER RBRACKET ATCTRL functionsignature
-        '''
-        if len(p) == 1:
-            #TODO: Look into whether the compile-time constants can be allowed for ctrl/negctrl rather than just numbers...
-            #It unwraps it here - perhaps do it like a preprocessor sweep before lex/yacc?
-            #
-            #ctrl/negctrl shouldn't conflict with function names as it's a reserved keyword...
-            if p[1] == 'CONTROL':
-                p[0] = [('ctrl')]
-            else:
-                p[0] = [('negctrl')]
-        elif len(p) == 4:
-            p[0] = [p[1]] + p[3]
-        elif len(p) == 5:
-            p[0] = [p[1]]*p[3]
-        else:
-            p[0] = [p[1]]*p[3] + p[6]
-
-
-    #OPENQASM only allows indexing of qubits in the global scope...
-    def p_params_indexed(self, p):
-        '''indexedparams : ID
-                        | ID COMMA indexedparams
-                        | ID LARRAY NUMBER RARRAY
-                        | ID LARRAY NUMBER RARRAY COMMA indexedparams
-        '''
-        if len(p) == 2:
-            p[0] = [p[1]]
-        elif len(p) == 4:
-            p[0] = [p[1]] + p[3]
-        elif len(p) == 5:
-            p[0] = [(p[1], p[3])]
-        else:
-            p[0] = [(p[1], p[3])] + p[6]
-
-    def p_expression(self, p):
-        '''expression : expression PLUS expression
-                    | expression MINUS expression
-                    | expression MULTIPLY expression
-                    | expression DIVIDE expression
-                    | LBRACKET expression RBRACKET
-                    | MINUS ID
-                    | MINUS NUMBER
-                    | MINUS expression
-                    | ID
-                    | NUMBER
-        '''
-        if len(p) == 4:
-            if p[1] == '(' and p[3] == ')':
-                p[0] = (p[2])
-            else:
-                p[0] = (p[2], p[1], p[3])
-        elif len(p) == 3:
-            p[0] = (p[1], p[2])
-        else:
-            p[0] = p[1]
-    
-    def p_expressions(self, p):
-        '''expressions : expression
-                | expression COMMA expressions
-        '''
-        if len(p) == 2:
-            p[0] = [p[1]]
-        else:
-            p[0] = [p[1]] + p[3]
-
-    def p_functioncall(self, p):
-        '''statement : functionsignature params SEMICOLON
-        '''
-        p[0] = ('functioncall', {'type':'function', 'name':p[1], 'qargs':p[2]})
-
-    def p_functioncall_global(self, p):
-        '''statement : functionsignature indexedparams SEMICOLON
-        '''
-        p[0] = ('functioncall', {'type':'function', 'name':p[1], 'qargs':p[2]})
-    
-    def p_version(self, p):
-        '''globalstatement : VERSION NUMBER SEMICOLON
-        '''
-        p[0] = ('version', p[2])
-    
-    def p_savestatevector(self, p):
-        '''globalstatement : OPAQUE SAVE_STATEVECTOR params SEMICOLON
-                    | SAVE_STATEVECTOR params SEMICOLON
-                    | OPAQUE SAVE_STATEVECTOR indexedparams SEMICOLON
-                    | SAVE_STATEVECTOR indexedparams SEMICOLON
-        '''
-        p[0] = ('sim_construct', p[1:])
-
-    def p_qubit(self, p):
-        '''globalstatement : QUBIT ID SEMICOLON
-                            | QUBIT LARRAY NUMBER RARRAY ID SEMICOLON
-        '''
-        if len(p) == 7:
-            p[0] = ('dec_qubit', p[5], p[3])
-        else:
-            p[0] = ('dec_qubit', p[2], 1)
-
-    def p_bit(self, p):
-        '''globalstatement : BIT ID SEMICOLON
-                            | BIT LARRAY NUMBER RARRAY ID SEMICOLON
-        '''
-        if len(p) == 7:
-            p[0] = ('dec_bit', p[5], p[3])
-        else:
-            p[0] = ('dec_bit', p[2], 1)
-
-    def p_measure(self, p):
-        '''globalstatement : ID ASSIGN MEASURE ID SEMICOLON
-                            |  ID LARRAY NUMBER RARRAY ASSIGN MEASURE ID SEMICOLON
-                            |  ID ASSIGN MEASURE ID LARRAY NUMBER RARRAY SEMICOLON
-                            |  ID LARRAY NUMBER RARRAY ASSIGN MEASURE ID LARRAY NUMBER RARRAY SEMICOLON
-        '''
-        if len(p) == 5:
-            p[0] = ('measure', {'type':'measure', 'qargs':[p[4]], 'store':p[1]})
-        elif len(p) == 8:
-            if p[2] == '[':
-                p[0] = ('measure', {'type':'measure', 'qargs':[p[7]], 'store':(p[1], p[3])})
-            else:
-                p[0] = ('measure', {'type':'measure', 'qargs':[(p[4], p[6])], 'store':p[1]})
-        else:
-            p[0] = ('measure', {'type':'measure', 'qargs':[(p[7], p[9])], 'store':(p[1], p[3])})
-    #
-    #NOTE: The measurement tuples are: (Qubit to Measure, Classical Register to Store)
-    def p_measure_old(self, p):
-        '''globalstatement : MEASURE ID ASSIGNOLD ID SEMICOLON
-                            |  MEASURE ID LARRAY NUMBER RARRAY ASSIGNOLD ID SEMICOLON
-                            |  MEASURE ID ASSIGNOLD ID LARRAY NUMBER RARRAY SEMICOLON
-                            |  MEASURE ID LARRAY NUMBER RARRAY ASSIGNOLD ID LARRAY NUMBER RARRAY SEMICOLON
-        '''
-        if len(p) == 5:
-            p[0] = ('measure', {'type':'measure', 'qargs':[p[2]], 'store':p[4]})
-        elif len(p) == 8:
-            if p[3] == '[':
-                p[0] = ('measure', {'type':'measure', 'qargs':[(p[2], p[4])], 'store':p[7]})
-            else:
-                p[0] = ('measure', {'type':'measure', 'qargs':[p[2]], 'store':(p[4], p[6])})
-        else:
-            p[0] = ('measure', {'type':'measure', 'qargs':[(p[2], p[4])], 'store':(p[7], p[9])})
-
-
-    def p_statements(self, p):
-        '''statements : statement
-                    | statement statements
-                    | globalstatement
-                    | globalstatement statements
-        '''
-        if len(p) == 2:
-            p[0] = [p[1]]
-        else:
-            p[0] = [p[1]] + p[2]
-
-    def p_program(self, p):
-        '''program : 
-                    | statement
-                    | globalstatement
-                    | gatedec
-                    | statement program
-                    | globalstatement program
-                    | gatedec program
-        '''
-        if len(p) == 1:
-            pass
-        elif len(p) == 2:
-            p[0] = [p[1]]
-        elif p[2] == None:
-            p[0] = [p[1]]
-        else:
-            p[0] = [p[1]] + p[2]
-    
-    def p_error(self, p):
-        assert False, f"Syntax error on line number {self.lineno} at '{p.value}'"
-
-    def build(self, **kwargs):
-        self.lexer = ply.lex.lex(object=self,**kwargs)
-
+class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
     def __init__(self):
-        pass
-    
-    def _tokenise(self, str_input):
-        self.lexer.input(str_input)
-        self.lineno = 1
-        while True:
-            tok = self.lexer.token()
-            if not tok:
-                break      # No more input
-            print(tok)
-        print("\n")
-    
-    def parse(self, str_input):
-        self.lineno = 1
-        parser = ply.yacc.yacc(module=self)
-        result = parser.parse(str_input, lexer=self.lexer, debug=True)
-        return result
+        super().__init__()
+        self.variables = {}
+        self._gate_defs = {}
+        self._commands = []
+        self._qubits = {}
+        self._bits = {}
 
+    #Not required as includes are handled separately...
+    # def visit_Include(self, node):
+    #     node.filename
+    #     print(f"Quantum register declared: {node.name} of size {node.size}")
+    #     return super().visit_QuantumDeclaration(node)
+
+    def visit_QuantumGateDefinition(self, node):
+        self._gate_defs[node.name.name] = node
+
+    def visit_QubitDeclaration(self, node):
+        if node.size == None:
+            reg_size = 1
+        else:
+            reg_size = node.size.value
+        self._qubits[node.qubit.name] = reg_size
+
+    def visit_ClassicalDeclaration(self, node):
+        if isinstance(node.type, openqasm3.ast.BitType):
+            if node.type.size == None:
+                reg_size = 1
+            else:
+                reg_size = node.type.size.value
+            self._bits[node.identifier.name] = reg_size
+    
+    def visit_QuantumGate(self, node):
+        args = [self._eval_arg(x) for x in node.arguments]
+        qargs = []
+        for x in node.qubits:
+            qargs += self._eval_qarg(x)
+        self._commands += self._eval_func(node, args, qargs)
+
+    def visit_QuantumBarrier(self, node):
+        # self._commands.append({'type':'barrier'})
+        #Pointless as we won't be doing commutation/collapse optimisation here...
+        pass
+
+    def visit_DelayInstruction(self, node):
+        cur_delay = self._eval_arg(node.duration)
+        if not isinstance(cur_delay, tuple):    #Typically must have unit, but 0 delay doesn't require units...abs
+            cur_delay = (cur_delay, 's')
+        qargs = []
+        for x in node.qubits:
+            qargs += self._eval_qarg(x)
+        self._commands.append({'type':'delay', 'targets':qargs, 'length':cur_delay})
+
+    def visit_QuantumMeasurementStatement(self, node):
+        self._commands.append( {'type': 'measure', 'qubit': self._eval_qarg(node.measure.qubit), 'store': self._eval_bits_arg(node.target)} )
+
+    def _eval_func(self, node, override_args:list, override_qargs:list, extra_mods:list=[]):
+        cur_func_name = node.name.name
+        assert cur_func_name == 'U' or cur_func_name in self._gate_defs, f"Line {node.span.start_line}: Function '{cur_func_name}' is undefined"
+
+        if cur_func_name == 'U':
+            assert len(override_args) == 3, f"Line {node.span.start_line}: The operator 'U' must have 3 angles."
+            ctrl_mods = []
+            if len(override_qargs) > 1:
+                for cur_modifier in extra_mods + node.modifiers: #i.e. the extra_mods list prepends any internal ctrl commands etc...
+                    if cur_modifier.argument == None:
+                        num = 1
+                    else:
+                        num = self._eval_arg(cur_modifier.argument)
+                    if cur_modifier.modifier.name == 'ctrl':
+                        ctrl_mods += ['ctrl']*num
+                    elif cur_modifier.modifier.name == 'negctrl':
+                        ctrl_mods += ['negctrl']*num
+            return [{'type': 'gate', 'angles': override_args, 'controls':ctrl_mods, 'targets': override_qargs}]
+        else:
+            cur_func_defn = self._gate_defs[cur_func_name]
+            args = [x.name for x in cur_func_defn.arguments]
+            qargs = [x.name for x in cur_func_defn.qubits]
+            #NOTE: OpenQASM3 specification does not seem to allow for default arguments here...
+            assert len(override_args) == len(args), f"Line {node.span.start_line}: The gate {cur_func_name} requires {len(args)} arguments, not {len(override_args)}."
+            map_args = {args[x]:override_args[x] for x in range(len(args))}
+            num_qargs = len(extra_mods) + len(node.modifiers) + len(qargs)
+            assert len(override_qargs) == num_qargs, f"Line {node.span.start_line}: The gate {cur_func_name} requires {num_qargs} qubits, not {len(override_qargs)}."
+            q_mod_args = [override_qargs[x] for x in range(len(extra_mods))]
+            q_mod_args += [override_qargs[x+len(q_mod_args)] for x in range(len(node.modifiers))]
+            map_qargs = {qargs[x]:override_qargs[len(q_mod_args) + x] for x in range(len(qargs))}
+            #
+            ret_instructions = []
+            for cur_statement in cur_func_defn.body:
+                ret_instructions += self._eval_func(cur_statement, [self._eval_arg(x, map_args) for x in cur_statement.arguments], q_mod_args + [map_qargs[x.name] for x in cur_statement.qubits], extra_mods + node.modifiers)
+            return ret_instructions
+
+    def _eval_qarg(self, qarg):
+        #It returns a list as a register passed without indices implies automatic slicing over all the individual qubits within the register...
+        #NOTE: Quantum types cannot be an array, so the only Indexed Identifier will be [[n]] for the register index n...
+        if isinstance(qarg, openqasm3.ast.Identifier):
+            assert qarg.name in self._qubits, f"The qubit register '{qarg.name}' is undefined."
+            return [(qarg.name, x) for x in range(self._qubits[qarg.name])]   #THIS MEANS IT IS FULL REG SIZE AND MUST BE MAPPED AS THUS!
+        elif isinstance(qarg, openqasm3.ast.IndexedIdentifier):
+            assert qarg.name.name in self._qubits, f"The qubit register '{qarg.name.name}' is undefined."
+            return [(qarg.name.name, self._eval_arg(qarg.indices[0][0]))]
+
+    def _eval_bits_arg(self, bit_arg):
+        #NOTE: Quantum types cannot be an array, so the only Indexed Identifier will be [[n]] for the register index n...
+        if isinstance(bit_arg, openqasm3.ast.Identifier):
+            assert bit_arg.name in self._bits, f"The register '{bit_arg.name}' is undefined."
+            return [(bit_arg.name, x) for x in range(self._bits[bit_arg.name])]   #THIS MEANS IT IS FULL REG SIZE AND MUST BE MAPPED AS THUS!
+        elif isinstance(bit_arg, openqasm3.ast.IndexedIdentifier):
+            assert bit_arg.name.name in self._bits, f"The register '{bit_arg.name.name}' is undefined."
+            return [(bit_arg.name.name, self._eval_arg(bit_arg.indices[0][0]))]
+
+    def _eval_arg(self, argument, dict_args = {}):
+        if isinstance(argument, (int, float)):    #More just here for safety...
+            return argument
+        elif isinstance(argument, (openqasm3.ast.IntegerLiteral, openqasm3.ast.FloatLiteral)):
+            return argument.value
+        elif isinstance(argument, openqasm3.ast.Identifier):
+            if argument.name == 'π' or argument.name == 'pi':
+                return np.pi
+            elif argument.name in dict_args:
+                return self._eval_arg(dict_args[argument.name]) #More just here for safety - could just return the dictionary value...
+        elif isinstance(argument, openqasm3.ast.DurationLiteral):
+            return (argument.value, argument.unit.name)
+        elif isinstance(argument, openqasm3.ast.UnaryExpression):
+            if argument.op.name == '-':
+                return -self._eval_arg(argument.expression, dict_args)
+        elif isinstance(argument, openqasm3.ast.BinaryExpression):
+            if argument.op.name == '+':
+                return self._eval_arg(argument.lhs, dict_args) + self._eval_arg(argument.rhs, dict_args)
+            elif argument.op.name == '-':
+                return self._eval_arg(argument.lhs, dict_args) - self._eval_arg(argument.rhs, dict_args)
+            elif argument.op.name == '*':
+                return self._eval_arg(argument.lhs, dict_args) * self._eval_arg(argument.rhs, dict_args)
+            elif argument.op.name == '/':
+                return self._eval_arg(argument.lhs, dict_args) / self._eval_arg(argument.rhs, dict_args)
+            elif argument.op.name == '**':
+                return self._eval_arg(argument.lhs, dict_args) ** self._eval_arg(argument.rhs, dict_args)
+        else:
+            assert False, f"Type {argument} not implemented!"
 
 
 class ParserOpenQASM:
-    def __init__(self, main_file: str, source_dirs: List[str]):
+    def __init__(self, main_file: str, source_dirs: list[str]):
         self._extract_includes(main_file, source_dirs)
         overall_includes = []
         self._get_include_tree([main_file], overall_includes, source_dirs)
-        self._gate_defs = {}
-        self._qubits = []
-        self._bits = []
-        self._operations = []
+        #
+        self._visitor = SQDQasmVisitor()
         for m, cur_file in enumerate(overall_includes):
-            self._parse_file(cur_file)
-        self.compiled_operations = self._final_compile()
+            ast = openqasm3.parser.parse(self._open_file_strip_comments(cur_file))
+            self._visitor.visit(ast)
+
+
 
     def _find_file(self, file_path, source_dirs):
         if not os.path.exists(file_path):
@@ -353,7 +172,7 @@ class ParserOpenQASM:
             assert found, f"Could not find file {file_path}"
         return file_path
 
-    def _get_include_tree(self, cur_includes_stack: List[str], overall_includes: List[str], source_dirs: List[str]):
+    def _get_include_tree(self, cur_includes_stack: list[str], overall_includes: list[str], source_dirs: list[str]):
         current_file = cur_includes_stack[-1]
         cur_includes = self._extract_includes(current_file, source_dirs)
         for cur_include in cur_includes:
@@ -362,7 +181,7 @@ class ParserOpenQASM:
         overall_includes.append(self._find_file(current_file, source_dirs))
         return
 
-    def _extract_includes(self, file_path: str, source_dirs: List[str]):
+    def _extract_includes(self, file_path: str, source_dirs: list[str]):
         file_path = self._find_file(file_path, source_dirs)
         #################
         lines = self._open_file_strip_comments(file_path)
@@ -371,186 +190,127 @@ class ParserOpenQASM:
         for line in lines:
             leLine = line.strip().lower()
             if leLine.startswith("include"):
-                inc_files.append(leLine.split("\"")[-2])
+                inc_files.append(leLine.replace('\'','\"').split("\"")[-2])
         return inc_files
 
     def _open_file_strip_comments(self, file_path):
         with open(file_path) as file:
             lines = [line.rstrip() for line in file]
-        lines = "\n".join(lines)
-        lines = re.sub('//.*?\n','\n', lines, flags=re.DOTALL)
+        # lines = "\n".join(lines)
+        # lines = re.sub('//.*?\n','\n', lines, flags=re.DOTALL)
         #
-        lines = lines.split('\n')
-        lines = [x.strip() for x in lines if x != '']
-        return lines
+        # lines = lines.split('\n')
+        # lines = [x.strip() for x in lines if x != '']
+        return '\n'.join(lines)
 
-    def _parse_file(self, file_path: str):
-        gate_defs = {}
-        lines = self._open_file_strip_comments(file_path)
-        
-        str_code = '\n'.join(lines)
-        str_code = re.sub('include?(.*?);', '', str_code, flags=re.DOTALL) #Strip include statements
-        leParser = _ParserOpenQASM()
-        leParser.build()
-        leParser._tokenise(str_code)
-        parsed_data = leParser.parse(str_code)
+    def create_schedule(self, params:dict):
+        #Initialise qubits and sync times
+        qubit_reg_mappings = {}
+        for cur_qreg in self._visitor._qubits:
+            for m in range(self._visitor._qubits[cur_qreg]):
+                qubit_reg_mappings[(cur_qreg,m)] = len(qubit_reg_mappings)
+        final_commands = []
+        cur_qubit_commands = [[] for x in range(len(qubit_reg_mappings))]
+        qubit_sync_times = np.zeros(len(qubit_reg_mappings))
+        last_sync_command_indices = [-1]*len(qubit_reg_mappings)
+        #
+        for cur_command in self._visitor._commands + [{'type':'end', 'targets':[x for x in qubit_reg_mappings]}]:
+            sync_command = False
+            if cur_command['type'] == 'gate' and len(cur_command['controls']) > 0:
+                sync_command = True
+            elif cur_command['type'] == 'delay' and len(cur_command['targets']) > 1:
+                sync_command = True
+            elif cur_command['type'] == 'end':
+                sync_command = True
 
-        for statement in parsed_data:
-            if statement[0] == 'gatedec':
-                self._gate_defs[statement[1]] = {'input_args': statement[2], 'output_args': statement[3], 'function': statement[4]}
-            elif statement[0] == 'sim_construct':
-                print("Warning: Ignoring simulation constructs.")
-            elif statement[0] == 'dec_qubit':
-                self._qubits.append((statement[1], statement[2]))
-            elif statement[0] == 'dec_bit':
-                self._bits.append((statement[1], statement[2]))
-            elif statement[0] == 'functioncall':
-                self._operations.append(statement[1])
-            elif statement[0] == 'measure':
-                self._operations.append(statement[1])
-    
-    def _eval_expression(self, expr, wildcards):
-        if isinstance(expr, (int, float)):
-            return expr
-        if isinstance(expr, str):
-            #TODO: Look up default fundamental constants supported by OpenQASM...
-            if expr == 'pi' or expr == 'π':
-                return np.pi
-            assert expr in wildcards, f"Argument {expr} could not be evaluated."
-            return self._eval_expression(wildcards[expr], wildcards)
-            
-        #Should be fine as the wildcards cannot be the reserved tokens...
-        expr = [(wildcards[x] if x in wildcards else x) for x in list(expr)]
-        if len(expr) == 1:
-            return self._eval_expression(expr, wildcards)
-        elif len(expr) == 2:
-            return -self._eval_expression(expr[1],wildcards)
-        else:
-            arg1, arg2 = self._eval_expression(expr[1],wildcards) , self._eval_expression(expr[2],wildcards)
-            if expr[0] == '+':
-                return arg1 + arg2
-            elif expr[0] == '-':
-                return arg1 - arg2
-            elif expr[0] == '*':
-                return arg1 * arg2
-            elif expr[0] == '/':
-                return arg1 / arg2
-
-    def _evaluate_func_signature(self, func_sign_list, wildcards):
-        if len(func_sign_list) > 1:
-            found_ind = -1
-            new_sign_list = []
-            for m, cur_func_sign_arg in enumerate(func_sign_list):
-                if isinstance(cur_func_sign_arg, str) and (cur_func_sign_arg == 'ctrl' or cur_func_sign_arg == 'negctrl'):
-                    new_sign_list.append(cur_func_sign_arg)
-                else:
-                    assert isinstance(cur_func_sign_arg, (tuple, list)), f"The argument {cur_func_sign_arg} is invalid in this controlled qubit sequence..."
-                    assert found_ind == -1, "Ill-formed control argument for a controlled-gate; there can only be a unitary on one qubit..."
-                    found_ind = m
-                    new_sign_list.append(cur_func_sign_arg)
-            assert found_ind != -1, "A controlled-gate sequence does not have a unitary on one of the qubits."
-            cur_func = new_sign_list[found_ind]
-        else:
-            cur_func = func_sign_list[0]
-        ret_list = [ (cur_func[0], [self._eval_expression(x, wildcards) for x in cur_func[1]]) ]
-        if len(func_sign_list) > 1:
-            new_sign_list[found_ind] = ret_list[0]
-            ret_list = new_sign_list
-        return ret_list
-
-    def _replace_func_with_arguments(self, func_name, func_inputs, func_outputs):
-        assert len(func_inputs) == len(self._gate_defs[func_name]['input_args']), f"The function {func_name} has {len(self._gate_defs[func_name]['input_args'])} arguments, not {len(func_inputs)}."
-        input_wildcards = {k:func_inputs[m] for m,k in enumerate(self._gate_defs[func_name]['input_args'])}
-        output_wildcards = {k:func_outputs[m] for m,k in enumerate(self._gate_defs[func_name]['output_args'])}
-        sub_func = []
-        for cur_func in self._gate_defs[func_name]['function']:
-            #Basically iterating over potential ctrl/negctrl etc...
-            new_func = {'name': self._evaluate_func_signature(cur_func[1]['name'],input_wildcards),
-                        'qargs': [output_wildcards[x] for x in cur_func[1]['qargs']]}
-            sub_func.append(new_func)
-        return sub_func
-
-
-    def _eval_func(self, dict_operation):
-        if len(dict_operation['name']) == 1:
-            if dict_operation['name'][0][0] == 'U':
-                return [{'type': 'function', 'name': [(dict_operation['name'][0][0], dict_operation['name'][0][1])], 'qargs': dict_operation['qargs']}]
+            if not sync_command:
+                if cur_command['type'] == 'gate':
+                    cur_qubit_commands[qubit_reg_mappings[cur_command['targets'][0]]].append(self._process_1Q_gate(cur_command['angles']))
+                elif cur_command['type'] == 'delay':
+                    cur_qubit_commands[qubit_reg_mappings[cur_command['targets'][0]]].append(self._process_delay(cur_command['length'], params['dt']))
             else:
-                assert dict_operation['name'][0][0] in self._gate_defs, f"The gate operation {dict_operation['name'][0][0]} is undefined."
-                temp_func_list = self._replace_func_with_arguments(*dict_operation['name'][0], dict_operation['qargs'])
-                ret_list = []
-                for cur_func in temp_func_list:
-                    ret_list += self._eval_func(cur_func)
-                return ret_list
+                ####
+                #Calculate new synchronisation point
+                #
+                cur_targ_indices = [qubit_reg_mappings[x] for x in cur_command['targets']]
+                cur_seq_lens = np.zeros(len(cur_targ_indices))
+                for m,cur_qubit_ind in enumerate(cur_targ_indices):
+                    cur_len = 0
+                    for cur_op in cur_qubit_commands[cur_qubit_ind]:
+                        if cur_op[0] == 'D':    #It is a delay...
+                            cur_len += cur_op[1]
+                        else:   #It is just X, Y, Z for the gate type...
+                            cur_len += params['gate_times'][cur_qubit_ind][cur_op[0]]
+                    cur_seq_lens[m] = cur_len
+                new_sync_point = np.max(qubit_sync_times[cur_targ_indices] + cur_seq_lens)
+                ####
+                #Pad/sequence Delays on qubits and add qubit sequences to final command list
+                #
+                for m,cur_qubit_ind in enumerate(cur_targ_indices):
+                    #Process residual/stretch delays
+                    residual = new_sync_point - (qubit_sync_times[cur_qubit_ind] + cur_seq_lens[m])
+                    #TODO: Check for stretches and synthesise delays here!
+                    cur_qubit_commands[cur_qubit_ind].append(('D',residual))
+                    #
+                    #Add sequence to command list and update current synchronised time for the qubit
+                    play_after = None if last_sync_command_indices[cur_qubit_ind] == -1 else last_sync_command_indices[cur_qubit_ind]
+                    final_commands.append({'qubit_index': cur_qubit_ind, 'sequence': cur_qubit_commands[cur_qubit_ind], 'after':play_after})
+                    cur_qubit_commands[cur_qubit_ind] = []
+                    qubit_sync_times[cur_qubit_ind] = new_sync_point
+                ####
+                #Add the actual command for the qubits and update the last synchronised command-sequence index
+                if cur_command['type'] == 'gate':
+                    cur_target_gate = self._process_1Q_gate(cur_command['angles'])
+                    cur_play_after_index = None if len(final_commands) == 0 else len(final_commands)-1
+                    final_commands.append({'qubit_index': cur_targ_indices, 'sequence': cur_command['controls'] + [cur_target_gate], 'after':cur_play_after_index})
+                    #Set all gate-sequences on these qubits to be synchronised to come after this new multi-qubit gate...
+                    for cur_qubit_ind in cur_targ_indices:
+                        qubit_sync_times[cur_qubit_ind] += 100e-9   #TODO: Must add 2QG time and pass this in - perhaps by a graph?
+                        last_sync_command_indices[cur_qubit_ind] = len(final_commands)-1
+                elif cur_command['type'] == 'delay':
+                    for cur_qubit_ind in cur_targ_indices:
+                        cur_delay_cmd = self._process_delay(cur_command['length'], params['dt'])
+                        cur_play_after_index = None if last_sync_command_indices[cur_qubit_ind] == -1 else last_sync_command_indices[cur_qubit_ind]
+                        final_commands.append({'qubit_index': cur_qubit_ind, 'sequence': [cur_delay_cmd], 'after':cur_play_after_index})
+                        qubit_sync_times[cur_qubit_ind] += cur_delay_cmd[1]
+                        last_sync_command_indices[cur_qubit_ind] = len(final_commands)-1
+                #Don't need to check if it's 'end' as it's the end...
+        #
+        return final_commands
+
+    def _process_delay(self, delay_params, dt_time):
+        if delay_params[1] == 's':
+            return ('D', delay_params[0])
+        elif delay_params[1] == 'ms':
+            return ('D', delay_params[0] * 1e-3)
+        elif delay_params[1] == 'µs' or delay_params[1] == 'us':
+            return ('D', delay_params[0] * 1e-6)
+        elif delay_params[1] == 'ns':
+            return ('D', delay_params[0] * 1e-9)
+        elif delay_params[1] == 'dt':
+            return ('D', delay_params[0] * dt_time)
         else:
-            func_sign_list = dict_operation['name']
-            found_ind = -1
-            new_sign_list = []
-            for m, cur_func_sign_arg in enumerate(func_sign_list):
-                if isinstance(cur_func_sign_arg, str) and (cur_func_sign_arg == 'ctrl' or cur_func_sign_arg == 'negctrl'):
-                    new_sign_list.append(cur_func_sign_arg)
-                else:
-                    assert isinstance(cur_func_sign_arg, (tuple, list)), f"The argument {cur_func_sign_arg} is invalid in this controlled qubit sequence..."
-                    assert found_ind == -1, "Ill-formed control argument for a controlled-gate; there can only be a unitary on one qubit..."
-                    found_ind = m
-                    new_sign_list.append(cur_func_sign_arg)
-            assert found_ind != -1, "A controlled-gate sequence does not have a unitary on one of the qubits."
-            cur_func = new_sign_list[found_ind]
-            if cur_func[0] == 'U':
-                return [dict_operation]
-            else:
-                assert cur_func[0] in self._gate_defs, f"Function {cur_func[0]} is undefined."
-                assert len(self._gate_defs[cur_func[0]]['output_args']) == 1, f"The function {cur_func[0]} is not a single-qubit unitary!"
-                temp_func_list = self._replace_func_with_arguments(*cur_func, dict_operation['qargs'])
-                func_sign_args = []
-                for cur_func in temp_func_list:
-                    func_sign_args += self._eval_func(cur_func)
-                ret_list = []
-                for cur_func in func_sign_args:
-                    le_list = [x for x in new_sign_list]
-                    le_list[found_ind] = cur_func['name'][0]
-                    ret_list.append({'type': 'function', 'name': le_list, 'qargs': dict_operation['qargs']})
-                    
-                return ret_list
-        
+            assert False, f"Cannot interpret delay parameters {delay_params}."
 
-    def _final_compile(self):
-        #Flatten the qubit registers into a single qubit array
-        qubit_reg_offset_and_size = {}
-        cur_offset = 0
-        qubit_regs = []
-        for cur_q in self._qubits:
-            qreg_name, qreg_size = cur_q
-            qubit_reg_offset_and_size[qreg_name] = (cur_offset, qreg_size)
-            cur_offset += qreg_size
-            qubit_regs.append((qreg_name, qreg_size))
-        self._qubit_reg_offset_and_size = qubit_reg_offset_and_size
-        
-        #Process operations
-        ops = []
-        for cur_op in self._operations:
-            if cur_op['type'] == 'function':
-                ops += self._eval_func(cur_op)
-            elif cur_op['type'] == 'measure':
-                ops.append(cur_op)
-        #Check qubit registers are valid
-        for cur_op in ops:
-            for cur_qubit_arg in cur_op['qargs']:
-                if isinstance(cur_qubit_arg, (list, tuple)):
-                    assert cur_qubit_arg[1] < qubit_reg_offset_and_size[cur_qubit_arg[0]][1], f"Index of qubit {cur_qubit_arg[0]}[{cur_qubit_arg[1]}] exceeds register size of {qubit_reg_offset_and_size[cur_qubit_arg[0]][1]}."
-            # if cur_op['type'] == 'measure':
-            #     if isinstance(cur_op['qubit'], (list, tuple)):
-            #         assert cur_op['qubit'][1] < qubit_reg_offset_and_size[cur_op['qubit'][0]][1], f"Index of qubit {cur_op['qubit'][0]}[{cur_op['qubit'][1]}] exceeds register size of {qubit_reg_offset_and_size[cur_op['qubit'][0]][1]}."                    
-                #TODO: Validate classical register sizes as well...
-                # if isinstance(cur_op['store'], (list, tuple)):
-                #     assert cur_op['store'][1] < qubit_reg_offset_and_size[cur_op['store'][0]][1], f"Index of qubit {cur_op['store'][0]}[{cur_op['store'][1]}] exceeds register size of {qubit_reg_offset_and_size[cur_op['store'][0]][1]}."                    
 
-        #Note that the format of ops is a list of gates where each element is a dictionary with keys:
-        #   name - a list of controls with exactly one unitary in the list
-        #   arguments - the target qubits upon which to apply the controlled unitary gates
-        #Except if it's a measure type, in which case it has 'qubit' and 'store' keys for the qubit and classical registers respectively.
-        return ops
-    
+    def _process_1Q_gate(self, unitary_angles):
+        axis, angle = self.get_axis_angle_from_unitary(unitary_angles)
+        self.normalise_name(axis, angle)
+        if axis[0] > 1-1e-6:
+            return ('X', angle)
+        elif axis[0] < -1+1e-6:
+            return ('X', -angle)
+        elif axis[1]>1-1e-6:
+            return ('Y', angle)
+        elif axis[1] < -1+1e-6:
+            return ('Y', -angle)
+        elif axis[2]>1-1e-6:
+            return ('Z', angle)
+        elif axis[2] < -1+1e-6:
+            return ('Z', angle)
+        else:
+            assert False, f"A gate is required on axis {axis}. Convert it into equivalent rotations about the basis axes X/Y/Z."
+
     def get_axis_angle_from_unitary(self, unitary_angles):
         #Based on their definition here: https://openqasm.com/language/gates.html
         #That is for theta,phi,lambda, it's a ZYZ rotation done via lambda, theta and phi...
@@ -573,8 +333,16 @@ class ParserOpenQASM:
         rotation_axis = rotation_axis / sin_angle_2
         rotation_angle = 2*np.arctan2(np.real(sin_angle_2), np.real(pauli_vec[0]))
 
-        return rotation_axis, rotation_angle
-    
+        return np.real(rotation_axis), rotation_angle
+
+
+
+
+
+
+
+
+
     def normalise_name(self, axis, angle):
         if axis[0]>1-1e-6:
             return r"$X_{angle}$"
@@ -589,7 +357,7 @@ class ParserOpenQASM:
         elif axis[2] < -1+1e-6:
             return r"$-Z_{angle}$"
         else:
-            return "U"#f"({axis[0]}, {axis[1]}, {axis[2]}), {angle}"
+            return "U"#f"({axis[0]}, {axis[1]}, {axis[2]}), {angle}"  
 
     def _plot_gate(self, ax, x,y,text, col):
         ax.add_artist(mpatch.Rectangle((x-0.45,y-0.45), 0.9, 0.9, facecolor=col))
@@ -651,7 +419,9 @@ class ParserOpenQASM:
         a=0
         
 
-# poqasm = ParserOpenQASM('qpe.qasm',[])
+poqasm = ParserOpenQASM('test1.qasm',[])
+leCommands = poqasm.create_schedule({'gate_times':[{'X':20e-9,'Y':20e-9,'Z':0}]*4, 'dt':1.0/2e9})
+a=0
 # poqasm.plot()
 # plt.show()
 # a=0

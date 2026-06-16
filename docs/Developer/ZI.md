@@ -27,7 +27,7 @@ The `QuantumOperations` class is useful in that it can call upon a custom 1QG/2Q
 - Have `sqdtoolz.HAL.ZI.QuantumElements` directory store a bunch of classes written purely in the ZI-format
 - Have the lightest HAL that simply links to the required parameters:
     - The `QuantumElement` class is taken upon instantiation (it stores the name of this class etc.). This implies that the HAL must manually import all the classes for otherwise, it cannot instantiate them on cold-reloading etc.
-    - It creates the HAL **properties off the capitalised attributes** found in the associated `QuantumParameters` class
+    - It creates the HAL with **properties off the capitalised attributes** found in the associated `QuantumParameters` class
 - This object is later passed as the coupling to the QPU
 
 
@@ -47,3 +47,16 @@ It has an attribute `_cur_workflow` that is set to `None` when `init_instruments
 ## ExpZIqubit
 
 This is written as a light wrapper to ZI experiment workflows that utilise ZI qubit and QPU objects.
+
+## Compatibility with QASM Parsing
+
+The OpenQASM3 parser has a scheduling layer that adds delays so that the sections nicely align when required (e.g. two-qubit gates, multi-qubit delays etc.). This requires querying of the gate-times enabled via functions embedded within:
+
+- `ZIQubit` - to query the single-qubit gate times
+- `QuantumOperations` class (can be accessed via the associated `QuantumElement` class) - to query the two-qubit gate times
+
+To enforce this, the classes must inherit the `QASMCompatible` abstract class. Ideally the low-level drivers should inherit this (i.e. custom `QuantumElement` classes); the individual qubit classes shall be absorbed into the `ZIQubit` HAL. Same is done for the `ZIQuantumElement` but it will just pass onto the `QuantumElement` classes. Internally it has a few constructs:
+
+- There is a `ScheduleParametersBase` that is passed onto `ParserOpenQASM` when creating schedules. This is used to query the required parameters such as gate durations etc.
+- There is a `ScheduleParametersSoftQPUZI` class that is used to gobble up `softQPU` objects and extract said qubit gate parameters as required for scheduling. Internally this is set to call the `QASMCompatible` methods within the individual qubits/couplers...
+

@@ -4,6 +4,8 @@ import openqasm3
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatch
+from sqdtoolz.HAL.SOFTqpu import SOFTqpu
+from sqdtoolz.Utilities.OpenQASM import ScheduleParametersBase, QASMCompatibleQubitSingle
 
 class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
     def __init__(self):
@@ -147,6 +149,22 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
             assert False, f"Type {argument} not implemented!"
 
 
+class ScheduleParametersSoftQPUZI(ScheduleParametersBase):
+    def __init__(self, softQPU_ZI:SOFTqpu):
+        self._qpu = softQPU_ZI
+    
+    def get_duration(self, qubit_index:int, gate_type: str) -> float:
+        return self._qpu.get_qubit_obj(qubit_index).get_gate_duration(gate_type)
+
+    def get_duration2QG(self, qubit1_index:int, qubit2_index:int, gate_type: str) -> float:
+        zi_elem,_ = self._qpu.get_qubit_coupling_objs(qubit1_index, qubit2_index)[0].get_ZI_parameters()
+        return zi_elem.get_gate_duration(gate_type, [self._qpu.get_qubit_obj(qubit1_index), self._qpu.get_qubit_obj(qubit2_index)])
+    
+    @property
+    def dt(self):
+        return 1.0/2e9  #TODO: Maybe make this properly query it?
+
+
 class ParserOpenQASM:
     def __init__(self, main_file: str, source_dirs: list[str]):
         self._extract_includes(main_file, source_dirs)
@@ -203,7 +221,7 @@ class ParserOpenQASM:
         # lines = [x.strip() for x in lines if x != '']
         return '\n'.join(lines)
 
-    def create_schedule(self, params:dict):
+    def create_schedule(self, params:ScheduleParametersBase):
         #Initialise qubits and sync times
         qubit_reg_mappings = {}
         for cur_qreg in self._visitor._qubits:
@@ -227,7 +245,9 @@ class ParserOpenQASM:
                 if cur_command['type'] == 'gate':
                     cur_qubit_commands[qubit_reg_mappings[cur_command['targets'][0]]].append(self._process_1Q_gate(cur_command['angles']))
                 elif cur_command['type'] == 'delay':
-                    cur_qubit_commands[qubit_reg_mappings[cur_command['targets'][0]]].append(self._process_delay(cur_command['length'], params['dt']))
+                    cur_qubit_commands[qubit_reg_mappings[cur_command['targets'][0]]].append(self._process_delay(cur_command['length'], params.dt))
+                elif cur_command['type'] == 'measure':
+                    cur_qubit_commands[qubit_reg_mappings[cur_command['qubit'][0]]].append(('Measure',cur_command['store'][0]))   #TODO: Check if multi-qubit registers can be stored/measured in OpenQASM3?
             else:
                 ####
                 #Calculate new synchronisation point
@@ -240,7 +260,7 @@ class ParserOpenQASM:
                         if cur_op[0] == 'D':    #It is a delay...
                             cur_len += cur_op[1]
                         else:   #It is just X, Y, Z for the gate type...
-                            cur_len += params['gate_times'][cur_qubit_ind][cur_op[0]]
+                            cur_len += params.get_duration(cur_qubit_ind, cur_op[0])
                     cur_seq_lens[m] = cur_len
                 new_sync_point = np.max(qubit_sync_times[cur_targ_indices] + cur_seq_lens)
                 ####
@@ -249,12 +269,13 @@ class ParserOpenQASM:
                 for m,cur_qubit_ind in enumerate(cur_targ_indices):
                     #Process residual/stretch delays
                     residual = new_sync_point - (qubit_sync_times[cur_qubit_ind] + cur_seq_lens[m])
+                    cur_seg_len = new_sync_point - qubit_sync_times[cur_qubit_ind]
                     #TODO: Check for stretches and synthesise delays here!
                     cur_qubit_commands[cur_qubit_ind].append(('D',residual))
                     #
                     #Add sequence to command list and update current synchronised time for the qubit
                     play_after = None if last_sync_command_indices[cur_qubit_ind] == -1 else last_sync_command_indices[cur_qubit_ind]
-                    final_commands.append({'qubit_index': cur_qubit_ind, 'sequence': cur_qubit_commands[cur_qubit_ind], 'after':play_after})
+                    final_commands.append({'qubit_index': cur_qubit_ind, 'sequence': cur_qubit_commands[cur_qubit_ind], 'after':play_after, 'length':cur_seg_len})
                     cur_qubit_commands[cur_qubit_ind] = []
                     qubit_sync_times[cur_qubit_ind] = new_sync_point
                 ####
@@ -262,21 +283,22 @@ class ParserOpenQASM:
                 if cur_command['type'] == 'gate':
                     cur_target_gate = self._process_1Q_gate(cur_command['angles'])
                     cur_play_after_index = None if len(final_commands) == 0 else len(final_commands)-1
-                    final_commands.append({'qubit_index': cur_targ_indices, 'sequence': cur_command['controls'] + [cur_target_gate], 'after':cur_play_after_index})
+                    gate_duration = params.get_duration2QG(cur_targ_indices[0], cur_targ_indices[1], cur_command['controls'] + [cur_target_gate[0]])
+                    final_commands.append({'qubit_index': cur_targ_indices, 'sequence': cur_command['controls'] + [cur_target_gate], 'after':cur_play_after_index, 'length':gate_duration})
                     #Set all gate-sequences on these qubits to be synchronised to come after this new multi-qubit gate...
                     for cur_qubit_ind in cur_targ_indices:
-                        qubit_sync_times[cur_qubit_ind] += 100e-9   #TODO: Must add 2QG time and pass this in - perhaps by a graph?
+                        qubit_sync_times[cur_qubit_ind] += gate_duration   #TODO: Must add 2QG time and pass this in - perhaps by a graph?
                         last_sync_command_indices[cur_qubit_ind] = len(final_commands)-1
                 elif cur_command['type'] == 'delay':
                     for cur_qubit_ind in cur_targ_indices:
-                        cur_delay_cmd = self._process_delay(cur_command['length'], params['dt'])
+                        cur_delay_cmd = self._process_delay(cur_command['length'], params.dt)
                         cur_play_after_index = None if last_sync_command_indices[cur_qubit_ind] == -1 else last_sync_command_indices[cur_qubit_ind]
-                        final_commands.append({'qubit_index': cur_qubit_ind, 'sequence': [cur_delay_cmd], 'after':cur_play_after_index})
+                        final_commands.append({'qubit_index': cur_qubit_ind, 'sequence': [cur_delay_cmd], 'after':cur_play_after_index, 'length':cur_delay_cmd[1]})
                         qubit_sync_times[cur_qubit_ind] += cur_delay_cmd[1]
                         last_sync_command_indices[cur_qubit_ind] = len(final_commands)-1
                 #Don't need to check if it's 'end' as it's the end...
         #
-        return final_commands
+        return {'qubit_mappings': qubit_reg_mappings, 'commands':final_commands}
 
     def _process_delay(self, delay_params, dt_time):
         if delay_params[1] == 's':
@@ -366,14 +388,10 @@ class ParserOpenQASM:
     def _plot_ctrl(self, ax, x,y, col):
         ax.add_artist(mpatch.Circle((x,y), 0.2, facecolor=col))
 
-    def plot(self):
+    def plot_schedule(self, gate_schedule:dict, qubit_params:dict):
         yticklabels = []
-        for cur_qubit in self._qubit_reg_offset_and_size:
-            if self._qubit_reg_offset_and_size[cur_qubit][1] > 1:
-                for cur_index in range(self._qubit_reg_offset_and_size[cur_qubit][1]):
-                    yticklabels.append(f"{cur_qubit}[{cur_index}]")
-            else:
-                yticklabels.append(f"{cur_qubit}")
+        for cur_qubit in gate_schedule['qubit_mappings']:
+            yticklabels.append(f"{cur_qubit[0]}[{cur_qubit[1]}]")
         num_qubits = len(yticklabels)
 
         #List the next *free* qubit position in time...
@@ -384,7 +402,7 @@ class ParserOpenQASM:
         ax.set_yticklabels(yticklabels, size=12)
         leCols = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
-        for op_ind,cur_op in enumerate(self.compiled_operations):
+        for op_ind,cur_op in enumerate(gate_schedule['commands']):
             cur_col = leCols[op_ind%len(leCols)]
             cur_qubit_indices = []
             for m,cur_qubit in enumerate(cur_op['qargs']):
@@ -419,8 +437,39 @@ class ParserOpenQASM:
         a=0
         
 
+
+from sqdtoolz.HAL.ZI.ZIQubit import ZIQubit
+from sqdtoolz.HAL.ZI.ZIACQ import ZIACQ
+from sqdtoolz.HAL.SOFTqpu import SOFTqpu
+from sqdtoolz.Experiments.Experimental.ExpZIqubit import ExpZIqubit
+from sqdtoolz.HAL.ZI.ZIQuantumElement import ZIQuantumElement
+from sqdtoolz.HAL.ZI.QuantumElements.TunableTransmonCouplerFixed import TunableTransmonCouplerFixed
+from sqdtoolz.Laboratory import Laboratory
+
+lab = Laboratory(instr_config_file = "tests/ZI_Basic.yaml", save_dir = "mySaves\\")
+
+lab.load_instrument('zi_boxes')
+ZIQubit('Qubit1', lab, 'zi_boxes', ('shfqc0', 'SGCHANNELS/0/OUTPUT'), ('shfqc0', 'QACHANNELS/0/OUTPUT'), ('shfqc0', 'QACHANNELS/0/INPUT'), ('hdawg0', 'SIGOUTS/0'))
+ZIQubit('Qubit2', lab, 'zi_boxes', ('shfqc0', 'SGCHANNELS/1/OUTPUT'), ('shfqc0', 'QACHANNELS/0/OUTPUT'), ('shfqc0', 'QACHANNELS/0/INPUT'), ('hdawg0', 'SIGOUTS/1'))
+ZIQubit('Qubit3', lab, 'zi_boxes', ('shfqc0', 'SGCHANNELS/2/OUTPUT'), ('shfqc0', 'QACHANNELS/0/OUTPUT'), ('shfqc0', 'QACHANNELS/0/INPUT'), ('hdawg0', 'SIGOUTS/2'))
+ZIQubit('Qubit4', lab, 'zi_boxes', ('shfqc0', 'SGCHANNELS/3/OUTPUT'), ('shfqc0', 'QACHANNELS/0/OUTPUT'), ('shfqc0', 'QACHANNELS/0/INPUT'), ('hdawg0', 'SIGOUTS/3'))
+ZIQuantumElement('Cpl12', lab, TunableTransmonCouplerFixed, flux='Qubit1/flux')
+ZIQuantumElement('Cpl34', lab, TunableTransmonCouplerFixed, flux='Qubit3/flux')
+# lab.HAL('Cpl12').QubitFlux = 'Qubit1'
+
+SOFTqpu('QPU', lab)
+lab.HAL('QPU').add_qubit(lab.HAL('Qubit1'))
+lab.HAL('QPU').add_qubit(lab.HAL('Qubit2'))
+lab.HAL('QPU').add_qubit(lab.HAL('Qubit3'))
+lab.HAL('QPU').add_qubit(lab.HAL('Qubit4'))
+lab.HAL('QPU').add_qubit_coupling('Qubit1', 'Qubit2', lab.HAL('Cpl12'))
+lab.HAL('QPU').add_qubit_coupling('Qubit3', 'Qubit4', lab.HAL('Cpl34'))
+
 poqasm = ParserOpenQASM('test1.qasm',[])
-leCommands = poqasm.create_schedule({'gate_times':[{'X':20e-9,'Y':20e-9,'Z':0}]*4, 'dt':1.0/2e9})
+# qubit_params = {'qubit_params':[{'X':20e-9,'Y':20e-9,'Z':0,'Measure':2e-6}]*4, 'dt':1.0/2e9}
+qubit_params = ScheduleParametersSoftQPUZI(lab.HAL('QPU'))
+leSchedule = poqasm.create_schedule(qubit_params)
+poqasm.plot_schedule(leSchedule, qubit_params)
 a=0
 # poqasm.plot()
 # plt.show()

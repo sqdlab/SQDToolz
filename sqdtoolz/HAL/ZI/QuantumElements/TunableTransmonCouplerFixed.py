@@ -7,6 +7,9 @@ from laboneq.dsl.quantum import (
     Transmon,
 )
 from laboneq.simple import *
+from laboneq_applications.qpu_types.tunable_transmon import TunableTransmonQubit
+from sqdtoolz.Utilities.OpenQASM import QASMCompatibleQubitMultiple
+from sqdtoolz.HAL.ZI.ZIQubit import ZIQubit
 
 @attrs.define(kw_only=True)
 class TunableTransmonCouplerFixedParameters(QuantumParameters):
@@ -15,9 +18,16 @@ class TunableTransmonCouplerFixedParameters(QuantumParameters):
     Length: float = 100e-9
     Pulse: dict = attrs.field(factory=lambda: {"function": "gaussian_square", "sigma": 0.5})
 
-class TunableTransmonCouplerFixed(QuantumElement):
+class TunableTransmonCouplerFixed(QuantumElement, QASMCompatibleQubitMultiple):
     PARAMETERS_TYPE = TunableTransmonCouplerFixedParameters
     REQUIRED_SIGNALS = ("flux",)
+
+    def get_gate_duration(self, gate:list[str]|tuple[str], qubits:list[ZIQubit]):
+        if gate[0] == 'ctrl' and gate[1] == 'Z':
+            return self.parameters.Length
+        elif gate[0] == 'ctrl' and gate[1] == 'X':
+            return self.parameters.Length + qubits[1].get_gate_duration('H')
+        assert False, f"Cannot implement {gate} on this coupler."
 
 class TunableTransmonCouplerFixedOperations(QuantumOperations):
     QUBIT_TYPES = TunableTransmonCouplerFixed

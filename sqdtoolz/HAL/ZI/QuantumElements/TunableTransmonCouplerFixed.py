@@ -22,7 +22,9 @@ class TunableTransmonCouplerFixed(QuantumElement, QASMCompatibleQubitMultiple):
     PARAMETERS_TYPE = TunableTransmonCouplerFixedParameters
     REQUIRED_SIGNALS = ("flux",)
 
-    def get_gate_duration(self, gate:list[str]|tuple[str], qubits:list[ZIQubit]):
+    def get_gate_duration(self, gate:list|tuple, qubits:list[ZIQubit]):
+        if isinstance(gate[1], (tuple,list)):
+            gate = (gate[0], gate[1][0])    #The gate time is irrespective of angle; if that's even allowed here... Could check if it's allowed etc...
         if gate[0] == 'ctrl' and gate[1] == 'Z':
             return self.parameters.Length
         elif gate[0] == 'ctrl' and gate[1] == 'X':

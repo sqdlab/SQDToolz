@@ -184,8 +184,10 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
     def get_ZI_parameters(self):
         return self._zi_qubit, self._zi_qops
 
-    def get_gate_duration(self, gate:str):
+    def get_gate_duration(self, gate):
         if self._qubit_type == "TunableTransmonQubit":
+            if isinstance(gate, (list, tuple)):
+                gate = gate[0]  #The gate times are the same irrespective of the rotation angles...
             if gate[0] == '-':
                 gate = gate[1:]
             if gate in ['X', 'X/2', 'Y', 'Y/2', 'H']:

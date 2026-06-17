@@ -6,6 +6,10 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatch
 from sqdtoolz.HAL.SOFTqpu import SOFTqpu
 from sqdtoolz.Utilities.OpenQASM import ScheduleParametersBase, QASMCompatibleQubitSingle
+import pandas as pd
+from sqdtoolz.Utilities.Miscellaneous import Miscellaneous
+import bokeh
+from bokeh.models import PanTool
 
 class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
     def __init__(self):
@@ -153,10 +157,18 @@ class ScheduleParametersSoftQPUZI(ScheduleParametersBase):
     def __init__(self, softQPU_ZI:SOFTqpu):
         self._qpu = softQPU_ZI
     
-    def get_duration(self, qubit_index:int, gate_type: str) -> float:
+    def get_duration(self, qubit_index:int, gate_type: str|list|tuple) -> float:
+        if isinstance(gate_type, (list,tuple)):
+            if gate_type[0] == 'D':
+                return gate_type[1]
+            elif gate_type[0] == 'Measure':
+                return self.get_duration_measurement(qubit_index)
         return self._qpu.get_qubit_obj(qubit_index).get_gate_duration(gate_type)
+    
+    def get_duration_measurement(self, qubit_index:int):
+        return self._qpu.get_qubit_obj(qubit_index).get_measure_duration()
 
-    def get_duration2QG(self, qubit1_index:int, qubit2_index:int, gate_type: str) -> float:
+    def get_duration2QG(self, qubit1_index:int, qubit2_index:int, gate_type:list) -> float:
         zi_elem,_ = self._qpu.get_qubit_coupling_objs(qubit1_index, qubit2_index)[0].get_ZI_parameters()
         return zi_elem.get_gate_duration(gate_type, [self._qpu.get_qubit_obj(qubit1_index), self._qpu.get_qubit_obj(qubit2_index)])
     
@@ -259,8 +271,10 @@ class ParserOpenQASM:
                     for cur_op in cur_qubit_commands[cur_qubit_ind]:
                         if cur_op[0] == 'D':    #It is a delay...
                             cur_len += cur_op[1]
+                        elif cur_op[0] == 'Measure':
+                            cur_len += params.get_duration_measurement(cur_qubit_ind)
                         else:   #It is just X, Y, Z for the gate type...
-                            cur_len += params.get_duration(cur_qubit_ind, cur_op[0])
+                            cur_len += params.get_duration(cur_qubit_ind, cur_op)
                     cur_seq_lens[m] = cur_len
                 new_sync_point = np.max(qubit_sync_times[cur_targ_indices] + cur_seq_lens)
                 ####
@@ -283,7 +297,7 @@ class ParserOpenQASM:
                 if cur_command['type'] == 'gate':
                     cur_target_gate = self._process_1Q_gate(cur_command['angles'])
                     cur_play_after_index = None if len(final_commands) == 0 else len(final_commands)-1
-                    gate_duration = params.get_duration2QG(cur_targ_indices[0], cur_targ_indices[1], cur_command['controls'] + [cur_target_gate[0]])
+                    gate_duration = params.get_duration2QG(cur_targ_indices[0], cur_targ_indices[1], cur_command['controls'] + [cur_target_gate])
                     final_commands.append({'qubit_index': cur_targ_indices, 'sequence': cur_command['controls'] + [cur_target_gate], 'after':cur_play_after_index, 'length':gate_duration})
                     #Set all gate-sequences on these qubits to be synchronised to come after this new multi-qubit gate...
                     for cur_qubit_ind in cur_targ_indices:
@@ -317,7 +331,7 @@ class ParserOpenQASM:
 
     def _process_1Q_gate(self, unitary_angles):
         axis, angle = self.get_axis_angle_from_unitary(unitary_angles)
-        self.normalise_name(axis, angle)
+        self._normalise_name(axis, angle)
         if axis[0] > 1-1e-6:
             return ('X', angle)
         elif axis[0] < -1+1e-6:
@@ -357,15 +371,7 @@ class ParserOpenQASM:
 
         return np.real(rotation_axis), rotation_angle
 
-
-
-
-
-
-
-
-
-    def normalise_name(self, axis, angle):
+    def _normalise_name(self, axis, angle):
         if axis[0]>1-1e-6:
             return r"$X_{angle}$"
         elif axis[0] < -1+1e-6:
@@ -381,60 +387,138 @@ class ParserOpenQASM:
         else:
             return "U"#f"({axis[0]}, {axis[1]}, {axis[2]}), {angle}"  
 
-    def _plot_gate(self, ax, x,y,text, col):
-        ax.add_artist(mpatch.Rectangle((x-0.45,y-0.45), 0.9, 0.9, facecolor=col))
+    def _get_1QG_name(self, axis:str, angle:float):
+        if axis == 'D':
+            return f'{Miscellaneous.get_units(angle)}s'
+        if axis == 'Measure':
+            return '∅'
+        if np.abs(angle - np.pi) < 1e-6:
+            return f'{axis}(π)'
+        if np.abs(angle - np.pi/2) < 1e-6:
+            return f'{axis}(π/2)'
+        if np.abs(angle + np.pi/2) < 1e-6:
+            return f'{axis}(-π/2)'
+        if np.abs(angle - np.pi/4) < 1e-6:
+            return f'{axis}(π/4)'
+        if np.abs(angle + np.pi/4) < 1e-6:
+            return f'{axis}(-π/4)'
+        return f'{axis}({angle})'
+
+
+    def _plot_gate(self, ax, x,y,text, time_span, col):
+        ax.add_artist(mpatch.Rectangle((x,y), time_span, 0.9, facecolor=col))
         ax.annotate(text, (x,y), color='w', weight='bold', 
                     fontsize=6, ha='center', va='center')
     def _plot_ctrl(self, ax, x,y, col):
         ax.add_artist(mpatch.Circle((x,y), 0.2, facecolor=col))
 
-    def plot_schedule(self, gate_schedule:dict, qubit_params:dict):
-        yticklabels = []
-        for cur_qubit in gate_schedule['qubit_mappings']:
-            yticklabels.append(f"{cur_qubit[0]}[{cur_qubit[1]}]")
-        num_qubits = len(yticklabels)
-
-        #List the next *free* qubit position in time...
-        qubit_positions = [1 for x in range(num_qubits)]
-
-        fig, ax = plt.subplots(1)
-        ax.set_yticks(range(len(yticklabels)))
-        ax.set_yticklabels(yticklabels, size=12)
-        leCols = plt.rcParams['axes.prop_cycle'].by_key()['color']
-
-        for op_ind,cur_op in enumerate(gate_schedule['commands']):
-            cur_col = leCols[op_ind%len(leCols)]
-            cur_qubit_indices = []
-            for m,cur_qubit in enumerate(cur_op['qargs']):
-                if isinstance(cur_qubit, tuple):
-                    cur_qubit_indices.append(self._qubit_reg_offset_and_size[cur_qubit[0]][0] + cur_qubit[1])
+    def tabulate_schedule(self, gate_schedule, qubit_params:ScheduleParametersBase):
+        cur_qubit_gate_time_indices = [0.0 for x in range(len(gate_schedule['qubit_mappings']))]
+        #
+        arr_qubits = []
+        arr_qubit_auxs = []
+        arr_start_times = []
+        arr_end_times = []
+        arr_gate_types = []
+        arr_col_intens = []
+        #
+        for cur_sec_ind,cur_sec_ops in enumerate(gate_schedule['commands']):
+            cur_qubit = cur_sec_ops['qubit_index']
+            if isinstance(cur_qubit, (list,tuple)):
+                if len(cur_qubit) == 1:
+                    cur_qubit = cur_qubit[0]    #A strange case that may never exist?
                 else:
-                    cur_qubit_indices.append(self._qubit_reg_offset_and_size[cur_qubit][0])
-            cur_pos = np.max([qubit_positions[x] for x in cur_qubit_indices])
-            
-            #Draw control stem if applicable
-            if len(cur_qubit_indices) > 1:
-                for x in cur_qubit_indices[1:]:
-                    ax.plot([cur_pos]*2, [cur_qubit_indices[0],x], color=cur_col)
+                    #Process it as a 2QG
+                    cur_gate_time = qubit_params.get_duration2QG(*cur_qubit, cur_sec_ops['sequence'])   #NOTE: This assumes that it's not a sequence, but just a singular list for control/target operations
+                    arr_qubit_auxs.append(cur_qubit[0])
+                    arr_qubits.append(cur_qubit[1])
+                    for m in range(2):
+                        start_time = cur_qubit_gate_time_indices[cur_qubit[m]]  #Should start/end times be the same across all qubits...
+                        cur_qubit_gate_time_indices[cur_qubit[m]] += cur_gate_time
+                        end_time = cur_qubit_gate_time_indices[cur_qubit[m]]
+                    arr_start_times.append(start_time)
+                    arr_end_times.append(end_time)
+                    arr_gate_types.append( self._get_1QG_name(*(cur_sec_ops['sequence'][1])) )
+                    arr_col_intens.append(cur_sec_ind/len(gate_schedule['commands']))
+                    continue
+            #Process it as a 1QG
+            for cur_gate in cur_sec_ops['sequence']:
+                cur_name = self._get_1QG_name(*cur_gate)
+                cur_gate_time = qubit_params.get_duration(cur_qubit, cur_gate)
+                #
+                arr_qubits.append(cur_qubit)
+                arr_qubit_auxs.append(-1)
+                arr_start_times.append(cur_qubit_gate_time_indices[cur_qubit])
+                cur_qubit_gate_time_indices[cur_qubit] += cur_gate_time
+                arr_end_times.append(cur_qubit_gate_time_indices[cur_qubit])
+                arr_gate_types.append(cur_name)
+                arr_col_intens.append(cur_sec_ind/len(gate_schedule['commands']))
+                pass
 
-            for m,x in enumerate(cur_qubit_indices):
-                qubit_positions[x] = cur_pos
-                if cur_op['type'] == 'measure':
-                    self._plot_gate(ax, qubit_positions[x], x, '∅', cur_col)
-                elif isinstance(cur_op['name'][m], tuple):
-                    if cur_op['name'][m][0] == 'U':
-                        axis, angle = self.get_axis_angle_from_unitary(cur_op['name'][m][1])
-                        self._plot_gate(ax, qubit_positions[x], x, self.normalise_name(axis, angle), cur_col)
-                elif cur_op['name'][m] == 'ctrl':
-                    self._plot_ctrl(ax, qubit_positions[x], x, cur_col)
-                qubit_positions[x] = cur_pos + 1
-            qubit_positions
-            a=0
+        df = pd.DataFrame({
+            'qubits':arr_qubits,
+            'qubitsAux':arr_qubit_auxs,
+            'start_time':arr_start_times,
+            'end_time':arr_end_times,
+            'gate_type':arr_gate_types,
+            'col_intensity':arr_col_intens
+        })
+
+        return df
+
+    def plot_schedule(self, gate_schedule, qubit_params:ScheduleParametersBase, output_file_path:str, title: str = "Quantum Circuit Timeline (Simplified Data Model)"):
+        """
+        Generates an interactive Bokeh timeline plot using a simplified data model.
+        """
+
+        df = self.tabulate_schedule(gate_schedule, qubit_params)
+        df['duration'] = df['end_time'] - df['start_time']
+        df['centre'] = (df['start_time']+df['end_time'])/2
+        df['durationBy4'] = df['duration']/4
+
+        source = bokeh.models.ColumnDataSource(df)
         
-        ax.set_xlim([0,np.max(qubit_positions)])
-        ax.set_ylim([-0.5,num_qubits-0.5])
-        fig.show()
-        a=0
+        all_qubits = pd.concat([df['qubits'], df['qubitsAux']]).dropna()
+        num_qubits = all_qubits.max() + 1 if not all_qubits.empty else 1
+        
+        wheel_zoom = bokeh.models.WheelZoomTool(dimensions="width")
+        wheel_zoom.modifiers = {"ctrl": True}
+        p = bokeh.plotting.figure(width=1000, height=500, title=title,x_axis_label="Time",y_axis_label="Qubit Index",x_axis_type="linear",
+                                  y_range=(-0.5, num_qubits - 0.5),tools="",active_scroll=wheel_zoom, sizing_mode="stretch_width"
+        )
+        p.add_tools(PanTool(dimensions="width"), wheel_zoom, bokeh.models.BoxZoomTool(dimensions="width"), bokeh.models.ResetTool())
+
+        #Plot 1Q gates
+        source_1q = bokeh.models.ColumnDataSource(df[df['qubitsAux'] == -1])
+        mapper = bokeh.transform.linear_cmap('col_intensity', palette=bokeh.palettes.Viridis256, low=0, high=1)
+        rect_renderer = p.rect(
+            x='centre', 
+            y='qubits', 
+            width='duration', 
+            height=0.8, 
+            source=source_1q, 
+            line_color="black",
+            fill_color=mapper,
+            alpha=1.0,
+            legend_field='gate_type'
+        )
+        p.text(x='centre', y='qubits', text='gate_type', source=source_1q, text_align='center', text_baseline='middle', text_color="black")
+
+        #Plot 2Q gates
+        source_2q = bokeh.models.ColumnDataSource(df[df['qubitsAux'] != -1])
+        inter_renderer = p.segment(x0='centre', y0='qubits', x1='centre', y1='qubitsAux', 
+            source=source_2q, line_color="black", line_width=4, legend_label="2-Qubit Gate",alpha=0.9
+        )
+        rect_renderer = p.rect( x='centre',  y='qubitsAux',  width='durationBy4', height=0.6,
+            border_radius=15, source=source_2q,  line_color="black", fill_color="black", alpha=0.9
+        )
+        rect_renderer = p.rect(x='centre', y='qubits', width='duration', height=0.8, 
+            source=source_2q, line_color="black", fill_color=mapper, alpha=1.0,
+        )
+        p.text(x='centre', y='qubits', text='gate_type', source=source_2q, text_align='center', text_baseline='middle', text_color="black")
+
+        p.legend.click_policy = "hide"
+        bokeh.io.save(p, output_file_path)
         
 
 
@@ -469,7 +553,8 @@ poqasm = ParserOpenQASM('test1.qasm',[])
 # qubit_params = {'qubit_params':[{'X':20e-9,'Y':20e-9,'Z':0,'Measure':2e-6}]*4, 'dt':1.0/2e9}
 qubit_params = ScheduleParametersSoftQPUZI(lab.HAL('QPU'))
 leSchedule = poqasm.create_schedule(qubit_params)
-poqasm.plot_schedule(leSchedule, qubit_params)
+leTable = poqasm.tabulate_schedule(leSchedule, qubit_params)
+poqasm.plot_schedule(leSchedule, qubit_params, 'output.html')
 a=0
 # poqasm.plot()
 # plt.show()

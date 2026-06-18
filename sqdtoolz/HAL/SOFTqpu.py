@@ -22,30 +22,28 @@ class SOFTqpu(HALbase, ZIbase):
     def fromConfigDict(cls, config_dict, lab):
         return cls(config_dict["Name"], lab, config_dict=config_dict)
 
+    @property
+    def NumQubits(self):
+        return len(self._qubits)
+
     def add_qubit(self, hal_obj:HALbase|ExperimentSpecification):
         self._qubits.append(self._lab._resolve_sqdobj_tree(hal_obj))
     
-    def add_qubit_coupling(self, qubit1: str|int, qubit2: str|int, hal_obj:str|HALbase):
+    def add_qubit_coupling(self, qubit1: str|int, qubit2: str|int, hal_obj:HALbase):
         qubit1 = self._resolve_qubit_index(qubit1)
         qubit2 = self._resolve_qubit_index(qubit2)
-        if isinstance(hal_obj, HALbase):
-            self._qubit_couplings.append((qubit1, qubit2, self._lab._resolve_sqdobj_tree(hal_obj)))
-        else:
-            self._qubit_couplings.append((qubit1, qubit2, hal_obj))
-
-    def get_qubit(self, qubit_id: str|int):
-        return self._qubits[self._resolve_qubit_index(qubit_id)]
+        self._qubit_couplings.append((qubit1, qubit2, self._lab._resolve_sqdobj_tree(hal_obj)))
 
     def get_qubit_obj(self, qubit_id: str|int):
         return self._lab._get_resolved_obj(self._qubits[self._resolve_qubit_index(qubit_id)])
  
-    def get_qubit_couplings(self, qubit1: str|int, qubit2: str|int):
+    def get_qubit_coupling_objs(self, qubit1: str|int, qubit2: str|int):
         qubit1 = self._resolve_qubit_index(qubit1)
         qubit2 = self._resolve_qubit_index(qubit2)
         ret_cpls = []
         for cur_cpl in self._qubit_couplings:
             if qubit1 == cur_cpl[0] and qubit2 == cur_cpl[1] or qubit1 == cur_cpl[1] and qubit2 == cur_cpl[0]:
-                ret_cpls.append(cur_cpl[2])
+                ret_cpls.append(self._lab._get_resolved_obj(cur_cpl[2]))
         return ret_cpls
 
     def get_ZI_parameters(self):

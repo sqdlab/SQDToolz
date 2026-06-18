@@ -20,6 +20,9 @@ class ExpZIBenchmarkETH(ExpZIqubit):
         assert (not 'update' in kwargs) or ('update' in kwargs and not kwargs['update']), "Don't set 'update=True'. The updates shall be done by calling update_qubit after running the experiment."
         kwargs['update'] = False
 
+        kwargs['coordinate_system'] = kwargs.get('coordinate_system', 'RH')
+        assert kwargs['coordinate_system'] in ['LH', 'RH'], "The 'coordinate_system' must be either LH or RH for left/right handed."
+
         self._fit_vals = []
 
         extra_gate_seqs = kwargs.get('extra_gate_seqs', [])

@@ -3,8 +3,9 @@ from sqdtoolz.HAL.ZI.ZIbase import ZIbase
 import laboneq.simple as lbeqs
 from laboneq_applications.qpu_types.tunable_transmon import TunableTransmonQubit, TunableTransmonOperations
 import logging
+from sqdtoolz.Utilities.OpenQASM import QASMCompatibleQubitSingle
 
-class ZIQubit(HALbase, ZIbase):
+class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
     def __init__(self, qubit_name, lab, instr_zi_boxes, zi_instr_phys_drive:tuple[str, str], zi_instr_phys_measure:tuple[str, str], zi_instr_phys_acquire:tuple[str, str], zi_phys_flux=("",""), zi_type="TunableTransmonQubit"):
         HALbase.__init__(self, qubit_name)
         
@@ -183,6 +184,22 @@ class ZIQubit(HALbase, ZIbase):
 
     def get_ZI_parameters(self):
         return self._zi_qubit, self._zi_qops
+
+    def get_gate_duration(self, gate):
+        if self._qubit_type == "TunableTransmonQubit":
+            if isinstance(gate, (list, tuple)):
+                gate = gate[0]  #The gate times are the same irrespective of the rotation angles...
+            if gate[0] == '-':
+                gate = gate[1:]
+            if gate in ['X', 'X/2', 'Y', 'Y/2', 'H']:
+                return self.DriveGETime
+            if gate in ['Z', 'Z/2']:
+                return 0
+            return -1
+    
+    def get_measure_duration(self):
+        if self._qubit_type == "TunableTransmonQubit":
+            return self.ReadoutTime
 
     def _get_current_config(self):
         ret_dict = {

@@ -49,10 +49,10 @@ class ExpZIRamsey(ExpZIqubit):
             dpkt['fit_data'] = {'amplitude': dpkt['fit_data'], 'amplitude_raw': data_y, 'T2*': 1.0/dpkt['decay_rate'], 'frequency': dpkt['frequency']}
 
             if self._normalise_data:
-                ExpZIRamsey.plot_fitted_results(axs[0], data_x, data_y, dpkt['fit_data'], self._normalise_data)
+                ExpZIRamsey.plot_fitted_results(axs[0], data_x, data_y, qubit_dataset, dpkt['fit_data'], self._normalise_data)
             else:
                 fig, ax = plt.subplots(1)
-                ExpZIRamsey.plot_fitted_results(ax, data_x, data_y, dpkt['fit_data'], self._normalise_data)
+                ExpZIRamsey.plot_fitted_results(ax, data_x, data_y, qubit_dataset, dpkt['fit_data'], self._normalise_data)
 
             fig.savefig(self._file_path + f'fitted_plot_{qubit_dataset}.png')
             if not self._dont_show_plot:
@@ -67,7 +67,7 @@ class ExpZIRamsey(ExpZIqubit):
             self._fit_vals.append({'qubit_obj': self._hal_QPU.get_qubit_obj(qubit_dataset), 'Detuning':self._detunings[ind_qubit], 'GE_frequency_fit': dpkt['frequency'], 'GE_T2star': 1.0/dpkt['decay_rate']})
 
     @staticmethod
-    def plot_fitted_results(ax, data_x, data_y, fitted_results:dict, data_normalised:bool):
+    def plot_fitted_results(ax, data_x, data_y, q, fitted_results:dict, data_normalised:bool):
         if data_normalised:
             ax.set_ylabel('Normalised Population')
         else:
@@ -77,14 +77,16 @@ class ExpZIRamsey(ExpZIqubit):
         ax.plot(data_x/norm_fac, data_y, 'kx')
         ax.plot(data_x/norm_fac, fitted_results['amplitude'], 'r-')
         ax.set_xlabel(f'Wait Times ({norm_prefix}s)')
+        ax.set_title(f"{q}: $T_2^*={fitted_results['T2*']*1e6:.2f}$us")
 
-    def update_qubits(self, assume_detuned_above=True):
+    def update_qubits(self, assume_detuned_above=True, t2_only=False):
         assert len(self._fit_vals) > 0, "Must run Ramsey Experiment before qubits can be updated."
         while len(self._fit_vals) > 0:
             cur_fit = self._fit_vals.pop(0)
-            if assume_detuned_above:
-                cur_fit['qubit_obj'].DriveGE += cur_fit['Detuning']-cur_fit['GE_frequency_fit']
-            else:
-                cur_fit['qubit_obj'].DriveGE += cur_fit['Detuning']+cur_fit['GE_frequency_fit']
-            cur_fit['qubit_obj'].DriveGE = float(cur_fit['qubit_obj'].DriveGE)
+            if not t2_only:
+                if assume_detuned_above:
+                    cur_fit['qubit_obj'].DriveGE += cur_fit['Detuning']-cur_fit['GE_frequency_fit']
+                else:
+                    cur_fit['qubit_obj'].DriveGE += cur_fit['Detuning']+cur_fit['GE_frequency_fit']    
+                cur_fit['qubit_obj'].DriveGE = float(cur_fit['qubit_obj'].DriveGE)
             cur_fit['qubit_obj'].T2GE_star = cur_fit['GE_T2star']

@@ -20,7 +20,7 @@ class ExpZISingleQubitTuneup:
         
         self._qubit = self._qpu.get_qubit_obj(self._qubit_id)
 
-        self._qubit_spec_LO_power = kwargs.pop('qubit_spec_LO_power', -5)
+        self._qubit_spec_LO_power = kwargs.pop('qubit_spec_LO_power', -20)
         self._qubit_time_domain_LO_power = kwargs.pop('qubit_time_domain_LO_power', 10)
 
         self._res_trough = kwargs.pop('res_is_trough', True)

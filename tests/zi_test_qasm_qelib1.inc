@@ -4,7 +4,7 @@
 // --- QE Hardware primitives ---
 
 gate CX a, b { ctrl @ U(π, 0, π) a, b; }
-gate test a,b,c,d,e { negctrl @ ctrl(2) @ u1(pi) @ x a, b, c, d, e; }
+// gate test a,b,c,d,e { negctrl @ ctrl(2) @ u1(pi) @ x a, b, c, d, e; }
 gate xy a {x a; y a;}
 
 // 3-parameter 2-pulse single qubit gate

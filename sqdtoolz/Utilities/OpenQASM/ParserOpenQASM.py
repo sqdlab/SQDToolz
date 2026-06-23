@@ -178,7 +178,7 @@ class ScheduleParametersSoftQPUZI(ScheduleParametersBase):
 
 
 class ParserOpenQASM:
-    def __init__(self, main_file: str, source_dirs: list[str]):
+    def __init__(self, main_file: str, source_dirs: list[str], **kwargs):
         self._extract_includes(main_file, source_dirs)
         overall_includes = []
         self._get_include_tree([main_file], overall_includes, source_dirs)
@@ -187,8 +187,8 @@ class ParserOpenQASM:
         for m, cur_file in enumerate(overall_includes):
             ast = openqasm3.parser.parse(self._open_file_strip_comments(cur_file))
             self._visitor.visit(ast)
-
-
+        #
+        self._measure_label = kwargs.get('measure_label', "∅")
 
     def _find_file(self, file_path, source_dirs):
         if not os.path.exists(file_path):
@@ -391,7 +391,7 @@ class ParserOpenQASM:
         if axis == 'D':
             return f'{Miscellaneous.get_units(angle)}s'
         if axis == 'Measure':
-            return '∅'
+            return self._measure_label
         if np.abs(angle - np.pi) < 1e-6:
             return f'{axis}(π)'
         if np.abs(angle - np.pi/2) < 1e-6:

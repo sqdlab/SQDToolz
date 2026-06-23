@@ -12,12 +12,14 @@ class ExpZICalibX(ExpZIqubit):
         self._qubit_datasets = qubit_ids
 
         self._hal_QPU = hal_QPU
+        
 
         self._dont_show_plot = kwargs.pop('dont_show_plot', False)
         assert (not 'update' in kwargs) or ('update' in kwargs and not kwargs['update']), "Don't set 'update=True'. The updates shall be done by calling update_qubit after running the experiment."
         kwargs['update'] = False
 
         self._fit_vals = []
+        self._fit_data = {}
 
         assert calib_denominator in [1,2], "Either supply 'calib_denominator' with 1 or 2 for X or X/2 gate calibration"
         self._calib_denominator = calib_denominator
@@ -71,7 +73,10 @@ class ExpZICalibX(ExpZIqubit):
             sol = scipy.optimize.minimize(cost_func, x0, bounds=((-10,10),(0.1,5)), method='Nelder-Mead')
             fit_data['Corr_Fac_Pct'] = sol.x[0]
             fit_data['Gate_Decay_per_100'] = sol.x[1]
-            fit_data['Gate_Corr_Fac'] = float(1/(1+sol.x[0]/100))
+            if (1+sol.x[0]/100) < 1:
+                fit_data['Gate_Corr_Fac'] = float(1/(1+sol.x[0]/100))
+            else:
+                fit_data['Gate_Corr_Fac'] = 2-float(1/(1+sol.x[0]/100))
 
             fig, ax = plt.subplots(1)
             ax.plot(data_x, pop_probs, 'o-')
@@ -89,15 +94,19 @@ class ExpZICalibX(ExpZIqubit):
                 plt.close(fig)
             #
             np.save(self._file_path + f'fitted_data_{qubit_dataset}.npy', fit_data)
-        
+            self._fit_data = fit_data
             #TODO: Generalise it for EF later?
             self._fit_vals.append({'qubit_obj': self._hal_QPU.get_qubit_obj(qubit_dataset), 'Gate_Corr_Fac':fit_data['Gate_Corr_Fac']})
 
-    def update_qubits(self):
+    def update_qubits(self, reverse_parity = False):
         assert len(self._fit_vals) > 0, "Must run Ramsey Experiment before qubits can be updated."
         while len(self._fit_vals) > 0:
             cur_fit = self._fit_vals.pop(0)
+            if reverse_parity:
+                correction = 2 - cur_fit['Gate_Corr_Fac']
+            else:
+                correction = cur_fit['Gate_Corr_Fac']
             if self._calib_denominator == 2:
-                cur_fit['qubit_obj'].DriveGEAmplitudeXon2 *= cur_fit['Gate_Corr_Fac']
+                cur_fit['qubit_obj'].DriveGEAmplitudeXon2 *= correction
             elif self._calib_denominator == 1:
-                cur_fit['qubit_obj'].DriveGEAmplitudeX *= cur_fit['Gate_Corr_Fac']
+                cur_fit['qubit_obj'].DriveGEAmplitudeX *= correction

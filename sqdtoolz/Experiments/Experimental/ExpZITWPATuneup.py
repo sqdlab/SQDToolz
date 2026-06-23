@@ -34,6 +34,7 @@ class ExpZITWPATuneup(ExpZIqubit):
         super()._run(file_path, sweep_vars=[(var_freq, self._twpa_freq_range), (var_power, self._twpa_power_range)], **kwargs)
 
     def _post_process(self, data):
+        n_qubits = len(self._qubit_ids)
         for qubit in self._qubit_ids:     
             leData = self.retrieve_last_dataset(qubit + r'_calib')
             arr = leData.get_numpy_array()
@@ -69,7 +70,10 @@ class ExpZITWPATuneup(ExpZIqubit):
         opt_indicies = np.where(snr_db_total == snr_db_total.max())
         freqs, powers, _ = sweep_vals
         if not self._dont_show_plot:
+            #TODO: add plots for each qubit
             if len(freqs)>1 and len(powers)>1: #2D sweep
+                fig = plt.figure(layout="constrained"); fig.set_figwidth(12); fig.set_figheight(12)
+                fig.suptitle(f"Tuneup {self._qubit_id}", fontsize=16, fontweight='bold')
                 self._optimum_twpa_point['Frequency'] = freqs[opt_indicies[0]]
                 self._optimum_twpa_point['Power'] = powers[opt_indicies[1]]
                 XX, YY = np.meshgrid(freqs,powers)
@@ -80,6 +84,7 @@ class ExpZITWPATuneup(ExpZIqubit):
                 cbar = fig.colorbar(cmap)
                 ax.legend(loc=0)
                 plt.show()
+   
             else: #1D sweep TWPA parameter, repititions
                 fig, ax = plt.subplots()
                 sweep_param = max(freqs, powers, key=len)

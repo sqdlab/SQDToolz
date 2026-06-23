@@ -7,9 +7,9 @@ from sqdtoolz.Utilities.DataFitting import *
 from sqdtoolz.Experiments.Experimental.ExpCalibGE import *
 from sqdtoolz.Utilities.QubitGates import QubitGatesBase
 import json
-from sqdtoolz.Experiments.Experimental.ZI import single_qubit_gates_sweep
+from sqdtoolz.Experiments.Experimental.ZI import oqasm_scheduled_qubits
 from sqdtoolz.Utilities.QubitGates import QubitGatesBase
-from sqdtoolz.Utilities.ParserOpenQASM import ParserOpenQASM
+from sqdtoolz.Utilities.OpenQASM.ParserOpenQASM import ParserOpenQASM, ScheduleParametersSoftQPUZI
 
 class ExpZIQASM(ExpZIqubit):   
     def __init__(self, name, expt_config, hal_QPU, qubit_ids, qasm_file_path, **kwargs):
@@ -24,14 +24,13 @@ class ExpZIQASM(ExpZIqubit):
         kwargs['coordinate_system'] = kwargs.get('coordinate_system', 'RH')
         assert kwargs['coordinate_system'] in ['LH', 'RH'], "The 'coordinate_system' must be either LH or RH for left/right handed."
 
-        self._poqasm = ParserOpenQASM(qasm_file_path)
-        self._poqasm.compiled_operations
+        self._poqasm = ParserOpenQASM(qasm_file_path, kwargs.pop('source_dirs', []))
+        qubit_params = ScheduleParametersSoftQPUZI(hal_QPU)
+        leSchedule = self._poqasm.create_schedule(qubit_params)
+        # leTable = self._poqasm.tabulate_schedule(leSchedule, qubit_params)
+        # self._poqasm.plot_schedule(leSchedule, qubit_params, 'output.html')
 
-        kwargs['gate_lists'] = []
-        for cur_seq in self._gate_seqs:
-            kwargs['gate_lists'].append([cur_seq]*len(qubit_ids))
-
-        super().__init__(name, expt_config, single_qubit_gates_sweep, hal_QPU, qubit_ids, **kwargs)
+        super().__init__(name, expt_config, oqasm_scheduled_qubits, hal_QPU, qubit_ids, openqasm_schedule=leSchedule, **kwargs)
 
     def _post_process(self, data):
         pass

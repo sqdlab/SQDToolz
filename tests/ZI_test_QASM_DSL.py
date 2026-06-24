@@ -27,15 +27,15 @@ lab.HAL('QPU').add_qubit(lab.HAL('Qubit4'))
 lab.HAL('QPU').add_qubit_coupling('Qubit1', 'Qubit2', lab.HAL('Cpl12'))
 lab.HAL('QPU').add_qubit_coupling('Qubit3', 'Qubit4', lab.HAL('Cpl34'))
 
-from sqdtoolz.Utilities.OpenQASM.ParserOpenQASM import ParserOpenQASM, ScheduleParametersSoftQPUZI
-poqasm = ParserOpenQASM('tests/ZI_test_QASM_DSL.qasm',['tests/'])
-qubit_params = ScheduleParametersSoftQPUZI(lab.HAL('QPU'))
-leSchedule = poqasm.create_schedule(qubit_params)
-leTable = poqasm.tabulate_schedule(leSchedule, qubit_params)
-poqasm.plot_schedule(leSchedule, qubit_params, 'output.html')
-a=0
+# from sqdtoolz.Utilities.OpenQASM.ParserOpenQASM import ParserOpenQASM, ScheduleParametersSoftQPUZI
+# poqasm = ParserOpenQASM('tests/ZI_test_QASM_DSL.qasm',['tests/'])
+# qubit_params = ScheduleParametersSoftQPUZI(lab.HAL('QPU'))
+# leSchedule = poqasm.create_schedule(qubit_params)
+# leTable = poqasm.tabulate_schedule(leSchedule, qubit_params)
+# poqasm.plot_schedule(leSchedule, qubit_params, 'output.html')
+# a=0
 
-# ZIACQ('ZIacq', lab, 'zi_boxes')
-# ExperimentConfiguration('ZI', lab, 0, [], 'ZIacq')
-# exp = ExpZIQASM('test', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Qubit1', 'Qubit2', 'Qubit3', 'Qubit4'], 'tests/ZI_test_QASM_DSL.qasm', source_dirs=['tests/'])
-# lab.run_single(exp, debug_skip_experiment=True)
+ZIACQ('ZIacq', lab, 'zi_boxes')
+ExperimentConfiguration('ZI', lab, 0, [], 'ZIacq')
+exp = ExpZIQASM('test', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Qubit1', 'Qubit2', 'Qubit3', 'Qubit4'], 'tests/ZI_test_QASM_DSL.qasm', source_dirs=['tests/'])
+lab.run_single(exp, debug_skip_experiment=True)

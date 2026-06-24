@@ -29,6 +29,9 @@ class ExpZIqubit(Experiment):
         self._update_params = kwargs.pop('update', False)
         self._normalise_data = kwargs.pop('use_cal_traces', True)
         self._transition = kwargs.pop('transition', 'ge')
+        #Automatically default to transition for calibration states... Note that this only matters if use_cal_traces is True...
+        kwargs['cal_states'] = kwargs.get('cal_states', self._transition)
+        #
         self._plot_ZI = kwargs.pop('ZI_plot', False)
         self._args = kwargs
         self._show_pulse_sheet = kwargs.pop('show_pulse_sheet', False)

@@ -154,13 +154,13 @@ class ZIACQ(HALbase, ZIbase):
                     'misc' : {}
                 }}
         for cur_dataset in datasets:
-            #TODO Broken for dispersive shift due to tree structure
             #NOTE: The names cannot have slashes as that will induce a subdataset in HDF5!
             if hasattr(workflow_results.output.data[cur_dataset], 'result'):
-                if hasattr(workflow_results.output.data[cur_dataset].result, 'e'):
-                    for i in ['e','g']:
-                        cur_res = workflow_results.output.data[cur_dataset].result[i]
-                        ret_val[str(cur_dataset) + '_' + i] = {
+                if not hasattr(workflow_results.output.data[cur_dataset].result, 'data'):   #i.e. there are sub-datasets like with Dispersive experiment which has g,e,f etc...
+                    cur_sub_datasets = workflow_results.output.data[cur_dataset].result._attr_keys()
+                    for cur_subdata in cur_sub_datasets:
+                        cur_res = workflow_results.output.data[cur_dataset].result[cur_subdata]
+                        ret_val[str(cur_dataset) + '_' + cur_subdata] = {
                                 #TODO: They allow multiple mappings to a given axis; this is a bit of a hack...
                                 'parameters' : [(x[0].replace('/','_') if isinstance(x, list) else x.replace('/','_')) for x in cur_res.axis_name],
                                 'data' : {},
@@ -172,8 +172,8 @@ class ZIACQ(HALbase, ZIbase):
                                 cur_axis_name = cur_axis[0].replace('/','_')
                             else:
                                 cur_axis_name = cur_axis.replace('/','_')
-                            ret_val[str(cur_dataset) + '_' + i]['parameter_values'][cur_axis_name] = (cur_res.axis[m][0] if isinstance(cur_res.axis[m], list) else cur_res.axis[m])
-                        self._process_data_dict(cur_res.data, ret_val[str(cur_dataset) + '_' + i]['data'])
+                            ret_val[str(cur_dataset) + '_' + cur_subdata]['parameter_values'][cur_axis_name] = (cur_res.axis[m][0] if isinstance(cur_res.axis[m], list) else cur_res.axis[m])
+                        self._process_data_dict(cur_res.data, ret_val[str(cur_dataset) + '_' + cur_subdata]['data'])
                 else:
                     cur_res = workflow_results.output.data[cur_dataset].result
                     ret_val[cur_dataset] = {

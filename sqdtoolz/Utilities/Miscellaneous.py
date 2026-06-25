@@ -64,5 +64,48 @@ class Miscellaneous:
         else:
             norm_prefix = ''
         
-
         return 10**norm_fac, norm_prefix
+
+    @staticmethod
+    def line_intersections_with_box(a, b, c, bbox_x, bbox_y):
+        """
+        Basically given a line equation ax+by=c and a bounding box, it finds the two points
+        on the box that give the line segment nicely.
+        """
+        # Unpack bounding box
+        x_min, x_max = bbox_x
+        y_min, y_max = bbox_y
+        candidates = []
+        #Intersections with vertical boundaries (x=x_min, x=x_max)
+        for x in [x_min, x_max]:
+            if b != 0:
+                y = (c - a*x) / b
+                if y_min <= y <= y_max:
+                    candidates.append((x, y))
+        #Intersections with horizontal boundaries (y=y_min, y=y_max)
+        for y in [y_min, y_max]:
+            if a != 0:
+                x = (c - b*y) / a
+                if x_min <= x <= x_max:
+                    candidates.append((x, y))
+        #Filter unique points to handle corners
+        points = sorted(list(set(candidates)))
+        return np.array(points) #Slices as ((x,y), (x,y))
+
+    @staticmethod
+    def line_intersection_two_segments(segment1, segment2):
+        """
+        The lines are given as segment1=((x1,y1),(x2,y2)) etc.
+        """
+        mx = segment1[0][0]
+        my = segment1[0][1]
+        nx = segment1[1][0]
+        ny = segment1[1][1]
+        px = segment2[0][0]
+        py = segment2[0][1]
+        qx = segment2[1][0]
+        qy = segment2[1][1]
+        
+        t = 1/((nx-mx)*(py-qy) - (px-qx)*(ny-my)) * ((py-qy)*(px-mx) + (qx-px)*(py-my))
+        return (mx+(nx-mx)*t, my+(ny-my)*t)
+

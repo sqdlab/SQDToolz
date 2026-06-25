@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 class DataSingleShotThreshold:
     def __init__(self, data_GE_Reps_IQ, iq_indices=[0,1]):
-        assert len(data_GE_Reps_IQ.shape) == 3, "ThData must be 3-dimensional - i.e. slicing on G/E, repetitions, IQ-values."
+        assert len(data_GE_Reps_IQ.shape) == 3, "Data must be 3-dimensional - i.e. slicing on G/E, repetitions, IQ-values."
         self._data_GE_Reps_IQ = data_GE_Reps_IQ
         self._iq_indices = iq_indices
         self.opt_thresh = None

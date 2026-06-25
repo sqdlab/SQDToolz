@@ -29,8 +29,6 @@ class ExpZIqubit(Experiment):
         self._update_params = kwargs.pop('update', False)
         self._normalise_data = kwargs.pop('use_cal_traces', True)
         self._transition = kwargs.pop('transition', 'ge')
-        #Automatically default to transition for calibration states... Note that this only matters if use_cal_traces is True...
-        kwargs['cal_states'] = kwargs.get('cal_states', self._transition)
         #
         self._plot_ZI = kwargs.pop('ZI_plot', False)
         self._args = kwargs
@@ -54,6 +52,9 @@ class ExpZIqubit(Experiment):
             getattr(options, 'transition')(self._transition)
         if hasattr(options, 'close_figures'):
             options.close_figures(not self._plot_ZI)
+        if hasattr(options, 'cal_states'):
+            #Automatically default to transition for calibration states... Note that this only matters if use_cal_traces is True...
+            getattr(options, 'cal_states')( self._args.get('cal_states', self._transition) )
         for x in [y for y in self._args]:
             if hasattr(options, x):
                 getattr(options, x)(self._args.pop(x))

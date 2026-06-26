@@ -39,6 +39,9 @@ class ExpZIqubit(Experiment):
 
         leACQ = self._expt_config._hal_ACQ
         assert isinstance(leACQ, ZIACQ), "The ExperimentConfiguration must have a ZIACQ object as its acquisition HAL."
+        override_ACQ_params = kwargs.get('override_ACQ_params', {})
+        for cur_param in override_ACQ_params:
+            setattr(leACQ, cur_param, override_ACQ_params[cur_param])
         options = self._workflow_module.experiment_workflow.options()
         leACQopts = leACQ.get_ZI_parameters()
         for x in leACQopts:

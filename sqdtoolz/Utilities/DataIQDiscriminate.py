@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from sqdtoolz.Utilities.Miscellaneous import Miscellaneous
 
 class DataIQDiscriminate:
-    def __init__(self, calib_IQ_states:np.ndarray):
+    def __init__(self, calib_IQ_states:list[np.ndarray]):
         """
         Performs the linear-SVM-based state discrimination of readout IQ-points.
 
@@ -140,14 +140,14 @@ class DataIQDiscriminate:
 
         return fig
 
-    def plot_assignment_matrix(self, ax=None, labels=['g','e','f']):
+    def plot_assignment_matrix(self, ax=None, labels=['g','e','f'], sigFigs=4):
         if ax == None:
             fig, ax = plt.subplots(1)
         else:
             fig = None
 
         ax.imshow(self._assigned_probs, cmap='GnBu', vmin=0, vmax=1, aspect='equal')
-        for i, j in np.ndindex(self._assigned_probs.shape): ax.text(j, i, f'{self._assigned_probs[i,j]:.4f}', ha='center', va='center', color='white' if i==j else 'black')
+        for i, j in np.ndindex(self._assigned_probs.shape): ax.text(j, i, f'{self._assigned_probs[i,j]:.{sigFigs}f}', ha='center', va='center', color='white' if i==j else 'black')
         # ax.set_colorbar()
         ticks = np.arange(self._N)
         tick_labels = [f'$|{labels[x]}\\rangle$' for x in range(self._N)]

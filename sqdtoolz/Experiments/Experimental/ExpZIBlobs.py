@@ -36,12 +36,12 @@ class ExpZIBlobs(ExpZIqubit):
         return np.array([x.get_fidelities() for x in self._leDIQDs])
 
     @staticmethod
-    def plot_fitted_results(leDIQD:DataIQDiscriminate):
+    def plot_fitted_results(leDIQD:DataIQDiscriminate, extra_title=''):
         fig, axs = plt.subplots(ncols=2, layout='constrained'); fig.set_figwidth(8)
         leDIQD.plot_points(axs[0])
         axs[0].set_box_aspect(1)
         leDIQD.plot_assignment_matrix(axs[1])
         axs[1].set_box_aspect(1)
         #
-        fig.suptitle(f"Average Fidelity: {leDIQD.get_average_fidelity()*100:.4g}%", y=0.92)
+        fig.suptitle(f"Average Fidelity: {leDIQD.get_average_fidelity()*100:.4g}% {extra_title}", y=0.92)
         return fig

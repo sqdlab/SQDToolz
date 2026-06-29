@@ -53,7 +53,6 @@ class ExpZIT1(ExpZIqubit):
             #
             if 'fit_data' in dpkt:
                 np.save(self._file_path + f'fitted_data_{qubit_dataset}.npy', dpkt['fit_data'])
-            #TODO: Generalise it for EF later
             self._fit_vals.append({'qubit_obj': self._hal_QPU.get_qubit_obj(qubit_dataset), 'T1':dpkt['decay_time']})
 
 

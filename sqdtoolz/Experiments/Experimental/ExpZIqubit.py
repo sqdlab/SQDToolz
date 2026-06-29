@@ -157,6 +157,9 @@ class ExpZIqubit(Experiment):
         pass
 
     def _estimate_experiment_params(self, kwargs,leSession,leQPU,leQubits,qubit_kwarg,options,file_path, file_name_suffix='', min_acq_buffer=40e-9):
+        """
+        Just calculates the experiment execution time and generates the pulse-sheets etc.
+        """
         print_pulse_sheet = kwargs.get('print_pulse_sheet',True)
         print_est_time =  kwargs.get('print_estimated_execution_time',True)
         leACQ = self._expt_config._hal_ACQ

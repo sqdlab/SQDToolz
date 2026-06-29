@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from sqdtoolz.Utilities.DataFitting import DFitExponential
 from laboneq_applications.experiments import lifetime_measurement
 from sqdtoolz.Utilities.Miscellaneous import Miscellaneous
+import numpy as np
 
 class ExpZIT1(ExpZIqubit):
     def __init__(self, name, expt_config, hal_QPU, qubit_ids, **kwargs):

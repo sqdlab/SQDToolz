@@ -4,6 +4,7 @@ import laboneq.simple as lbeqs
 from laboneq_applications.qpu_types.tunable_transmon import TunableTransmonQubit, TunableTransmonOperations
 import logging
 from sqdtoolz.Utilities.OpenQASM import QASMCompatibleQubitSingle
+import numpy as np
 
 class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
     def __init__(self, qubit_name, lab, instr_zi_boxes, zi_instr_phys_drive:tuple[str, str], zi_instr_phys_measure:tuple[str, str], zi_instr_phys_acquire:tuple[str, str], zi_phys_flux=("",""), zi_type="TunableTransmonQubit"):
@@ -129,7 +130,6 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
                 'ThermalPhotonNum': 0,
                 'ReadoutLineAttenuation_dB': -70
             }
-
             self._param_mappings = {
                 'ChiGE': 'ge_chi_shift',
                 'DriveLO':'drive_lo_frequency',
@@ -149,7 +149,11 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
                 'ReadoutInputRange':'readout_range_in',
                 'ReadoutFrequency':'readout_resonator_frequency',
                 'ReadoutAmplitude':'readout_amplitude',
+                #
                 'ReadoutKernelType':'readout_integration_kernels_type',
+                'ReadoutKernelThresholds':'readout_integration_discrimination_thresholds',
+                'ReadoutKernelWeights':'readout_integration_kernels',
+                #
                 'ReadoutTime':'readout_length',
                 'ReadoutPad':'readout_integration_delay',
                 'ResetTime':'reset_delay_length',
@@ -236,3 +240,9 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
         
         for cur_param in dict_config:
             setattr(self, cur_param, dict_config[cur_param])
+        
+        if self.ReadoutKernelType == 'optimal':
+            if not isinstance(self.ReadoutKernelWeights, np.ndarray):
+                self.ReadoutKernelType = 'default'
+                self.ReadoutKernelThresholds = None
+

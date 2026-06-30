@@ -36,6 +36,7 @@ class ExpZIQubitFluxSweep:
         lab.group_open(self._name)
         #
         fr = self._hal_QPU.get_qubit_obj(self._qubit_id).ReadoutFrequency
+        drive_pwr = self._hal_QPU.get_qubit_obj(self._qubit_id).DrivePower
         # TODO: proper runtime estimate
         if not self._flux_range is None:
             for flux in self._flux_range:
@@ -79,12 +80,6 @@ class ExpZIQubitFluxSweep:
         parent = str(Path(expQ._file_path).parent)
         fig.savefig(parent + '/Overview.png')
         #
-        # fig, ax = plt.subplots(figsize=(8,5)); 
-        # ax.pcolor(freq_valsQ, self._flux_range, amplQ_corrected)
-        # ax.set_title(f"{self._qubit_id} qubit spectroscopy")
-        # ax.set_ylabel('Flux (V)')
-        # ax.set_xlabel('Frequency (Hz)')
-        # fig.tight_layout()
         fig = plt.figure(figsize=(14, 5))
         gs = GridSpec(3, 2, width_ratios=[2, 1], figure=fig)
         fig.suptitle(f"{self._qubit_id} qubit spectroscopy", fontsize=16)
@@ -116,6 +111,4 @@ class ExpZIQubitFluxSweep:
         #
         if self._print_file_path:
             print(r"File: {}".format(parent) + r"/{}.h5".format(self._qubit_id))
-
-        # 
             

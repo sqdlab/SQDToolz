@@ -104,3 +104,9 @@ class ExpZIRes(ExpZIqubit):
                     plt.close(dpkt['fig'])
             if 'fit_data' in dpkt:
                 np.save(self._file_path + 'fitted_data.npy', dpkt['fit_data'])
+        else:
+            if not self._dont_plot:
+                plt.plot(data_x, data_y)
+                plt.xlabel("Frequency (Hz)")
+                plt.ylabel("|S21|")
+                plt.show()

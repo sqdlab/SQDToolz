@@ -4,6 +4,7 @@ from laboneq_applications.experiments import resonator_spectroscopy, qubit_spect
 from sqdtoolz.Variable import VariablePropertyTransient
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
 from sqdtoolz.Utilities.FileIO import FileIODirectory
 from pathlib import Path
 
@@ -28,12 +29,14 @@ class ExpZIQubitFluxSweep:
         self._hal_QPU = hal_QPU
 
         self._enable_ZI_log_messages = kwargs.pop('enable_ZI_log_messages', False)
+        self._print_file_path = kwargs.pop('print_file_path', False)
     
     def run(self, lab):
         var_flux = VariablePropertyTransient('Flux', self._hal_QPU.get_qubit_obj(self._qubit_id), 'FluxDC')
         lab.group_open(self._name)
         #
         fr = self._hal_QPU.get_qubit_obj(self._qubit_id).ReadoutFrequency
+        # TODO: proper runtime estimate
         if not self._flux_range is None:
             for flux in self._flux_range:
                 var_flux.Value = flux
@@ -49,29 +52,70 @@ class ExpZIQubitFluxSweep:
         #
         dataQ = FileIODirectory(expQ._file_path + f'{self._qubit_id}.h5')
         dataR = FileIODirectory(expR._file_path + f'{self._qubit_id}.h5')
+
         arrQ = dataQ.get_numpy_array()
-        flux_vals, freq_valsQ = dataQ.param_vals
+        freq_valsQ = dataQ.param_vals[1]
         amplQ = np.sqrt(arrQ[:,:,0]**2 + arrQ[:,:,1]**2)
+        row_means = np.nanmean(amplQ, axis=1)
+        amplQ_corrected = (amplQ.T - row_means).T
+
         arrR = dataR.get_numpy_array()
         freq_valsR = dataR.param_vals[1]
         amplR = np.sqrt(arrR[:,:,0]**2 + arrR[:,:,1]**2)
+        row_means = np.nanmean(amplR, axis=1)
+        amplR_corrected = (amplR.T - row_means).T
         #
-        fig, axes = plt.subplots(ncols=2, sharey=True, figsize=(12,4)); 
+        fig, axes = plt.subplots(ncols=2, sharey=True, figsize=(14,5)); 
         fig.suptitle(f"{self._qubit_id} flux sweep", fontsize=16)
-        axes[0].pcolor(freq_valsQ, flux_vals, amplQ)
+        axes[0].pcolor(freq_valsQ, self._flux_range, amplQ_corrected)
         axes[0].set_title('Qubit spectroscopy')
         axes[0].set_ylabel('Flux (V)')
-        axes[0].set_xlabel('Frequency (Hz)')
-        axes[1].pcolor(freq_valsR, flux_vals, amplR)
+        axes[1].pcolor(freq_valsR, self._flux_range, amplR_corrected)
         axes[1].set_title('Resonator spectroscopy')
-        axes[1].set_xlabel('Frequency (Hz)')
+        for ax in axes:
+            ax.set_xlabel('Frequency (Hz)')
+            ax.yaxis.grid(True, color='white', alpha=0.3, linewidth=0.8)
         fig.tight_layout()
-        fig.savefig(str(Path(expQ._file_path).parent) + '/Overview.png')
+        parent = str(Path(expQ._file_path).parent)
+        fig.savefig(parent + '/Overview.png')
         #
-        fig, ax = plt.subplots(figsize=(8,6)); 
-        ax.pcolor(freq_valsQ, flux_vals, amplQ)
-        ax.set_title(f"{self._qubit_id} qubit spectroscopy")
-        ax.set_ylabel('Flux (V)')
-        ax.set_xlabel('Frequency (Hz)')
+        # fig, ax = plt.subplots(figsize=(8,5)); 
+        # ax.pcolor(freq_valsQ, self._flux_range, amplQ_corrected)
+        # ax.set_title(f"{self._qubit_id} qubit spectroscopy")
+        # ax.set_ylabel('Flux (V)')
+        # ax.set_xlabel('Frequency (Hz)')
+        # fig.tight_layout()
+        fig = plt.figure(figsize=(14, 5))
+        gs = GridSpec(3, 2, width_ratios=[2, 1], figure=fig)
+        fig.suptitle(f"{self._qubit_id} qubit spectroscopy", fontsize=16)
+        ax_main = fig.add_subplot(gs[:, 0])
+        ax_main.pcolor(freq_valsQ, self._flux_range, amplQ_corrected)
+        ax_main.set_title(f"Flux sweep")
+        ax_main.set_ylabel('Flux (V)')
+        ax_main.set_xlabel('Frequency (Hz)')
+
+        flux_min, flux_max = self._flux_range[0], self._flux_range[-1]
+        flux_targets = [flux_min, (flux_min + flux_max) / 2, flux_max]
+        flux_indices = [np.argmin(np.abs(self._flux_range - f)) for f in flux_targets]
+        
+        axes_right = [fig.add_subplot(gs[i, 1]) for i in range(3)]
+        axes_right[0].set_title('Linescans')
+        for ax, idx in zip(axes_right, flux_indices):
+            flux_val = self._flux_range[idx]
+            ax.plot(freq_valsQ, amplQ_corrected[idx, :], linewidth=1.0, label = f"Flux = {flux_val:.4g} V")
+            ax.legend(loc='lower right')
+            ax.set_xlabel('Frequency (Hz)')
+            ax.set_ylabel('Amplitude')
+            ax.xaxis.grid(True, color='black', alpha=0.3, linewidth=0.8)
+            ax_main.axhline(flux_val, color='white', linestyle='--', linewidth=1, alpha=0.7)
+        for ax in axes_right[:-1]:
+            plt.setp(ax.get_xticklabels(), visible=False)
+            ax.set_xlabel('')
         fig.tight_layout()
-        fig.savefig(str(Path(expQ._file_path).parent) + '/QubitFluxSpec.png')
+        fig.savefig(parent + '/QubitFluxSpec.png')
+        #
+        if self._print_file_path:
+            print(r"File: {}".format(parent) + r"/{}.h5".format(self._qubit_id))
+
+        # 
+            

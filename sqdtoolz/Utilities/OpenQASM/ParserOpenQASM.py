@@ -224,7 +224,7 @@ class ParserOpenQASM:
         return inc_files
 
     def _open_file_strip_comments(self, file_path):
-        with open(file_path) as file:
+        with open(file_path, encoding="utf-8") as file: #If it is not UTF-8, it'll read the pi symbol as the Euro symbol etc...
             lines = [line.rstrip() for line in file]
         # lines = "\n".join(lines)
         # lines = re.sub('//.*?\n','\n', lines, flags=re.DOTALL)

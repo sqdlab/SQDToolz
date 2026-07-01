@@ -224,16 +224,24 @@ def create_experiment(
                     le_UIDs.append(current_section_uid)
 
                     if isinstance(cur_section['qubit_index'], (list,tuple)):
-                        pass
+                        cur_qubits = [qubits[x] for x in cur_section['qubit_index']]
+                        edges = [edge for edge in qpu.topology.edges() if {edge.source_node.uid, edge.target_node.uid}=={cur_qubits[0].uid, cur_qubits[1].uid}]
+                        assert len(edges) == 1, "QPU with multiple couplers unsupported for now..."
+                        # edges = [edge for edge in edges if isinstance(edge.quantum_element, TunableTransmonCouplerFixed)]
+                        cur_coupler = edges[0].quantum_element
+                        assert cur_section['sequence'][0] == 'ctrl', "Non ctrl-A 2QGs not supported for now..."
+                        assert cur_section['sequence'][1][0] == 'Z', "Only CZ gates supported natively for now..."
+                        assert np.abs(cur_section['sequence'][1][1]-np.pi) < 1e-7, "Only CZ gates supported natively for now..."
+                        qop.CZ(cur_coupler)
                     else:
                         #Process Single-Qubit operations
                         cur_qubit = qubits[cur_section['qubit_index']]
                         for cur_gate in cur_section['sequence']:
                             if cur_gate[0] == 'X' or cur_gate[0] == 'Y':
                                 if (np.abs(cur_gate[1]-np.pi/2) < 1e-7):
-                                    ampl = params['amplitude_pi2']
+                                    ampl = cur_qubit.parameters.ge_drive_amplitude_pi2
                                 elif (np.abs(cur_gate[1]+np.pi/2) < 1e-7):
-                                    ampl = -params['amplitude_pi2']
+                                    ampl = -cur_qubit.parameters.ge_drive_amplitude_pi2
                                 else:
                                     ampl = None
                             if cur_gate[0] == 'X':

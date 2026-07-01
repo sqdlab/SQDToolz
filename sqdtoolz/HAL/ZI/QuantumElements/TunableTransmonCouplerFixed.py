@@ -56,10 +56,9 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
         )
 
     @dsl.quantum_operation
-    def CX(
+    def CZ(
         self,
         q: TunableTransmonCouplerFixed,
-        qubit_name_control: str,
         phase: float = 0.0,
     ) -> None:
         # pulse_parameters = {"function": "gaussian_square", "sigma": 0.5}
@@ -84,4 +83,7 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
 #   - For complicated gates like CX, we pass the coupler and the qubit name for control?
 #   - Easy way to grab a given fixed-coupler given a QPU and the 2 qubits involved for the gate
 #   - Ideally, it's just CX(qubit1, qubit2) - but how does it know of the coupler? Maybe it needs to be CX(qpu, qubit1, qubit2)? Here it could infer the correct coupling by using the class type QubitCoupling?
-
+#OR alternatively, just stick with the native gate-set:
+# - The CZ gate is symmetric w.r.t. the control/target designations
+# - The Hadamards for a CX can be added in the QASM gate set! That is, they can slot in and overlap nicely around other gates while the CZ gate acts as the impassable barrier
+# - This yields greater flexibility in scheduling etc...

@@ -38,8 +38,8 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
     def fixed_coupler_flux_pulse(
         self,
         q: TunableTransmonCouplerFixed,
-        amplitude: float | SweepParameter,
-        length: float | SweepParameter
+        length: float | SweepParameter,
+        amplitude: float | SweepParameter = None
     ) -> None:
         # pulse_parameters = {"function": "gaussian_square", "sigma": 0.5}
         # flux_pulse = dsl.create_pulse(pulse_parameters, name="flux_pulse")
@@ -50,7 +50,7 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
         dsl.play(
             # self.qpu[q.parameters.QubitFlux].signals['flux'],
             q.signals['flux'],
-            amplitude=amplitude,
+            amplitude=amplitude if amplitude != None else q.parameters.Amplitude,
             length=length,
             pulse=flux_pulse,
         )

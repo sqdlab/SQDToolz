@@ -247,7 +247,7 @@ def create_experiment(
                             if cur_gate[0] == 'X':
                                 qop.rx(cur_qubit, cur_gate[1], amplitude=ampl)
                             elif cur_gate[0] == 'Y':
-                                qop.rx(cur_qubit, cur_gate[1], amplitude=ampl)
+                                qop.ry(cur_qubit, cur_gate[1], amplitude=ampl)
                             elif cur_gate[0] == 'Z':
                                 if coordinate_system == 'RH':
                                     qop.rz(cur_qubit, -cur_gate[1])

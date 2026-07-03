@@ -85,19 +85,20 @@ class ExpZIDispersive(ExpZIqubit):
                         cur_qubit.ThermalPhotonNum = float(np.atleast_1d(n_th)[0])
                 if not self._dont_plot:
                     fig, ax = plt.subplots()
-                    ax.plot(g_data_x*1e-9, g_data_y, label=f"g ({g_dpkt['fr']*1e-9:.4f} GHz)", c='tab:blue')
-                    ax.plot(e_data_x*1e-9, e_data_y, label=f"e ({e_dpkt['fr']*1e-9:.4f} GHz)", c='tab:orange')                
+                    fig.set_figwidth(15)
+                    ax.plot(g_data_x*1e-9, g_data_y, 'x', label=f"g ({g_dpkt['fr']*1e-9:.4f} GHz)", c='tab:blue')
+                    ax.plot(e_data_x*1e-9, e_data_y, 'x', label=f"e ({e_dpkt['fr']*1e-9:.4f} GHz)", c='tab:orange')                
                     if e_dpkt and g_dpkt:
-                        ax.plot(g_data_x*1e-9, np.absolute(g_dpkt['fit_data']), c='tab:blue', ls='dashed')
-                        ax.plot(e_data_x*1e-9, np.absolute(e_dpkt['fit_data']), c='tab:orange', ls='dashed')
+                        ax.plot(g_data_x*1e-9, np.absolute(g_dpkt['fit_data']), c='tab:blue', alpha=1)
+                        ax.plot(e_data_x*1e-9, np.absolute(e_dpkt['fit_data']), c='tab:orange', alpha=1)
                         if self._fit_type == 'Circlefit':
-                            ax.axvline(g_dpkt['fr']*1e-9, lw=1, ls='dashed', alpha=0.5, c='tab:blue')
-                            ax.axvline(e_dpkt['fr']*1e-9, lw=1, ls='dashed', alpha=0.5, c='tab:orange')
+                            ax.axvline(g_dpkt['fr']*1e-9, lw=2, ls='dashed', alpha=1, c='tab:blue')
+                            ax.axvline(e_dpkt['fr']*1e-9, lw=2, ls='dashed', alpha=1, c='tab:orange')
                     if self._fit_type == "Minimum":
-                        ax.axvline(g_min_f*1e-9, lw=1, ls='dashed', alpha=0.5, c='tab:blue')
-                        ax.axvline(e_min_f*1e-9, lw=1, ls='dashed', alpha=0.5, c='tab:orange')
+                        ax.axvline(g_min_f*1e-9, lw=2, ls='dashed', c='tab:blue', alpha=1)
+                        ax.axvline(e_min_f*1e-9, lw=2, ls='dashed', c='tab:orange', alpha=1)
                     if chi != 0:
-                        ax.set_title(f"{qubit} " + r"$\chi_{ge}=$"+f"{chi*1e-6:.3f} MHz")
+                        ax.set_title(f"{qubit} dispersive shift: " + r"$\chi_{ge}=$"+f"{chi*1e-6:.3f} MHz")
                     else:
                         ax.set_title(f"{qubit}")
                     ax.legend()

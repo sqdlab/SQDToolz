@@ -111,5 +111,5 @@ class ExpZIQubitFluxSweep:
         fig.savefig(parent + '/QubitFluxSpec.png')
         #
         if self._print_file_path:
-            print(r"File: '{}".format(parent) + r"/{}.h5'".format(self._qubit_id))
+            print(r"File: '{}'".format(parent))
             

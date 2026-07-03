@@ -54,15 +54,15 @@ if TYPE_CHECKING:
     from laboneq_applications.typing import QuantumElements, QubitSweepPoints
 
 
-import numpy as np
+from sqdtoolz.HAL.ZI.QuantumElements.TunableTransmonCouplerFixed import TunableTransmonCouplerFixed
 
-@workflow.workflow(name="oqasm_scheduled_qubits")
+@workflow.workflow(name="calibrate_tunable_transmon_fixed_coupler_osc")
 def experiment_workflow(
     session: Session,
     qpu: QPU,
     qubits: QuantumElements | list[str] | str,
-    openqasm_schedule,
-    coordinate_system: str = 'RH',
+    wait_times: QubitSweepPoints,
+    coupler_name:str = None,
     # TODO: Update the type hint for the temporary_parameters argument when the new
     # qubit class is available. Same for other experiment workflows.
     temporary_parameters: dict[str | tuple[str, str, str], dict | QuantumParameters]
@@ -92,10 +92,6 @@ def experiment_workflow(
         qubits:
             The qubits to run the experiments on, passed by UID. May be either a single
             qubit or a list of qubits.
-        openqasm_schedule:
-            The openqasm3-based schedule given by ParseOpenQASM.create_schedule
-        coordinate_system:
-            Coordinate system to use for x, y and z axes - either LH or RH for left/right handed.
         temporary_parameters:
             The temporary parameters with which to update the quantum elements and
             topology edges. For quantum elements, the dictionary key is the quantum
@@ -110,6 +106,27 @@ def experiment_workflow(
     Returns:
         WorkflowBuilder:
             The builder of the experiment workflow.
+
+    Example:
+        ```python
+        options = TuneUpExperimentWorkflowOptions()
+        options.create_experiment.count = 10
+        options.create_experiment.transition = "ge"
+        qpu = QPU(
+            quantum_elements=[TunableTransmonQubit("q0"), TunableTransmonQubit("q1")],
+            quantum_operations=TunableTransmonOperations(),
+        )
+        temp_qubits = qpu.copy_quantum_elements()
+        result = experiment_workflow(
+            session=session,
+            qpu=qpu,
+            qubits=temp_qubits,
+            amplitudes=[
+                np.linspace(0, 1, 11),
+                np.linspace(0, 0.75, 11),
+            ],
+            options=options,
+        ).run()
         ```
     """
     temp_qpu = temporary_qpu(qpu, temporary_parameters)
@@ -118,8 +135,8 @@ def experiment_workflow(
     exp = create_experiment(
         temp_qpu,
         qubits,
-        openqasm_schedule,
-        coordinate_system
+        wait_times,
+        coupler_name
         # quarter_time=quarter_time,
     )
     compiled_exp = compile_experiment(session, exp)
@@ -137,8 +154,8 @@ def experiment_workflow(
 def create_experiment(
     qpu: QPU,
     qubits: QuantumElements,
-    openqasm_schedule,
-    coordinate_system: str = 'RH',
+    wait_times: QubitSweepPoints,
+    coupler_name:str = None,
     options: TuneupExperimentOptions | None = None,
 ) -> Experiment:
     """Creates an Amplitude Rabi experiment Workflow.
@@ -149,10 +166,6 @@ def create_experiment(
         qubits:
             The qubits to run the experiments on. May be either a single
             qubit or a list of qubits.
-        openqasm_schedule:
-            The openqasm3-based schedule given by ParseOpenQASM.create_schedule
-        coordinate_system:
-            Coordinate system to use for x, y and z axes - either LH or RH for left/right handed.
         options:
             The options for building the experiment.
             See [TuneupExperimentOptions] and [BaseExperimentOptions] for
@@ -163,14 +176,45 @@ def create_experiment(
     Returns:
         experiment:
             The generated LabOne Q experiment instance to be compiled and executed.
-            NOTE: The experiment will initialise the qubits and then right-align the
-            list of respective gates such that measurements are done simultaneously
-            and  immediately after the execution of said list of gates.
 
     Raises:
         ValueError:
+            If the qubits and qubit_amplitudes are not of the same length.
+
+        ValueError:
+            If qubit_amplitudes is not a list of numbers when a single qubit is passed.
+
+        ValueError:
+            If qubit_amplitudes is not a list of lists of numbers.
+
+        ValueError:
             If the experiment uses calibration traces and the averaging mode is
             sequential.
+
+    Example:
+        ```python
+        options = {
+            "count": 10,
+            "transition": "ge",
+            "averaging_mode": "cyclic",
+            "acquisition_type": "integration_trigger",
+            "cal_traces": True,
+        }
+        options = TuneupExperimentOptions(**options)
+        qpu = QPU(
+            quantum_elements=[TunableTransmonQubit("q0"), TunableTransmonQubit("q1")],
+            quantum_operations=TunableTransmonOperations(),
+        )
+        temp_qubits = qpu.copy_quantum_elements()
+        create_experiment(
+            qpu=qpu,
+            qubits=temp_qubits,
+            amplitudes=[
+                np.linspace(0, 1, 11),
+                np.linspace(0, 0.75, 11),
+            ],
+            options=options,
+        )
         ```
     """
     # Define the custom options for the experiment
@@ -185,6 +229,20 @@ def create_experiment(
             "outside the sweep."
         )
 
+    if coupler_name == None:
+        cpl_cands = qpu.topology[:, qubits[0], qubits[1]] + qpu.topology[:, qubits[1], qubits[0]]
+        the_coupler = None
+        for cur_cpl in cpl_cands:
+            cur_qelem = cur_cpl.quantum_element
+            if isinstance(cur_qelem, TunableTransmonCouplerFixed):
+                the_coupler = cur_qelem
+        assert the_coupler != None, f"Could not find a suitable \'TunableTransmonCouplerFixed\' coupler for qubits \'{qubits[0]}\' and \'{qubits[1]}\'. Maybe provide coupler_name explicitly."
+    else:
+        the_coupler = qpu[coupler_name]
+        assert isinstance(the_coupler, TunableTransmonCouplerFixed), f"The coupler \'{coupler_name}\' is not a \'TunableTransmonCouplerFixed\' type."
+
+    times_sweep_pars = SweepParameter(f"flux_wait_time", wait_times, axis_name=f"flux_wait_time")
+
     # We will fix the length of the measure section to the longest section among
     # the qubits to allow the qubits to have different readout and/or
     # integration lengths.
@@ -198,9 +256,7 @@ def create_experiment(
         repetition_time=opts.repetition_time,
         reset_oscillator_phase=opts.reset_oscillator_phase,
     ):
-        ###################
-        with dsl.section(name="init"):
-            init_section_uid = dsl.active_section().uid
+        with dsl.sweep(name="wait_time_sweep", parameter=times_sweep_pars):
             if opts.active_reset:
                 qop.active_reset(
                     qubits,
@@ -208,60 +264,22 @@ def create_experiment(
                     number_resets=opts.active_reset_repetitions,
                     measure_section_length=max_measure_section_length,
                 )
-            else:
-                for q in qubits:
-                    qop.passive_reset(q)
-        ###################
-        le_UIDs = []
-        with dsl.section(name="Main", play_after=init_section_uid):
-            for m,cur_section in enumerate(openqasm_schedule['commands']):
-                if cur_section['after'] != None:
-                    after = le_UIDs[cur_section['after']]
-                else:
-                    after = None
-                with dsl.section(name=f"sec{m}", alignment=SectionAlignment.LEFT, play_after=after):
-                    current_section_uid = dsl.active_section().uid
-                    le_UIDs.append(current_section_uid)
+            with dsl.section(name="main", alignment=SectionAlignment.RIGHT):
+                with dsl.section(name="main_drive", alignment=SectionAlignment.RIGHT):
+                    qop.prepare_state.omit_section(qubits[0], state='e')
+                    qop.prepare_state.omit_section(qubits[1], state='e')
+                with dsl.section(name="flux_pulse", alignment=SectionAlignment.LEFT):
+                    qop.fixed_coupler_flux_pulse.omit_section(the_coupler, length=times_sweep_pars)
+                # with dsl.section(name="flux_pulse", alignment=SectionAlignment.LEFT):
+                #     dsl.play(signal=qubits[0].signals['flux'], pulse=lbeqs.pulse_library.const(length=1e-6), amplitude=1.0 )
 
-                    if isinstance(cur_section['qubit_index'], (list,tuple)):
-                        cur_qubits = [qubits[x] for x in cur_section['qubit_index']]
-                        edges = [edge for edge in qpu.topology.edges() if {edge.source_node.uid, edge.target_node.uid}=={cur_qubits[0].uid, cur_qubits[1].uid}]
-                        assert len(edges) == 1, "QPU with multiple couplers unsupported for now..."
-                        # edges = [edge for edge in edges if isinstance(edge.quantum_element, TunableTransmonCouplerFixed)]
-                        cur_coupler = edges[0].quantum_element
-                        assert cur_section['sequence'][0] == 'ctrl', "Non ctrl-A 2QGs not supported for now..."
-                        assert cur_section['sequence'][1][0] == 'Z', "Only CZ gates supported natively for now..."
-                        assert np.abs(cur_section['sequence'][1][1]-np.pi) < 1e-7, "Only CZ gates supported natively for now..."
-                        qop.CZ(cur_coupler)
-                    else:
-                        #Process Single-Qubit operations
-                        cur_qubit = qubits[cur_section['qubit_index']]
-                        for cur_gate in cur_section['sequence']:
-                            if cur_gate[0] == 'X' or cur_gate[0] == 'Y':
-                                if (np.abs(cur_gate[1]-np.pi/2) < 1e-7):
-                                    ampl = cur_qubit.parameters.ge_drive_amplitude_pi2
-                                elif (np.abs(cur_gate[1]+np.pi/2) < 1e-7):
-                                    ampl = -cur_qubit.parameters.ge_drive_amplitude_pi2
-                                else:
-                                    ampl = None
-                            if cur_gate[0] == 'X':
-                                qop.rx(cur_qubit, cur_gate[1], amplitude=ampl)
-                            elif cur_gate[0] == 'Y':
-                                qop.ry(cur_qubit, cur_gate[1], amplitude=ampl)
-                            elif cur_gate[0] == 'Z':
-                                if coordinate_system == 'RH':
-                                    qop.rz(cur_qubit, -cur_gate[1])
-                                else:
-                                    qop.rz(cur_qubit, cur_gate[1])
-                            elif cur_gate[0] == 'D':
-                                if cur_gate[1] > 0:
-                                    qop.delay(cur_qubit, cur_gate[1])
-                            elif cur_gate[0] == 'Measure':
-                                qop.measure(cur_qubit, dsl.handles.result_handle(cur_qubit.uid))
-                pass
+                with dsl.section(name="main_measure", alignment=SectionAlignment.LEFT):
+                    for q in qubits:
+                        sec = qop.measure(q, dsl.handles.result_handle(q.uid))
+                        # Fix the length of the measure section
+                        sec.length = max_measure_section_length
+                        qop.passive_reset(q)
 
-        for q in qubits:
-            qop.passive_reset(q)
         if opts.use_cal_traces:
             qop.calibration_traces.omit_section(
                 qubits=qubits,

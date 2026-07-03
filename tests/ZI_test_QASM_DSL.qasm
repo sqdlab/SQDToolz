@@ -13,7 +13,7 @@ x q[3];
 t q[3];
 y q[3];
 x q[3];
-//ctrl @ x q[2], q[3];
+ctrl @ z q[2], q[3];
 delay[100ns] q[2], q[3];
 y q[1];
 // h q[2];

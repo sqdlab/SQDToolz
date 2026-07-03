@@ -206,7 +206,7 @@ class ExpZISingleQubitTuneup:
         #
         #T1
         #
-        exp = ExpZIT1(f'T1_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], delays=[self._t1_times], update=self._update_live, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
+        exp = ExpZIT1(f'T1_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], delays=[self._t1_times], ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
         lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages)
         #
         leData = exp.retrieve_last_aux_dataset(self._qubit_id)
@@ -216,6 +216,7 @@ class ExpZISingleQubitTuneup:
         data_x = leData.param_vals[0]
         ExpZIT1.plot_fitted_results(ax, data_x, fitted_data['amplitude_raw'], fitted_data, True)
         ax.set_title(f"T1: {Miscellaneous.get_units(fitted_data['T1'],4)}s")
+        exp.update_qubits()
         ##############################
         lab.group_close()
 

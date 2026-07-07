@@ -12,6 +12,7 @@ class ExpZITWPATuneup(ExpZIqubit):
         self._hal_twpa = hal_twpa
         self._iq_blob_data = {}
         self._dont_show_plot = kwargs.pop('dont_show_plot', False)
+        self._plot_all_qubits = kwargs.pop('plot_all_qubits', False)
         self._update_qubit = kwargs.pop('update_qubit_params', True)
         self._optimum_twpa_point = {'Frequency': self._hal_twpa.Frequency, 'Power':self._hal_twpa.Power}
 
@@ -84,7 +85,32 @@ class ExpZITWPATuneup(ExpZIqubit):
                 cbar = fig.colorbar(cmap)
                 ax.legend(loc=0)
                 plt.show()
-   
+                
+                if self._plot_all_qubits:#Plot of all qubits individually
+                    n = len(self._qubit_ids)
+                    cols = int(np.ceil(np.sqrt(n)))
+                    rows = int(np.ceil(n / cols))
+                    fig, axes = plt.subplots(rows, cols, figsize=(cols * 3, rows * 3))
+                    if n == 1:
+                        axes_flat = [axes]
+                    else:
+                        axes_flat = axes.flatten()
+
+                    for i,qubit in enumerate(self._qubit_ids):
+                        ZZ = (self._iq_blob_data[qubit]).T
+                        if i < n:
+                            cmap = axes_flat[i].pcolormesh(XX,YY,ZZ)
+                            axes_flat[i].plot(freqs[opt_indicies[0]], powers[opt_indicies[1]], 'o', color = 'red', 
+                                    label = f'$f_p=${freqs[opt_indicies[0]]/1e9} GHz, $P=${powers[opt_indicies[1]]} dB'
+                                )
+                            cbar = fig.colorbar(cmap)
+                            axes_flat[i].legend(loc=0)
+                            axes_flat[i].set_title(f'{qubit}')
+                        else:
+                            axes_flat[i].axis('off')
+                    plt.tight_layout()
+                    plt.show()
+
             else: #1D sweep TWPA parameter, repititions
                 fig, ax = plt.subplots()
                 sweep_param = max(freqs, powers, key=len)

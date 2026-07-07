@@ -62,6 +62,7 @@ def experiment_workflow(
     qpu: QPU,
     qubits: QuantumElements | list[str] | str,
     openqasm_schedule,
+    qubit_mapping,
     coordinate_system: str = 'RH',
     # TODO: Update the type hint for the temporary_parameters argument when the new
     # qubit class is available. Same for other experiment workflows.
@@ -94,6 +95,9 @@ def experiment_workflow(
             qubit or a list of qubits.
         openqasm_schedule:
             The openqasm3-based schedule given by ParseOpenQASM.create_schedule
+        qubit_mapping:
+            A dictionary that maps the 'qubit_index' entries in the sections given in openqasm_schedule
+            onto the indices of the hardware 'qubits' list. Thus, it is set of int:int key-value pairs.
         coordinate_system:
             Coordinate system to use for x, y and z axes - either LH or RH for left/right handed.
         temporary_parameters:
@@ -119,6 +123,7 @@ def experiment_workflow(
         temp_qpu,
         qubits,
         openqasm_schedule,
+        qubit_mapping,
         coordinate_system
         # quarter_time=quarter_time,
     )
@@ -138,6 +143,7 @@ def create_experiment(
     qpu: QPU,
     qubits: QuantumElements,
     openqasm_schedule,
+    qubit_mapping,
     coordinate_system: str = 'RH',
     options: TuneupExperimentOptions | None = None,
 ) -> Experiment:
@@ -151,6 +157,9 @@ def create_experiment(
             qubit or a list of qubits.
         openqasm_schedule:
             The openqasm3-based schedule given by ParseOpenQASM.create_schedule
+        qubit_mapping:
+            A dictionary that maps the 'qubit_index' entries in the sections given in openqasm_schedule
+            onto the indices of the hardware 'qubits' list. Thus, it is set of int:int key-value pairs.
         coordinate_system:
             Coordinate system to use for x, y and z axes - either LH or RH for left/right handed.
         options:
@@ -224,7 +233,8 @@ def create_experiment(
                     le_UIDs.append(current_section_uid)
 
                     if isinstance(cur_section['qubit_index'], (list,tuple)):
-                        cur_qubits = [qubits[x] for x in cur_section['qubit_index']]
+                        cur_qinds = [qubit_mapping[x] for x in cur_section['qubit_index']]
+                        cur_qubits = [qubits[x] for x in cur_qinds]
                         edges = [edge for edge in qpu.topology.edges() if {edge.source_node.uid, edge.target_node.uid}=={cur_qubits[0].uid, cur_qubits[1].uid}]
                         assert len(edges) == 1, "QPU with multiple couplers unsupported for now..."
                         # edges = [edge for edge in edges if isinstance(edge.quantum_element, TunableTransmonCouplerFixed)]
@@ -235,7 +245,7 @@ def create_experiment(
                         qop.CZ(cur_coupler)
                     else:
                         #Process Single-Qubit operations
-                        cur_qubit = qubits[cur_section['qubit_index']]
+                        cur_qubit = qubits[qubit_mapping[cur_section['qubit_index']]]
                         for cur_gate in cur_section['sequence']:
                             if cur_gate[0] == 'X' or cur_gate[0] == 'Y':
                                 if (np.abs(cur_gate[1]-np.pi/2) < 1e-7):

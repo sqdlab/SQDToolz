@@ -131,7 +131,7 @@ class ExpZIqubit(Experiment):
         
         emulate = kwargs.pop('debug_skip_experiment__run', False)
         if kwargs.pop('debug_skip_experiment', False):
-            if not emulate:
+            if emulate:
                 print('Not running experiment')
                 return
             else:

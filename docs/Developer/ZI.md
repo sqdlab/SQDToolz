@@ -60,3 +60,10 @@ To enforce this, the classes must inherit the `QASMCompatible` abstract class. I
 - There is a `ScheduleParametersBase` that is passed onto `ParserOpenQASM` when creating schedules. This is used to query the required parameters such as gate durations etc.
 - There is a `ScheduleParametersSoftQPUZI` class that is used to gobble up `softQPU` objects and extract said qubit gate parameters as required for scheduling. Internally this is set to call the `QASMCompatible` methods within the individual qubits/couplers...
 
+In summary:
+
+- `ParserOpenQASM` parses the `.qasm` file and schedules the timing. It can plot or tabulate the gate sequences. It can also check for ZI compatibility.
+- The `oqasm_scheduled_qubits` ZI workflow is a lightweight wrapper that translates the scheduled sequence into QDSL
+- `ExpZIQASM` is the main user interface that uses `oqasm_scheduled_qubits` to execute a `.qasm` file...
+
+The qubits in `ExpZIQASM` are mapped onto hardware either by default in the ordering supplied by `qubit_ids` or via a custom mapping set via the `set_qubit_reg_to_ZI_mappings(...)` function.

@@ -72,7 +72,7 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
             q.signals["flux"],
             amplitude=amplitude,
             length=length,
-            phase=phase,
+            # phase=phase,
             pulse=flux_pulse,
         )
 

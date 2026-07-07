@@ -26,3 +26,6 @@ y q[1];
 // c[1] = measure q[1];
 c[2] = measure q[2];
 c[3] = measure q[3];
+
+x q[2];
+c[2] = measure q[2];

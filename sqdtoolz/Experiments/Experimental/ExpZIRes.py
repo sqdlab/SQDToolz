@@ -18,6 +18,7 @@ class ExpZIRes(ExpZIqubit):
         self._iq_indices = kwargs.pop('iq_indices', [0,1])
         self._is_trough = kwargs.pop('is_trough', False)
         self._fit_type = kwargs.pop('fit_type', 'Default')  #Default, Fano, Full
+        assert self._fit_type in ["Default", "Fano", "Full"], "Choose fit_type as either 'Default', 'Fano' or 'Full'."
         assert self._is_trough or (not self._is_trough and not self._fit_type=='Fano'), "Fano resonance fitting only supports troughs at the moment."
         self._param_centre = kwargs.pop('param_freq', None)
         self._param_width = kwargs.pop('param_width', None)

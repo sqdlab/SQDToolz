@@ -4,6 +4,7 @@ from sqdtoolz.HAL.ZI.ZIbase import ZIbase
 from sqdtoolz.Variable import VariableInternalTransient
 from sqdtoolz.Utilities.FileIO import FileIODatalogger, FileIOReader
 import time
+import json
 import scipy.signal
 import numpy as np
 import laboneq.dsl.quantum
@@ -107,6 +108,29 @@ class SOFTqpu(HALbase, ZIbase):
             'QubitCouplings': self._qubit_couplings
             }
         return ret_dict
+    
+    def save_QPU_config(self, lab, label=None):
+        qubits_dict = {}
+        for m in range(len(self._qubits)):
+            cur_qubit = self._lab._get_resolved_obj(self._qubits[m])
+            qubits_dict[cur_qubit.Name] = cur_qubit._get_current_config()
+        couplers_dict={}
+        for m in range(len(self._qubit_couplings)):
+            cur_hal_cpl = self._lab._get_resolved_obj( self._qubit_couplings[m][2] )
+            couplers_dict[cur_hal_cpl.Name] = cur_hal_cpl.get_current_config()
+        ret_dict = {
+            'Name' : self.Name,
+            'Type' : self.__class__.__name__,
+            'Qubits': qubits_dict,
+            'QubitCouplings': couplers_dict
+        }
+        if label:
+            json_name = f"QPU_config_{label}.json"
+        else:
+            json_name = "QPU_config.json"
+        ret_dict = self._get_current_config
+        with open(lab._save_dir + json_name, 'w', encoding='utf-8') as f:
+            json.dump(ret_dict, f, indent=4)
 
     def _set_current_config(self, dict_config, lab):
         assert dict_config['Type'] == self.__class__.__name__, 'Cannot set configuration to a SoQPU with a configuration that is of type ' + dict_config['Type']

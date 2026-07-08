@@ -113,7 +113,9 @@ class SOFTqpu(HALbase, ZIbase):
         qubits_dict = {}
         for m in range(len(self._qubits)):
             cur_qubit = self._lab._get_resolved_obj(self._qubits[m])
-            qubits_dict[cur_qubit.Name] = cur_qubit._get_current_config()
+            cur_qubit_config = cur_qubit._get_current_config()
+            kernel_weights = cur_qubit_config.pop('ReadoutKernelWeights') #.json can not write ndarray
+            qubits_dict[cur_qubit.Name] = cur_qubit_config
         couplers_dict={}
         for m in range(len(self._qubit_couplings)):
             cur_hal_cpl = self._lab._get_resolved_obj( self._qubit_couplings[m][2] )
@@ -128,7 +130,6 @@ class SOFTqpu(HALbase, ZIbase):
             json_name = f"QPU_config_{label}.json"
         else:
             json_name = "QPU_config.json"
-        ret_dict = self._get_current_config
         with open(lab._save_dir + json_name, 'w', encoding='utf-8') as f:
             json.dump(ret_dict, f, indent=4)
 

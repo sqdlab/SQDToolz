@@ -8,7 +8,7 @@ from sqdtoolz.Variable import VariablePropertyTransient
 from laboneq_applications.experiments import time_traces
 import numpy as np
 
-class EzpZIActiveResetTuneup():
+class ExpZIActiveResetTuneup():
     def __init__(self, name, expt_config, hal_QPU, qubit_ids, **kwargs):
         self._name = name
         self._expt_config = expt_config

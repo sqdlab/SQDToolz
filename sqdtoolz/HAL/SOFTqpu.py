@@ -117,7 +117,7 @@ class SOFTqpu(HALbase, ZIbase):
         couplers_dict={}
         for m in range(len(self._qubit_couplings)):
             cur_hal_cpl = self._lab._get_resolved_obj( self._qubit_couplings[m][2] )
-            couplers_dict[cur_hal_cpl.Name] = cur_hal_cpl.get_current_config()
+            couplers_dict[cur_hal_cpl.Name] = cur_hal_cpl._get_current_config()
         ret_dict = {
             'Name' : self.Name,
             'Type' : self.__class__.__name__,

@@ -4,6 +4,7 @@ from sqdtoolz.HAL.ZI.ZIbase import ZIbase
 from sqdtoolz.Variable import VariableInternalTransient
 from sqdtoolz.Utilities.FileIO import FileIODatalogger, FileIOReader
 import time
+import json
 import scipy.signal
 import numpy as np
 import laboneq.dsl.quantum
@@ -22,30 +23,28 @@ class SOFTqpu(HALbase, ZIbase):
     def fromConfigDict(cls, config_dict, lab):
         return cls(config_dict["Name"], lab, config_dict=config_dict)
 
+    @property
+    def NumQubits(self):
+        return len(self._qubits)
+
     def add_qubit(self, hal_obj:HALbase|ExperimentSpecification):
         self._qubits.append(self._lab._resolve_sqdobj_tree(hal_obj))
     
-    def add_qubit_coupling(self, qubit1: str|int, qubit2: str|int, hal_obj:str|HALbase):
+    def add_qubit_coupling(self, qubit1: str|int, qubit2: str|int, hal_obj:HALbase):
         qubit1 = self._resolve_qubit_index(qubit1)
         qubit2 = self._resolve_qubit_index(qubit2)
-        if isinstance(hal_obj, HALbase):
-            self._qubit_couplings.append((qubit1, qubit2, self._lab._resolve_sqdobj_tree(hal_obj)))
-        else:
-            self._qubit_couplings.append((qubit1, qubit2, hal_obj))
-
-    def get_qubit(self, qubit_id: str|int):
-        return self._qubits[self._resolve_qubit_index(qubit_id)]
+        self._qubit_couplings.append((qubit1, qubit2, self._lab._resolve_sqdobj_tree(hal_obj)))
 
     def get_qubit_obj(self, qubit_id: str|int):
         return self._lab._get_resolved_obj(self._qubits[self._resolve_qubit_index(qubit_id)])
  
-    def get_qubit_couplings(self, qubit1: str|int, qubit2: str|int):
+    def get_qubit_coupling_objs(self, qubit1: str|int, qubit2: str|int):
         qubit1 = self._resolve_qubit_index(qubit1)
         qubit2 = self._resolve_qubit_index(qubit2)
         ret_cpls = []
         for cur_cpl in self._qubit_couplings:
             if qubit1 == cur_cpl[0] and qubit2 == cur_cpl[1] or qubit1 == cur_cpl[1] and qubit2 == cur_cpl[0]:
-                ret_cpls.append(cur_cpl[2])
+                ret_cpls.append(self._lab._get_resolved_obj(cur_cpl[2]))
         return ret_cpls
 
     def get_ZI_parameters(self):
@@ -109,6 +108,30 @@ class SOFTqpu(HALbase, ZIbase):
             'QubitCouplings': self._qubit_couplings
             }
         return ret_dict
+    
+    def save_QPU_config(self, lab, label=None):
+        qubits_dict = {}
+        for m in range(len(self._qubits)):
+            cur_qubit = self._lab._get_resolved_obj(self._qubits[m])
+            cur_qubit_config = cur_qubit._get_current_config()
+            kernel_weights = cur_qubit_config.pop('ReadoutKernelWeights') #.json can not write ndarray
+            qubits_dict[cur_qubit.Name] = cur_qubit_config
+        couplers_dict={}
+        for m in range(len(self._qubit_couplings)):
+            cur_hal_cpl = self._lab._get_resolved_obj( self._qubit_couplings[m][2] )
+            couplers_dict[cur_hal_cpl.Name] = cur_hal_cpl._get_current_config()
+        ret_dict = {
+            'Name' : self.Name,
+            'Type' : self.__class__.__name__,
+            'Qubits': qubits_dict,
+            'QubitCouplings': couplers_dict
+        }
+        if label:
+            json_name = f"QPU_config_{label}.json"
+        else:
+            json_name = "QPU_config.json"
+        with open(lab._save_dir + json_name, 'w', encoding='utf-8') as f:
+            json.dump(ret_dict, f, indent=4)
 
     def _set_current_config(self, dict_config, lab):
         assert dict_config['Type'] == self.__class__.__name__, 'Cannot set configuration to a SoQPU with a configuration that is of type ' + dict_config['Type']

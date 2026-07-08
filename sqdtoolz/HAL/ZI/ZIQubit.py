@@ -3,8 +3,10 @@ from sqdtoolz.HAL.ZI.ZIbase import ZIbase
 import laboneq.simple as lbeqs
 from laboneq_applications.qpu_types.tunable_transmon import TunableTransmonQubit, TunableTransmonOperations
 import logging
+from sqdtoolz.Utilities.OpenQASM import QASMCompatibleQubitSingle
+import numpy as np
 
-class ZIQubit(HALbase, ZIbase):
+class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
     def __init__(self, qubit_name, lab, instr_zi_boxes, zi_instr_phys_drive:tuple[str, str], zi_instr_phys_measure:tuple[str, str], zi_instr_phys_acquire:tuple[str, str], zi_phys_flux=("",""), zi_type="TunableTransmonQubit"):
         HALbase.__init__(self, qubit_name)
         
@@ -128,7 +130,6 @@ class ZIQubit(HALbase, ZIbase):
                 'ThermalPhotonNum': 0,
                 'ReadoutLineAttenuation_dB': -70
             }
-
             self._param_mappings = {
                 'ChiGE': 'ge_chi_shift',
                 'DriveLO':'drive_lo_frequency',
@@ -148,6 +149,11 @@ class ZIQubit(HALbase, ZIbase):
                 'ReadoutInputRange':'readout_range_in',
                 'ReadoutFrequency':'readout_resonator_frequency',
                 'ReadoutAmplitude':'readout_amplitude',
+                #
+                'ReadoutKernelType':'readout_integration_kernels_type',
+                'ReadoutKernelThresholds':'readout_integration_discrimination_thresholds',
+                'ReadoutKernelWeights':'readout_integration_kernels',
+                #
                 'ReadoutTime':'readout_length',
                 'ReadoutPad':'readout_integration_delay',
                 'ResetTime':'reset_delay_length',
@@ -182,6 +188,22 @@ class ZIQubit(HALbase, ZIbase):
 
     def get_ZI_parameters(self):
         return self._zi_qubit, self._zi_qops
+
+    def get_gate_duration(self, gate):
+        if self._qubit_type == "TunableTransmonQubit":
+            if isinstance(gate, (list, tuple)):
+                gate = gate[0]  #The gate times are the same irrespective of the rotation angles...
+            if gate[0] == '-':
+                gate = gate[1:]
+            if gate in ['X', 'X/2', 'Y', 'Y/2', 'H']:
+                return self.DriveGETime
+            if gate in ['Z', 'Z/2']:
+                return 0
+            return -1
+    
+    def get_measure_duration(self):
+        if self._qubit_type == "TunableTransmonQubit":
+            return self.ReadoutTime
 
     def _get_current_config(self):
         ret_dict = {
@@ -218,3 +240,9 @@ class ZIQubit(HALbase, ZIbase):
         
         for cur_param in dict_config:
             setattr(self, cur_param, dict_config[cur_param])
+        
+        if self.ReadoutKernelType == 'optimal':
+            if not isinstance(self.ReadoutKernelWeights, np.ndarray):
+                self.ReadoutKernelType = 'default'
+                self.ReadoutKernelThresholds = None
+

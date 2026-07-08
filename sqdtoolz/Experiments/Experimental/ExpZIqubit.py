@@ -29,6 +29,7 @@ class ExpZIqubit(Experiment):
         self._update_params = kwargs.pop('update', False)
         self._normalise_data = kwargs.pop('use_cal_traces', True)
         self._transition = kwargs.pop('transition', 'ge')
+        #
         self._plot_ZI = kwargs.pop('ZI_plot', False)
         self._args = kwargs
         self._show_pulse_sheet = kwargs.pop('show_pulse_sheet', False)
@@ -38,6 +39,9 @@ class ExpZIqubit(Experiment):
 
         leACQ = self._expt_config._hal_ACQ
         assert isinstance(leACQ, ZIACQ), "The ExperimentConfiguration must have a ZIACQ object as its acquisition HAL."
+        override_ACQ_params = kwargs.get('override_ACQ_params', {})
+        for cur_param in override_ACQ_params:
+            setattr(leACQ, cur_param, override_ACQ_params[cur_param])
         options = self._workflow_module.experiment_workflow.options()
         leACQopts = leACQ.get_ZI_parameters()
         for x in leACQopts:
@@ -51,6 +55,9 @@ class ExpZIqubit(Experiment):
             getattr(options, 'transition')(self._transition)
         if hasattr(options, 'close_figures'):
             options.close_figures(not self._plot_ZI)
+        if hasattr(options, 'cal_states'):
+            #Automatically default to transition for calibration states... Note that this only matters if use_cal_traces is True...
+            getattr(options, 'cal_states')( self._args.get('cal_states', self._transition) )
         for x in [y for y in self._args]:
             if hasattr(options, x):
                 getattr(options, x)(self._args.pop(x))
@@ -75,6 +82,7 @@ class ExpZIqubit(Experiment):
         # folder_store = FolderStore(file_path)
         # folder_store.activate()
         leSession = leACQ._get_ZI_session()
+        leSession.disconnect()
         leSession.connect(do_emulation=kwargs.get('debug_skip_experiment',False))
         for handler in leLogger.handlers:
             if isinstance(handler, logging.StreamHandler):
@@ -89,6 +97,8 @@ class ExpZIqubit(Experiment):
         else:
             qubit_kwarg = {'qubits': leQubits}
 
+        min_buffer_between_acq = kwargs.get('min_buffer_between_acquisitions', 40e-9)
+        assert min_buffer_between_acq >= 20e-9, "The minimum buffer between acquisitions recommended by the ZI hardware team is 20ns."
         if not kwargs.get('quick_query',False):
             execution_time = 0
             if 'states' in self._args and not ('states' in zi_exp_params) and 'state' in zi_exp_params:
@@ -96,11 +106,11 @@ class ExpZIqubit(Experiment):
                 temp_states = self._args.pop('states')
                 for cur_state in temp_states:
                     self._args['state'] = cur_state
-                    execution_time += self._estimate_experiment_params(kwargs,leSession,leQPU,leQubits,qubit_kwarg,options,file_path, f'_{cur_state}')
+                    execution_time += self._estimate_experiment_params(kwargs,leSession,leQPU,leQubits,qubit_kwarg,options,file_path, f'_{cur_state}', min_buffer_between_acq)
                 self._args.pop('state')
                 self._args['states'] = temp_states
             else:
-                execution_time = self._estimate_experiment_params(kwargs,leSession,leQPU,leQubits,qubit_kwarg,options,file_path)
+                execution_time = self._estimate_experiment_params(kwargs,leSession,leQPU,leQubits,qubit_kwarg,options,file_path, min_acq_buffer=min_buffer_between_acq)
             #Another hack for the case where they iterate once per qubit in the experiment for a given workflow...
             if 'qubits' in zi_wfw_params and not ('qubits' in zi_exp_params) and 'qubit' in zi_exp_params:
                 execution_time *= len(leQubits)
@@ -119,9 +129,13 @@ class ExpZIqubit(Experiment):
 
         self._expt_config._hal_ACQ._cur_workflow = exp_workflow
         
+        emulate = kwargs.pop('debug_skip_experiment__run', False)
         if kwargs.pop('debug_skip_experiment', False):
-            print('Not running experiment')
-            return
+            if emulate:
+                print('Not running experiment')
+                return
+            else:
+                print('ZI Emulating experiment')
 
         if kwargs.get('quick_query',False):
             self._expt_config.prepare_instruments()
@@ -135,12 +149,17 @@ class ExpZIqubit(Experiment):
         # logging_store.deactivate()
         logging.disable(logging.NOTSET)
 
+        leSession.disconnect()
+
         return leData
 
     def _post_process(self, data):
         pass
 
-    def _estimate_experiment_params(self, kwargs,leSession,leQPU,leQubits,qubit_kwarg,options,file_path, file_name_suffix=''):
+    def _estimate_experiment_params(self, kwargs,leSession,leQPU,leQubits,qubit_kwarg,options,file_path, file_name_suffix='', min_acq_buffer=40e-9):
+        """
+        Just calculates the experiment execution time and generates the pulse-sheets etc.
+        """
         print_pulse_sheet = kwargs.get('print_pulse_sheet',True)
         print_est_time =  kwargs.get('print_estimated_execution_time',True)
         leACQ = self._expt_config._hal_ACQ
@@ -155,10 +174,11 @@ class ExpZIqubit(Experiment):
         if print_pulse_sheet:
             pulse_sheet_viewer.show_pulse_sheet(file_path+'timing_diagram', compiled_exp)
             output_sim = OutputSimulator(compiled_exp)
-            max_time = kwargs.get('raw_pulse_sheet_duration', output_sim.max_output_length)
+            max_time = kwargs.get('raw_pulse_sheet_duration', 100e-6)
             #
             #Get all pulses/signals from the experiment
             dict_data = {}
+            qubit_acqs = []
             for cur_qubit in leQubits:
                 cur_signals = cur_qubit.signals
                 for cur_signal in cur_signals:
@@ -173,6 +193,8 @@ class ExpZIqubit(Experiment):
                                 if cur_freq > 0:
                                     cur_name += f' (LO={Miscellaneous.get_units(cur_freq)}Hz)'
                     dict_data[cur_name] = output_sim.get_snippet(cur_phys_channel_uid, 0, max_time)
+                    if cur_signal.lower().endswith('acquire'):
+                        qubit_acqs.append({'qubit':cur_qubit, 'acq_times':dict_data[cur_name].time*1.0, 'acq_trigs':dict_data[cur_name].wave*1})
             #
             #Use Bokeh to plot it in a nice HTML format (ctrl for x-zoom)
             # Build channel dict
@@ -225,6 +247,16 @@ class ExpZIqubit(Experiment):
             html = html.replace("display: flow-root;", "")
             with open(file_path+f'timing_diagram_raw{file_name_suffix}.html', "w") as f:
                 f.write(html)
+            #
+            #CHECK IF ACQ PULSES ARE SPACED FAR ENOUGH APART ACROSS EACH QUBIT
+            #
+            #Perhaps look into whether it is faster to just read off compiled_exp.scheduled_experiment to get the raw events? Might be suspectible to changes/deprecation however...
+            for cur_qubit in qubit_acqs:
+                acq_trig_locs = np.where(cur_qubit['acq_trigs']==1)[0] #It's just an array of 0s and 1s with 1 to trigger a read...
+                time_spacings = np.diff(cur_qubit['acq_times'][acq_trig_locs])
+                valid_slots = time_spacings > cur_qubit['qubit'].parameters.readout_length + min_acq_buffer
+                msg = ', '.join([f"[{Miscellaneous.get_units(cur_qubit['acq_times'][acq_trig_locs[m]])}s,{Miscellaneous.get_units(cur_qubit['acq_times'][acq_trig_locs[m+1]])}s]" for m in range(len(valid_slots)) if not valid_slots[m]])
+                assert len(msg) == 0, f"Acquisition triggers on Qubit '{cur_qubit['qubit'].uid}' are too close to one another (inspect the generated pulse sheets for at least a {Miscellaneous.get_units(min_acq_buffer)}s buffer between acquisitions), specifically the pairs: {msg}"
 
         if compiled_exp:
             return compiled_exp.estimated_runtime

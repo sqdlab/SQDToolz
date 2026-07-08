@@ -56,12 +56,13 @@ if TYPE_CHECKING:
 
 import numpy as np
 
-@workflow.workflow(name="single_qubit_gates_sweep")
+@workflow.workflow(name="oqasm_scheduled_qubits")
 def experiment_workflow(
     session: Session,
     qpu: QPU,
     qubits: QuantumElements | list[str] | str,
-    gate_lists: list[list[list]],
+    openqasm_schedule,
+    qubit_mapping,
     coordinate_system: str = 'RH',
     # TODO: Update the type hint for the temporary_parameters argument when the new
     # qubit class is available. Same for other experiment workflows.
@@ -92,12 +93,11 @@ def experiment_workflow(
         qubits:
             The qubits to run the experiments on, passed by UID. May be either a single
             qubit or a list of qubits.
-        gate_lists:
-            List of lists of lists. The first sliced dimension is for the different swept
-            sequences across the qubits. The second sliced dimension is for each qubit
-            The final sliced dimension for a given qubit can include strings (e.g. 'X',
-            'Y', '-Z/2' etc.) or tuples for arbitrary rotations in radians (e.g. ('Rx',0.1),
-            ('Rz',-0.2) etc.)
+        openqasm_schedule:
+            The openqasm3-based schedule given by ParseOpenQASM.create_schedule
+        qubit_mapping:
+            A dictionary that maps the 'qubit_index' entries in the sections given in openqasm_schedule
+            onto the indices of the hardware 'qubits' list. Thus, it is set of int:int key-value pairs.
         coordinate_system:
             Coordinate system to use for x, y and z axes - either LH or RH for left/right handed.
         temporary_parameters:
@@ -122,7 +122,8 @@ def experiment_workflow(
     exp = create_experiment(
         temp_qpu,
         qubits,
-        gate_lists,
+        openqasm_schedule,
+        qubit_mapping,
         coordinate_system
         # quarter_time=quarter_time,
     )
@@ -141,7 +142,8 @@ def experiment_workflow(
 def create_experiment(
     qpu: QPU,
     qubits: QuantumElements,
-    gate_lists: list[list[list]],
+    openqasm_schedule,
+    qubit_mapping,
     coordinate_system: str = 'RH',
     options: TuneupExperimentOptions | None = None,
 ) -> Experiment:
@@ -153,12 +155,11 @@ def create_experiment(
         qubits:
             The qubits to run the experiments on. May be either a single
             qubit or a list of qubits.
-        gate_lists:
-            List of lists of lists. The first sliced dimension is for the different swept
-            sequences across the qubits. The second sliced dimension is for each qubit
-            The final sliced dimension for a given qubit can include strings (e.g. 'X',
-            'Y', '-Z/2' etc.) or tuples for arbitrary rotations in radians (e.g. ('Rx',0.1),
-            ('Rz',-0.2) etc.)
+        openqasm_schedule:
+            The openqasm3-based schedule given by ParseOpenQASM.create_schedule
+        qubit_mapping:
+            A dictionary that maps the 'qubit_index' entries in the sections given in openqasm_schedule
+            onto the indices of the hardware 'qubits' list. Thus, it is set of int:int key-value pairs.
         coordinate_system:
             Coordinate system to use for x, y and z axes - either LH or RH for left/right handed.
         options:
@@ -206,66 +207,68 @@ def create_experiment(
         repetition_time=opts.repetition_time,
         reset_oscillator_phase=opts.reset_oscillator_phase,
     ):
-        with dsl.section(name="main", alignment=SectionAlignment.RIGHT):
-            for seq in range(len(gate_lists)):
-                if opts.active_reset:
-                    qop.active_reset(
-                        qubits,
-                        active_reset_states=opts.active_reset_states,
-                        number_resets=opts.active_reset_repetitions,
-                        measure_section_length=max_measure_section_length,
-                    )
+        ###################
+        with dsl.section(name="init"):
+            init_section_uid = dsl.active_section().uid
+            if opts.active_reset:
+                qop.active_reset(
+                    qubits,
+                    active_reset_states=opts.active_reset_states,
+                    number_resets=opts.active_reset_repetitions,
+                    measure_section_length=max_measure_section_length,
+                )
+            else:
+                for q in qubits:
+                    qop.passive_reset(q)
+        ###################
+        le_UIDs = []
+        with dsl.section(name="Main", play_after=init_section_uid):
+            for m,cur_section in enumerate(openqasm_schedule['commands']):
+                if cur_section['after'] != None:
+                    after = le_UIDs[cur_section['after']]
                 else:
-                    for q in qubits:
-                        qop.passive_reset(q)
-                with dsl.section(name=f"main_drive_seq{seq}", alignment=SectionAlignment.RIGHT):
-                    for m,q in enumerate(qubits):
-                        for cur_gate in gate_lists[seq][m]:
-                            _,params = q.transition_parameters('ge')
-                            if isinstance(cur_gate, (tuple, list)):
-                                assert len(cur_gate) == 2, "Arbitrary rotations must be specified as a tuple - e.g. ('Rx',0.02)."
-                                if cur_gate[0] == 'Rz':
-                                    qop.rz(q,cur_gate[1])
-                                elif cur_gate[0] == 'Ry':
-                                    qop.ry(q,cur_gate[1])
-                                elif cur_gate[0] == 'Rx':
-                                    qop.rx(q,cur_gate[1])
-                                else:
-                                    assert False, "The gate type for arbitrary rotations must be 'Rx', 'Ry' or 'Rz'."
-                            elif cur_gate == 'X':
-                                qop.rx(q,np.pi)
-                            elif cur_gate == 'X/2':
-                                qop.x90(q)
-                            elif cur_gate == '-X/2':
-                                qop.rx(q, -np.pi/2, amplitude=-params['amplitude_pi2'])
-                            elif cur_gate == 'Y':
-                                qop.ry(q,np.pi)
-                            elif cur_gate == 'Y/2':
-                                qop.y90(q)
-                            elif cur_gate == '-Y/2':
-                                qop.ry(q, -np.pi/2, amplitude=-params['amplitude_pi2'])
-                            elif cur_gate == 'Z':
-                                qop.rz(q,np.pi)
-                            elif cur_gate == 'Z/2':
-                                if coordinate_system == 'RH':
-                                    qop.rz(q,-np.pi/2)
-                                else:
-                                    qop.rz(q,np.pi/2)
-                            elif cur_gate == '-Z/2':
-                                if coordinate_system == 'RH':
-                                   qop.rz(q,np.pi/2)
-                                else:
-                                   qop.rz(q,-np.pi/2)
-                            elif cur_gate == 'H':
-                                qop.rz(q,np.pi)
-                                qop.ry(q,np.pi/2)
+                    after = None
+                with dsl.section(name=f"sec{m}", alignment=SectionAlignment.LEFT, play_after=after):
+                    current_section_uid = dsl.active_section().uid
+                    le_UIDs.append(current_section_uid)
 
-
-                with dsl.section(name=f"main_measure_seq{seq}", alignment=SectionAlignment.LEFT):
-                    for q in qubits:
-                        sec = qop.measure(q, dsl.handles.result_handle(q.uid))
-                        # Fix the length of the measure section
-                        sec.length = max_measure_section_length
+                    if isinstance(cur_section['qubit_index'], (list,tuple)):
+                        cur_qinds = [qubit_mapping[x] for x in cur_section['qubit_index']]
+                        cur_qubits = [qubits[x] for x in cur_qinds]
+                        edges = [edge for edge in qpu.topology.edges() if {edge.source_node.uid, edge.target_node.uid}=={cur_qubits[0].uid, cur_qubits[1].uid}]
+                        assert len(edges) == 1, "QPU with multiple couplers unsupported for now..."
+                        # edges = [edge for edge in edges if isinstance(edge.quantum_element, TunableTransmonCouplerFixed)]
+                        cur_coupler = edges[0].quantum_element
+                        assert cur_section['sequence'][0] == 'ctrl', "Non ctrl-A 2QGs not supported for now..."
+                        assert cur_section['sequence'][1][0] == 'Z', "Only CZ gates supported natively for now..."
+                        assert np.abs(cur_section['sequence'][1][1]-np.pi) < 1e-7, "Only CZ gates supported natively for now..."
+                        qop.CZ(cur_coupler)
+                    else:
+                        #Process Single-Qubit operations
+                        cur_qubit = qubits[qubit_mapping[cur_section['qubit_index']]]
+                        for cur_gate in cur_section['sequence']:
+                            if cur_gate[0] == 'X' or cur_gate[0] == 'Y':
+                                if (np.abs(cur_gate[1]-np.pi/2) < 1e-7):
+                                    ampl = cur_qubit.parameters.ge_drive_amplitude_pi2
+                                elif (np.abs(cur_gate[1]+np.pi/2) < 1e-7):
+                                    ampl = -cur_qubit.parameters.ge_drive_amplitude_pi2
+                                else:
+                                    ampl = None
+                            if cur_gate[0] == 'X':
+                                qop.rx(cur_qubit, cur_gate[1], amplitude=ampl)
+                            elif cur_gate[0] == 'Y':
+                                qop.ry(cur_qubit, cur_gate[1], amplitude=ampl)
+                            elif cur_gate[0] == 'Z':
+                                if coordinate_system == 'RH':
+                                    qop.rz(cur_qubit, -cur_gate[1])
+                                else:
+                                    qop.rz(cur_qubit, cur_gate[1])
+                            elif cur_gate[0] == 'D':
+                                if cur_gate[1] > 0:
+                                    qop.delay(cur_qubit, cur_gate[1])
+                            elif cur_gate[0] == 'Measure':
+                                qop.measure(cur_qubit, dsl.handles.result_handle(cur_qubit.uid))
+                pass
 
         for q in qubits:
             qop.passive_reset(q)

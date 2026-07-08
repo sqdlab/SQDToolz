@@ -18,6 +18,7 @@ class ExpZIRes(ExpZIqubit):
         self._iq_indices = kwargs.pop('iq_indices', [0,1])
         self._is_trough = kwargs.pop('is_trough', False)
         self._fit_type = kwargs.pop('fit_type', 'Default')  #Default, Fano, Full
+        assert self._fit_type in ["Default", "Fano", "Full"], "Choose fit_type as either 'Default', 'Fano' or 'Full'."
         assert self._is_trough or (not self._is_trough and not self._fit_type=='Fano'), "Fano resonance fitting only supports troughs at the moment."
         self._param_centre = kwargs.pop('param_freq', None)
         self._param_width = kwargs.pop('param_width', None)
@@ -84,19 +85,29 @@ class ExpZIRes(ExpZIqubit):
             #Commit to parameters...
             if self._update_qubit:
                 cur_qubit = self._hal_QPU.get_qubit_obj(self._qubit_dataset)
-                cur_qubit.ReadoutFrequency = dpkt['fr']
-                cur_qubit.ReadoutQi = dpkt['Qi_dia_corr']
-                cur_qubit.ReadoutQc = dpkt['Qc_dia_corr']
-                cur_qubit.ReadoutQl = dpkt['Ql']
+                if dpkt and dpkt['fr']:
+                    cur_qubit.ReadoutFrequency = dpkt['fr']
+                    cur_qubit.ReadoutQi = dpkt['Qi_dia_corr']
+                    cur_qubit.ReadoutQc = dpkt['Qc_dia_corr']
+                    cur_qubit.ReadoutQl = dpkt['Ql']
+                    dpkt['fit_data'] = {'real': np.real(dpkt['fit_data']), 'imag': np.imag(dpkt['fit_data'])}
+                else:
+                    print('Qubit parameters were not updated: bad fit.')
             if self._param_centre:
                 self._param_centre.Value = dpkt['fr']
-            dpkt['fit_data'] = {'real': np.real(dpkt['fit_data']), 'imag': np.imag(dpkt['fit_data'])}
-
-        if not self._dont_plot:
-            dpkt['fig'].savefig(self._file_path + 'fitted_plot.png')
-            if not self._dont_show_plot:
-                dpkt['fig'].show()
-            else:
-                plt.close(dpkt['fig'])
-        if 'fit_data' in dpkt:
-            np.save(self._file_path + 'fitted_data.npy', dpkt['fit_data'])
+        
+        if dpkt:
+            if not self._dont_plot:
+                dpkt['fig'].savefig(self._file_path + 'fitted_plot.png')
+                if not self._dont_show_plot:
+                    dpkt['fig'].show()
+                else:
+                    plt.close(dpkt['fig'])
+            if 'fit_data' in dpkt:
+                np.save(self._file_path + 'fitted_data.npy', dpkt['fit_data'])
+        else:
+            if not self._dont_plot:
+                plt.plot(data_x, data_y)
+                plt.xlabel("Frequency (Hz)")
+                plt.ylabel("|S21|")
+                plt.show()

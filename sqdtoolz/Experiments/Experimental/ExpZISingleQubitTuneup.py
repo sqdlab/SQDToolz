@@ -107,7 +107,7 @@ class ExpZISingleQubitTuneup:
             ExpZIResFluxSweep.plot_fitted_results(ax, self._qubit_id, freq_vals, flux_vals, ampl, fitted_data)
         ##############################
         #
-        #RESONATOR SWEEP
+        #RESONATOR SPECTROSCOPY
         #
         if not self._flux_range is None:
             ax = fig.add_subplot(gs[1, 0])
@@ -130,7 +130,7 @@ class ExpZISingleQubitTuneup:
         ax.set_ylabel('Squared Amplitude')
         ##############################
         #
-        #QUBIT SWEEP
+        #QUBIT SPECTROSCOPY
         #
         #TODO: Second -30dBm smaller spanned qubit spec.
         self._qubit.DrivePower = self._qubit_spec_LO_power

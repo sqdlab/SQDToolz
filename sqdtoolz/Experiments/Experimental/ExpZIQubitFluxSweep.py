@@ -144,7 +144,8 @@ class ExpZIQubitFluxSweep:
         axes[1].pcolor(data['freq_valsR'], self._flux_range, data['amplR_corrected'])
         axes[1].set_title(f'Resonator spectroscopy ($f_r={self._hal_QPU.get_qubit_obj(qid).ReadoutFrequency*1e-9:.4f}$ GHz)')
         #
-        axes[1].plot(data['readout_freqs'], self._flux_range, 'wo', markersize=2, label="Fitted frequencies")
+        if self._plot_fitted_res_freqs:
+            axes[1].plot(data['readout_freqs'], self._flux_range, 'wo', markersize=2, alpha=0.7, label="Fitted frequencies")
         axes[1].legend()
         #
         for ax in axes:

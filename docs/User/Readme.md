@@ -54,4 +54,4 @@ Zurich Instruments (ZI) related objects and functions:
 - [Setting up a ZI QPU](ZI_QPU.md)
 - [Running a LabOne Q workflow as an SQDToolz experiment](ZI_ExpZIqubit.md)
 - [Single qubit tuneup](ZI_SingleQubitTuneup.md)
-- Specialised experiments for ZI hardware
+- [Experiment list for ZI hardware](ZI_ExperimentList.md)

@@ -1,0 +1,5 @@
+# Semi-automated single qubit tuneup with ZI
+
+`ExpZISingleQubitTuneup` is used for semi-automated tuneup of a transmon qubit. It contains routine measurements to calibrate Rabi pulses, and characterise the qubit $T_1$ and $T_2^*$. The user should first identify the optimal frequencies of both the readout resonator (`ExpZIRes`) and the qubit (`ExpZIQubitSpec`), and the optimal readout power (`ExpZIResPowerSweep`). Once these attributes have been set to the qubit (e.g. `lab.HAL('Q0').ReadoutFrequency = 6.1e9`), `ExpZISingleQubitTuneup` should take care of the rest.
+
+Default measurement parameters have been carefully set, so that the existing qubit parameters are used to choose suitable frequency ranges for spectroscopy experiments, and drive/readout powers for time domain experiments (Rabi, Ramsey, lifetime etc.). However, the user has access to all measurement parameters as keyword arguments when initialising the `ExpZISingleQubitTuneup` class.

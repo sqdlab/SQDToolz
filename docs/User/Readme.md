@@ -49,3 +49,9 @@ Other auxiliary articles:
 - **[Driver-level documentation](InstrumentSpecific/Readme.md)** on setting up the hardware (e.g. template YAML and wiring diagrams)
 - [Notes on custom devices](CustomDevices/Readme.md)
 - [Measurement methods](MeasurementMethods/Readme.md)
+
+Zurich Instruments (ZI) related objects and functions:
+- [Setting up a ZI QPU](ZI_QPU.md)
+- [Running a LabOne Q workflow as an SQDToolz experiment](ZI_ExpZIqubit.md)
+- [Single qubit tuneup](ZI_SingleQubitTuneup.md)
+- Specialised experiments for ZI hardware

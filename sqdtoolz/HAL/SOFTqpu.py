@@ -3,8 +3,10 @@ from sqdtoolz.ExperimentSpecification import ExperimentSpecification
 from sqdtoolz.HAL.ZI.ZIbase import ZIbase
 from sqdtoolz.Variable import VariableInternalTransient
 from sqdtoolz.Utilities.FileIO import FileIODatalogger, FileIOReader
+from sqdtoolz.Utilities.FileJSON import SQDJSONEncoder
 import time
 import json
+import os
 import scipy.signal
 import numpy as np
 import laboneq.dsl.quantum
@@ -89,6 +91,63 @@ class SOFTqpu(HALbase, ZIbase):
                 leQPU.topology.add_edge(cur_cpl.Name, qubit1, qubit2, quantum_element=cpl)
         return leQPU, leQubits, leQcouplers
 
+    def save_config(self, lab, file_name='', store_local=True):
+        #Not choosing to filter intrinsic parameters yet. Ultimately, many parameters can be ignored by the routines
+        #like SingleQubitTuneup anyway. So it's up to those routines to decide what's mandatory and what's to be
+        #overwritten... This will shift stuff like FluxDC, but again, recalibration will mandate those be checked
+        #anyway... Most of the time cold_reload_last_configuration should be used - this is more for the case where
+        #it's a fresh experiment and it's convenient to just slice out the qubit-only parameters...
+        #
+        #Anyway, the idea is to reuse the cold_reload_labconfig function to instantiate/initialise the parameters...
+        #Thus, the code is written to be compatible/friendly to that while adding some extra parameters to aid in the
+        #user API here...
+        param_dict = {
+                    'ActiveInstruments' : [],
+                    'HALs' : [],
+                    'PROCs': [],
+                    'WFMTs': [],
+                    'SPECs': [],
+                    'Qubits': {},
+                    'QubitCouplings': {}
+                    }
+        cur_index = 0
+        for m in range(len(self._qubits)):
+            cur_qubit = self._lab._get_resolved_obj(self._qubits[m])
+            param_dict['HALs'].append(cur_qubit._get_current_config())
+            param_dict['Qubits'][cur_qubit.Name] = cur_index
+            cur_index += 1
+        for m in range(len(self._qubit_couplings)):
+            cur_hal_cpl = self._lab._get_resolved_obj( self._qubit_couplings[m][2] )
+            param_dict['HALs'].append(cur_hal_cpl._get_current_config())
+            param_dict['QubitCouplings'][cur_hal_cpl.Name] = cur_index
+            cur_index += 1
+        param_dict['HALs'].append(self._get_current_config())
+        file_path = '' if store_local else lab._save_dir
+        file_path += 'QPU_config.json' if file_name == '' else file_name
+        with open(file_path, 'w') as outfile:
+            json.dump(param_dict, outfile, indent=4, cls=SQDJSONEncoder)
+
+    @staticmethod
+    def load_config(lab, id='', file_path=''):
+        """
+        Function to initialise (instantiate if necessary) all qubits/couplers. If id is empty, all qubits/couplers are loaded/instantiated.
+        """
+        if file_path == '':
+            assert os.path.exists('QPU_config.json'), "Cannot find configuration 'QPU_config.json' in the default path. Specify actual file name"
+            file_path = 'QPU_config.json'
+        else:
+            assert os.path.exists(file_path), f"Cannot find configuration file '{file_path}'."
+        loaded_dict = lab._load_json_file(file_path)
+        if id != '':
+            if id in loaded_dict['Qubits']:
+                hal_index = loaded_dict['Qubits'][id]
+            elif id in loaded_dict['QubitCouplings']:
+                hal_index = loaded_dict['QubitCouplings'][id]
+            else:
+                assert False, f"There is no qubit or coupler named {id}."
+            loaded_dict['HALs'] = [loaded_dict['HALs'][hal_index]]
+        lab.cold_reload_labconfig(loaded_dict)
+
     def _resolve_qubit_index(self, qubit_id):
         if isinstance(qubit_id, int):
             assert qubit_id < len(self._qubits) and qubit_id >= 0, f"Qubit index {qubit_id} is out of range given the number of qubits."
@@ -99,7 +158,6 @@ class SOFTqpu(HALbase, ZIbase):
                 return m
         assert False, f"Qubit \"{qubit_id}\" does not exist."
 
-
     def _get_current_config(self):
         ret_dict = {
             'Name' : self.Name,
@@ -108,30 +166,6 @@ class SOFTqpu(HALbase, ZIbase):
             'QubitCouplings': self._qubit_couplings
             }
         return ret_dict
-    
-    def save_QPU_config(self, lab, label=None):
-        qubits_dict = {}
-        for m in range(len(self._qubits)):
-            cur_qubit = self._lab._get_resolved_obj(self._qubits[m])
-            cur_qubit_config = cur_qubit._get_current_config()
-            kernel_weights = cur_qubit_config.pop('ReadoutKernelWeights') #.json can not write ndarray
-            qubits_dict[cur_qubit.Name] = cur_qubit_config
-        couplers_dict={}
-        for m in range(len(self._qubit_couplings)):
-            cur_hal_cpl = self._lab._get_resolved_obj( self._qubit_couplings[m][2] )
-            couplers_dict[cur_hal_cpl.Name] = cur_hal_cpl._get_current_config()
-        ret_dict = {
-            'Name' : self.Name,
-            'Type' : self.__class__.__name__,
-            'Qubits': qubits_dict,
-            'QubitCouplings': couplers_dict
-        }
-        if label:
-            json_name = f"QPU_config_{label}.json"
-        else:
-            json_name = "QPU_config.json"
-        with open(lab._save_dir + json_name, 'w', encoding='utf-8') as f:
-            json.dump(ret_dict, f, indent=4)
 
     def _set_current_config(self, dict_config, lab):
         assert dict_config['Type'] == self.__class__.__name__, 'Cannot set configuration to a SoQPU with a configuration that is of type ' + dict_config['Type']

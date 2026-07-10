@@ -30,49 +30,7 @@ import os
 import time
 import numpy as np
 import sys
-#
-import io
-import base64
-import zlib
-import numpy as np
-
-
-class SerialiseJSON:
-    @staticmethod
-    def encode_ndarray(arr: np.ndarray) -> str:
-        """Serialize a NumPy array to a compressed base64 string."""
-        buf = io.BytesIO()
-        np.save(buf, arr, allow_pickle=False)
-        return base64.b64encode(zlib.compress(buf.getvalue())).decode("ascii")
-
-    @staticmethod
-    def decode_ndarray(data: str) -> np.ndarray:
-        """Deserialize a compressed base64 string back into a NumPy array."""
-        raw = zlib.decompress(base64.b64decode(data.encode("ascii")))
-        return np.load(io.BytesIO(raw), allow_pickle=False)
-
-    @staticmethod    
-    def decode_hook(obj):
-        if "__type__" in obj:
-            if obj["__type__"] == 'numpy.ndarray':
-                assert "data" in obj, "If it is a serialised numpy array, there must be a 'data' key with the encoded data."
-                return SerialiseJSON.decode_ndarray(obj["data"])
-        return obj
-
-class CustomJSONEncoder(json.JSONEncoder):
-    def default(self, obj):
-        #Inspired by: https://stackoverflow.com/questions/56250514/how-to-tackle-with-error-object-of-type-int32-is-not-json-serializable/56254172
-        if isinstance(obj, np.integer):
-            return int(obj)
-        if isinstance(obj, np.floating):
-            return float(obj)
-        if isinstance(obj, np.ndarray):
-            return {
-                "__type__": "numpy.ndarray",
-                "encoding": "npy+zlib+base64",
-                "data": SerialiseJSON.encode_ndarray(obj)
-            }
-        return super().default(obj)
+from sqdtoolz.Utilities.FileJSON import SQDJSONEncoder, SerialiseJSON
 
 class Laboratory:
     def __init__(self, instr_config_file, save_dir, using_VS_Code=False):
@@ -478,7 +436,7 @@ class Laboratory:
         exp_params = {'Configuration': expt_obj.ConfigName, 'SPECs': self.CONFIG(expt_obj.ConfigName).get_spec_names()}
         expt_param_file = self._save_dir + '_cur_exp.json'
         with open(expt_param_file, 'w') as outfile:
-            json.dump(exp_params, outfile, indent=4, cls=CustomJSONEncoder)
+            json.dump(exp_params, outfile, indent=4, cls=SQDJSONEncoder)
 
         ret_vals = expt_obj._run(cur_exp_path, sweep_vars, ping_iteration=self._update_progress_bar, **kwargs)
         self._group_dir['ExptIndex'] += 1
@@ -513,13 +471,13 @@ class Laboratory:
             # json.dump(param_dict, outfile)
             outfile.write(
                 '{\n' +
-                ',\n'.join(f"\"{x}\" : {json.dumps(param_dict[x], cls=CustomJSONEncoder)}" for x in param_dict.keys()) +
+                ',\n'.join(f"\"{x}\" : {json.dumps(param_dict[x], cls=SQDJSONEncoder)}" for x in param_dict.keys()) +
                 '\n}\n')
 
     def save_experiment_configs(self, cur_exp_path, file_name = 'experiment_configurations.txt'):
         dict_expt_configs = {x : self._expt_configs[x].get_config() for x in self._expt_configs}
         with open(cur_exp_path + file_name, 'w') as outfile:
-            json.dump(dict_expt_configs, outfile, indent=4, cls=CustomJSONEncoder)
+            json.dump(dict_expt_configs, outfile, indent=4, cls=SQDJSONEncoder)
 
     def save_laboratory_config(self, cur_exp_path, file_name = 'laboratory_configuration.txt'):
         #Prepare the dictionary of HAL configurations
@@ -551,7 +509,7 @@ class Laboratory:
                     }
         if cur_exp_path != '':
             with open(cur_exp_path + file_name, 'w') as outfile:
-                json.dump(param_dict, outfile, indent=4, cls=CustomJSONEncoder)
+                json.dump(param_dict, outfile, indent=4, cls=SQDJSONEncoder)
         return param_dict
 
     def _save_instrument_config(self, cur_exp_path):
@@ -570,7 +528,7 @@ class Laboratory:
             return result
         with open(cur_exp_path + 'instrument_configuration.txt', 'w') as outfile:
             raw_snapshot = self._station.snapshot_base()
-            json.dump(decode_dict(raw_snapshot), outfile, indent=4, cls=CustomJSONEncoder)
+            json.dump(decode_dict(raw_snapshot), outfile, indent=4, cls=SQDJSONEncoder)
 
 
     @staticmethod

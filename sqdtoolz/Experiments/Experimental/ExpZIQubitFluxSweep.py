@@ -35,6 +35,7 @@ class ExpZIQubitFluxSweep:
         self._flux_range = flux_range
         self._res_freq_range = res_frequencies
         self._qubit_freq_range = qubit_frequencies
+        self._plot_fitted_res_freqs = kwargs.pop('plot_fitted_res_freqs', True)
 
         self._update_qubit = kwargs.pop('update_qubit_params', True)
         self._dont_show_plot = kwargs.pop('dont_show_plot', False)
@@ -43,7 +44,6 @@ class ExpZIQubitFluxSweep:
         self._fit_type = kwargs.pop('res_fit_type', 'Full')
         assert self._fit_type in ["Default", "Fano", "Full"], "Choose res_fit_type as either 'Default', 'Fano' or 'Full'."
         self._dont_plot = kwargs.pop('dont_plot', False)
-        self._xUnits = kwargs.pop('plot_x_units', 'Hz')
 
         self._hal_QPU = hal_QPU
 
@@ -75,7 +75,7 @@ class ExpZIQubitFluxSweep:
                     if self._averages is not None:
                         lab.HAL(self._acq_hal_name).NumRepetitions = self._averages[i]
                         stz.ExperimentConfiguration(self._expt_config._name, lab, 0, [], self._acq_hal_name) # update averages
-                    expR = ExpZIRes(f'res_spec_{qid}', self._expt_config, self._hal_QPU, qid, frequencies=res_freqs, dont_plot=self._dont_plot, is_trough=self._is_trough, fit_type=self._fit_type, update=True)
+                    expR = ExpZIRes(f'res_spec_{qid}', self._expt_config, self._hal_QPU, qid, frequencies=res_freqs, dont_plot=self._dont_plot, is_trough=self._is_trough, fit_type=self._fit_type, update_qubit_params=True)
                     lab.run_single(expR, disable_ZI_logging=not self._enable_ZI_log_messages)
                     last_expR[qid] = expR
                     readout_freqs_at_flux[qid].append(lab.HAL(qid).ReadoutFrequency)

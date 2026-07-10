@@ -8,11 +8,7 @@ The class contains functions useful for data retrieval, analysis, sorting and pl
    1. `ResonatorPowerSweep.n_ph_calculator` for calculating photon number from power
    2. `ResonatorPowerSweep.fit_data_to_sorted_dataframe` for sorting and filtering of data
    3. `ResonatorPowerSweep.get_frequency_bins` to sort measurements into frequency bins (i.e. per resonator)
-4. Plots data, and fits a TLS-loss-model to allow extraction of the TLS loss tangent (`ResonatorPowerSweep.plotBokeh_n_ph` for Bokeh plotting, `ResonatorPowerSweep.plotMpl_n_ph` for Matplotlib plotting). The fitting routine is contained in the function `ResonatorPowerSweep.TLS_fit`, where the [model from Earnest et. al](https://iopscience.iop.org/article/10.1088/1361-6668/aae548) is fitted, 
-   
-   $$\tan\delta=\frac{1}{Q_i}=F\tan\delta_{TLS,0}\frac{\tanh\left(\frac{\hbar\omega}{2 k_B T}\right)}{\left(1+\left(\frac{\langle n \rangle}{n_c}\right)\right)^\beta} + \frac{1}{Q_{HP}},$$ 
-   
-   where the fit parameters are the filling-factor-scaled TLS-loss-tangent $F\tan\delta_{TLS,0}$, the critical photon number $n_c$ (above which TLS-resonator interaction saturates), the power-independent (high-power) loss $Q_{HP}$, and a fitting parameter $\beta$.
+4. Plots data, and fits a TLS-loss-model to allow extraction of the TLS loss tangent (`ResonatorPowerSweep.plotBokeh_n_ph` for Bokeh plotting, `ResonatorPowerSweep.plotMpl_n_ph` for Matplotlib plotting). The fitting routine is contained in the function `ResonatorPowerSweep.TLS_fit`, where the [model from Earnest et. al](https://iopscience.iop.org/article/10.1088/1361-6668/aae548) is fitted, $$\tan\delta=\frac{1}{Q_i}=F\tan\delta_{TLS,0}\frac{\tanh\left(\frac{\hbar\omega}{2 k_B T}\right)}{\left(1+\left(\frac{\langle n \rangle}{n_c}\right)\right)^\beta} + \frac{1}{Q_{HP}},$$where the fit parameters are the filling-factor-scaled TLS-loss-tangent $F\tan\delta_{TLS,0}$, the critical photon number $n_c$ (above which TLS-resonator interaction saturates), the power-independent (high-power) loss $Q_{HP}$, and a fitting parameter $\beta$.
 5. Saves all fitted and calculated data to a text file.
 
 ### Example usage

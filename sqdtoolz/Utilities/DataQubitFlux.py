@@ -36,7 +36,6 @@ class DataTransmonFlux:
             ampl_corrected = ampl
         return cls(qubit_id, ampl_corrected, cur_data.param_vals[flux_param_index], cur_data.param_vals[freq_param_index])
 
-
     def fit_qubit_frequency(self, p0=None, prominence_frac=0.9, fixed_period=None, fit_flux_range=None):
         """
         Fits qubit frequency vs flux using the standard transmon flux dependence:
@@ -218,8 +217,10 @@ class DataTransmonFlux:
         if save:
             fig.savefig(parent + '/QubitFluxSpecLinescans.png')
 
-
     def get_frequency_from_fluxDC(self, fluxDC):
+        """
+        Returns the fitted qubit frequency for a given flux line voltage 'fluxDC'.
+        """
         assert self._qubit_amp_fit is not None, "Run fit_qubit_frequency() first."
         fit_func = self._qubit_amp_fit['fit_func']
         popt = self._qubit_amp_fit['popt']

@@ -13,16 +13,14 @@ class ExpZIQubitPowerSweep(ExpZIqubit):
         assert isinstance(qubit_id, str), "Supply qubit_id as the solitary string ID here (i.e. not a list)."
         self._qubit_id = qubit_id
 
-        self._update_qubit = kwargs.pop('update_qubit_params', False)
         self._drive_power_range = kwargs.pop('drive_power_range', np.linspace(-30, 10, 9))
         self._num_plotted_peaks = kwargs.pop('num_plotted_peaks', 3)
-        self._min_prominence = kwargs.pop('min_peak_prominence', 0.01)
+        self._min_prominence = kwargs.pop('min_peak_prominence', None)
 
         self._dont_show_plot = kwargs.pop('dont_show_plot', False)
 
         self._is_trough = kwargs.pop('is_trough', False)
         self._dont_plot = kwargs.pop('dont_plot', False)
-        self._xUnits = kwargs.pop('plot_x_units', 'Hz')
         self._frequencies = frequencies
         self._hal_QPU = hal_QPU
 
@@ -78,7 +76,7 @@ class ExpZIQubitPowerSweep(ExpZIqubit):
             fig.savefig(self._file_path + 'fitted_plot.png')
     
     @staticmethod
-    def plot_fitted_results(ax, hal_QPU, qubit_id, freq_vals, pwr_vals, ampl, fitted_data, min_prominence=None, top_n=3):
+    def plot_fitted_results(ax, hal_QPU, qubit_id, freq_vals, pwr_vals, ampl, fitted_data, min_prominence=None, top_n=1):
         row_means = np.nanmean(ampl, axis=1)
         ampl_corrected = (ampl.T - row_means).T
         ax.pcolor(freq_vals, pwr_vals, ampl_corrected)

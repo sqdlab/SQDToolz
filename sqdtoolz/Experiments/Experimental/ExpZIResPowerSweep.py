@@ -12,14 +12,12 @@ class ExpZIResPowerSweep(ExpZIqubit):
         assert isinstance(qubit_id, str), "Supply qubit_id as the solitary string ID here (i.e. not a list)."
         self._qubit_id = qubit_id
 
-        self._update_qubit = kwargs.pop('update_qubit_params', True)
         self._amplitude_range = kwargs.pop('amplitude_range', np.linspace(0.001, 1, 20))
 
         self._dont_show_plot = kwargs.pop('dont_show_plot', False)
 
         self._is_trough = kwargs.pop('is_trough', True)
         self._dont_plot = kwargs.pop('dont_plot', False)
-        self._xUnits = kwargs.pop('plot_x_units', 'Hz')
         self._frequencies = frequencies
         self._hal_QPU = hal_QPU
 

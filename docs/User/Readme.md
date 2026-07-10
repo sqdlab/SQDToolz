@@ -39,7 +39,8 @@ Main structure:
     - [Data retrieval](Data_IO.md)
     - [Data fitting (Basic)](Data_Fitting.md)
     - [Data fitting (RF resonators)](Data_Fitting_RF.md)
-    - [Data retrieval, fitting, and plotting (RF resonator power sweeps)](Resonator_Tools.md)
+    - [Data fitting (RF resonator power sweeps)](Data_ResonatorTools.md)
+    - [Analysis and calibration of qubit flux sweeps](Data_QubitFlux.md)
 
 Other advanced use-cases:
 - [Synthesising SQDToolz HDF5 data files](Data_Write.md)
@@ -54,4 +55,4 @@ Zurich Instruments (ZI) related objects and functions:
 - [Setting up a ZI QPU](ZI_QPU.md)
 - [Running a LabOne Q workflow as an SQDToolz experiment](ZI_ExpZIqubit.md)
 - [Single qubit tuneup](ZI_SingleQubitTuneup.md)
-- [Experiment list for ZI hardware](ZI_ExperimentList.md)
+- [**Experiment list** for ZI hardware](ZI_ExperimentList.md)

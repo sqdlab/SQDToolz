@@ -15,12 +15,14 @@ from sqdtoolz.HAL.ZI.ZIQubit import ZIQubit
 class TunableTransmonCouplerFixedParameters(QuantumParameters):
     # QubitFlux: str = ''
     Amplitude: float = 0.5
+    AmplitudeAux: float = 0.0
     Length: float = 100e-9
     Pulse: dict = attrs.field(factory=lambda: {"function": "gaussian_square", "sigma": 0.5})
 
 class TunableTransmonCouplerFixed(QuantumElement, QASMCompatibleQubitMultiple):
     PARAMETERS_TYPE = TunableTransmonCouplerFixedParameters
     REQUIRED_SIGNALS = ("flux",)
+    OPTIONAL_SIGNALS = ("flux_aux")
 
     def get_gate_duration(self, gate:list|tuple, qubits:list[ZIQubit]):
         if isinstance(gate[1], (tuple,list)):
@@ -39,7 +41,8 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
         self,
         q: TunableTransmonCouplerFixed,
         length: float | SweepParameter,
-        amplitude: float | SweepParameter = None
+        amplitude: float | SweepParameter = None,
+        amplitude_aux: float | SweepParameter = None
     ) -> None:
         # pulse_parameters = {"function": "gaussian_square", "sigma": 0.5}
         # flux_pulse = dsl.create_pulse(pulse_parameters, name="flux_pulse")
@@ -54,6 +57,16 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
             length=length,
             pulse=flux_pulse,
         )
+
+        aux_signal = q.signals.get("flux_aux")
+        if aux_signal is not None:
+            aux_amp = amplitude_aux if amplitude_aux is not None else q.parameters.AmplitudeAux
+            dsl.play(
+                aux_signal,
+                pulse=flux_pulse,
+                amplitude=aux_amp,
+                length=length,
+            )
 
     @dsl.quantum_operation
     def CZ(
@@ -75,6 +88,17 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
             # phase=phase,
             pulse=flux_pulse,
         )
+
+        aux_signal = q.signals.get("flux_aux")
+        if aux_signal is not None:
+            amplitude_aux = q.parameters.AmplitudeAux
+            if amplitude_aux is not None:
+                dsl.play(
+                    aux_signal,
+                    pulse=flux_pulse,
+                    amplitude=amplitude_aux,
+                    length=length,
+                )
 
 # - How to infer qubits given the coupler in the QPU
 # - The qubits need to be inferred to choose the correct signal path

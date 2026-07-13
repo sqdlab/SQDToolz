@@ -28,6 +28,7 @@ lab.HAL('QPU').add_qubit_coupling('Qubit1', 'Qubit2', lab.HAL('Cpl12'))
 lab.HAL('QPU').add_qubit_coupling('Qubit3', 'Qubit4', lab.HAL('Cpl34'))
 
 lab.HAL('QPU').save_config(lab)
+lab.HAL('QPU').print_summary_ZIQubits()
 
 lab.HAL('Qubit1').ReadoutFrequency = 9e9
 lab.HAL('Qubit2').ReadoutFrequency = 8e9

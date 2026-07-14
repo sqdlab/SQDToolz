@@ -10,6 +10,7 @@ import os
 import scipy.signal
 import numpy as np
 import laboneq.dsl.quantum
+import pandas as pd
 
 class SOFTqpu(HALbase, ZIbase):
     def __init__(self, hal_name, lab, **kwargs):
@@ -147,6 +148,24 @@ class SOFTqpu(HALbase, ZIbase):
                 assert False, f"There is no qubit or coupler named {id}."
             loaded_dict['HALs'] = [loaded_dict['HALs'][hal_index]]
         lab.cold_reload_labconfig(loaded_dict)
+
+    def print_summary_ZIQubits(self):
+        """
+        Prints a Markdown Table of the ZI Qubits
+        """
+        leQubits = [self._lab._get_resolved_obj(x) for x in self._qubits]
+        #Stick to the format here to add columns!
+        data = {
+                'Qubit': [x.Name for x in leQubits],
+                r'$f_r$ (GHz)':                 [f'{x.ReadoutFrequency/1e9:.4g}' for x in leQubits],
+                r'$f_q$ (GHz)':                 [f'{x.DriveGE/1e9:.4g}' for x in leQubits],
+                r'$T_1$ (μs)':                  [f'{x.T1GE*1e6:.4g}' for x in leQubits],
+                r'$T_2^*$ (μs)':                [f'{x.T2GE_star*1e6:.4g}' for x in leQubits],
+                r'$T_2^{\text{Hahn}}$ (μs)':    [f'{x.T2GE*1e6:.4g}' for x in leQubits],
+                r'$\chi$ (MHz)':                [f'{x.ChiGE/1e6:.4g}' for x in leQubits]
+               }
+        df = pd.DataFrame(data)
+        print(df.to_markdown(index=False))
 
     def _resolve_qubit_index(self, qubit_id):
         if isinstance(qubit_id, int):

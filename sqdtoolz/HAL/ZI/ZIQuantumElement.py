@@ -45,6 +45,10 @@ class ZIQuantumElement(HALbase, ZIbase):
             assert cur_signal in elem_params, f"Must supply \"{cur_signal}\" signal"
             signals[cur_signal] = elem_params.pop(cur_signal)
             self.signals[cur_signal] = signals[cur_signal]
+        for cur_signal in cls_zi_quantum_element.OPTIONAL_SIGNALS:
+            if cur_signal in elem_params:
+                signals[cur_signal] = elem_params.pop(cur_signal)
+                self.signals[cur_signal] = signals[cur_signal]
         self._zi_qelem = cls_zi_quantum_element(uid=self.Name, signals=signals)
 
         #Check if the operations class is just the class name with Operations appeneded. Otherwise, if the standard is not adhered,

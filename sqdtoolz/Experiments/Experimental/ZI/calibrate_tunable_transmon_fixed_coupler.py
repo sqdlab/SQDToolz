@@ -63,6 +63,7 @@ def experiment_workflow(
     qubits: QuantumElements | list[str] | str,
     amplitudes: QubitSweepPoints,   #QubitSweepPoints is just an alias for ArrayLike or list of ArrayLike objects really...
     wait_times: QubitSweepPoints,
+    amplitude_aux: float = None,
     coupler_name:str = None,
     # TODO: Update the type hint for the temporary_parameters argument when the new
     # qubit class is available. Same for other experiment workflows.
@@ -97,6 +98,8 @@ def experiment_workflow(
             The amplitudes to sweep over for each qubit. If `qubits` is a
             single qubit, `amplitudes` must be a list of numbers or an array. Otherwise
             it must be a list of lists of numbers or arrays.
+        amplitude_aux:
+            Ampitude of pulse to place on secondary qubit if provided.
         temporary_parameters:
             The temporary parameters with which to update the quantum elements and
             topology edges. For quantum elements, the dictionary key is the quantum
@@ -142,6 +145,7 @@ def experiment_workflow(
         qubits,
         amplitudes,
         wait_times,
+        amplitude_aux,
         coupler_name
         # quarter_time=quarter_time,
     )
@@ -162,6 +166,7 @@ def create_experiment(
     qubits: QuantumElements,
     amplitudes: QubitSweepPoints,
     wait_times: QubitSweepPoints,
+    amplitude_aux: float,
     coupler_name:str = None,
     options: TuneupExperimentOptions | None = None,
 ) -> Experiment:
@@ -177,6 +182,8 @@ def create_experiment(
             The amplitudes to sweep over for each qubit. If `qubits` is a
             single qubit, `amplitudes` must be a list of numbers or an array. Otherwise
             it must be a list of lists of numbers or arrays.
+        amplitude_aux:
+            Ampitude of pulse to place on secondary qubit if provided.
         options:
             The options for building the experiment.
             See [TuneupExperimentOptions] and [BaseExperimentOptions] for
@@ -282,7 +289,7 @@ def create_experiment(
                         qop.prepare_state.omit_section(qubits[0], state='e')
                         qop.prepare_state.omit_section(qubits[1], state='e')
                     with dsl.section(name="flux_pulse", alignment=SectionAlignment.LEFT):
-                        qop.fixed_coupler_flux_pulse.omit_section(the_coupler, amplitude=ampls_sweep_pars, length=times_sweep_pars)
+                        qop.fixed_coupler_flux_pulse.omit_section(the_coupler, amplitude=ampls_sweep_pars, length=times_sweep_pars, amplitude_aux=amplitude_aux)
                     # with dsl.section(name="flux_pulse", alignment=SectionAlignment.LEFT):
                     #     dsl.play(signal=qubits[0].signals['flux'], pulse=lbeqs.pulse_library.const(length=1e-6), amplitude=1.0 )
 

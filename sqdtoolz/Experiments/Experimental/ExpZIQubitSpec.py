@@ -23,7 +23,9 @@ class ExpZIQubitSpec(ExpZIqubit):
         if self._states=='ge':
             super().__init__(name, expt_config, qubit_spectroscopy, hal_QPU, [qubit_id], **kwargs)
         elif self._states=='ef':
-            super().__init__(name, expt_config, qubit_spectroscopy_gef, hal_QPU, [qubit_id], states='ef', spectroscopy_reset_delay=self._spectroscopy_reset_delay, **kwargs)
+            kwargs['states'] = self._states
+            kwargs['spectroscopy_reset_delay'] = self._spectroscopy_reset_delay
+            super().__init__(name, expt_config, qubit_spectroscopy_gef, hal_QPU, [qubit_id], **kwargs)
     
     def _post_process(self, data):
         data = self.retrieve_last_dataset(self._qubit_dataset)

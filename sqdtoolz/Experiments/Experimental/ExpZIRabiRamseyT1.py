@@ -73,7 +73,11 @@ class ExpZIRabiRamseyT1:
     def run(self, lab):
         fig = plt.figure(layout="constrained"); fig.set_figwidth(12); fig.set_figheight(8)
         gs = matplotlib.gridspec.GridSpec(3, 2, figure=fig)
-        fig.suptitle(f"Tuneup {self._qubit_id}: {self._states}", fontsize=16, fontweight='bold')
+        if self._states=='ge':
+            freq = self._qubit.DriveGE
+        else:
+            freq = self._qubit.DriveEF
+        fig.suptitle(f"{self._qubit_id}: {self._states} characterisation ($f={freq*1e-9:.3f}$ GHz)", fontsize=16, fontweight='bold')
         #
         lab.group_open(self._name)
         ##############################
@@ -87,9 +91,11 @@ class ExpZIRabiRamseyT1:
         else:
             self._qubit.DriveEFAmplitudeX = 1.0
             self._qubit.DriveEFAmplitudeXon2 = 0.5  
-        exp = ExpZIRabi(f'rabi_pre_cal_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], amplitudes=[self._rabi_ampls], transition=self._states, cal_states=self._states, update=self._update_live, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots, use_cal_traces=False)
+        exp = ExpZIRabi(f'rabi_pre_cal_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], amplitudes=[self._rabi_ampls], transition=self._states, 
+                        cal_states=self._states, update=self._update_live, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots, use_cal_traces=False)
         lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages)
-        exp = ExpZIRabi(f'rabi_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], amplitudes=[self._rabi_ampls], transition=self._states, cal_states=self._states, update=self._update_live, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
+        exp = ExpZIRabi(f'rabi_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], amplitudes=[self._rabi_ampls], transition=self._states, 
+                        cal_states=self._states, update=self._update_live, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
         lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages)
         #
         leData = exp.retrieve_last_aux_dataset(self._qubit_id)
@@ -105,7 +111,8 @@ class ExpZIRabiRamseyT1:
         #RAMSEY
         #
         #Fast
-        exp = ExpZIRamsey(f'ramsey_fast_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], delays=[self._ramsey_fast_times], detunings=[self._ramsey_fast_detuning], transition=self._states, cal_states=self._states, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
+        exp = ExpZIRamsey(f'ramsey_fast_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], delays=[self._ramsey_fast_times], 
+                          detunings=[self._ramsey_fast_detuning], transition=self._states, cal_states=self._states, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
         lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages)
         #
         leData = exp.retrieve_last_aux_dataset(self._qubit_id)
@@ -119,7 +126,8 @@ class ExpZIRabiRamseyT1:
         exp.update_qubits() #TODO: Add error-checking here to slam brakes if necessary
         #
         #Slow
-        exp = ExpZIRamsey(f'ramsey_slow_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], delays=[self._ramsey_slow_times], detunings=[self._ramsey_slow_detuning], transition=self._states, cal_states=self._states, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
+        exp = ExpZIRamsey(f'ramsey_slow_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], delays=[self._ramsey_slow_times], 
+                          detunings=[self._ramsey_slow_detuning], transition=self._states, cal_states=self._states, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
         lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages)
         #
         leData = exp.retrieve_last_aux_dataset(self._qubit_id)
@@ -135,7 +143,8 @@ class ExpZIRabiRamseyT1:
         #
         #T1
         #
-        exp = ExpZIT1(f'T1_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], delays=[self._t1_times], transition=self._states, cal_states=self._states, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
+        exp = ExpZIT1(f'T1_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], delays=[self._t1_times], transition=self._states, 
+                      cal_states=self._states, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
         lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages)
         #
         leData = exp.retrieve_last_aux_dataset(self._qubit_id)

@@ -10,7 +10,8 @@ class ExpZIQubitSpec(ExpZIqubit):
 
         self._update_qubit = kwargs.pop('update_qubit_params', True)
         self._states = kwargs.pop('states', 'ge')
-        assert self._states in ['ge', 'ef'], "Supply states as either 'ge' or 'ef'."
+        # assert self._states in ['ge', 'ef'], "Supply states as either 'ge' or 'ef'."
+        assert self._states=='ge', "Only states='ge' qubit spectroscopy currently supported." # TODO: fix 'ef' spectroscopy
         self._dont_show_plot = kwargs.pop('dont_show_plot', False)
     
         self._iq_indices = kwargs.pop('iq_indices', [0,1])

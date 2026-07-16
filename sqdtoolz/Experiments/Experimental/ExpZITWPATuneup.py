@@ -116,13 +116,13 @@ class ExpZITWPATuneup(ExpZIqubit):
                 sweep_param = max(freqs, powers, key=len)
                 sweep_param_idx,  sweep_param_vals = max(enumerate([freqs, powers]), key=lambda x: len(x[1]))
                 if sweep_param_idx == 0:
-                    ax.plot(freqs, snr_db_total[:, 0])
+                    ax.plot(freqs, snr_db_total[:, 0], label='mean SNR')
                     for qubit in self._qubit_ids:
                         snr = self._iq_blob_data[qubit]
                         ax.plot(freqs, snr[0,:], label=f'{qubit}')
                     ax.vline(freqs[opt_indicies[0]], color = 'black', label = f'$f_p=${freqs[opt_indicies[0]]/1e9} GHz, $P=${powers[opt_indicies[1]]} dB')
                 else:
-                    ax.plot(powers, snr_db_total[0, :])
+                    ax.plot(powers, snr_db_total[0, :], label='mean SNR')
                     for qubit in self._qubit_ids:
                         snr = self._iq_blob_data[qubit]
                         ax.plot(powers, snr[0,:], label=f'{qubit}')

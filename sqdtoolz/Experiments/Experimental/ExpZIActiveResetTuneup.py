@@ -56,7 +56,8 @@ class ExpZIActiveResetTuneup():
         lab.run_single(exp)
         self._qubit_fidelities = self._expt_config._hal_ACQ._temp.tasks["analysis_workflow"].output
         ## Optimal Integration Kernels
-        self._expt_config._hal_ACQ.NumRepetitions = 2**16
+        #TODO: some kind of assert so ZI memory limitations arent reached...
+        self._expt_config._hal_ACQ.NumRepetitions = 2**14
         self._expt_config.commit()
 
         for qubit in self._qubit_ids:

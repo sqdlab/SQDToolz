@@ -29,7 +29,7 @@ class ExpZIActiveResetTuneup():
         if not self._skip_Xcal:
             for qubit in self._qubit_ids:
                 qubit_obj = self._hal_QPU.get_qubit_obj(qubit)
-                qubit_obj.ResetTime = 5*qubit_obj.T1GE
+                qubit_obj.ResetTime = np.max([5*qubit_obj.T1GE,200e-6])
                 qubit_obj.IntegrationKernelType = 'default'
                 print(qubit)
                 exp = ExpZICalibX(f'Xcalib_{qubit}',self._expt_config, self._hal_QPU, [qubit], 1, num_gates=self._num_gates)

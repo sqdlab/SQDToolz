@@ -74,7 +74,6 @@ class ExpZITWPATuneup(ExpZIqubit):
             #TODO: add plots for each qubit
             if len(freqs)>1 and len(powers)>1: #2D sweep
                 fig = plt.figure(layout="constrained"); fig.set_figwidth(12); fig.set_figheight(12)
-                fig.suptitle(f"Tuneup {self._qubit_id}", fontsize=16, fontweight='bold')
                 self._optimum_twpa_point['Frequency'] = freqs[opt_indicies[0]]
                 self._optimum_twpa_point['Power'] = powers[opt_indicies[1]]
                 XX, YY = np.meshgrid(freqs,powers)

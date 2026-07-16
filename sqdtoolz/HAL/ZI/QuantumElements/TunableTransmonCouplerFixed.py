@@ -22,7 +22,7 @@ class TunableTransmonCouplerFixedParameters(QuantumParameters):
 class TunableTransmonCouplerFixed(QuantumElement, QASMCompatibleQubitMultiple):
     PARAMETERS_TYPE = TunableTransmonCouplerFixedParameters
     REQUIRED_SIGNALS = ("flux",)
-    OPTIONAL_SIGNALS = ("flux_aux")
+    OPTIONAL_SIGNALS = ("flux_aux",)
 
     def get_gate_duration(self, gate:list|tuple, qubits:list[ZIQubit]):
         if isinstance(gate[1], (tuple,list)):

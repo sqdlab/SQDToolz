@@ -242,7 +242,7 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
             setattr(self, cur_param, dict_config[cur_param])
         
         if self.ReadoutKernelType == 'optimal':
-            if not isinstance(self.ReadoutKernelWeights, np.ndarray):
+            if not (isinstance(self.ReadoutKernelWeights, list) and len(self.ReadoutKernelWeights)>0):
                 self.ReadoutKernelType = 'default'
                 self.ReadoutKernelThresholds = None
 

@@ -29,7 +29,6 @@ class ExpZISingleQubitTuneup:
         self._individual_plots = kwargs.pop('individual_plots', False)
         self._update_live = kwargs.pop('update_params_live', True)
         self._enable_ZI_log_messages = kwargs.pop('enable_ZI_log_messages', False)
-        self._assume_detuned_above = kwargs.pop('ramsey_assume_detuned_above', True)
         #
         if 'res_freq_range' in kwargs:
             self._res_freq_range = kwargs.pop('res_freq_range')
@@ -65,6 +64,7 @@ class ExpZISingleQubitTuneup:
             max_fast_points = kwargs.pop('ramsey_fast_points', 40)
             self._ramsey_fast_times = np.linspace(0,max_fast_time, max_fast_points)
         #
+        self._assume_detuned_above = kwargs.pop('ramsey_assume_detuned_above', True)
         self._ramsey_slow_detuning = kwargs.pop('ramsey_slow_detuning', 0.125e6)
         if 'ramsey_slow_times' in kwargs:
             self._ramsey_slow_times = kwargs.pop('ramsey_slow_times')

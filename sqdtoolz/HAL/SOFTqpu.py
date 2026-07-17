@@ -92,6 +92,17 @@ class SOFTqpu(HALbase, ZIbase):
                 leQPU.topology.add_edge(cur_cpl.Name, qubit1, qubit2, quantum_element=cpl)
         return leQPU, leQubits, leQcouplers
 
+    def get_coupler_obj_from_qubits(self, qubit1: str|int, qubit2: str|int, zi_object_type):
+        leCplers = self.get_qubit_coupling_objs(qubit1, qubit2)
+        found = False
+        for cur_cplr in leCplers:
+            if isinstance(cur_cplr.get_ZI_parameters()[0], zi_object_type):
+                leCpler = cur_cplr
+                found = True
+                break
+        assert found, f"There is no valid {zi_object_type} coupling between qubits {qubit1} and {qubit2}."
+        return leCpler
+
     def save_config(self, lab, file_name='', store_local=True):
         #Not choosing to filter intrinsic parameters yet. Ultimately, many parameters can be ignored by the routines
         #like SingleQubitTuneup anyway. So it's up to those routines to decide what's mandatory and what's to be

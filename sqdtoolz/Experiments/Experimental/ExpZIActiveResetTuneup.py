@@ -29,7 +29,7 @@ class ExpZIActiveResetTuneup():
         if not self._skip_Xcal:
             for qubit in self._qubit_ids:
                 qubit_obj = self._hal_QPU.get_qubit_obj(qubit)
-                qubit_obj.ResetTime = 5*qubit_obj.T1GE
+                qubit_obj.ResetTime = np.max([5*qubit_obj.T1GE,200e-6])
                 qubit_obj.IntegrationKernelType = 'default'
                 print(qubit)
                 exp = ExpZICalibX(f'Xcalib_{qubit}',self._expt_config, self._hal_QPU, [qubit], 1, num_gates=self._num_gates)
@@ -56,7 +56,8 @@ class ExpZIActiveResetTuneup():
         lab.run_single(exp)
         self._qubit_fidelities = self._expt_config._hal_ACQ._temp.tasks["analysis_workflow"].output
         ## Optimal Integration Kernels
-        self._expt_config._hal_ACQ.NumRepetitions = 2**16
+        #TODO: some kind of assert so ZI memory limitations arent reached...
+        self._expt_config._hal_ACQ.NumRepetitions = 2**14
         self._expt_config.commit()
 
         for qubit in self._qubit_ids:

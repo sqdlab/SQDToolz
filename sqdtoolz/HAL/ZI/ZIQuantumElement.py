@@ -76,6 +76,13 @@ class ZIQuantumElement(HALbase, ZIbase):
         attributes = [x[0] for x in attributes if not x[0].startswith('__') and x[0]!='' and x[0][0].isupper()]
         self._elem_params = attributes
 
+    def get_involved_qubits(self):
+        ret_val = []
+        for cur_signal in self.signals:
+            cur_signal_path = self.signals[cur_signal]
+            ret_val.append( cur_signal_path.split('/')[0] )
+        return ret_val
+
     def get_ZI_parameters(self):
         return self._zi_qelem, self._zi_qops
 

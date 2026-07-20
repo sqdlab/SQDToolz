@@ -74,7 +74,6 @@ class ExpZITWPATuneup(ExpZIqubit):
             #TODO: add plots for each qubit
             if len(freqs)>1 and len(powers)>1: #2D sweep
                 fig = plt.figure(layout="constrained"); fig.set_figwidth(12); fig.set_figheight(12)
-                fig.suptitle(f"Tuneup {self._qubit_id}", fontsize=16, fontweight='bold')
                 self._optimum_twpa_point['Frequency'] = freqs[opt_indicies[0]]
                 self._optimum_twpa_point['Power'] = powers[opt_indicies[1]]
                 XX, YY = np.meshgrid(freqs,powers)
@@ -116,10 +115,17 @@ class ExpZITWPATuneup(ExpZIqubit):
                 sweep_param = max(freqs, powers, key=len)
                 sweep_param_idx,  sweep_param_vals = max(enumerate([freqs, powers]), key=lambda x: len(x[1]))
                 if sweep_param_idx == 0:
-                    ax.plot(freqs, snr_db_total[:, 0])
+                    ax.plot(freqs, snr_db_total[:, 0], label='mean SNR')
+                    for qubit in self._qubit_ids:
+                        snr = self._iq_blob_data[qubit]
+                        ax.plot(freqs, snr[0,:], label=f'{qubit}')
+                    ax.vline(freqs[opt_indicies[0]], color = 'black', label = f'$f_p=${freqs[opt_indicies[0]]/1e9} GHz, $P=${powers[opt_indicies[1]]} dB')
                 else:
-                    ax.plot(powers, snr_db_total[0, :])
-                ax.plot(freqs[opt_indicies[0]], powers[opt_indicies[1]], 'o', color = 'red', label = f'$f_p=${freqs[opt_indicies[0]]/1e9} GHz, $P=${powers[opt_indicies[1]]} dB')
+                    ax.plot(powers, snr_db_total[0, :], label='mean SNR')
+                    for qubit in self._qubit_ids:
+                        snr = self._iq_blob_data[qubit]
+                        ax.plot(powers, snr[0,:], label=f'{qubit}')
+                    ax.vline(powers[opt_indicies[1]], color = 'black', label = f'$f_p=${freqs[opt_indicies[0]]/1e9} GHz, $P=${powers[opt_indicies[1]]} dB')
 
         if self._update_qubit:
             self._hal_twpa.Frequency = self._optimum_twpa_point['Frequency'][0] 

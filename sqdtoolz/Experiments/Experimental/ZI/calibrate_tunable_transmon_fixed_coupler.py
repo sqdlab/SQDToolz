@@ -166,7 +166,7 @@ def create_experiment(
     qubits: QuantumElements,
     amplitudes: QubitSweepPoints,
     wait_times: QubitSweepPoints,
-    amplitude_aux: float,
+    amplitude_aux: float=None,
     coupler_name:str = None,
     options: TuneupExperimentOptions | None = None,
 ) -> Experiment:

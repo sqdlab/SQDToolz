@@ -9,9 +9,9 @@ This table of contents is given in roughly the order experiments would be needed
 - **[Qubit spectroscopy](#expziqubitspec):** `ExpZIQubitSpec`
     - [Qubit spectroscopy flux sweep](#expziqubitfluxsweep): `ExpZIQubitFluxSweep`
     - [Qubit spectroscopy power sweep](#expziqubitpowersweep): `ExpZIQubitPowerSweep`
-- **Qubit time domain experiments:**
+- **Time domain:** `ExpZIRabiRamseyT1`
     - [Amplitude Rabi](#expzirabi): `ExpZIRabi`
-    - [Lifetime $T_1$](expzit1):  `ExpZIT1`
+    - [Lifetime $T_1$](#expzit1):  `ExpZIT1`
     - [Ramsey $T_2^*$](#expziramsey): `ExpZIRamsey`
 - **[Dispersive shift](#expzidispersive)** $\chi$: `ExpZIDispersive`
 - **Single shot readout and active reset:**
@@ -21,7 +21,9 @@ This table of contents is given in roughly the order experiments would be needed
     - Lifetime $T_1$ (single shot): `ExpZIT1SingleShot`
     - Resonator frequency for optimised readout fidelity: `ExpZIResOptimal`
 - **Single qubit $X$ gate calibration:** `ExpZICalibX`
-- **Two qubit chevrons:** `ExpZIChevrons`
+- ***ef* characterisation**
+  - **Chevrons:** `ExpZIChevrons`
+  - **Time domain:** `ExpZIRabiRamseyT1`
 - **QASM implementation:** `ExpZIQASM`
 
 Other documented experiments include:
@@ -74,6 +76,16 @@ onto the qubit object and/or into user-supplied parameter objects.
 | `plot_x_units` | `str`, default `'Hz'` | Units used for the frequency axis on the fitted plot. |
 
 Any remaining keyword arguments are passed through to `ExpZIqubit.__init__`.
+
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIRes import ExpZIRes
+
+exp = ExpZIRes('resSpec', lab.CONFIG('ZI'), lab.HAL('QPU'), 'Q0',
+  frequencies=np.linspace(4.0e9, 4.2e9, 1001), is_trough=True
+  fit_type = "Full", update=True)
+lab.run_single(exp, disable_ZI_logging=True)
+```
 
 #### Analysis, Fitting and Outputs
 
@@ -165,6 +177,15 @@ identify the onset of nonlinear/bifurcation behaviour).
 
 Any remaining keyword arguments are passed through to `ExpZIqubit.__init__`.
 
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIResPowerSweep import ExpZIResPowerSweep
+
+exp = ExpZIResPowerSweep('res_power_Q0', lab.CONFIG('ZI'), lab.HAL('QPU'), 'Q0', 
+  frequencies=np.linspace(4.0e9, 4.2e9, 1001))
+lab.run_single(exp, disable_ZI_logging=True)
+```
+
 #### Analysis, Fitting and Outputs
 
 ##### Sweep
@@ -252,6 +273,16 @@ Any remaining keyword arguments are passed through to `ExpZIqubit.__init__`.
 
 Note: `_run` asserts that no external `sweep_vars` are supplied — the
 frequency and flux ranges must be fixed at construction time.
+
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIResFluxSweep import ExpZIResFluxSweep
+
+exp = ExpZIResFluxSweep('resFluxSweep', lab.CONFIG('ZI'), lab.HAL('QPU'), 'Q0', 
+  frequencies=np.linspace(4.0e9, 4.2e9, 1001), 
+  flux_range=np.linspace(-1, 1, 20))
+lab.run_single(exp, disable_ZI_logging=True)
+```
 
 #### Analysis, Fitting and Outputs
 
@@ -357,6 +388,15 @@ qubit object.
 
 Any remaining keyword arguments are passed through to `ExpZIqubit.__init__`.
 
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIQubitSpec import ExpZIQubitSpec
+
+exp = ExpZIQubitSpec('qubitSpec', lab.CONFIG('ZI'), lab.HAL('QPU'), 'Q0', 
+  frequencies=np.linspace(4.0e9, 4.2e9, 201), is_trough=True, update=True)
+lab.run_single(exp, disable_ZI_logging=True)
+```
+
 #### Analysis, Fitting and Outputs
 
 After the sweep completes, `_post_process` retrieves the dataset for the
@@ -434,6 +474,32 @@ neighbouring qubit's spectrum is affected by another qubit's flux bias
 | `print_file_path` | `bool`, default `False` | If `True`, prints the output directory of the first qubit's data at the end of `run()`. |
 | `measurement_averages` | `int`/`float`/`list`, default `None` | Number of repetitions to use per qubit. A single value is broadcast to all qubits; a list must match the length of `qubit_ids`. If set, applied via the acquisition HAL before each qubit's resonator-spectroscopy sub-experiment at each flux point. |
 | `acquisition_hal` | `str`, default `'ZIacq'` | Name of the acquisition HAL used to set `NumRepetitions` when `measurement_averages` is supplied. |
+
+#### Example snippet
+Sweep flux and measure flux on a single qubit:
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIQubitFluxSweep import ExpZIQubitFluxSweep
+import sqdtoolz as stz
+
+stz.VariableProperty(f'QfluxLine_Q1', lab, lab.HAL('Q1'), 'FluxDC')
+
+exp = ExpZIQubitFluxSweep('qubitFluxSweep', lab.CONFIG('ZI'), 
+  lab.HAL('QPU'), 'Q1', 
+  qubit_frequencies=np.linspace(4.2e9, 4.6e9, 1001), 
+  res_frequencies=np.linspace(6e9, 6.2e9, 1001),
+  flux_range=np.linspace(-0.35, -0.22, 201), 
+  flux_var=lab.VAR('QfluxLine_Q1'))
+exp.run(lab)
+```
+Sweep flux on a single qubit (here, Q1), but measure qubit spectroscopy on two qubits Q0 and Q1:
+```python
+exp = ExpZIQubitFluxSweep('multiQubitFluxSweep', lab.CONFIG('ZI'), 
+  lab.HAL('QPU'), ['Q0', 'Q1'], 
+  qubit_frequencies=[np.linspace(3.8e9, 4.2e9, 301)]*2, 
+  res_frequencies=[np.linspace(6e9, 6.2e9, 301), np.linspace(7e9, 7.2e9, 301)],  
+  flux_range=np.linspace(-0.8, -0.5, 101), flux_var=lab.VAR('QfluxLine_Q1'))
+exp.run(lab)
+```
 
 #### Methods
 
@@ -523,6 +589,16 @@ with drive power.
 
 Any remaining keyword arguments are passed through to `ExpZIqubit.__init__`.
 
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIQubitPowerSweep import ExpZIQubitPowerSweep
+
+exp = ExpZIQubitPowerSweep('qubitPowerSweep', lab.CONFIG('ZI'), lab.HAL('QPU'), 
+  'Q3', frequencies=np.linspace(4.1e9, 4.6e9, 101))
+lab.run_single(exp, disable_ZI_logging=True)
+```
+
+
 #### Analysis, Fitting and Outputs
 
 ##### Sweep
@@ -578,9 +654,9 @@ Static helper used to render the power-sweep result onto a given axis:
   (in GHz), and labels the axes as frequency (Hz) and qubit drive power
   (dBm).
 
-  ___
+___
 
-  ### ExpZIRabi
+### ExpZIRabi
 
 `class ExpZIRabi(ExpZIqubit)`
 
@@ -634,6 +710,15 @@ directly. Anything left over is forwarded as-is into the
 `amplitude_rabi` `experiment_workflow` call — this is how workflow-specific
 parameters such as the drive amplitude sweep values are supplied, since
 `ExpZIRabi` does not expose a dedicated amplitude-sweep argument itself.
+
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIRabi import ExpZIRabi
+
+exp = ExpZIRabi('rabi', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q3'], 
+  amplitudes=[np.linspace(0, 1, 25)], update=True, ZI_plot=True)
+lab.run_single(exp)
+```
 
 #### Analysis, Fitting and Outputs
 
@@ -738,9 +823,20 @@ turn within `_post_process`.
 | `update` | — | **Not settable.** The constructor asserts that `update` is either absent or falsy, then forcibly sets `kwargs['update'] = False` before calling `ExpZIqubit.__init__`. Qubit updates are only ever applied via the separate `update_qubits()` method, never automatically in `_post_process`. |
 
 The remaining kwargs behave exactly as in `ExpZIqubit` (see `ExpZIRabi`'s
-documentation for the full breakdown of `use_cal_traces`, `transition`,
+[documentation](#expzirabi) for the full breakdown of `use_cal_traces`, `transition`,
 `ZI_plot`, `show_pulse_sheet`, and how unmatched kwargs are forwarded into
 the `ramsey` `experiment_workflow` call).
+
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIRamsey import ExpZIRamsey
+
+exp = ExpZIRamsey('ramsey_Q0', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0'], 
+  delays=[np.linspace(0, 6e-6, 100)], detunings=[1e6], update=False)
+lab.run_single(exp)
+#
+exp.update_qubits()
+```
 
 #### Analysis, Fitting and Outputs
 
@@ -852,6 +948,12 @@ documentation for the full breakdown of `use_cal_traces`, `transition`,
 `ZI_plot`, `show_pulse_sheet`, and how unmatched kwargs are forwarded into
 the `lifetime_measurement` `experiment_workflow` call. Unlike `ExpZIRamsey`,
 there is no `detunings` requirement here.
+
+#### Example snippet
+```python
+
+```
+
 
 #### Analysis, Fitting and Outputs
 

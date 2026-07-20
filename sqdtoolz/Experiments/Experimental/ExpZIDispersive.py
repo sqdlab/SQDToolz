@@ -105,5 +105,6 @@ class ExpZIDispersive(ExpZIqubit):
                     ax.set_xlabel("f (GHz)")
                     ax.set_ylabel(r"$|S_{21}|$")
                     ax.xaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, _: f'{x:.4f}'))
-                    fig.show()
+                    if not self._dont_show_plot:
+                        fig.show()
                     fig.savefig(self._file_path + 'dispersive_shift_ge.png')

@@ -17,6 +17,7 @@ ZIQubit('Qubit3', lab, 'zi_boxes', ('shfqc0', 'SGCHANNELS/2/OUTPUT'), ('shfqc0',
 ZIQubit('Qubit4', lab, 'zi_boxes', ('shfqc0', 'SGCHANNELS/3/OUTPUT'), ('shfqc0', 'QACHANNELS/0/OUTPUT'), ('shfqc0', 'QACHANNELS/0/INPUT'), ('hdawg0', 'SIGOUTS/3'))
 ZIQuantumElement('Cpl12', lab, TunableTransmonCouplerFixed, flux='Qubit1/flux')
 ZIQuantumElement('Cpl34', lab, TunableTransmonCouplerFixed, flux='Qubit3/flux')
+ZIQuantumElement('Cpl24', lab, TunableTransmonCouplerFixed, flux='Qubit4/flux')
 # lab.HAL('Cpl12').QubitFlux = 'Qubit1'
 
 SOFTqpu('QPU', lab)
@@ -26,6 +27,7 @@ lab.HAL('QPU').add_qubit(lab.HAL('Qubit3'))
 lab.HAL('QPU').add_qubit(lab.HAL('Qubit4'))
 lab.HAL('QPU').add_qubit_coupling('Qubit1', 'Qubit2', lab.HAL('Cpl12'))
 lab.HAL('QPU').add_qubit_coupling('Qubit3', 'Qubit4', lab.HAL('Cpl34'))
+lab.HAL('QPU').add_qubit_coupling('Qubit2', 'Qubit4', lab.HAL('Cpl24'))
 
 # from sqdtoolz.Utilities.OpenQASM.ParserOpenQASM import ParserOpenQASM, ScheduleParametersSoftQPUZI
 # poqasm = ParserOpenQASM('tests/ZI_test_QASM_DSL.qasm',['tests/'])
@@ -35,9 +37,16 @@ lab.HAL('QPU').add_qubit_coupling('Qubit3', 'Qubit4', lab.HAL('Cpl34'))
 # poqasm.plot_schedule(leSchedule, qubit_params, 'output.html')
 # a=0
 
+# ZIACQ('ZIacq', lab, 'zi_boxes')
+# ExperimentConfiguration('ZI', lab, 0, [], 'ZIacq')
+# exp = ExpZIQASM('test', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Qubit1', 'Qubit2', 'Qubit3', 'Qubit4'], 'tests/ZI_test_QASM_DSL.qasm', source_dirs=['tests/'])
+# qregs = exp.get_qubit_regs()
+# exp.set_qubit_reg_to_ZI_mappings({('q',0):'Qubit2',('q',1):'Qubit1',('q',2):'Qubit3',('q',3):'Qubit4'})
+# lab.run_single(exp, debug_skip_experiment=True)
+
 ZIACQ('ZIacq', lab, 'zi_boxes')
 ExperimentConfiguration('ZI', lab, 0, [], 'ZIacq')
-exp = ExpZIQASM('test', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Qubit1', 'Qubit2', 'Qubit3', 'Qubit4'], 'tests/ZI_test_QASM_DSL.qasm', source_dirs=['tests/'])
+exp = ExpZIQASM('test', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Qubit2', 'Qubit4'], 'tests/ZI_Test_Bell.qasm', source_dirs=['tests/'])
 qregs = exp.get_qubit_regs()
-exp.set_qubit_reg_to_ZI_mappings({('q',0):'Qubit2',('q',1):'Qubit1',('q',2):'Qubit3',('q',3):'Qubit4'})
+exp.set_qubit_reg_to_ZI_mappings({('q',0):'Qubit4',('q',1):'Qubit2'})
 lab.run_single(exp, debug_skip_experiment=True)

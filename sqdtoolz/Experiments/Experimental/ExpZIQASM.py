@@ -34,10 +34,9 @@ class ExpZIQASM(ExpZIqubit):
         mapping = {self._qregs[x]:qubit_ids[x] for x in range(len(qubit_ids))}
         self._qasm_qubit_params = ScheduleParametersSoftQPUZI(hal_QPU,mapping)
 
-        #This maps from the index of the list of self._qregs onto the index in qubit_ids. Defaults to order given in qubit_ids.
-        self._mapping_qregInd_to_ziQubitInd = {x:x for x in range(num_qasm_qubits)}
-
         super().__init__(name, expt_config, oqasm_scheduled_qubits, hal_QPU, qubit_ids, **kwargs)
+        #This maps from the index of the list of self._qregs onto the index in qubit_ids. Defaults to order given in qubit_ids.
+        self._args['qubit_mapping'] = {x:x for x in range(num_qasm_qubits)}
 
     def get_qubit_regs(self):
         return self._poqasm.get_qubit_registers()

@@ -7,6 +7,18 @@ from laboneq_applications.experiments import amplitude_rabi
 class ExpZIRabi(ExpZIqubit):
     def __init__(self, name, expt_config, hal_QPU, qubit_ids, **kwargs):
         self._dont_show_plot = kwargs.pop('dont_show_plot', False)
+
+        for q in np.asarray(qubit_ids):
+            transition = kwargs.get('transition', 'ge')
+            if transition=='ef' and hal_QPU.get_qubit_obj(q).DriveEFAmplitudeX > 1:
+                print(f"Warning: Magnitude of 'DriveEFAmplitudeX' > 1 ({hal_QPU.get_qubit_obj(q).DriveEFAmplitudeX}), setting to 1.")
+                hal_QPU.get_qubit_obj(q).DriveEFAmplitudeX = 1
+                hal_QPU.get_qubit_obj(q).DriveEFAmplitudeXon2 = 0.5
+            elif hal_QPU.get_qubit_obj(q).DriveGEAmplitudeX > 1:
+                print(f"Warning: Magnitude of 'DriveGEAmplitudeX' > 1 ({hal_QPU.get_qubit_obj(q).DriveGEAmplitudeX}), setting to 1.")
+                hal_QPU.get_qubit_obj(q).DriveGEAmplitudeX = 1
+                hal_QPU.get_qubit_obj(q).DriveGEAmplitudeXon2 = 0.5
+
         super().__init__(name, expt_config, amplitude_rabi, hal_QPU, qubit_ids, **kwargs)
     
     def _post_process(self, data):

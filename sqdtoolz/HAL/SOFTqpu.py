@@ -167,13 +167,24 @@ class SOFTqpu(HALbase, ZIbase):
         leQubits = [self._lab._get_resolved_obj(x) for x in self._qubits]
         #Stick to the format here to add columns!
         data = {
-                'Qubit': [x.Name for x in leQubits],
+                'Qubit':                        [x.Name for x in leQubits],
                 r'$f_r$ (GHz)':                 [f'{x.ReadoutFrequency/1e9:.4g}' for x in leQubits],
-                r'$f_q$ (GHz)':                 [f'{x.DriveGE/1e9:.4g}' for x in leQubits],
+                r'$f_q^{ge}$ (GHz)':            [f'{x.DriveGE/1e9:.4g}' for x in leQubits],
+                r'$f_q^{ef}$ (GHz)':            [f'{x.DriveEF/1e9:.4g}' for x in leQubits],
                 r'$T_1$ (μs)':                  [f'{x.T1GE*1e6:.4g}' for x in leQubits],
                 r'$T_2^*$ (μs)':                [f'{x.T2GE_star*1e6:.4g}' for x in leQubits],
                 r'$T_2^{\text{Hahn}}$ (μs)':    [f'{x.T2GE*1e6:.4g}' for x in leQubits],
-                r'$\chi$ (MHz)':                [f'{x.ChiGE/1e6:.4g}' for x in leQubits]
+                r'$\Delta$ (GHz)':              [f'{(x.DriveGE - x.ReadoutFrequency)/1e9:.4g}' for x in leQubits],
+                r'$\alpha$ (MHz)':              [f'{(x.DriveEF - x.DriveGE)/1e6:.4g}' for x in leQubits],
+                r'$\chi$ (MHz)':                [f'{x.ChiGE/1e6:.4g}' for x in leQubits],
+                r'$\tau_X^{ge}$ (ns)':          [f'{x.DriveGETime*1e9:.4g}' for x in leQubits],
+                r'$V_{\Phi}$ (V)':              [f'{x.FluxDC:.4g}' for x in leQubits],
+                r'$\Delta V_{\Phi}$ (V)':       [f'{x.FluxConversionParams["period"]:.4g}' if x.FluxConversionParams else 'N/A' for x in leQubits],
+                r'$\kappa$ (MHz)':              [f'{x.ReadoutKappa/1e6:.4g}' for x in leQubits],
+                r'$Q_c^{\text{read}}$':         [f'{x.ReadoutQc:.4g}' for x in leQubits],
+                r'$Q_i^{\text{read}}$':         [f'{x.ReadoutQi:.4g}' for x in leQubits],
+                r'$P^{\text{read}}$ (dBm)':     [f'{x.ReadoutPower:.4g}' for x in leQubits],
+                r'$A^{\text{read}}$':           [f'{x.ReadoutAmplitude:.4g}' for x in leQubits],
                }
         df = pd.DataFrame(data)
         print(df.to_markdown(index=False))

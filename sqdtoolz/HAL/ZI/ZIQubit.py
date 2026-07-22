@@ -128,7 +128,8 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
                 'ReadoutQl': 1,
                 'ReadoutKappa': 0,
                 'ThermalPhotonNum': 0,
-                'ReadoutLineAttenuation_dB': -70
+                'ReadoutLineAttenuation_dB': -70,
+                'FluxConversionParams': None
             }
             self._param_mappings = {
                 'ChiGE': 'ge_chi_shift',

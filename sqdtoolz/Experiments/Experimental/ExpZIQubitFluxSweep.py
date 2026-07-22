@@ -10,42 +10,83 @@ from pathlib import Path
 import sqdtoolz as stz
 
 class ExpZIQubitFluxSweep:
-    def __init__(self, name, expt_config, hal_QPU, qubit_ids, qubit_frequencies, res_frequencies, flux_range, flux_var, **kwargs):
-        # Allow a single qubit_id (str) or a list for multiple qubits.
+    def __init__(self, name, expt_config, hal_QPU, qubit_ids, qubit_frequencies=None, res_frequencies=None, flux_range=None, flux_var=None, **kwargs):
+        #Allow a single qubit_id (str) or a list for multiple qubits.
         if isinstance(qubit_ids, str):
             qubit_ids = [qubit_ids]
-            qubit_frequencies = [qubit_frequencies]
-            res_frequencies = [res_frequencies]
+            if qubit_frequencies is not None and not isinstance(qubit_frequencies, list):
+                qubit_frequencies = [qubit_frequencies]
+            if res_frequencies is not None and not isinstance(res_frequencies, list):
+                res_frequencies = [res_frequencies]
 
         assert isinstance(qubit_ids, list) and all(isinstance(q, str) for q in qubit_ids), \
             "Supply qubit_ids as a single string (one qubit) or a list of strings (multiple qubits)."
-        assert len(qubit_frequencies) == len(qubit_ids), \
-            "Supply qubit_frequencies as a list of frequency arrays matching the length of qubit_ids."
-        assert len(res_frequencies) == len(qubit_ids), \
-            "Supply res_frequencies as a list of frequency arrays matching the length of qubit_ids."
 
         self._qubit_ids = qubit_ids
         self._name = name
         self._expt_config = expt_config
+        self._hal_QPU = hal_QPU
+
+        #Settings used only when auto-generating sweeps from qubit properties (ignored if the corresponding array/range is supplied explicitly).
+        qubit_freq_span = kwargs.pop('qubit_freq_span', 1e9)
+        qubit_freq_pts = kwargs.pop('qubit_freq_pts', 101)
+        res_freq_span = kwargs.pop('res_freq_span', 15e6)
+        res_freq_pts = kwargs.pop('res_freq_pts', 101)
+        flux_span = kwargs.pop('flux_span', 1)
+        flux_pts = kwargs.pop('flux_pts', 25)
+
+        #Default qubit_frequencies to a span around each qubit's GE drive frequency.
+        if qubit_frequencies is None:
+            qubit_frequencies = [
+                np.linspace(self._hal_QPU.get_qubit_obj(qid).DriveGE - 0.8 * qubit_freq_span,
+                            self._hal_QPU.get_qubit_obj(qid).DriveGE + 0.2 * qubit_freq_span,
+                            qubit_freq_pts)
+                for qid in self._qubit_ids
+            ]
+        assert len(qubit_frequencies) == len(self._qubit_ids), \
+            "Supply qubit_frequencies as a list of frequency arrays matching the length of qubit_ids."
+
+        #Default res_frequencies to a span around each qubit's readout frequency.
+        if res_frequencies is None:
+            res_frequencies = [
+                np.linspace(self._hal_QPU.get_qubit_obj(qid).ReadoutFrequency - res_freq_span / 2,
+                            self._hal_QPU.get_qubit_obj(qid).ReadoutFrequency + res_freq_span / 2,
+                            res_freq_pts)
+                for qid in self._qubit_ids
+            ]
+        assert len(res_frequencies) == len(self._qubit_ids), \
+            "Supply res_frequencies as a list of frequency arrays matching the length of qubit_ids."
+
+        #Default var_flux to the first qubit's flux line if not supplied.
+        if flux_var is None:
+            print(f"Warning: No flux variable was explicitly given, so sweeping flux on {self._qubit_ids[0]}.")
+            flux_var = VariablePropertyTransient('Flux', self._hal_QPU.get_qubit_obj(self._qubit_ids[0]),'FluxDC')
         self._flux_var = flux_var
-        assert self._flux_var._prop == 'FluxDC', "Supply a 'Flux_DC' variable as flux_var, i.e. stz.VariableProperty(f'fluxLineQ0', lab, lab.HAL('Q0'), 'FluxDC')."
+        assert self._flux_var._prop == 'FluxDC', \
+            "Supply a 'Flux_DC' variable as flux_var, i.e. stz.VariableProperty(f'fluxLineQ0', lab, lab.HAL('Q0'), 'FluxDC')."
         flux_qubit = self._flux_var._get_current_config()['ResList'][0][0]
         assert flux_qubit in self._qubit_ids, \
             f"Supply a 'Flux_DC' variable corresponding to one of the qubits being measured. Currently you supplied a flux variable for {flux_qubit}, which is not in {self._qubit_ids}."
+
+        #Default flux_range to a span around the current FluxDC on the target qubit
+        if flux_range is None:
+            current_flux = self._hal_QPU.get_qubit_obj(self.qubit_ids[0]).FluxDC
+            flux_range = np.linspace(current_flux - flux_span / 2, current_flux + flux_span / 2, flux_pts)
         self._flux_range = flux_range
+
         self._res_freq_range = res_frequencies
         self._qubit_freq_range = qubit_frequencies
+
         self._plot_fitted_res_freqs = kwargs.pop('plot_fitted_res_freqs', True)
 
         self._update_qubit = kwargs.pop('update_qubit_params', True)
         self._dont_show_plot = kwargs.pop('dont_show_plot', False)
+        self._emulate = kwargs.pop('emulate', False)
 
         self._is_trough = kwargs.pop('is_trough', True)
         self._fit_type = kwargs.pop('res_fit_type', 'Full')
         assert self._fit_type in ["Default", "Fano", "Full"], "Choose res_fit_type as either 'Default', 'Fano' or 'Full'."
         self._dont_plot = kwargs.pop('dont_plot', False)
-
-        self._hal_QPU = hal_QPU
 
         self._enable_ZI_log_messages = kwargs.pop('enable_ZI_log_messages', False)
         self._print_file_path = kwargs.pop('print_file_path', False)
@@ -59,9 +100,12 @@ class ExpZIQubitFluxSweep:
                 "Supply measurement_averages as a single value or a list matching the length of qubit_ids."
 
         self._acq_hal_name = kwargs.pop('acquisition_hal', 'ZIacq')
-
+    
     def run(self, lab):
-        original_freqs = {qid: self._hal_QPU.get_qubit_obj(qid).ReadoutFrequency for qid in self._qubit_ids}
+        #Store original values so everything can be reset once the sweep is done
+        original_flux = self._flux_var.Value
+        original_drive_freqs = {qid: self._hal_QPU.get_qubit_obj(qid).DriveGE for qid in self._qubit_ids}
+        original_readout_freqs = {qid: self._hal_QPU.get_qubit_obj(qid).ReadoutFrequency for qid in self._qubit_ids}
 
         last_expR = {}
         last_expQ = {}
@@ -76,18 +120,20 @@ class ExpZIQubitFluxSweep:
                         lab.HAL(self._acq_hal_name).NumRepetitions = self._averages[i]
                         stz.ExperimentConfiguration(self._expt_config._name, lab, 0, [], self._acq_hal_name) # update averages
                     expR = ExpZIRes(f'res_spec_{qid}', self._expt_config, self._hal_QPU, qid, frequencies=res_freqs, dont_plot=self._dont_plot, is_trough=self._is_trough, fit_type=self._fit_type, update_qubit_params=True)
-                    lab.run_single(expR, disable_ZI_logging=not self._enable_ZI_log_messages)
+                    lab.run_single(expR, disable_ZI_logging=not self._enable_ZI_log_messages, debug_skip_experiment=self._emulate)
                     last_expR[qid] = expR
                     readout_freqs_at_flux[qid].append(lab.HAL(qid).ReadoutFrequency)
                     #
                     expQ = ExpZIqubit(f'qubit_spec_{qid}', self._expt_config, qubit_spectroscopy, self._hal_QPU, [qid], frequencies=[qubit_freqs], ZI_plot=not self._dont_plot, update=self._update_qubit)
-                    lab.run_single(expQ, disable_ZI_logging=not self._enable_ZI_log_messages)
+                    lab.run_single(expQ, disable_ZI_logging=not self._enable_ZI_log_messages, debug_skip_experiment=self._emulate)
                     last_expQ[qid] = expQ
         lab.group_close()
 
-        if not self._update_qubit:
-            for qid in self._qubit_ids:
-                self._hal_QPU.get_qubit_obj(qid).ReadoutFrequency = original_freqs[qid]
+        #Restore flux, qubit drive frequency and resonator readout frequency to their original values
+        self._hal_QPU.get_qubit_obj(self._qubit_ids[0]).FluxDC = original_flux
+        for qid in self._qubit_ids:
+            self._hal_QPU.get_qubit_obj(qid).DriveGE = original_drive_freqs[qid]
+            self._hal_QPU.get_qubit_obj(qid).ReadoutFrequency = original_readout_freqs[qid]
 
         qubit_data = {}
         for qid in self._qubit_ids:

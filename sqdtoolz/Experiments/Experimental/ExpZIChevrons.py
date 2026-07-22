@@ -59,7 +59,7 @@ class ExpZIChevrons(ExpZIqubit):
     def update_qubits(self):
         assert self._fit_freq != None, "Must run Chevron Experiment before qubit can be updated."
         if self._transition == 'ef':
-            self._hal_QPU.get_qubit_obj('Q0').DriveEF = self._fit_freq
+            self._hal_QPU.get_qubit_obj(self._qubit_ids[0]).DriveEF = self._fit_freq
         else:
-            self._hal_QPU.get_qubit_obj('Q0').DriveGE = self._fit_freq
+            self._hal_QPU.get_qubit_obj(self._qubit_ids[0]).DriveGE = self._fit_freq
         self._fit_freq = None

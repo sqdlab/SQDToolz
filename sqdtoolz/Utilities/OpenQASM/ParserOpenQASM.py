@@ -154,23 +154,24 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
 
 
 class ScheduleParametersSoftQPUZI(ScheduleParametersBase):
-    def __init__(self, softQPU_ZI:SOFTqpu):
+    def __init__(self, softQPU_ZI:SOFTqpu, mapping:dict):
         self._qpu = softQPU_ZI
+        self.mapping = mapping  #This maps the qubit-register (e.g. ('q',2)) in QASM into the softQPU IDs...
     
-    def get_duration(self, qubit_index:int, gate_type: str|list|tuple) -> float:
+    def get_duration(self, qubit_reg_index:tuple[str,int], gate_type: str|list|tuple) -> float:
         if isinstance(gate_type, (list,tuple)):
             if gate_type[0] == 'D':
                 return gate_type[1]
             elif gate_type[0] == 'Measure':
-                return self.get_duration_measurement(qubit_index)
-        return self._qpu.get_qubit_obj(qubit_index).get_gate_duration(gate_type)
+                return self.get_duration_measurement(qubit_reg_index)
+        return self._qpu.get_qubit_obj(self.mapping[qubit_reg_index]).get_gate_duration(gate_type)
     
-    def get_duration_measurement(self, qubit_index:int):
-        return self._qpu.get_qubit_obj(qubit_index).get_measure_duration()
+    def get_duration_measurement(self, qubit_reg_index:tuple[str,int]):
+        return self._qpu.get_qubit_obj(self.mapping[qubit_reg_index]).get_measure_duration()
 
-    def get_duration2QG(self, qubit1_index:int, qubit2_index:int, gate_type:list) -> float:
-        zi_elem,_ = self._qpu.get_qubit_coupling_objs(qubit1_index, qubit2_index)[0].get_ZI_parameters()
-        return zi_elem.get_gate_duration(gate_type, [self._qpu.get_qubit_obj(qubit1_index), self._qpu.get_qubit_obj(qubit2_index)])
+    def get_duration2QG(self, qubit1_reg_index:tuple[str,int], qubit2_reg_index:tuple[str,int], gate_type:list) -> float:
+        zi_elem,_ = self._qpu.get_qubit_coupling_objs(self.mapping[qubit1_reg_index], self.mapping[qubit2_reg_index])[0].get_ZI_parameters()
+        return zi_elem.get_gate_duration(gate_type, [self._qpu.get_qubit_obj(self.mapping[qubit1_reg_index]), self._qpu.get_qubit_obj(self.mapping[qubit2_reg_index])])
     
     @property
     def dt(self):
@@ -233,16 +234,27 @@ class ParserOpenQASM:
         # lines = [x.strip() for x in lines if x != '']
         return '\n'.join(lines)
 
+    def get_qubit_registers(self):
+        ret_list = []
+        for cur_qreg in self._visitor._qubits:
+            for m in range(self._visitor._qubits[cur_qreg]):
+                ret_list.append((cur_qreg,m))
+        return ret_list
+
     def create_schedule(self, params:ScheduleParametersBase):
         #Initialise qubits and sync times
+        #The qubit_reg_mappings dictionary maps the ordered list of QASM qubit-registers to the softQPU ordering.
         qubit_reg_mappings = {}
         for cur_qreg in self._visitor._qubits:
             for m in range(self._visitor._qubits[cur_qreg]):
                 qubit_reg_mappings[(cur_qreg,m)] = len(qubit_reg_mappings)
+        qubit_reg_mappings_inv = {v: k for k, v in qubit_reg_mappings.items()}
+        num_qubits = len(qubit_reg_mappings)
+        #
         final_commands = []
-        cur_qubit_commands = [[] for x in range(len(qubit_reg_mappings))]
-        qubit_sync_times = np.zeros(len(qubit_reg_mappings))
-        last_sync_command_indices = [-1]*len(qubit_reg_mappings)
+        cur_qubit_commands = [[] for x in range(num_qubits)]
+        qubit_sync_times = np.zeros(num_qubits)
+        last_sync_command_indices = [-1]*num_qubits
         #
         for cur_command in self._visitor._commands + [{'type':'end', 'targets':[x for x in qubit_reg_mappings]}]:
             sync_command = False
@@ -272,9 +284,9 @@ class ParserOpenQASM:
                         if cur_op[0] == 'D':    #It is a delay...
                             cur_len += cur_op[1]
                         elif cur_op[0] == 'Measure':
-                            cur_len += params.get_duration_measurement(cur_qubit_ind)
+                            cur_len += params.get_duration_measurement(qubit_reg_mappings_inv[cur_qubit_ind])
                         else:   #It is just X, Y, Z for the gate type...
-                            cur_len += params.get_duration(cur_qubit_ind, cur_op)
+                            cur_len += params.get_duration(qubit_reg_mappings_inv[cur_qubit_ind], cur_op)
                     cur_seq_lens[m] = cur_len
                 new_sync_point = np.max(qubit_sync_times[cur_targ_indices] + cur_seq_lens)
                 ####
@@ -297,7 +309,7 @@ class ParserOpenQASM:
                 if cur_command['type'] == 'gate':
                     cur_target_gate = self._process_1Q_gate(cur_command['angles'])
                     cur_play_after_index = None if len(final_commands) == 0 else len(final_commands)-1
-                    gate_duration = params.get_duration2QG(cur_targ_indices[0], cur_targ_indices[1], cur_command['controls'] + [cur_target_gate])
+                    gate_duration = params.get_duration2QG(cur_command['targets'][0], cur_command['targets'][1], cur_command['controls'] + [cur_target_gate])
                     final_commands.append({'qubit_index': cur_targ_indices, 'sequence': cur_command['controls'] + [cur_target_gate], 'after':cur_play_after_index, 'length':gate_duration})
                     #Set all gate-sequences on these qubits to be synchronised to come after this new multi-qubit gate...
                     for cur_qubit_ind in cur_targ_indices:
@@ -422,6 +434,7 @@ class ParserOpenQASM:
         arr_gate_types = []
         arr_col_intens = []
         #
+        qubit_reg_mappings_inv = {v: k for k, v in gate_schedule['qubit_mappings'].items()}
         for cur_sec_ind,cur_sec_ops in enumerate(gate_schedule['commands']):
             cur_qubit = cur_sec_ops['qubit_index']
             if isinstance(cur_qubit, (list,tuple)):
@@ -429,7 +442,7 @@ class ParserOpenQASM:
                     cur_qubit = cur_qubit[0]    #A strange case that may never exist?
                 else:
                     #Process it as a 2QG
-                    cur_gate_time = qubit_params.get_duration2QG(*cur_qubit, cur_sec_ops['sequence'])   #NOTE: This assumes that it's not a sequence, but just a singular list for control/target operations
+                    cur_gate_time = qubit_params.get_duration2QG(qubit_reg_mappings_inv[cur_qubit[0]], qubit_reg_mappings_inv[cur_qubit[1]], cur_sec_ops['sequence'])   #NOTE: This assumes that it's not a sequence, but just a singular list for control/target operations
                     arr_qubit_auxs.append(cur_qubit[0])
                     arr_qubits.append(cur_qubit[1])
                     for m in range(2):
@@ -444,7 +457,7 @@ class ParserOpenQASM:
             #Process it as a 1QG
             for cur_gate in cur_sec_ops['sequence']:
                 cur_name = self._get_1QG_name(*cur_gate)
-                cur_gate_time = qubit_params.get_duration(cur_qubit, cur_gate)
+                cur_gate_time = qubit_params.get_duration(qubit_reg_mappings_inv[cur_qubit], cur_gate)
                 #
                 arr_qubits.append(cur_qubit)
                 arr_qubit_auxs.append(-1)

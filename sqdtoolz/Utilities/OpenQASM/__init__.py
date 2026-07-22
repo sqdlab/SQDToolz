@@ -11,13 +11,13 @@ class QASMCompatibleQubitMultiple:
         raise NotImplementedError()
 
 class ScheduleParametersBase:
-    def get_duration(self, qubit_index:int, gate_type:str|list|tuple) -> float:
+    def get_duration(self, qubit_reg_index:tuple[str,int], gate_type:str|list|tuple) -> float:
         raise NotImplementedError()
     
-    def get_duration_measurement(self, qubit_index:int):
+    def get_duration_measurement(self, qubit_reg_index:tuple[str,int]):
         return NotImplementedError()
 
-    def get_duration2QG(self, qubit1_index:int, qubit2_index:int, gate_type:list) -> float:
+    def get_duration2QG(self, qubit1_reg_index:tuple[str,int], qubit2_reg_index:tuple[str,int], gate_type:list) -> float:
         raise NotImplementedError()
 
     @property

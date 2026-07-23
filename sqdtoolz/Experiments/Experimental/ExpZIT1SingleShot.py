@@ -44,6 +44,8 @@ class ExpZIT1SingleShot(ExpZIqubit):
             elif self._transition == 'ge':
                 ax.set_title('Initialising E')
 
+            # TODO: fit T1 to f state
+
             fig.savefig(self._file_path + f'fitted_plot_{qubit_dataset}.png')
             if not self._dont_show_plot:
                 fig.show()

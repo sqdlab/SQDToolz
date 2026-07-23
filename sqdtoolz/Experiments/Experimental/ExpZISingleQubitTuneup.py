@@ -49,7 +49,7 @@ class ExpZISingleQubitTuneup:
             self._qubit_freq_range = np.linspace(self._qubit.DriveGE - freq_span/2, self._qubit.DriveGE + freq_span/2, freq_points)
         #
         if 'rabi_amplitudes' in kwargs:
-            self._rabi_ampls = kwargs.pop('rabi_amplitudes')
+            self._rabi_ampls = kwargs.pop('rabi_amplitudes') 
             assert not 'rabi_points' in kwargs, "Do not supply 'rabi_points' if supplying 'rabi_amplitudes'"
         else:
             self._rabi_ampls = np.linspace(0,1,kwargs.pop('rabi_points',30))

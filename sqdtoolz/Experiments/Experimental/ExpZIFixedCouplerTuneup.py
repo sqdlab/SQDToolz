@@ -17,6 +17,8 @@ class ExpZIFixedCouplerTuneup:
         self._qubit_fit = fit_qubit
         self._state_fit = kwargs.get('fit_state', 'E')
         self._extremum_type = kwargs.get('pop_fit_extremum', 'max')
+        self._variance_fit = kwargs.get('variance_fit_type', 'default')
+        assert self._variance_fit in ['default', 'max'], "Choose 'variance_fit_type' as either 'default' or 'max'."
         assert self._extremum_type in ['min', 'max'], "The pop_fit_extremum (to fit in the final time-trace) must be 'min' or 'max'."
 
         self._individual_plots = kwargs.pop('individual_plots', False)
@@ -83,7 +85,10 @@ class ExpZIFixedCouplerTuneup:
         ax10.pcolor(fitted_data['flux_amps'], fitted_data['wait_times']/norm_fac, leCounts.T, cmap='inferno')
         ax10.set_xlabel('Flux Amplitudes (0-1)')
         ax10.set_ylabel(f'Wait Times ({norm_prefix}s)')
-        opt_amp = float(dPkt['centre'])
+        if self._variance_fit=='default':
+            opt_amp = float(dPkt['centre'])
+        elif self._variance_fit=='max':
+            opt_amp = float(data_x[int(np.argmax(data_y))])
         ax10.vlines([opt_amp], np.min(fitted_data['wait_times'])/norm_fac, np.max(fitted_data['wait_times'])/norm_fac, color='white', linestyle='dashed')
         #
         exp.cur_coupler_obj.Amplitude = opt_amp
@@ -91,7 +96,7 @@ class ExpZIFixedCouplerTuneup:
         #
         #TIME SWEEP
         #
-        exp2 = ExpZIChevrons2QFixedCoupler(f'flux_pulse_{self._qubit_ids[0]}_{self._qubit_ids[1]}_single', lab.CONFIG('ZI'), lab.HAL('QPU'), ["Q1", "Q2"],
+        exp2 = ExpZIChevrons2QFixedCoupler(f'flux_pulse_{self._qubit_ids[0]}_{self._qubit_ids[1]}_single', lab.CONFIG('ZI'), lab.HAL('QPU'), self._qubit_ids,
                                            amplitudes=np.array([exp.cur_coupler_obj.Amplitude]), wait_times=self._wait_times,
                                            single_shot=True, dont_show_plot=not self._individual_plots)
         lab.run_single(exp2)
@@ -126,7 +131,7 @@ class ExpZIFixedCouplerTuneup:
                 elif cs_der2(r) > 0 and self._extremum_type=='min':
                     peaks_x.append(r)
         #Approximate the period as there can be multiple initial maxima due to distortions etc...
-        approx_period = np.median(np.diff(peaks_x))
+        approx_period = np.median(np.diff(peaks_x)) # TODO: optionally, choose the 3rd, 5th, etc. maxima
         extremum_ind = np.argmin(np.abs(peaks_x-approx_period))
         ax11.plot([peaks_x[extremum_ind]] , [leSpline(peaks_x[extremum_ind])], 'ro')
         ax11.legend([['G','E','F'][state_ind], 'Spline'],ncol=3, loc="upper right")

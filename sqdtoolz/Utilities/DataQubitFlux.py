@@ -10,15 +10,18 @@ class DataTransmonFlux:
     """
     Fit flux sweeps of transmon qubit spectroscopy.
     """
-    def __init__(self, qubit_id, qubit_ampl, fluxDC, frequencies):
+    def __init__(self, qubit_id, qubit_ampl, fluxDC, frequencies, file_path, hal_QPU, **kwargs):
         self._qubit_id = qubit_id
         self._qubit_amp = np.array(qubit_ampl)
         self._fluxDC = np.array(fluxDC)
         self._frequencies = np.array(frequencies)
         self._qubit_amp_fit = None
-    
+        self._file_path = file_path
+        self._hal_QPU = hal_QPU
+        self._update_qubit = kwargs.pop('update_qubit', True)
+
     @classmethod
-    def calibrateQubitFluxFromFile(cls, file_path, flux_param_index=0, freq_param_index=1, iq_indices=[0,1], background_subtraction=True, qubit_id=None):
+    def calibrateQubitFluxFromFile(cls, file_path, hal_QPU, flux_param_index=0, freq_param_index=1, iq_indices=[0,1], background_subtraction=True, qubit_id=None, **kwargs):
         cur_data = FileIODirectory(file_path)
         #
         assert (flux_param_index != freq_param_index) and flux_param_index < len(cur_data.param_names) and freq_param_index < len(cur_data.param_names), \
@@ -29,12 +32,12 @@ class DataTransmonFlux:
             qubit_id = Path(file_path).stem
         #
         arr = cur_data.get_numpy_array()
-        ampl = np.sqrt(arr[:,:,0]**2 + arr[:,:,1]**2)
+        ampl = np.sqrt(arr[:,:,iq_indices[0]]**2 + arr[:,:,iq_indices[1]]**2)
         if background_subtraction:
             ampl_corrected = (ampl.T - np.nanmean(ampl, axis=1)).T
         else:
             ampl_corrected = ampl
-        return cls(qubit_id, ampl_corrected, cur_data.param_vals[flux_param_index], cur_data.param_vals[freq_param_index])
+        return cls(qubit_id, ampl_corrected, cur_data.param_vals[flux_param_index], cur_data.param_vals[freq_param_index], file_path, hal_QPU, **kwargs)
 
     def fit_qubit_frequency(self, p0=None, prominence_frac=0.9, fixed_period=None, fit_flux_range=None):
         """
@@ -112,6 +115,14 @@ class DataTransmonFlux:
             'offset': popt[3],
             'fit_func': transmon_flux_model,
         }
+        if self._update_qubit:
+            q = self._hal_QPU.get_qubit_obj(self._qubit_id)
+            q.FluxConversionParams = {
+                'f_max': float(popt[0]),
+                'flux0': float(popt[1]),
+                'period': float(popt[2]),
+                'offset': float(popt[3]),
+            }
         return self._qubit_amp_fit
 
 
@@ -178,6 +189,7 @@ class DataTransmonFlux:
             ax2.set_title(f'Extrapolated fit ({extrap_range[0]:.3f}V to {extrap_range[1]:.3f}V)')
             ax2.legend(loc='lower right', fontsize=8)
         fig.tight_layout()
+        parent = Path(self._file_path).parent
         if save and show_extrap:
             fig.savefig(parent + '/QubitFluxSpecFit.png')
         elif save:
@@ -214,6 +226,7 @@ class DataTransmonFlux:
             ax.set_xlabel('')
         fig.tight_layout()
         #
+        parent = Path(self._file_path).parent
         if save:
             fig.savefig(parent + '/QubitFluxSpecLinescans.png')
 
@@ -277,3 +290,18 @@ class DataTransmonFlux:
                 print(f"{self._qubit_id}: no negative flux solution found for {target_freq*1e-9:.4f} GHz; returning closest overall.")
         best_idx = np.argmin(np.abs(candidates - near_flux))
         return candidates[best_idx]
+
+    @staticmethod
+    def convert_flux_amplitude_to_frequency_zi(qubit_object, flux_amplitude=None, fluxDC=0):
+        assert (flux_amplitude is not None) or (fluxDC != 0), "Must pass either flux_amplitude or flux_DC as floats or arrays." 
+        assert qubit_object._zi_qubit, "Pass a qubit object, for example: lab.HAL('Q1')."
+        assert qubit_object.FluxConversionParams is not None, "Must populate the 'FluxConversionParams' qubit attribute to use this function. Run DataTransmonFlux.calibrateQubitFluxFromFile first."
+        popt = qubit_object.FluxConversionParams
+        total_flux = np.asarray(fluxDC) + np.asarray(flux_amplitude)
+        def transmon_flux_model(x, f_max, flux0, period, offset):
+            return f_max * np.sqrt(np.abs(np.cos(np.pi * (x - flux0) / period))) + offset
+        return transmon_flux_model(total_flux, **popt)
+    
+    @staticmethod
+    def convert_fluxDC_to_frequency_zi(qubit_object, fluxDC):
+        return DataTransmonFlux.convert_flux_amplitude_to_frequency_zi(qubit_object, flux_amplitude=0, fluxDC=fluxDC)

@@ -8,6 +8,8 @@ from sqdtoolz.Utilities.DataIQDiscriminate import DataIQDiscriminate
 class ExpZIBlobs(ExpZIqubit):
     def __init__(self, name, expt_config, hal_QPU, qubit_ids, **kwargs):
         self._dont_show_plot = kwargs.pop('dont_show_plot', False)
+        self._states = kwargs.pop('states', "ge")
+        self._iq_blob_data = {}
         assert (not 'update' in kwargs) or ('update' in kwargs and not kwargs['update']), "Don't set 'update=True'. This is just a diagnostic experiment."
         kwargs['update'] = False
         # self._fit_vals = []
@@ -34,6 +36,40 @@ class ExpZIBlobs(ExpZIqubit):
         if average:
             return np.array([x.get_average_fidelity() for x in self._leDIQDs])
         return np.array([x.get_fidelities() for x in self._leDIQDs])
+    
+    def optimal_fidelity(self):
+        assert 'f' not in self._states, "f state not yet supported"
+        for qubit in self._qubit_ids:     
+            leData = self.retrieve_last_dataset(qubit + r'_calib')
+            arr = leData.get_numpy_array()
+            sweep_vals = leData.param_vals
+            g_real = arr[..., 0]
+            g_imag = arr[..., 1]
+            e_real = arr[..., 2]
+            e_imag = arr[..., 3]
+
+            mean_g_real = np.mean(g_real, axis=-1)
+            mean_g_imag = np.mean(g_imag, axis=-1)
+            mean_e_real = np.mean(e_real, axis=-1)
+            mean_e_imag = np.mean(e_imag, axis=-1)
+
+            delta_real = mean_e_real - mean_g_real
+            delta_imag = mean_e_imag - mean_g_imag
+            
+            d = np.sqrt(delta_real**2 + delta_imag**2)
+
+            var_g = np.var(g_real, axis=-1) + np.var(g_imag, axis=-1)
+            var_e = np.var(e_real, axis=-1) + np.var(e_imag, axis=-1)
+            
+            sigma = (np.sqrt(var_g) + np.sqrt(var_e)) / 2.0
+            
+            voltage_snr = d / (2.0 * sigma)
+            power_snr = voltage_snr**2
+            
+            power_snr = np.where(power_snr <= 0, 1e-10, power_snr)
+            snr_db = 10.0 * np.log10(power_snr)
+            self._iq_blob_data[qubit] = snr_db
+
 
     @staticmethod
     def plot_fitted_results(leDIQD:DataIQDiscriminate, extra_title=''):

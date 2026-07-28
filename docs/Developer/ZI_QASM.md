@@ -43,3 +43,40 @@ extern measure(qubit) -> frame;
 That is, for any qubit, one may query the drive, flux or measure lines by using these three functions. After that, the `play` functions can be used in a straightforward manner.
 
 
+## Variable scoping
+
+Just a reminder:
+- Variables in the global scope or the scope exterior to `gatedef` blocks are not seen (i.e. only locally scoped variables)
+- Similarly, `defcal` blocks can only see locally scoped variables and any variable declared within the `cal` blocks.
+- Qubits can only be declared in the global scope
+
+The following declaraitons can only appear in the global scope:
+- `gate`
+- `def`
+- `defcal`
+- `defcalgrammar`
+- `extern`
+- `include`
+- `qubit`
+
+In addition, the declarations cannot be duplicated within the same scope (can have a `gate` and a `def` with the same name as they occupy different namespaces). Thus, in terms of processing, the following steps are taken:
+- A state machine gathers and tracks the scoping of current variables and discards them upon ending the current scope
+- All for loops are unrolled if they have constructs within that make use of the looping variable/identifier (this is conducive with the default behaviour of *LabOneQ*; albeit, the CYCLIC/SEQUENTIAL averaging types do differ in behaviour, but only CYCLIC is taken as the default behaviour in the present parser as SEQUENTIAL breaks when there are multiple loops etc... Idea is to use manual Python loops outside the OpenQASM calls in those cases...)
+
+
+
+OpenQASM scopes
+---------------
+global
+  ├── block
+  ├── for
+  ├── if
+  ├── def
+  └── gate
+
+Calibration scopes
+------------------
+cal (global calibration namespace)
+  ├── cal block
+  └── defcal
+

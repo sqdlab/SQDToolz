@@ -59,15 +59,18 @@ class ExpZIQASM(ExpZIqubit):
         self._args['qubit_mapping'] = final_mapping
 
     def _run(self, file_path, sweep_vars=[], **kwargs):
-        self._leSchedule = self._poqasm.create_schedule(self._qasm_qubit_params)
-        qubit_reg_mappings_inv = {v: k for k, v in self._leSchedule['qubit_mappings'].items()}
-        self._args['openqasm_schedule'] = self._leSchedule
+        self._leScheduleBlocks = self._poqasm.create_schedule(self._qasm_qubit_params)
+        qubit_reg_mappings_inv = {v: k for k, v in self._leScheduleBlocks['qubit_mappings'].items()}
+        
+        self._leScheduleFlattened = {'qubit_mappings':self._leScheduleBlocks['qubit_mappings'], 'commands':[item for sublist in self._leScheduleBlocks['commands'] for item in sublist]}
 
         # leTable = self._poqasm.tabulate_schedule(leSchedule, qubit_params)
-        self._poqasm.plot_schedule(self._leSchedule, self._qasm_qubit_params, file_path + 'compiled_qasm_schedule.html')
+        # for m in range(len(self._leScheduleBlocks['commands'])):
+        self._poqasm.plot_schedule(self._leScheduleFlattened, self._qasm_qubit_params, file_path + 'compiled_qasm_schedule.html')
 
-        self._poqasm.check_ZI_compatibility(self._leSchedule, self._qasm_qubit_params, **kwargs)
+        self._poqasm.check_ZI_compatibility(self._leScheduleFlattened, self._qasm_qubit_params, **kwargs)
 
+        self._args['openqasm_schedule'] = self._leScheduleFlattened
         super()._run(file_path, sweep_vars, **kwargs)
 
     def _post_process(self, data):

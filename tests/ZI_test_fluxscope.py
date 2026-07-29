@@ -38,13 +38,17 @@ lab.HAL('Qubit2').ResetTime = 50e-9
 # plt.show()
 
 ZIACQ('ZIacq', lab, 'zi_boxes')
-lab.HAL('ZIacq').NumRepetitions = 2048
+lab.HAL('ZIacq').NumRepetitions = 2042
 
 from sqdtoolz.Experiments.Experimental.ZI import flux_scope
+from sqdtoolz.Experiments.Experimental.ZI import cryo_scope
 
 ExperimentConfiguration('ZI', lab, 0, [], 'ZIacq')
 frequencies = lab.HAL('Qubit1').DriveGE + np.linspace(0, 500e6, 5)
 
-exp = ExpZIqubit('test', lab.CONFIG('ZI'), flux_scope, lab.HAL('QPU'),
-                 ['Qubit1', 'Qubit2'], delays = np.linspace(1e-6, 10e-6,  3), frequencies=frequencies)
+flux_amplitudes = np.linspace(0.1,1.0,3)
+flux_lengths = np.linspace(10e-9, 80e-9,3)
+
+exp = ExpZIqubit('test', lab.CONFIG('ZI'), cryo_scope, lab.HAL('QPU'),
+                 ['Qubit1', 'Qubit2'], lengths = flux_lengths, amplitudes=flux_amplitudes)
 lab.run_single(exp, debug_skip_experiment=True)

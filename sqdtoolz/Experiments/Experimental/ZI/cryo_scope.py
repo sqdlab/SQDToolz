@@ -1,15 +1,14 @@
-"""This module defines the fluxscope experiment.
+"""This module defines the cryscope experiment.
 
-In this experiment we measure the flux pulse distortion on a qubit utilisng the flux scope protocol
+In this experiment we measure the flux pulse distortion on a qubit utilisng the cryo scope protocol
 
-The fluxscope experiment has the following pulse sequence:
+The cryoscope experiment has the following pulse sequence:
 
-    qb --- [ prep transition ] --- [flux pulse] --- [delay] --- [ x180_transition ] --- [ measure ]
+    qb --- [ prep transition ] --- [x90] --- [flux pulse] --- [delay] --- [ x90/y90 ] --- [ measure ]
     
 If multiple qubits are passed to the `run` workflow, the above pulses are applied
 in parallel on all the qubits.
 
-Qubit must be prepared in a flux sensitive area e.g. away from sweet spot
 """
 from __future__ import annotations
 
@@ -57,8 +56,12 @@ def experiment_workflow(
     session: Session,
     qpu: QPU,
     qubits: QuantumElements | list[str] | str,
-    delays: QubitSweepPoints,
-    frequencies: QubitSweepPoints,
+    amplitudes: QubitSweepPoints,
+    lengths: QubitSweepPoints,
+    amplitude_aux: float=None,
+    coupler_name:str = None,
+    y90:bool = False,
+    fixed_delay_length:float=None,
     temporary_parameters: dict[str | tuple[str, str, str], dict | QuantumParameters]
     | None = None,
     options: TuneUpWorkflowOptions | None = None,
@@ -129,8 +132,12 @@ def experiment_workflow(
     dsl = create_experiment(
         temp_qpu,
         qubits,
-        delays,
-        frequencies,
+        amplitudes,
+        lengths,
+        amplitude_aux,
+        coupler_name,
+        y90,
+        fixed_delay_length
     )
     compiled_exp = compile_experiment(session, dsl)
     result = run_experiment(session, compiled_exp)
@@ -147,12 +154,12 @@ def experiment_workflow(
 def create_experiment(
     qpu: QPU,
     qubits: QuantumElements,
-    delays: QubitSweepPoints,
-    frequencies: QubitSweepPoints,
+    amplitudes: QubitSweepPoints,
+    lengths: QubitSweepPoints,
+    amplitude_aux: float=None,
     coupler_name:str = None,
-    flux_amplitude:float=None,
-    flux_amplitude_aux: float=None,
-    flux_length:float=None,
+    y90:bool = False,
+    fixed_delay_length:float=None,
     options: TuneupExperimentOptions | None = None,
 ) -> Experiment:
     """Creates an Amplitude Rabi experiment Workflow.
@@ -242,13 +249,8 @@ def create_experiment(
         the_coupler = qpu[coupler_name]
         assert isinstance(the_coupler, TunableTransmonCouplerFixed), f"The coupler \'{coupler_name}\' is not a \'TunableTransmonCouplerFixed\' type."
 
-    sweep_frequency = SweepParameter(f"frequency", frequencies, axis_name=f"qubit_frequency")
-    sweep_delay = SweepParameter(f"delay", delays, axis_name=f"flux_delay")
-
-    if flux_amplitude is None:
-        amplitude = the_coupler.parameters.Amplitude
-    if flux_length is None:
-        length = the_coupler.parameters.Length
+    flux_amp_sweep = SweepParameter(f"amplitude", amplitudes, axis_name=f"flux_frequency")
+    flux_length_sweep = SweepParameter(f"length", lengths, axis_name=f"flux_length")
 
     # We will fix the length of the measure section to the longest section among
     # the qubits to allow the qubits to have different readout and/or
@@ -256,16 +258,22 @@ def create_experiment(
     max_measure_section_length = qpu.measure_section_length(qubits)
     qop = qpu.quantum_operations
 
+    if fixed_delay_length is None:
+        fixed_delay_length = 2*max(lengths)
+
+    target_qubit = qubits[0]
+    #first qubit in a two qubit pair will always be the target qubit
+    drive_line, params = target_qubit.transition_parameters("ge")     
     with dsl.acquire_loop_rt(
         uid="shots",
         count=opts.count,
         averaging_mode=opts.averaging_mode, #CYCLIC
         acquisition_type=opts.acquisition_type, #INTEGRATION
     ):
-        with dsl.sweep(uid="frequency_sweep", parameter=sweep_frequency):
-            # inner sweep - delay between start of qubit excitation pulse and start of flux pulse
-            with dsl.sweep(uid="sweep", parameter=sweep_delay):
-                qop.set_frequency(qubits[0], sweep_frequency)
+        with dsl.sweep(uid="amplitude_sweep",parameter=flux_amp_sweep):
+            with dsl.sweep(uid="length_sweep", parameter=flux_length_sweep):
+
+                # (optional) active reset                
                 if opts.active_reset:
                     qop.active_reset(
                         qubits,
@@ -273,16 +281,29 @@ def create_experiment(
                         number_resets=opts.active_reset_repetitions,
                         measure_section_length=max_measure_section_length,
                     )
-                # flux pulse
-                with dsl.section(uid="qubit_excitation"):
-                    #flux pulse
+                # qubit excitation pulses - Ramsey with fixed timing
+                with dsl.section(uid="ramsey"):
+                    # play first Ramsey excitation pulse
+                    qop.x90.omit_section(target_qubit)
+                    #fixed ramsey delay
+                    qop.delay.omit_section(target_qubit, time=fixed_delay_length)
+                    # play second Ramsey excitation pulse
+                    if y90:
+                        qop.y90.omit_section(target_qubit)
+                    else:
+                        qop.x90.omit_section(target_qubit)
+
+                #interleaved flux pulse with variable length and amplitude
+                with dsl.section(uid="flux"):
+                    # delay while first Ramsey pulse is played
+                    dsl.delay(signal=target_qubit.signals['flux'], time = params["length"])
+                    # flux pulse
                     qop.fixed_coupler_flux_pulse.omit_section(
                         the_coupler,
-                        length, 
-                        amplitude=amplitude, 
-                        amplitude_aux=flux_amplitude_aux)
-                    qop.delay.omit_section(qubits[0], time=sweep_delay)  # delay is swept
-                    qop.x180.omit_section(qubits[0])
+                        flux_length_sweep, 
+                        amplitude=flux_amp_sweep, 
+                        amplitude_aux=amplitude_aux)
+
                 # readout and data acquisition
                 with dsl.section(name="main_measure"):
                     for q in qubits:
@@ -290,20 +311,13 @@ def create_experiment(
                         # Fix the length of the measure section
                         sec.length = max_measure_section_length
                         qop.passive_reset(q)
-
-            if opts.use_cal_traces:
-                qop.calibration_traces.omit_section(
-                    qubits=qubits,
-                    states=opts.cal_states,
-                    active_reset=opts.active_reset,
-                    active_reset_states=opts.active_reset_states,
-                    active_reset_repetitions=opts.active_reset_repetitions,
-                    measure_section_length=max_measure_section_length,
-                )
-
-#Delays and frequencies need to specified at run time. Some knowledge about CZ pulse gate parameters will be required
-#By default the fluxscope utilises the amplitude and time parameters by the CZ dsl pulse that lives in TunableTransmonCouplerFixed,
-#This should probably re re-done so that you can perform flux_scope on an arbitrary single qubit. i.e. no couplers called here
-#Alternativley we could extract the exact required delay time from TunableTransmonCouplerFixed ? 
-
-#Tested in simulation mode with ZI_test_fluxscope.py
+        #calibration
+        if opts.use_cal_traces:
+            qop.calibration_traces.omit_section(
+                qubits=qubits,
+                states=opts.cal_states,
+                active_reset=opts.active_reset,
+                active_reset_states=opts.active_reset_states,
+                active_reset_repetitions=opts.active_reset_repetitions,
+                measure_section_length=max_measure_section_length,
+            )

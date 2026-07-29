@@ -6,9 +6,6 @@ The cryoscope experiment has the following pulse sequence:
 
     qb --- [ prep transition ] --- [x90] --- [flux pulse] --- [delay] --- [ x90/y90 ] --- [ measure ]
     
-If multiple qubits are passed to the `run` workflow, the above pulses are applied
-in parallel on all the qubits.
-
 """
 from __future__ import annotations
 
@@ -84,11 +81,20 @@ def experiment_workflow(
         qubits:
             The qubits to run the experiments on, passed by UID. May be either a single
             qubit or a list of qubits.
-        delays:
-            delays (in seconds) In between start of flux pulse and x180 excitation
-        frequencies:
-            the frequencies (Hz) scanned by the qubit charge drive excitation pulse in order to find the qubit after
-            during flux pulse
+        amplitudes:
+            amplitudes of flux pulse for sweep e.g. chevrons
+        lengths:
+            lengths / truncation point of flux pulse sweep in order to measure instantaneous flux applied to the qubit
+        amplitude_aux:
+            amplitude of parking qubit during flux pulse
+        coupler_name:
+            can specify a defined TunableTransmonCouplerFixed element e.g. 'cpl12' directly if it cannot be found
+        y90:
+            If True will peform a y90 gate as the second gate of the ramsey sequence, this is used in order to reconstruct the flux
+            in the cryoscope protocol
+        fixed_delay_length
+            length in seconds of the ramsey sequence, this is fixed and not swept. Will default to 2 x the length of the flux pulse.
+            it must be > flux pulse length
         temporary_parameters:
             The temporary parameters with which to update the quantum elements and
             topology edges. For quantum elements, the dictionary key is the quantum

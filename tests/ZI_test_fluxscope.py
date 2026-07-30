@@ -52,7 +52,7 @@ flux_amplitudes = np.linspace(0.1,1.0,3)
 flux_lengths = np.linspace(10e-9, 80e-9,3)
 
 exp = ExpZIFluxscope('test', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Qubit1', 'Qubit2'])
-lab.run_single(exp, debug_skip_experiment=True)     
+exp.run(lab, debug_skip_experiment=True)     
 
 
 # exp = ExpZIqubit('test', lab.CONFIG('ZI'), cryo_scope, lab.HAL('QPU'),

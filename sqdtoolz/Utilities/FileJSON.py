@@ -6,16 +6,21 @@ import json
 
 class SerialiseJSON:
     @staticmethod
-    def encode_ndarray(arr: np.ndarray) -> str:
+    def encode_ndarray(arr: np.ndarray, use_hex=False) -> str:
         """Serialize a NumPy array to a compressed base64 string."""
         buf = io.BytesIO()
         np.save(buf, arr, allow_pickle=False)
-        return base64.b64encode(zlib.compress(buf.getvalue())).decode("ascii")
+        if use_hex:
+            return zlib.compress(buf.getvalue()).hex().upper()
+        else:
+            return base64.b64encode(zlib.compress(buf.getvalue())).decode("ascii")
 
-    @staticmethod
-    def decode_ndarray(data: str) -> np.ndarray:
-        """Deserialize a compressed base64 string back into a NumPy array."""
-        raw = zlib.decompress(base64.b64decode(data.encode("ascii")))
+    def decode_ndarray(data: str, use_hex=False) -> np.ndarray:
+        """Deserialize a NumPy array from a compressed hexadecimal string."""
+        if use_hex:
+            raw = zlib.decompress(bytes.fromhex(data))
+        else:
+            raw = zlib.decompress(base64.b64decode(data.encode("ascii")))
         return np.load(io.BytesIO(raw), allow_pickle=False)
 
     @staticmethod    

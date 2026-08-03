@@ -318,6 +318,16 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
                     if len(argument.arguments) > 2:
                         ret_dict['sigma'] = argument.arguments[2]
                     return ret_dict
+                case 'set_phase':
+                    assert len(argument.arguments) == 2, "Must give 2 arguments: the frame (i.e. drive/flux/measure etc.) of the signal line and the phase in radians."
+                    frame_var = self._eval_arg(argument.arguments[0])
+                    angle_var = self._eval_arg(argument.arguments[1])
+                    self._cur_defcal.append( {'type': 'pulse_attribute', 'frame_var':  frame_var, 'set_phase_val':angle_var} )
+                case 'shift_phase':
+                    assert len(argument.arguments) == 2, "Must give 2 arguments: the frame (i.e. drive/flux/measure etc.) of the signal line and the phase in radians."
+                    frame_var = self._eval_arg(argument.arguments[0])
+                    angle_var = self._eval_arg(argument.arguments[1])
+                    self._cur_defcal.append( {'type': 'pulse_attribute', 'frame_var':  frame_var, 'shift_phase_val':angle_var} )
                 case 'play':
                     # assert self._in_defcal_blk, "The play function is reserved for defcal blocks only."
                     assert len(argument.arguments) == 2, "Must give 2 arguments: the frame (i.e. drive/flux/measure etc.) of the signal line and the waveform."
@@ -737,14 +747,17 @@ class ParserOpenQASM:
             pulse_lengths[('measure', cur_target)] = 0
         #Process the lengths based on the waveforms...
         for cur_cmd in dict_command['play_commands']:
-            if cur_cmd['waveform_var']['type'] in ['gaussian']:
+            if cur_cmd['type'] == 'pulse_attribute':
+                cur_len = 0
+            elif cur_cmd['waveform_var']['type'] in ['gaussian']:
                 cur_len = self._process_delay(cur_cmd['waveform_var']['length'],dt_time)
             elif cur_cmd['waveform_var']['type'] == 'sampled':  #Shouldn't be anything else given how everything so far is hard-coded...
                 assert len(cur_cmd['waveform_var']['samples'].shape) == 1, "Must be 1D array. There is a custom sampled waveform that is not 1D..."
                 cur_len = cur_cmd['waveform_var']['samples'].shape[0]*dt_time
             else:
                 assert False, f"Cannot process waveform type {cur_cmd['waveform_var']['type']}" #Shouldn't happen given how everything preceding this is hard-coded...
-            cur_cmd['waveform_var']['length'] = cur_len
+            if cur_cmd['type'] == 'play':
+                cur_cmd['waveform_var']['length'] = cur_len
             #
             pulse_lengths[cur_cmd['frame_var']] += cur_len
         dict_command['length'] = max([pulse_lengths[x] for x in pulse_lengths])

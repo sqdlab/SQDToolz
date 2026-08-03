@@ -27,6 +27,7 @@ defcal rx(angle leAngle) $1 {
         drive($1),
         gaussian(20ns, 0.5*leAngle+offset)
     );
+    shift_phase(drive($1), pi/2);
     play(
         flux($1),
         gaussian(35ns, 0.5*leAngle+offset)

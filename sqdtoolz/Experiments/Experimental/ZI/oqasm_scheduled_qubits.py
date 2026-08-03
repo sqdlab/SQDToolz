@@ -259,7 +259,13 @@ def create_experiment(
                         for cur_pulse in cur_section['sequence']:
                             cur_signal_line = cur_pulse['frame_var']
                             cur_signal_line = f'{qubits[cur_signal_line[1]].uid}/{cur_signal_line[0]}'
-                            dsl.play(signal=cur_signal_line, pulse=cur_pulse['zi_pulse'])
+                            if cur_pulse['type'] == 'play':
+                                dsl.play(signal=cur_signal_line, pulse=cur_pulse['zi_pulse'])
+                            elif cur_pulse['type'] == 'pulse_attribute':
+                                if 'set_phase_val' in cur_pulse:
+                                    dsl.play(signal=cur_signal_line,pulse=None, set_oscillator_phase=cur_pulse['set_phase_val'])
+                                elif 'shift_phase_val' in cur_pulse:
+                                    dsl.play(signal=cur_signal_line,pulse=None, increment_oscillator_phase=cur_pulse['shift_phase_val'])
                     elif isinstance(cur_section['qubit_index'], (list,tuple)):
                         cur_qinds = [x for x in cur_section['qubit_index']]
                         cur_qubits = [qubits[x] for x in cur_qinds]

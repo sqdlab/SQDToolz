@@ -8,7 +8,7 @@ import scipy.optimize
 from sqdtoolz.Utilities.DataFitting import DFitPeakLorentzian
 
 class ExpZIResFluxSweep(ExpZIqubit):
-    def __init__(self, name, expt_config, hal_QPU, qubit_id, frequencies, flux_range, **kwargs):
+    def __init__(self, name, expt_config, hal_QPU, qubit_id, **kwargs):
         assert isinstance(qubit_id, str), "Supply qubit_id as the solitary string ID here (i.e. not a list)."
         self._qubit_id = qubit_id
 
@@ -19,13 +19,18 @@ class ExpZIResFluxSweep(ExpZIqubit):
         self._is_trough = kwargs.pop('is_trough', True)
         self._dont_plot = kwargs.pop('dont_plot', False)
         self._xUnits = kwargs.pop('plot_x_units', 'Hz')
-        self._flux_range = flux_range
-        self._frequencies = frequencies
+        self._flux_range = kwargs.pop('flux_range', np.linspace(-1, 1, 10))
+        self._frequencies = kwargs.pop('frequencies', None)
+        self._span = kwargs.pop('span', 10e6)
+        self._num_freq_pts = kwargs.pop('num_frequency_points', 401)
         self._hal_QPU = hal_QPU
 
         self._opt_flux_val = None
 
-        kwargs['frequencies'] = frequencies
+        if self._frequencies is None:
+            self._frequencies = np.linspace(-self._span, self._span, self._num_freq_pts) + self._hal_QPU.get_qubit_obj(self._qubit_id).ReadoutFrequency
+
+        kwargs['frequencies'] = self._frequencies
         super().__init__(name, expt_config, resonator_spectroscopy, hal_QPU, [qubit_id], **kwargs)
     
     def _run(self, file_path, sweep_vars=[], **kwargs):

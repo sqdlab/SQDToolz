@@ -29,6 +29,15 @@ class ExpZIRes(ExpZIqubit):
         self._xUnits = kwargs.pop('plot_x_units', 'Hz')
         self._hal_QPU = hal_QPU
 
+        self._frequencies = kwargs.pop('frequencies', None)
+        self._span = kwargs.pop('span', 5e6)
+        self._num_freq_pts = kwargs.pop('num_frequency_points', 401)
+
+        if self._frequencies is None:
+            self._frequencies = np.linspace(-self._span, self._span, self._num_freq_pts) + self._hal_QPU.get_qubit_obj(self._qubit_dataset).ReadoutFrequency
+
+        kwargs['frequencies'] = self._frequencies
+
         super().__init__(name, expt_config, resonator_spectroscopy, hal_QPU, [qubit_id], **kwargs)
     
     def _post_process(self, data):

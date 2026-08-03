@@ -8,7 +8,7 @@ from sqdtoolz.Utilities.DataIQDiscriminate import DataIQDiscriminate
 class ExpZIBlobs(ExpZIqubit):
     def __init__(self, name, expt_config, hal_QPU, qubit_ids, **kwargs):
         self._dont_show_plot = kwargs.pop('dont_show_plot', False)
-        self._states = kwargs.pop('states', "ge")
+        self._states = kwargs.get('states', "ge")
         self._iq_blob_data = {}
         assert (not 'update' in kwargs) or ('update' in kwargs and not kwargs['update']), "Don't set 'update=True'. This is just a diagnostic experiment."
         kwargs['update'] = False

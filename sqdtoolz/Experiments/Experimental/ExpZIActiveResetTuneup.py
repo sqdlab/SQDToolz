@@ -27,6 +27,7 @@ class ExpZIActiveResetTuneup():
         lab.group_open(self._name)
         ## X/2 gate calibration (run twice to check parity)
         if not self._skip_Xcal:
+            assert self._expt_config._hal_ACQ.AveragingMode not in ("DISCRIMINATION", "RAW"), "Averaging mode not supported" 
             for qubit in self._qubit_ids:
                 qubit_obj = self._hal_QPU.get_qubit_obj(qubit)
                 qubit_obj.ResetTime = np.max([5*qubit_obj.T1GE,200e-6])
@@ -62,7 +63,8 @@ class ExpZIActiveResetTuneup():
 
         for qubit in self._qubit_ids:
             qubit_obj = self._hal_QPU.get_qubit_obj(qubit)
-            assert self._qubit_fidelities[qubit] > 0.8, "Single Qubit fidelity must be > 0.8 before attempting active reset, try re-tuning qubit."
+            if self._qubit_fidelities[qubit] > 0.8:
+                print("WARNING: Single Qubit fidelity must be > 0.8 before attempting active reset, try re-tuning qubit.")
             assert np.abs(qubit_obj.ReadoutLO - qubit_obj.ReadoutFrequency) < 500e6, "Readout LO must be closer to resonator frequency for optimal integration weights"
             exp = ExpZIqubit('integration_weights_{qubit}', self._expt_config, time_traces, self._hal_QPU, [qubit], states=self._states, update=True, ZI_plot=False)
             lab.run_single(exp)

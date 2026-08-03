@@ -297,7 +297,8 @@ class DataTransmonFlux:
         assert qubit_object._zi_qubit, "Pass a qubit object, for example: lab.HAL('Q1')."
         assert qubit_object.FluxConversionParams is not None, "Must populate the 'FluxConversionParams' qubit attribute to use this function. Run DataTransmonFlux.calibrateQubitFluxFromFile first."
         popt = qubit_object.FluxConversionParams
-        total_flux = np.asarray(fluxDC) + np.asarray(flux_amplitude)
+        flux_range = qubit_object.FluxRange
+        total_flux = np.asarray(fluxDC) + np.asarray(flux_amplitude) * flux_range
         def transmon_flux_model(x, f_max, flux0, period, offset):
             return f_max * np.sqrt(np.abs(np.cos(np.pi * (x - flux0) / period))) + offset
         return transmon_flux_model(total_flux, **popt)

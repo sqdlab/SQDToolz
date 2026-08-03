@@ -14,6 +14,9 @@ from sqdtoolz.Utilities.Miscellaneous import Miscellaneous
 
 class ExpZIQASM(ExpZIqubit):   
     def __init__(self, name, expt_config, hal_QPU, qubit_ids, qasm_file_path, **kwargs):
+        """
+        NOTE: The physical qubit identifiers $0,$1,$2... in OpenPulse are mapped to the qubit_ids!
+        """
         self._qubit_datasets = qubit_ids
 
         self._hal_QPU = hal_QPU
@@ -26,17 +29,13 @@ class ExpZIQASM(ExpZIqubit):
         assert kwargs['coordinate_system'] in ['LH', 'RH'], "The 'coordinate_system' must be either LH or RH for left/right handed."
 
         self._poqasm = ParserOpenQASM(qasm_file_path, kwargs.pop('source_dirs', []), measure_label='QMEAS')
+        self._final_qreg_phys_mapping = self._poqasm._qreg_phys_mapping #Copy over the default qreg to physical qubit mapping
 
         self._qregs = self._poqasm.get_qubit_registers()
         num_qasm_qubits = len(self._qregs)
         assert num_qasm_qubits <= len(qubit_ids), f"The QASM script needs {num_qasm_qubits} while only {len(qubit_ids)} qubits have been specified."
         
-        mapping = {self._qregs[x]:qubit_ids[x] for x in range(len(qubit_ids))}
-        self._qasm_qubit_params = ScheduleParametersSoftQPUZI(hal_QPU,mapping)
-
         super().__init__(name, expt_config, oqasm_scheduled_qubits, hal_QPU, qubit_ids, **kwargs)
-        #This maps from the index of the list of self._qregs onto the index in qubit_ids. Defaults to order given in qubit_ids.
-        self._args['qubit_mapping'] = {x:x for x in range(num_qasm_qubits)}
 
     def get_qubit_regs(self):
         return self._poqasm.get_qubit_registers()
@@ -51,24 +50,33 @@ class ExpZIQASM(ExpZIqubit):
         leQubitNames = [self._hal_QPU.get_qubit_obj(x).Name for x in self._qubit_ids] #Still allowing integer/string-based indexing on the qubit_ids...
         leQregs = self._poqasm.get_qubit_registers()
 
-        final_mapping = {}
+        self._final_qreg_phys_mapping = {}
         for m,cur_qubit_reg in enumerate(leQregs):
             assert cur_qubit_reg in mapping, f"The qubit register {cur_qubit_reg} not present in the supplied mapping."
             assert mapping[cur_qubit_reg] in leQubitNames, f"Qubit by name {mapping[cur_qubit_reg]} does not exist in the qubits supplied in qubit_ids when initialising ExpZIQASM..."
-            final_mapping[m] = leQubitNames.index( mapping[cur_qubit_reg] )
-        self._args['qubit_mapping'] = final_mapping
+            cur_phys_index = leQubitNames.index( mapping[cur_qubit_reg] )
+            self._final_qreg_phys_mapping[cur_qubit_reg] = cur_phys_index
+        self._poqasm.set_qreg_physical_mapping(self._final_qreg_phys_mapping)
 
     def _run(self, file_path, sweep_vars=[], **kwargs):
-        self._leScheduleBlocks = self._poqasm.create_schedule(self._qasm_qubit_params)
-        qubit_reg_mappings_inv = {v: k for k, v in self._leScheduleBlocks['qubit_mappings'].items()}
+        self._poqasm.perform_parsing()
+
+        leQubitNames = [self._hal_QPU.get_qubit_obj(x).Name for x in self._qubit_ids] #Still allowing integer/string-based indexing on the qubit_ids...
+
+        mapping_qreg_physQid = {}
+        for cur_qreg in self._final_qreg_phys_mapping:
+            mapping_qreg_physQid[self._final_qreg_phys_mapping[cur_qreg]] = leQubitNames[self._final_qreg_phys_mapping[cur_qreg]]
+        qasm_qubit_params = ScheduleParametersSoftQPUZI(self._hal_QPU,mapping_qreg_physQid)
+        #
+        self._leScheduleBlocks = self._poqasm.create_schedule(qasm_qubit_params)
         
-        self._leScheduleFlattened = {'qubit_mappings':self._leScheduleBlocks['qubit_mappings'], 'commands':[item for sublist in self._leScheduleBlocks['commands'] for item in sublist]}
+        self._leScheduleFlattened = {'commands':[item for sublist in self._leScheduleBlocks['commands'] for item in sublist]}
 
-        # leTable = self._poqasm.tabulate_schedule(leSchedule, qubit_params)
+        # leTable = self._poqasm.tabulate_schedule(self._leScheduleFlattened, qasm_qubit_params)
         # for m in range(len(self._leScheduleBlocks['commands'])):
-        self._poqasm.plot_schedule(self._leScheduleFlattened, self._qasm_qubit_params, file_path + 'compiled_qasm_schedule.html')
+        self._poqasm.plot_schedule(self._leScheduleFlattened, qasm_qubit_params, file_path + 'compiled_qasm_schedule.html')
 
-        self._poqasm.check_ZI_compatibility(self._leScheduleFlattened, self._qasm_qubit_params, **kwargs)
+        self._poqasm.check_ZI_compatibility(self._leScheduleFlattened, qasm_qubit_params, **kwargs)
 
         self._args['openqasm_schedule'] = self._leScheduleFlattened
         super()._run(file_path, sweep_vars, **kwargs)

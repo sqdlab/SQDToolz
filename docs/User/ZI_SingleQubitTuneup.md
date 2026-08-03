@@ -51,7 +51,7 @@ lab.HAL('ZIacq').NumRepetitions = 1024
 stz.ExperimentConfiguration('ZI', lab, 0, [], 'ZIacq')
 
 exp = ExpZISingleQubitTuneup('Tuneup', lab.CONFIG('ZI'), lab.HAL('QPU'), 'Q0', flux_range=np.arange(1.25, 0.5, -0.1), qubit_spec_LO_power=-25, res_freq_span=5e6)
-exp.run(lab, disable_ZI_logging=True)
+exp.run(lab)
 ```
  
 Below is an example of the output plots.

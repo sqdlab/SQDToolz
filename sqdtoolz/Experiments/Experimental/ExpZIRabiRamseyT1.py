@@ -88,9 +88,11 @@ class ExpZIRabiRamseyT1:
         if self._states=='ge':
             self._qubit.DriveGEAmplitudeX = 1.0
             self._qubit.DriveGEAmplitudeXon2 = 0.5  
+            drivetime = self._qubit.DriveGETime
         else:
             self._qubit.DriveEFAmplitudeX = 1.0
             self._qubit.DriveEFAmplitudeXon2 = 0.5  
+            drivetime = self._qubit.DriveEFTime
         exp = ExpZIRabi(f'rabi_pre_cal_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], amplitudes=[self._rabi_ampls], transition=self._states, 
                         cal_states=self._states, update=self._update_live, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots, use_cal_traces=False)
         lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages)
@@ -105,7 +107,7 @@ class ExpZIRabiRamseyT1:
         data_x = leData.param_vals[0]
         ExpZIRabi.plot_fitted_results(ax, data_x, fitted_data['amplitude_raw'], fitted_data, True)
         sigFigs = 4
-        ax.set_title(f"Rabi amplitudes: X={fitted_data['amp_X']:.{sigFigs}g}, X/2={fitted_data['amp_Xon2']:.{sigFigs}g}")
+        ax.set_title(f"Rabi amplitudes: X={fitted_data['amp_X']:.{sigFigs}g}, X/2={fitted_data['amp_Xon2']:.{sigFigs}g} ({drivetime*1e9:.1f} ns)")
         ##############################
         #
         #RAMSEY

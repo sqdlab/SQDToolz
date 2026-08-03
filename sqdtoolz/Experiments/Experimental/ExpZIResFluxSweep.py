@@ -90,7 +90,7 @@ class ExpZIResFluxSweep(ExpZIqubit):
         ax.plot(fitted_data['smoothed_fit_freqs'], flux_vals, 'w-')
         ax.plot(fitted_data['raw_fit_freqs'], flux_vals, 'wo')
         ax.plot([fitted_data['sweet_freq_flux'][0]], [fitted_data['sweet_freq_flux'][1]], 'ro')
-        ax.set_title(f"{qubit_id} sweet spot: f={fitted_data['sweet_freq_flux'][0]*1e-9:.4f} GHz, FluxDC={fitted_data['sweet_freq_flux'][1]:.4f} V")
+        ax.set_title(f"{qubit_id} resonator flux sweep: $f_r$={fitted_data['sweet_freq_flux'][0]*1e-9:.4f} GHz, $V_\Phi$={fitted_data['sweet_freq_flux'][1]:.4f} V")
         ax.set_xlabel('Frequency (Hz)')
         ax.set_ylabel('Flux (V)')
 

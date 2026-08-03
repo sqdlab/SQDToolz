@@ -52,6 +52,8 @@ angle vtheta = pi / 4;
 rx(vtheta) q;
 complex[float] f = 1+2im;
 
+reset q;
+
 for int i in [0:2] {
     angle vtheta = pi / (i + 2); // Shadows the outer vtheta
     for int m in [0:i]

@@ -302,6 +302,8 @@ def create_experiment(
                                     qop.delay(cur_qubit, cur_gate[1])
                             elif cur_gate[0] == 'Measure':
                                 qop.measure(cur_qubit, dsl.handles.result_handle(cur_qubit.uid))
+                            elif cur_gate[0] == 'Reset':
+                                qop.passive_reset(cur_qubit)
                 pass
 
         for q in qubits:

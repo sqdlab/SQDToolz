@@ -189,6 +189,10 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
     def visit_FunctionCall(self, node):
         return self._eval_arg(node)
 
+    def visit_QuantumReset(self, node):
+        qargs = self._eval_qarg(node.qubits)    #TODO: Look into whole-register reset...
+        self._commands.append({'type':'reset', 'targets':qargs})
+
     def visit_QuantumBarrier(self, node):
         # self._commands.append({'type':'barrier'})
         #Pointless as we won't be doing commutation/collapse optimisation here...
@@ -636,6 +640,9 @@ class ParserOpenQASM:
                         cur_qubit_commands[cur_command['targets'][0]].append(('D', self._process_delay(cur_command['length'], params.dt)))
                     elif cur_command['type'] == 'measure':
                         cur_qubit_commands[cur_command['qubit'][0]].append(('Measure',cur_command['store'][0]))   #TODO: Check if multi-qubit registers can be stored/measured in OpenQASM3?
+                    elif cur_command['type'] == 'reset':
+                        #Reset does not synchronise
+                        cur_qubit_commands[cur_command['targets']].append(('Reset',)) #TODO: Adapt to multi-qubit registers
                 else:
                     ####
                     #Calculate new synchronisation point
@@ -875,7 +882,10 @@ class ParserOpenQASM:
                     continue
             #Process it as a 1QG
             for cur_gate in cur_sec_ops['sequence']:
-                cur_name = self._get_1QG_name(*cur_gate)
+                if cur_gate[0] == 'Reset':
+                    cur_name = 'Reset'
+                else:
+                    cur_name = self._get_1QG_name(*cur_gate)
                 cur_gate_time = qubit_params.get_duration(cur_qubit, cur_gate)
                 #
                 arr_qubits.append(cur_qubit)

@@ -32,6 +32,14 @@ class ExpZIChevrons2QFixedCoupler(ExpZIqubit):
         self._temp_var_ampl = VariablePropertyTransient('flux_amplitude', self.cur_coupler_obj, 'Amplitude')
         self._single_shot = kwargs.pop('single_shot', False)
 
+        self._show_single_qubit_only = kwargs.pop('show_single_qubit', False)
+        if self._show_single_qubit_only == True:
+            self._show_single_qubit_only = qubit_ids[0]
+        elif isinstance(self._show_single_qubit_only, str):
+            assert self._show_single_qubit_only in qubit_ids, "If providing a qubit for show_single_qubit, ensure it is in qubit_ids."
+        elif self._show_single_qubit_only != False:
+            assert False, "Set show_single_qubit either to True, False, or a string containing a qubit in the measurement, e.g. 'Q1'."
+
         super().__init__(name, expt_config, calibrate_tunable_transmon_fixed_coupler_osc, hal_QPU, qubit_ids, **kwargs)
 
     def _run(self, file_path, sweep_vars=[], **kwargs):
@@ -111,9 +119,15 @@ class ExpZIChevrons2QFixedCoupler(ExpZIqubit):
 
             np.save(self._file_path + f'fitted_data.npy', {'qubits':self._qubit_ids, 'wait_times':wait_times, 'flux_amps':leData.param_vals[0], 'pop_qubit_amps_times':final_pops})
         else:
-            fig, axs = plt.subplots(nrows=len(self._qubit_ids))
+            if self._show_single_qubit_only:
+                fig, axs = plt.subplots(nrows=1)
+                qubits_to_plot = [self._show_single_qubit_only]
+                axs = [axs]
+            else:
+                fig, axs = plt.subplots(nrows=len(self._qubit_ids))
+                qubits_to_plot = self._qubit_ids
 
-            for m, cur_qubit in enumerate(self._qubit_ids):
+            for m, cur_qubit in enumerate(qubits_to_plot):
                 leData = self.retrieve_last_dataset(cur_qubit)
                 wait_times = leData.param_vals[1]
                 norm_fac, norm_prefix = Miscellaneous.get_metric_multiplier(wait_times)

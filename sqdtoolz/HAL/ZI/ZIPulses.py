@@ -1,13 +1,14 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from laboneq.simple import *
+import laboneq.dsl.experiment.pulse
 
 """
 Pulse library for use with ZI hardware. Imported with instantiation of ZIQubit.
 """
 
 @pulse_library.register_pulse_functional
-def flattop_gaussian_two_stage(
+def flattop_gaussian_buffer(
     x,
     relative_length_flat=0.7,
     relative_length_buffer=0.1,
@@ -104,7 +105,7 @@ def flattop_gaussian_buffer_asymmetric(
     if ramp_width_left <= 0:
         raise ValueError("relative_length_flat + relative_length_buffer must be < 1")
     sigma_left = ramp_width_left / 3
-    b1 = b0_left + ramp_width_left
+    b1 = b0_legenerate_sampled_pulseft + ramp_width_left
     b2 = b1 + relative_length_buffer
 
     # right-side plateau is shifted out by relative_length_buffer, so the
@@ -135,3 +136,72 @@ def flattop_gaussian_buffer_asymmetric(
     res[mask] = np.exp(-((x[mask] - b0_right) ** 2) / (2 * sigma_right**2))
 
     return res
+
+def plot_sampled_pulse(pulse, iq=True, amp_phi=False):
+    assert isinstance(pulse, laboneq.dsl.experiment.pulse.PulseFunctional), "Pass a laboneq pulse."
+    if amp_phi:
+        iq = False
+    assert iq ^ amp_phi, "Either 'iq' or 'amp_phi' must be True."
+    #
+    times, samples = pulse.generate_sampled_pulse()
+    times = times*1e9
+    samples = np.asarray(samples)
+    if iq:
+        fig, ax = plt.subplots(figsize=(8,4))
+        ax.plot(times, samples.real, label="I", color="tab:blue")
+        ax.plot(times, samples.imag, label="Q", color="tab:orange")
+        ax.set_xlabel("t (ns)")
+        ax.set_ylabel("Amplitude")
+        ax.legend()
+        ax.set_title(f"{pulse.function}")
+    else:  # amp_phi
+        amplitude = np.abs(samples)
+        phase = np.angle(samples)
+        #
+        fig, ax_amp = plt.subplots(figsize=(8, 4))
+        ax_phi = ax_amp.twinx()
+        #
+        line_amp, = ax_amp.plot(times, amplitude, color="tab:blue", label="Amplitude")
+        ax_amp.set_xlabel("t (ns)")
+        ax_amp.set_ylabel("Amp", color="tab:blue")
+        ax_amp.tick_params(axis="y", labelcolor="tab:blue")
+        #
+        line_phi, = ax_phi.plot(times, phase, color="tab:orange", label="Phase")
+        ax_phi.set_ylabel("$\phi$ (rad)", color="tab:orange")
+        ax_phi.tick_params(axis="y", labelcolor="tab:orange")
+        #
+        _align_zero(ax_amp, ax_phi)
+        ax_amp.set_title(f"{pulse.function}")
+    plt.tight_layout()
+    plt.show()
+
+def _align_zero(ax1, ax2):
+    """Rescale y-limits of two twin axes so that y=0 lines up on both."""
+    y1_min, y1_max = ax1.get_ylim()
+    y2_min, y2_max = ax2.get_ylim()
+    frac1 = -y1_min / (y1_max - y1_min) if (y1_max - y1_min) != 0 else 0.5
+    frac2 = -y2_min / (y2_max - y2_min) if (y2_max - y2_min) != 0 else 0.5
+    frac = max(frac1, frac2)  # use the larger "below zero" fraction for both
+    def rescale(ymin, ymax, frac):
+        span_above = ymax
+        span_below = -ymin
+        if frac == 0:
+            new_min = ymin
+            new_max = ymax
+        else:
+            total_below = max(span_below, span_above * frac / (1 - frac)) if frac < 1 else span_below
+            total_above = max(span_above, span_below * (1 - frac) / frac) if frac > 0 else span_above
+            new_min = -total_below
+            new_max = total_above
+        return new_min, new_max
+
+    ax1.set_ylim(*rescale(y1_min, y1_max, frac))
+    ax2.set_ylim(*rescale(y2_min, y2_max, frac))
+
+
+# We need to add a few more pulse shapes in the future
+#   - Slepian
+#
+#
+#
+#import laboneq.dsl.experiment.pulse

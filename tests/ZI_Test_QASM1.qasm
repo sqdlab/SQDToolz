@@ -4,6 +4,7 @@ include "ZI_test_QASM_qelib1.inc";
 qubit q;
 qubit q2;
 bit[2] c;
+bit mid;
 
 cal {
     float ampl = 0.358;
@@ -51,6 +52,8 @@ angle vtheta = pi / 4;
 
 rx(vtheta) q;
 complex[float] f = 1+2im;
+
+mid = measure q;
 
 reset q;
 

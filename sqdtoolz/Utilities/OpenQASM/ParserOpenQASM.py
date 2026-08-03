@@ -615,6 +615,8 @@ class ParserOpenQASM:
         #Initialise qubits and sync times
         phys_qubit_ids = list(self._qreg_phys_mapping.values())
         #
+        meas_store_ids = {}
+        meas_index = 0
         final_blocks = []
         for cur_block in self._command_blocks:
             final_commands = []
@@ -639,7 +641,10 @@ class ParserOpenQASM:
                     elif cur_command['type'] == 'delay':
                         cur_qubit_commands[cur_command['targets'][0]].append(('D', self._process_delay(cur_command['length'], params.dt)))
                     elif cur_command['type'] == 'measure':
-                        cur_qubit_commands[cur_command['qubit'][0]].append(('Measure',cur_command['store'][0]))   #TODO: Check if multi-qubit registers can be stored/measured in OpenQASM3?
+                        cur_meas_id = f'm{meas_index}'
+                        cur_qubit_commands[cur_command['qubit'][0]].append(('Measure',cur_meas_id))   #TODO: Check if multi-qubit registers can be stored/measured in OpenQASM3?
+                        meas_store_ids[cur_command['store'][0]] = cur_meas_id
+                        meas_index += 1
                     elif cur_command['type'] == 'reset':
                         #Reset does not synchronise
                         cur_qubit_commands[cur_command['targets']].append(('Reset',)) #TODO: Adapt to multi-qubit registers
@@ -711,7 +716,7 @@ class ParserOpenQASM:
                     #Don't need to check if it's 'end' as it's the end...
             final_blocks.append(final_commands)
         #
-        return {'commands':final_blocks}
+        return {'commands':final_blocks, 'meas_store_ids': meas_store_ids}
 
     def _process_delay(self, delay_params, dt_time):
         if delay_params[1] == 's':
@@ -813,8 +818,6 @@ class ParserOpenQASM:
     def _get_1QG_name(self, axis:str, angle:float):
         if axis == 'D':
             return f'{Miscellaneous.get_units(angle)}s'
-        if axis == 'Measure':
-            return self._measure_label
         if np.abs(angle - np.pi) < 1e-6:
             return f'{axis}(π)'
         if np.abs(angle - np.pi/2) < 1e-6:
@@ -884,6 +887,8 @@ class ParserOpenQASM:
             for cur_gate in cur_sec_ops['sequence']:
                 if cur_gate[0] == 'Reset':
                     cur_name = 'Reset'
+                elif cur_gate[0] == 'Measure':
+                    cur_name = self._measure_label
                 else:
                     cur_name = self._get_1QG_name(*cur_gate)
                 cur_gate_time = qubit_params.get_duration(cur_qubit, cur_gate)

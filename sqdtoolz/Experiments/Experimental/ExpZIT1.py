@@ -11,6 +11,7 @@ class ExpZIT1(ExpZIqubit):
         self._dont_show_plot = kwargs.pop('dont_show_plot', False)
         assert (not 'update' in kwargs) or ('update' in kwargs and not kwargs['update']), "Don't set 'update=True'. The updates shall be done by calling update_qubit after running the experiment."
         kwargs['update'] = False
+        kwargs['delays'] = kwargs.pop('delays', [np.linspace(0, 150e-6, 25)])
         self._fit_vals = []
         self._expect_rise = kwargs.pop('expect_rise', False)    #Only for unnormalised fitting
         super().__init__(name, expt_config, lifetime_measurement, hal_QPU, qubit_ids, **kwargs)
@@ -73,11 +74,13 @@ class ExpZIT1(ExpZIqubit):
         ax.set_xlabel(f'Wait Times ({norm_prefix}s)')
         ax.set_title(f"{fitted_results['qubit_name']}: {cur_transition}-$T_1=${Miscellaneous.get_units(fitted_results['T1'],4)}s")
 
-    def update_qubits(self):
+    def update_qubits(self, set_qubit_qi=True):
         assert len(self._fit_vals) > 0, "Must run T1 Experiment before qubits can be updated."
         while len(self._fit_vals) > 0:
             cur_fit = self._fit_vals.pop(0)
             if self._transition == 'ge':
                 cur_fit['qubit_obj'].T1GE = float(cur_fit['T1'])
+                cur_fit['qubit_obj'].QubitQiGE = 2 * np.pi * cur_fit['qubit_obj'].DriveGE * float(cur_fit['T1'])
             else:
                 cur_fit['qubit_obj'].T1EF = float(cur_fit['T1'])
+                cur_fit['qubit_obj'].QubitQiEF = 2 * np.pi * cur_fit['qubit_obj'].DriveEF * float(cur_fit['T1'])

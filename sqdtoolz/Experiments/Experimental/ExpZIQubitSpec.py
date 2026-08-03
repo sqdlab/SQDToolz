@@ -21,6 +21,10 @@ class ExpZIQubitSpec(ExpZIqubit):
         self._hal_QPU = hal_QPU
         self._spectroscopy_reset_delay = kwargs.pop('spectroscopy_reset_delay', 200e-6)
 
+        fq = self._hal_QPU.get_qubit_obj(self._qubit_dataset).DriveGE if self._states=='ge' else self._hal_QPU.get_qubit_obj(self._qubit_dataset).DriveEF
+        frequencies = kwargs.pop('frequencies', np.linspace(-100e6, 100e6, 401) + fq)
+        kwargs['frequencies'] = frequencies if isinstance(frequencies, list) else [frequencies]
+
         if self._states=='ge':
             super().__init__(name, expt_config, qubit_spectroscopy, hal_QPU, [qubit_id], **kwargs)
         elif self._states=='ef':

@@ -153,6 +153,7 @@ class DataTransmonFlux:
                 ax1.legend(loc='lower right', fontsize=8)
             else:
                 print("Do fit_qubit_frequency() before plotting the fit.")
+        ax1.set_xlim(np.min(self._frequencies), np.max(self._frequencies))
         if show_extrap:
             fit_func = self._qubit_amp_fit['fit_func']
             popt = self._qubit_amp_fit['popt']

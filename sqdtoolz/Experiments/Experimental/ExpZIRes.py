@@ -91,6 +91,7 @@ class ExpZIRes(ExpZIqubit):
                     cur_qubit.ReadoutQc = dpkt['Qc_dia_corr']
                     cur_qubit.ReadoutQl = dpkt['Ql']
                     dpkt['fit_data'] = {'real': np.real(dpkt['fit_data']), 'imag': np.imag(dpkt['fit_data'])}
+                    cur_qubit.ReadoutKappa = dpkt['fr'] / dpkt['Qc_dia_corr']
                 else:
                     print('Qubit parameters were not updated: bad fit.')
             if self._param_centre:

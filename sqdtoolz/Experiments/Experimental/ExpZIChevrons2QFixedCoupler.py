@@ -112,10 +112,6 @@ class ExpZIChevrons2QFixedCoupler(ExpZIqubit):
             np.save(self._file_path + f'fitted_data.npy', {'qubits':self._qubit_ids, 'wait_times':wait_times, 'flux_amps':leData.param_vals[0], 'pop_qubit_amps_times':final_pops})
         else:
             fig, axs = plt.subplots(nrows=len(self._qubit_ids))
-            if self.cur_coupler_obj.signals['flux']:
-                fig.suptitle(f"Chevrons: {self.cur_coupler_obj.Name} ({self.cur_coupler_obj.signals['flux']})", y=0.98)
-            else:
-                fig.suptitle(f"Chevrons: {self.cur_coupler_obj.Name}", y=0.98)
 
             for m, cur_qubit in enumerate(self._qubit_ids):
                 leData = self.retrieve_last_dataset(cur_qubit)
@@ -124,10 +120,12 @@ class ExpZIChevrons2QFixedCoupler(ExpZIqubit):
                 arr = leData.get_numpy_array()
                 #
                 flux_amps = leData.param_vals[0]
-                axs[m].pcolor(flux_amps, wait_times/norm_fac, np.sqrt(arr[:,:,0]**2+arr[:,:,1]**2).T, vmin=0)
+                # axs[m].pcolor(flux_amps, wait_times/norm_fac, np.sqrt(arr[:,:,0]**2+arr[:,:,1]**2).T, vmin=0)
+                axs[m].pcolor(flux_amps, wait_times/norm_fac, np.sqrt(arr[:,:,0]**2+arr[:,:,1]**2).T)
                 axs[m].set_ylabel(f'Wait Time ({norm_prefix}s)')
                 axs[m].text(x=1.03, y=0.5, s=cur_qubit, rotation=0, ha='left', va='center', transform=axs[m].transAxes)
                 #
+                title_y=0.86
                 if self.tuned_qubit.FluxConversionParams is not None and self._plot_with_frequency:
                     x_vals = DataTransmonFlux.convert_flux_amplitude_to_frequency_zi(self.tuned_qubit, flux_amplitude=flux_amps, fluxDC=self.tuned_qubit.FluxDC)
                     amp_order = np.argsort(flux_amps)
@@ -144,7 +142,8 @@ class ExpZIChevrons2QFixedCoupler(ExpZIqubit):
                     freq_ticks = locator.tick_values(freq_sorted.min(), freq_sorted.max())
                     freq_ticks = freq_ticks[(freq_ticks >= freq_sorted.min()) & (freq_ticks <= freq_sorted.max())]
                     secax.set_xticks(freq_ticks)
-
+                    #
+                    title_y=0.98
                     if m == 0:
                         secax.set_xlabel('Frequency', labelpad=8)
                     else:
@@ -153,8 +152,13 @@ class ExpZIChevrons2QFixedCoupler(ExpZIqubit):
                 if m < len(self._qubit_ids)-1:
                     axs[m].set_xticklabels([])
                     # axs[m].tick_params(axis='x', which='both', bottom=False)
+            if self.cur_coupler_obj.signals['flux']:
+                fig.suptitle(f"Chevrons: {self.cur_coupler_obj.Name} ({self.cur_coupler_obj.signals['flux']})", y=title_y)
+            else:
+                fig.suptitle(f"Chevrons: {self.cur_coupler_obj.Name}", y=title_y)
+            #
             axs[m].set_xlabel('Flux Pulse Amplitude (0-1)')
-
+            #
             fig.subplots_adjust(hspace=0.1, top=0.8)
 
         fig.savefig(self._file_path + f'fitted_plot.png')

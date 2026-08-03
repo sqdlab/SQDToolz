@@ -182,7 +182,6 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
             self.DriveGE = 5.2e9
             self.DriveEF = 5.1e9
             self.ReadoutFrequency = 7.0e9
-            #TODO set FluxRange automatically to minimum above current FluxDC
             self.FluxRange = 1
 
             self._zi_qops = TunableTransmonOperations
@@ -247,3 +246,7 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
                 self.ReadoutKernelType = 'default'
                 self.ReadoutKernelThresholds = None
 
+    def reset_readout_kernels(self):
+        self.ReadoutKernelType = 'default'
+        self.ReadoutKernelThresholds = None
+        self.ReadoutKernelWeights = None

@@ -63,7 +63,7 @@ def experiment_workflow(
     | None = None,
     options: TuneUpWorkflowOptions | None = None,
 ) -> None:
-    """The fluxscope Workflow.
+    """The cryoscope Workflow.
 
     The workflow consists of the following steps:
 

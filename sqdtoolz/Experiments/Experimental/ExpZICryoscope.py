@@ -8,7 +8,7 @@ from sqdtoolz.Utilities.FileIO import FileIODirectory
 from pathlib import Path
 import sqdtoolz as stz
 
-class ExpZIFluxscope:
+class ExpZICryoscope:
     def __init__(self, name, expt_config, hal_QPU, qubit_ids, **kwargs):
         self._name = name
         self._expt_config= expt_config
@@ -16,7 +16,7 @@ class ExpZIFluxscope:
         self._isY = 0 #Will be passed to cryo_scope to determine x90 or y90
         self._qubit_ids = qubit_ids
         self._kwargs = kwargs
-        assert len(self._qubit_ids)==2, "Also must define a second qubit as Will attempt to optimise a pulse specific to each coupler element"
+        assert len(self._qubit_ids)==2, "Also must define a second qubit as it will attempt to optimise a pulse specific to each coupler element"
         
 
         self._amplitudes = kwargs.get('amplitudes', np.linspace(0.1,1.0,10))

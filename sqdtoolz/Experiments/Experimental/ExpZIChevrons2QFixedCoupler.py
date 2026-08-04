@@ -163,7 +163,7 @@ class ExpZIChevrons2QFixedCoupler(ExpZIqubit):
                     else:
                         secax.set_xticklabels([])
                         # secax.tick_params(top=False, labeltop=False)
-                if m < len(self._qubit_ids)-1:
+                if (m < len(self._qubit_ids)-1) and not self._show_single_qubit_only:
                     axs[m].set_xticklabels([])
                     # axs[m].tick_params(axis='x', which='both', bottom=False)
             if self.cur_coupler_obj.signals['flux']:

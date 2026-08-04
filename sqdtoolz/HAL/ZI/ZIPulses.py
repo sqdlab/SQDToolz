@@ -137,13 +137,22 @@ def flattop_gaussian_buffer_asymmetric(
 
     return res
 
-def plot_sampled_pulse(pulse, iq=True, amp_phi=False):
-    assert isinstance(pulse, laboneq.dsl.experiment.pulse.PulseFunctional), "Pass a laboneq pulse."
+
+
+def plot_sampled_pulse(pulse, iq=True, amp_phi=False, function=None, title=None):
+    assert isinstance(pulse, tuple), "Provide a sampled pulse, which should be a tuple containing an array of time points, and an equal length array of complex values."
     if amp_phi:
         iq = False
     assert iq ^ amp_phi, "Either 'iq' or 'amp_phi' must be True."
     #
-    times, samples = pulse.generate_sampled_pulse()
+    if title:
+        title = title
+    elif function:
+        title = function
+    else:
+        title = ""
+    #
+    times, samples = pulse
     times = times*1e9
     samples = np.asarray(samples)
     if iq:
@@ -153,7 +162,7 @@ def plot_sampled_pulse(pulse, iq=True, amp_phi=False):
         ax.set_xlabel("t (ns)")
         ax.set_ylabel("Amplitude")
         ax.legend()
-        ax.set_title(f"{pulse.function}")
+        ax.set_title(f"{title}")
     else:  # amp_phi
         amplitude = np.abs(samples)
         phase = np.angle(samples)
@@ -171,10 +180,20 @@ def plot_sampled_pulse(pulse, iq=True, amp_phi=False):
         ax_phi.tick_params(axis="y", labelcolor="tab:orange")
         #
         _align_zero(ax_amp, ax_phi)
-        ax_amp.set_title(f"{pulse.function}")
+        ax_amp.set_title(f"{title}")
     plt.tight_layout()
     plt.show()
 
+def plot_pulse(pulse, iq=True, amp_phi=False, title=None):
+    if isinstance(pulse, tuple):
+        sampled_pulse = pulse
+        function = None
+    else:
+        assert isinstance(pulse, laboneq.dsl.experiment.pulse.PulseFunctional), "Pass a laboneq pulse."
+        sampled_pulse = pulse.generate_sampled_pulse()
+        function = pulse.function
+    plot_sampled_pulse(sampled_pulse, iq=iq, amp_phi=amp_phi, function=function, title=title)
+    
 def _align_zero(ax1, ax2):
     """Rescale y-limits of two twin axes so that y=0 lines up on both."""
     y1_min, y1_max = ax1.get_ylim()

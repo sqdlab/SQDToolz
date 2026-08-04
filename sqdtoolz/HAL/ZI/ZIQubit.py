@@ -201,6 +201,8 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
                 return self.DriveGETime
             if gate in ['Z', 'Z/2']:
                 return 0
+            if gate == 'Reset':
+                return self.ResetTime   #TODO: Adapt for active reset...
             return -1
     
     def get_measure_duration(self):

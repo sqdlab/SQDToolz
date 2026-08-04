@@ -70,7 +70,7 @@ class ExpZIQASM(ExpZIqubit):
         #
         self._leScheduleBlocks = self._poqasm.create_schedule(qasm_qubit_params)
         
-        self._leScheduleFlattened = {'commands':[item for sublist in self._leScheduleBlocks['commands'] for item in sublist]}
+        self._leScheduleFlattened = {'commands':[item for sublist in self._leScheduleBlocks['commands'] for item in sublist], 'meas_store_ids':self._leScheduleBlocks['meas_store_ids']}
 
         # leTable = self._poqasm.tabulate_schedule(self._leScheduleFlattened, qasm_qubit_params)
         # for m in range(len(self._leScheduleBlocks['commands'])):
@@ -80,6 +80,17 @@ class ExpZIQASM(ExpZIqubit):
 
         self._args['openqasm_schedule'] = self._leScheduleFlattened
         super()._run(file_path, sweep_vars, **kwargs)
+
+        self.qasm_output = {}
+        for cur_meas_output in self._leScheduleFlattened['meas_store_ids']:
+            cur_fileioread = self.retrieve_last_aux_dataset(self._leScheduleFlattened['meas_store_ids'][cur_meas_output])
+            #TODO: Check if single-shot...
+            arr = cur_fileioread.get_numpy_array()
+            if len(arr.shape) == 2:
+                self.qasm_output[cur_meas_output] = arr[-1,0]
+            else:
+                self.qasm_output[cur_meas_output] = arr[0]
+        pass
 
     def _post_process(self, data):
         pass

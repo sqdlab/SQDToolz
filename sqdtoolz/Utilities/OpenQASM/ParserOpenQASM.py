@@ -12,6 +12,15 @@ from sqdtoolz.Utilities.Miscellaneous import Miscellaneous
 import bokeh
 from bokeh.models import PanTool
 from sqdtoolz.Utilities.FileJSON import SerialiseJSON
+from enum import Enum, auto
+
+class SQDQasmCommandType(Enum):
+    GATE = auto()
+    DELAY = auto()
+    MEASURE = auto()
+    RESET = auto()
+    DEF_CAL = auto()
+    END_BLOCK = auto()
 
 class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
     def __init__(self, qreg_phys_mapping:dict):
@@ -46,6 +55,10 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
     def enter_scope(self, with_scope_barrier=False):
         #Idea of with_scope_barrier is that it'll stop backtracking in variable resolution in cases like functions where
         #scope must be local.
+        #This stack manipulation is FINE in this case as it's a static compilation sequence. That is, it is not a run-time
+        #stack (i.e. the typical concern may occur with an exception that occurs after calling enter_scope and then but
+        #before calling leave_scope, so on leaving this subroutine, it would leave the stack unpopped...), so any errors
+        #will just fail compilation rather than continue runtime...
         if self._in_cal_blk:
             if with_scope_barrier:
                 self._variables_cal_stack.append(None)
@@ -73,10 +86,34 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
         else:
             self._variables_stack[-1][var_name] = [var_type, var_value]
     def set_var_in_cur_scope(self, var_name, var_value):
+        #Check the scoping variable stack...
         if self._in_cal_blk:
-            self._variables_cal_stack[-1][var_name][1] = var_value
+            cur_vars = self._variables_cal_stack
         else:
-            self._variables_stack[-1][var_name][1] = var_value
+            cur_vars = self._variables_stack
+        for m in range(len(cur_vars)-1,-1,-1):
+            if cur_vars[m] == None:    #Stop if there is a scoping barrier
+                if not search_global_scope:
+                    break
+                else:
+                    continue
+            if var_name in cur_vars[m]:
+                cur_vars[m][var_name][1] = var_value   #TODO: Consider type-checking on index 0 somehow here or elsewhere?
+    def get_var_in_cur_scope(self, var_name, search_global_scope=False):
+        #Check the scoping variable stack...
+        if self._in_cal_blk:
+            cur_vars = self._variables_cal_stack
+        else:
+            cur_vars = self._variables_stack
+        for m in range(len(cur_vars)-1,-1,-1):
+            if cur_vars[m] == None:    #Stop if there is a scoping barrier
+                if not search_global_scope:
+                    break
+                else:
+                    continue
+            if var_name in cur_vars[m]:
+                return cur_vars[m][var_name][1]   #TODO: Consider type-checking on index 0 somehow here or elsewhere?
+        assert False, f"The identifier {var_name} is undefined in this scope!"
 
     def visit_QuantumGateDefinition(self, node):
         self._gate_defs[node.name.name] = node
@@ -89,7 +126,25 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
         self._qubits[node.qubit.name] = reg_size
 
     def visit_ClassicalAssignment(self, node):
-        self.set_var_in_cur_scope(node.lvalue.name, self._eval_arg(node.rvalue))
+        #TODO: Check op and properly implement this... Also, check the set_var_in_cur_scope command. It doesn't traverse the stack?
+        cur_val = self.get_var_in_cur_scope(node.lvalue.name)
+        new_val = self._eval_arg(node.rvalue)
+        match node.op:
+            case '=':
+                self.set_var_in_cur_scope(node.lvalue.name, new_val)
+            case '+=':
+                self.set_var_in_cur_scope(node.lvalue.name, self._eval_binary_expression(cur_val, new_val, '+'))
+            case '-=':
+                self.set_var_in_cur_scope(node.lvalue.name,  self._eval_binary_expression(cur_val, new_val, '-'))
+            case '*=':
+                self.set_var_in_cur_scope(node.lvalue.name,  self._eval_binary_expression(cur_val, new_val, '*'))
+            case '/=':
+                self.set_var_in_cur_scope(node.lvalue.name,  self._eval_binary_expression(cur_val, new_val, '/'))
+            case '%=':
+                self.set_var_in_cur_scope(node.lvalue.name,  self._eval_binary_expression(cur_val, new_val, '%'))
+            case '**=':
+                self.set_var_in_cur_scope(node.lvalue.name,  self._eval_binary_expression(cur_val, new_val, '**'))
+
 
     def visit_ClassicalDeclaration(self, node):
         if isinstance(node.type, openqasm3.ast.BitType):
@@ -145,7 +200,7 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
                     ctrl_mods += ['ctrl']*num
                 elif cur_modifier.modifier.name == 'negctrl':
                     ctrl_mods += ['negctrl']*num
-            self._commands.append( {'type': 'gate', 'angles':  args, 'controls':ctrl_mods, 'targets': self._extra_mod_qubits+qargs} )
+            self._commands.append( {'type': SQDQasmCommandType.GATE, 'angles':  args, 'controls':ctrl_mods, 'targets': self._extra_mod_qubits+qargs} )
             return
         else:
             #or cur_func_name in self._def?
@@ -178,7 +233,7 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
             self._extra_mod_stack.pop()
             self._extra_mod_qubits.pop()
         if is_cal:
-            self._commands.append({'type':'defcal', 'targets':qargs, 'play_commands':self._cur_defcal})  #Synchronisation barrier to ensure everything outside is run sequentially
+            self._commands.append({'type':SQDQasmCommandType.DEF_CAL, 'targets':qargs, 'play_commands':self._cur_defcal})  #Synchronisation barrier to ensure everything outside is run sequentially
         self._in_cal_blk = False
         # self._commands += self._eval_func(node, args, qargs)
 
@@ -188,6 +243,10 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
 
     def visit_FunctionCall(self, node):
         return self._eval_arg(node)
+
+    def visit_QuantumReset(self, node):
+        qargs = self._eval_qarg(node.qubits)    #TODO: Look into whole-register reset...
+        self._commands.append({'type':SQDQasmCommandType.RESET, 'targets':qargs})
 
     def visit_QuantumBarrier(self, node):
         # self._commands.append({'type':'barrier'})
@@ -199,11 +258,11 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
         if not isinstance(cur_delay, tuple):    #Typically must have unit, but 0 delay doesn't require units...abs
             cur_delay = (cur_delay, 's')
         qargs = [self._eval_qarg(x) for x in node.qubits]
-        self._commands.append({'type':'delay', 'targets':qargs, 'length':cur_delay})
+        self._commands.append({'type':SQDQasmCommandType.DELAY, 'targets':qargs, 'length':cur_delay})
 
     def visit_QuantumMeasurementStatement(self, node):
         qargs = [self._eval_qarg(node.measure.qubit)]   #TODO: Expand to support registers expanding...
-        self._commands.append( {'type': 'measure', 'qubit': qargs, 'store': self._eval_bits_arg(node.target)} )
+        self._commands.append( {'type': SQDQasmCommandType.MEASURE, 'qubit': qargs, 'store': self._eval_bits_arg(node.target)} )
 
     def visit_RangeDefinition(self, node):
         leStep = 1 if node.step==None else self._eval_arg(node.step)
@@ -244,20 +303,7 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
             if argument.name == 'π' or argument.name == 'pi':
                 return np.pi
             else:
-                #Check the scoping variable stack...
-                if self._in_cal_blk:
-                    cur_vars = self._variables_cal_stack
-                else:
-                    cur_vars = self._variables_stack
-                for m in range(len(cur_vars)-1,-1,-1):
-                    if cur_vars[m] == None:    #Stop if there is a scoping barrier
-                        if not search_global_scope:
-                            break
-                        else:
-                            continue
-                    if argument.name in cur_vars[m]:
-                        return cur_vars[m][argument.name][1]   #TODO: Consider type-checking on index 0 somehow here or elsewhere?
-                assert False, f"The identifier {argument.name} is undefined in this scope!"
+                return self.get_var_in_cur_scope(argument.name, search_global_scope)
         elif isinstance(argument, openqasm3.ast.DurationLiteral):
             return (argument.value, argument.unit.name)
         elif isinstance(argument, openqasm3.ast.UnaryExpression):
@@ -266,39 +312,12 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
         elif isinstance(argument, openqasm3.ast.BinaryExpression):
             lhs = self._eval_arg(argument.lhs)
             rhs = self._eval_arg(argument.rhs)
-            assert not (isinstance(lhs, (list,tuple)) and isinstance(rhs, (list,tuple))), f"Cannot multiply two elements ({lhs} and {rhs}) where both have units."
-            units = None
-            if isinstance(lhs, (list,tuple)):
-                val_lhs = lhs[0]
-                units = lhs[1]                
-            else:
-                val_lhs = lhs
-            if isinstance(rhs, (list,tuple)):
-                val_rhs = rhs[0]
-                units = rhs[1]                
-            else:
-                val_rhs = rhs
-            #
-            if argument.op.name == '+':
-                ret_val = val_lhs + val_rhs
-            elif argument.op.name == '-':
-                ret_val = val_lhs - val_rhs
-            elif argument.op.name == '*':
-                ret_val = val_lhs * val_rhs
-            elif argument.op.name == '/':
-                ret_val = val_lhs / val_rhs
-            elif argument.op.name == '**':
-                ret_val = val_lhs ** val_rhs
-            #
-            if units == None:
-                return ret_val
-            else:
-                return (ret_val,units)
+            return self._eval_binary_expression(lhs, rhs, argument.op.name)
         elif isinstance(argument, openqasm3.ast.FunctionCall):
             match argument.name.name:
                 case 'load_numpy_encoded':
                     assert len(argument.arguments) == 1 and isinstance(argument.arguments[0], openqasm3.ast.IntegerLiteral), "The function load_numpy_encoded must have only one hashed encoded hex value."
-                    return self._temp_numpy_arrays.pop(argument.arguments[0].value)
+                    return self._temp_numpy_arrays[argument.arguments[0].value]
                 #
                 case 'drive':
                     assert len(argument.arguments) == 1 and argument.arguments[0].name[0]=='$', "Must give a single physical qubit (i.e. starts with $) to extract the line for the 'drive' function."
@@ -343,9 +362,42 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
         else:
             assert False, f"Type {argument} not implemented!"
 
-    
-
-
+    def _eval_binary_expression(self, lhs, rhs, operator):
+        units = [None, None]
+        if isinstance(lhs, (list,tuple)):
+            val_lhs = lhs[0]
+            units[0] = lhs[1]
+        else:
+            val_lhs = lhs
+        if isinstance(rhs, (list,tuple)):
+            val_rhs = rhs[0]
+            units[1] = rhs[1]
+        else:
+            val_rhs = rhs
+        #
+        if operator == '+':
+            assert (units[0] == None or units[1] == None) or (units[0] == units[1]), "Inconsistent units in addition."
+            ret_val = val_lhs + val_rhs
+        elif operator == '-':
+            assert (units[0] == None or units[1] == None) or (units[0] == units[1]), "Inconsistent units in subtraction."
+            ret_val = val_lhs - val_rhs
+        elif operator == '*':
+            assert (units[0] == None or units[1] == None), "Cannot multiply two numbers with different (dimensioned) units."
+            ret_val = val_lhs * val_rhs
+        elif operator == '/':
+            assert (units[0] == None or units[1] == None), "Cannot divide two numbers with different (dimensioned) units."
+            ret_val = val_lhs / val_rhs
+        elif operator == '**':
+            assert (units[0] == None and units[1] == None), "Cannot take powers with variables containing units."
+            ret_val = val_lhs ** val_rhs
+        elif operator == '%':
+            assert (units[0] == None and units[1] == None), "Cannot take modulo with variables containing units."
+            ret_val = val_lhs % val_rhs
+        #
+        if units[0] == None and units[1] == None:
+            return ret_val
+        else:
+            return (ret_val,units[0] if units[0] != None else units[1])
 
     def _preprocess_encoded_numpy_arrays(self, cal_string:str):
         """
@@ -611,6 +663,8 @@ class ParserOpenQASM:
         #Initialise qubits and sync times
         phys_qubit_ids = list(self._qreg_phys_mapping.values())
         #
+        meas_store_ids = {}
+        meas_index = 0
         final_blocks = []
         for cur_block in self._command_blocks:
             final_commands = []
@@ -618,24 +672,30 @@ class ParserOpenQASM:
             qubit_sync_times = {x:0 for x in phys_qubit_ids}
             last_sync_command_indices = {x:-1 for x in phys_qubit_ids}
             #
-            for cur_command in cur_block + [{'type':'end', 'targets':phys_qubit_ids}]:
+            for cur_command in cur_block + [{'type':SQDQasmCommandType.END_BLOCK, 'targets':phys_qubit_ids}]:
                 sync_command = False
-                if cur_command['type'] == 'gate' and len(cur_command['controls']) > 0:
+                if cur_command['type'] == SQDQasmCommandType.GATE and len(cur_command['controls']) > 0:
                     sync_command = True
-                elif cur_command['type'] == 'delay' and len(cur_command['targets']) > 1:
+                elif cur_command['type'] == SQDQasmCommandType.DELAY and len(cur_command['targets']) > 1:
                     sync_command = True
-                elif cur_command['type'] == 'end':
+                elif cur_command['type'] == SQDQasmCommandType.END_BLOCK:
                     sync_command = True
-                elif cur_command['type'] == 'defcal':
+                elif cur_command['type'] == SQDQasmCommandType.DEF_CAL:
                     sync_command = True
 
                 if not sync_command:
-                    if cur_command['type'] == 'gate':
+                    if cur_command['type'] == SQDQasmCommandType.GATE:
                         cur_qubit_commands[cur_command['targets'][0]].append(self._process_1Q_gate(cur_command['angles']))
-                    elif cur_command['type'] == 'delay':
+                    elif cur_command['type'] == SQDQasmCommandType.DELAY:
                         cur_qubit_commands[cur_command['targets'][0]].append(('D', self._process_delay(cur_command['length'], params.dt)))
-                    elif cur_command['type'] == 'measure':
-                        cur_qubit_commands[cur_command['qubit'][0]].append(('Measure',cur_command['store'][0]))   #TODO: Check if multi-qubit registers can be stored/measured in OpenQASM3?
+                    elif cur_command['type'] == SQDQasmCommandType.MEASURE:
+                        cur_meas_id = f'm{meas_index}'
+                        cur_qubit_commands[cur_command['qubit'][0]].append(('Measure',cur_meas_id))   #TODO: Check if multi-qubit registers can be stored/measured in OpenQASM3?
+                        meas_store_ids[cur_command['store'][0]] = cur_meas_id
+                        meas_index += 1
+                    elif cur_command['type'] == SQDQasmCommandType.RESET:
+                        #Reset does not synchronise
+                        cur_qubit_commands[cur_command['targets']].append(('Reset',)) #TODO: Adapt to multi-qubit registers
                 else:
                     ####
                     #Calculate new synchronisation point
@@ -675,7 +735,7 @@ class ParserOpenQASM:
                         qubit_sync_times[cur_phys_qubit_index] = new_sync_point
                     ####
                     #Add the actual command for the qubits and update the last synchronised command-sequence index
-                    if cur_command['type'] == 'gate':
+                    if cur_command['type'] == SQDQasmCommandType.GATE:
                         cur_target_gate = self._process_1Q_gate(cur_command['angles'])
                         cur_play_after_index = None if len(final_commands) == 0 else len(final_commands)-1
                         gate_duration = params.get_duration2QG(cur_command['targets'][0], cur_command['targets'][1], cur_command['controls'] + [cur_target_gate])
@@ -684,7 +744,7 @@ class ParserOpenQASM:
                         for cur_phys_qubit_index in cur_targ_phys_indices:
                             qubit_sync_times[cur_phys_qubit_index] += gate_duration   #TODO: Must add 2QG time and pass this in - perhaps by a graph?
                             last_sync_command_indices[cur_phys_qubit_index] = len(final_commands)-1
-                    elif cur_command['type'] == 'delay':
+                    elif cur_command['type'] == SQDQasmCommandType.DELAY:
                         for cur_phys_qubit_index in cur_targ_phys_indices:
                             cur_delay_cmd = ('D', self._process_delay(cur_command['length'], params.dt))
                             if cur_delay_cmd[1] > 0: #Don't add the command if the delay is 0...
@@ -692,7 +752,7 @@ class ParserOpenQASM:
                                 final_commands.append({'qubit_index': cur_phys_qubit_index, 'custom_waveform':False, 'sequence': [cur_delay_cmd], 'after':cur_play_after_index, 'length':cur_delay_cmd[1]})
                                 qubit_sync_times[cur_phys_qubit_index] += cur_delay_cmd[1]
                                 last_sync_command_indices[cur_phys_qubit_index] = len(final_commands)-1
-                    elif cur_command['type'] == 'defcal':
+                    elif cur_command['type'] == SQDQasmCommandType.DEF_CAL:
                         cur_pulse_seq = self._process_defcal_command(cur_command, params.dt)
                         cur_play_after_index = None if len(final_commands) == 0 else len(final_commands)-1
                         gate_duration = cur_pulse_seq['length']
@@ -701,10 +761,10 @@ class ParserOpenQASM:
                         for cur_phys_qubit_index in cur_targ_phys_indices:
                             qubit_sync_times[cur_phys_qubit_index] += gate_duration   #TODO: Must add 2QG time and pass this in - perhaps by a graph?
                             last_sync_command_indices[cur_phys_qubit_index] = len(final_commands)-1
-                    #Don't need to check if it's 'end' as it's the end...
+                    #Don't need to check if it's SQDQasmCommandType.END_BLOCK as it's the end...
             final_blocks.append(final_commands)
         #
-        return {'commands':final_blocks}
+        return {'commands':final_blocks, 'meas_store_ids': meas_store_ids}
 
     def _process_delay(self, delay_params, dt_time):
         if delay_params[1] == 's':
@@ -806,8 +866,6 @@ class ParserOpenQASM:
     def _get_1QG_name(self, axis:str, angle:float):
         if axis == 'D':
             return f'{Miscellaneous.get_units(angle)}s'
-        if axis == 'Measure':
-            return self._measure_label
         if np.abs(angle - np.pi) < 1e-6:
             return f'{axis}(π)'
         if np.abs(angle - np.pi/2) < 1e-6:
@@ -875,7 +933,12 @@ class ParserOpenQASM:
                     continue
             #Process it as a 1QG
             for cur_gate in cur_sec_ops['sequence']:
-                cur_name = self._get_1QG_name(*cur_gate)
+                if cur_gate[0] == 'Reset':
+                    cur_name = 'Reset'
+                elif cur_gate[0] == 'Measure':
+                    cur_name = self._measure_label
+                else:
+                    cur_name = self._get_1QG_name(*cur_gate)
                 cur_gate_time = qubit_params.get_duration(cur_qubit, cur_gate)
                 #
                 arr_qubits.append(cur_qubit)

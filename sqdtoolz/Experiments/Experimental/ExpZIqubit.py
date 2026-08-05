@@ -164,12 +164,14 @@ class ExpZIqubit(Experiment):
         print_est_time =  kwargs.get('print_estimated_execution_time',True)
         leACQ = self._expt_config._hal_ACQ
         compiled_exp = None
+        sig = inspect.signature(self._workflow_module.create_experiment)
+        zi_exp_params = list(sig.parameters.keys())
         if print_pulse_sheet or print_est_time:
             temp_exp = self._workflow_module.create_experiment(
                         leQPU,
                         **qubit_kwarg,
                         options=options.base._task_options['create_experiment'],    #TODO: Look into pitfalls here, but it needs to be converted into actual options here anyway...
-                        **self._args)
+                        **{x:self._args[x] for x in self._args if x in zi_exp_params})
             compiled_exp = compile_experiment(leSession, temp_exp)
         if print_pulse_sheet:
             pulse_sheet_viewer.show_pulse_sheet(file_path+'timing_diagram', compiled_exp)

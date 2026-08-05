@@ -24,11 +24,13 @@ ZIACQ('ZIacq', lab, 'zi_boxes')
 from laboneq_applications.experiments import (
     qubit_spectroscopy,
     qubit_spectroscopy_amplitude,
+    amplitude_fine
 )
 
 ExperimentConfiguration('ZI', lab, 0, [], 'ZIacq')
 
-exp = ExpZIqubit('test', lab.CONFIG('ZI'), qubit_spectroscopy, lab.HAL('QPU'), ['Qubit1'], frequencies=[np.linspace(5.8e9, 6.2e9, 101)])
+# exp = ExpZIqubit('test', lab.CONFIG('ZI'), qubit_spectroscopy, lab.HAL('QPU'), ['Qubit1'], frequencies=[np.linspace(5.8e9, 6.2e9, 101)])
+exp = ExpZIqubit('test', lab.CONFIG('ZI'), amplitude_fine, lab.HAL('QPU'), ['Qubit1'], amplification_qop='x90', repetitions=[[1,2,3,4]], target_angle=np.pi/2, phase_offset=0)
 lab.run_single(exp, debug_skip_experiment=True, disable_ZI_logging=True)
 a=0
 

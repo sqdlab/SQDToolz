@@ -32,7 +32,7 @@ jobs:
 
       - name: Install
         run: |
-          pip install -e .
+          pip install -e .[full]
         # pip install cupy-cuda12x
         #pip install -r requirements_test.txt          
 

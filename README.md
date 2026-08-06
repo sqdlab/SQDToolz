@@ -41,7 +41,7 @@ git clone https://github.com/sqdlab/sqdtoolz.git
 Now there is a sqdtoolz folder in the current directory. Do not enter this new folder. Simply run:
 
 ```
-pip install -e sqdtoolz
+pip install -e sqdtoolz[full]
 ```
 
 This should install all required dependencies.

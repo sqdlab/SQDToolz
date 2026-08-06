@@ -3,7 +3,7 @@ from sqdtoolz.ExperimentSpecification import ExperimentSpecification
 from sqdtoolz.HAL.ZI.ZIbase import ZIbase
 from sqdtoolz.Variable import VariableInternalTransient
 from sqdtoolz.Utilities.FileIO import FileIODatalogger, FileIOReader
-from sqdtoolz.Utilities.FileJSON import SQDJSONEncoder
+from sqdtoolz.Utilities.FileJSON import SQDJSONEncoder, SerialiseJSON
 import time
 import json
 import os
@@ -160,6 +160,39 @@ class SOFTqpu(HALbase, ZIbase):
             loaded_dict['HALs'] = [loaded_dict['HALs'][hal_index]]
         lab.cold_reload_labconfig(loaded_dict)
 
+    @staticmethod
+    def create_summary_config_from_json(json_file_path, summary_output_json_file_path):
+        assert os.path.exists(json_file_path), f"Cannot find configuration file '{json_file_path}'."
+        with open(json_file_path) as json_file:
+            data = json.loads(json_file.read(), object_hook=SerialiseJSON.decode_hook)
+        final_json = {'Qubits':[], 'Couplers':[]}
+        #
+        keys_to_copy = ['Name', 'DriveGE', 'DriveEF', 'DriveGEAmplitudeX', 'DriveGEAmplitudeXon2', 'DriveGETime', 'DriveGEPulse',
+                        'DriveEFAmplitudeX', 'DriveEFAmplitudeXon2', 'DriveEFTime', 'DriveEFPulse',
+                        'ReadoutFrequency', 'ReadoutTime', 'ResetTime',
+                        'T1GE', 'T2GE_star', 'T2GE', 'T1EF', 'T2EF_star', 'T2EF',
+                        'ReadoutQi', 'ReadoutQc', 'ReadoutQl', 'ChiGE',
+                        'Fidelity1QRB']
+        cur_qubit_names = [x for x in data['Qubits']]
+        for cur_qubit in data['Qubits']:
+            dict_cur_qubit = data['HALs'][data['Qubits'][cur_qubit]]
+            final_json['Qubits'].append({x:dict_cur_qubit[x] for x in dict_cur_qubit if x in keys_to_copy})
+        #
+        #Should be fine for different coupler types - just hard-code the newer elements...
+        keys_to_copy = ['ZI_QuantumElement', 'ZI_QuantumElementEx', 'Amplitude', 'AmplitudeAux',
+                        'Length', 'Pulse']
+        dict_qpu = next((x for x in data['HALs'] if x['Type']=='SOFTqpu'), None)        
+        for cur_cplr in dict_qpu['QubitCouplings']:
+            cur_dict_cplr = {'Linkage': [cur_qubit_names[cur_cplr[0]], cur_qubit_names[cur_cplr[1]]]}
+            cur_cplr_name = cur_cplr[2][0][0]
+            # cur_dict_cplr = {**cur_dict_cplr, **{x for x in }}
+            cur_data_cplr = data['HALs'][ data['QubitCouplings'][cur_cplr_name] ]
+            final_json['Couplers'].append({**cur_dict_cplr,**{x:cur_data_cplr[x] for x in cur_data_cplr if x in keys_to_copy}})
+        #
+        with open(summary_output_json_file_path, 'w') as outfile:
+            json.dump(final_json, outfile, indent=4, cls=SQDJSONEncoder)
+
+ 
     def print_summary_ZIQubits(self):
         """
         Prints a Markdown Table of the ZI Qubits
@@ -213,3 +246,5 @@ class SOFTqpu(HALbase, ZIbase):
         assert dict_config['Type'] == self.__class__.__name__, 'Cannot set configuration to a SoQPU with a configuration that is of type ' + dict_config['Type']
         self._qubits = dict_config.get('Qubits', [])
         self._qubit_couplings = dict_config.get('QubitCouplings', [])
+
+SOFTqpu.create_summary_config_from_json('QPU_configQW.json', 'QPU_summary.json')

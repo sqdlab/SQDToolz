@@ -9,7 +9,8 @@ from sqdtoolz.Utilities.QubitGates import QubitGatesBase
 import json
 from sqdtoolz.Experiments.Experimental.ZI import oqasm_scheduled_qubits
 from sqdtoolz.Utilities.QubitGates import QubitGatesBase
-from sqdtoolz.Utilities.OpenQASM.ParserOpenQASM import ParserOpenQASM, ScheduleParametersSoftQPUZI
+from sqdtoolz.Utilities.OpenQASM.ParserOpenQASM import ParserOpenQASM
+from sqdtoolz.Utilities.OpenQASM.ScheduleParametersSoftQPUZI import ScheduleParametersSoftQPUZI
 from sqdtoolz.Utilities.Miscellaneous import Miscellaneous
 
 class ExpZIQASM(ExpZIqubit):   

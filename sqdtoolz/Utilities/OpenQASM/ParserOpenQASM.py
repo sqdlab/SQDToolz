@@ -5,7 +5,6 @@ import openpulse
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatch
-from sqdtoolz.HAL.SOFTqpu import SOFTqpu
 from sqdtoolz.Utilities.OpenQASM import ScheduleParametersBase, QASMCompatibleQubitSingle
 import pandas as pd
 from sqdtoolz.Utilities.Miscellaneous import Miscellaneous
@@ -490,34 +489,7 @@ class QubitCollector(openqasm3.visitor.QASMVisitor):
     def visit_QubitDeclaration(self, node):
         self.qubits[node.qubit.name] = 1 if node.size == None else node.size.value
 
-class ScheduleParametersSoftQPUZI(ScheduleParametersBase):
-    def __init__(self, softQPU_ZI:SOFTqpu, mapping:dict):
-        self._qpu = softQPU_ZI
-        self.mapping = mapping  #This maps the physical qubit index in QASM onto the softQPU IDs...
-    
-    def get_duration(self, phys_qubit_index:tuple[str,int], gate_type: str|list|tuple) -> float:
-        if isinstance(gate_type, (list,tuple)):
-            if gate_type[0] == 'D':
-                return gate_type[1]
-            elif gate_type[0] == 'Measure':
-                return self.get_duration_measurement(phys_qubit_index)
-        return self._qpu.get_qubit_obj(self.mapping[phys_qubit_index]).get_gate_duration(gate_type)
-    
-    def get_duration_measurement(self, phys_qubit_index:tuple[str,int]):
-        return self._qpu.get_qubit_obj(self.mapping[phys_qubit_index]).get_measure_duration()
 
-    def get_duration2QG(self, qubit1_reg_index:tuple[str,int], qubit2_reg_index:tuple[str,int], gate_type:list) -> float:
-        zi_elem,_ = self._qpu.get_qubit_coupling_objs(self.mapping[qubit1_reg_index], self.mapping[qubit2_reg_index])[0].get_ZI_parameters()
-        return zi_elem.get_gate_duration(gate_type, [self._qpu.get_qubit_obj(self.mapping[qubit1_reg_index]), self._qpu.get_qubit_obj(self.mapping[qubit2_reg_index])])
-    
-    @property
-    def dt(self):
-        return 1.0/2e9  #TODO: Maybe make this properly query it?
-
-    # gates: dict[str, GateDefinition]
-    # functions: dict[str, SubroutineDefinition]
-    # defcals: dict[CalibrationSignature, DefcalDefinition]
-    # variables: ScopeStack
 
 class ParserOpenQASM:
     def __init__(self, main_file: str, source_dirs: list[str], **kwargs):

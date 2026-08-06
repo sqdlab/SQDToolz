@@ -99,7 +99,7 @@ class ExpZIqubit(Experiment):
 
         min_buffer_between_acq = kwargs.get('min_buffer_between_acquisitions', 40e-9)
         assert min_buffer_between_acq >= 20e-9, "The minimum buffer between acquisitions recommended by the ZI hardware team is 20ns."
-        if not kwargs.get('quick_query',False):
+        if not kwargs.get('quick_query',False) and not kwargs.get('skip_timing_diagram'):
             execution_time = 0
             if 'states' in self._args and not ('states' in zi_exp_params) and 'state' in zi_exp_params:
                 #A hack that is probably find - could dive deeper, but it shouldn't be the typical use-case...abs

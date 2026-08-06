@@ -131,7 +131,8 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
                 'ReadoutLineAttenuation_dB': -70,
                 'FluxConversionParams': None,
                 'QubitQiGE': 0,
-                'QubitQiEF': 0
+                'QubitQiEF': 0,
+                'Fidelity1QRB':0.0
             }
             self._param_mappings = {
                 'ChiGE': 'ge_chi_shift',

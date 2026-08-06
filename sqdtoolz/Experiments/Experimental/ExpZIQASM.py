@@ -64,27 +64,25 @@ class ExpZIQASM(ExpZIqubit):
 
         leQubitNames = [self._hal_QPU.get_qubit_obj(x).Name for x in self._qubit_ids] #Still allowing integer/string-based indexing on the qubit_ids...
 
-        mapping_qreg_physQid = {}
+        mapping_physQid_QPUQubitindex = {}
         for cur_qreg in self._final_qreg_phys_mapping:
-            mapping_qreg_physQid[self._final_qreg_phys_mapping[cur_qreg]] = leQubitNames[self._final_qreg_phys_mapping[cur_qreg]]
-        qasm_qubit_params = ScheduleParametersSoftQPUZI(self._hal_QPU,mapping_qreg_physQid)
+            mapping_physQid_QPUQubitindex[self._final_qreg_phys_mapping[cur_qreg]] = leQubitNames[self._final_qreg_phys_mapping[cur_qreg]]
+        qasm_qubit_params = ScheduleParametersSoftQPUZI(self._hal_QPU,mapping_physQid_QPUQubitindex)
         #
-        self._leScheduleBlocks = self._poqasm.create_schedule(qasm_qubit_params)
-        
-        self._leScheduleFlattened = {'commands':[item for sublist in self._leScheduleBlocks['commands'] for item in sublist], 'meas_store_ids':self._leScheduleBlocks['meas_store_ids']}
+        self._leSchedule = self._poqasm.create_schedule(qasm_qubit_params, flatten_blocks=True)
 
-        # leTable = self._poqasm.tabulate_schedule(self._leScheduleFlattened, qasm_qubit_params)
+        # leTable = self._poqasm.tabulate_schedule(self._leSchedule, qasm_qubit_params)
         # for m in range(len(self._leScheduleBlocks['commands'])):
-        self._poqasm.plot_schedule(self._leScheduleFlattened, qasm_qubit_params, file_path + 'compiled_qasm_schedule.html')
+        self._poqasm.plot_schedule(self._leSchedule, qasm_qubit_params, file_path + 'compiled_qasm_schedule.html')
 
-        self._poqasm.check_ZI_compatibility(self._leScheduleFlattened, qasm_qubit_params, **kwargs)
+        self._poqasm.check_ZI_compatibility(self._leSchedule, qasm_qubit_params, **kwargs)
 
-        self._args['openqasm_schedule'] = self._leScheduleFlattened
+        self._args['openqasm_schedule'] = self._leSchedule
         super()._run(file_path, sweep_vars, **kwargs)
 
         self.qasm_output = {}
-        for cur_meas_output in self._leScheduleFlattened['meas_store_ids']:
-            cur_fileioread = self.retrieve_last_aux_dataset(self._leScheduleFlattened['meas_store_ids'][cur_meas_output])
+        for cur_meas_output in self._leSchedule['meas_store_ids']:
+            cur_fileioread = self.retrieve_last_aux_dataset(self._leSchedule['meas_store_ids'][cur_meas_output])
             #TODO: Check if single-shot...
             arr = cur_fileioread.get_numpy_array()
             if len(arr.shape) == 2:

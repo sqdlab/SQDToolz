@@ -1,0 +1,246 @@
+{
+    "Qubits": [
+        {
+            "Name": "Q0",
+            "ChiGE": 0,
+            "DriveGE": 5139662911.964231,
+            "DriveEF": 4924996585.661414,
+            "DriveGEAmplitudeX": 0.3771832017272831,
+            "DriveGEAmplitudeXon2": 0.1885916008636416,
+            "DriveGETime": 2.5e-08,
+            "DriveGEPulse": {
+                "function": "drag",
+                "beta": 0,
+                "sigma": 0.25
+            },
+            "DriveEFAmplitudeX": 0.2583596035411646,
+            "DriveEFAmplitudeXon2": 0.11349387753612547,
+            "DriveEFTime": 2.5e-08,
+            "DriveEFPulse": {
+                "function": "drag",
+                "beta": 0,
+                "sigma": 0.25
+            },
+            "ReadoutFrequency": 7263597793.618528,
+            "ReadoutTime": 2e-06,
+            "ResetTime": 0.0001,
+            "T1GE": 4.623839113200089e-05,
+            "T2GE": 0,
+            "T2GE_star": 2.388189916794404e-05,
+            "T1EF": 1.2242947245883942e-05,
+            "T2EF": 0,
+            "T2EF_star": 1.0182708515261728e-05,
+            "ReadoutQi": 15305989.681153925,
+            "ReadoutQc": 8395414559.847887,
+            "ReadoutQl": 15278135.549187467
+        },
+        {
+            "Name": "Q1",
+            "ChiGE": 0,
+            "DriveGE": 5117835142.027211,
+            "DriveEF": 4900331764.510417,
+            "DriveGEAmplitudeX": 0.533626661997548,
+            "DriveGEAmplitudeXon2": 0.26850476899237513,
+            "DriveGETime": 2.5e-08,
+            "DriveGEPulse": {
+                "function": "drag",
+                "beta": 0,
+                "sigma": 0.25
+            },
+            "DriveEFAmplitudeX": 0.2795413425705059,
+            "DriveEFAmplitudeXon2": 0.13977067128525297,
+            "DriveEFTime": 2.5e-08,
+            "DriveEFPulse": {
+                "function": "drag",
+                "beta": 0,
+                "sigma": 0.25
+            },
+            "ReadoutFrequency": 7411627704.569572,
+            "ReadoutTime": 2e-06,
+            "ResetTime": 0.0002,
+            "T1GE": 3.503082303386486e-05,
+            "T2GE": 0,
+            "T2GE_star": 2.001889083132647e-05,
+            "T1EF": 1.3594894125873749e-05,
+            "T2EF": 0,
+            "T2EF_star": 1.6964743582250063e-05,
+            "ReadoutQi": 1,
+            "ReadoutQc": 1,
+            "ReadoutQl": 1
+        },
+        {
+            "Name": "Q2",
+            "ChiGE": 0,
+            "DriveGE": 5880480082.434595,
+            "DriveEF": 5674383023.14192,
+            "DriveGEAmplitudeX": 0.6741457732926643,
+            "DriveGEAmplitudeXon2": 0.3463814583584369,
+            "DriveGETime": 2.5e-08,
+            "DriveGEPulse": {
+                "function": "drag",
+                "beta": 0,
+                "sigma": 0.25
+            },
+            "DriveEFAmplitudeX": 0.44307602934621526,
+            "DriveEFAmplitudeXon2": 0.22153801467310766,
+            "DriveEFTime": 2.5e-08,
+            "DriveEFPulse": {
+                "function": "drag",
+                "beta": 0,
+                "sigma": 0.25
+            },
+            "ReadoutFrequency": 7548336542.65985,
+            "ReadoutTime": 2e-06,
+            "ResetTime": 0.0002,
+            "T1GE": 3.237616011677225e-05,
+            "T2GE": 0,
+            "T2GE_star": 2.0584305514180792e-05,
+            "T1EF": 0.00049999999847593,
+            "T2EF": 0,
+            "T2EF_star": 4.1141297563763145e-05,
+            "ReadoutQi": 1,
+            "ReadoutQc": 1,
+            "ReadoutQl": 1
+        },
+        {
+            "Name": "Q3",
+            "ChiGE": 0,
+            "DriveGE": 6760414831.538453,
+            "DriveEF": 6568536666.666667,
+            "DriveGEAmplitudeX": 0.6532553889800512,
+            "DriveGEAmplitudeXon2": 0.3366041410748127,
+            "DriveGETime": 2.5e-08,
+            "DriveGEPulse": {
+                "function": "drag",
+                "beta": 0,
+                "sigma": 0.25
+            },
+            "DriveEFAmplitudeX": 0.4133060566442621,
+            "DriveEFAmplitudeXon2": 0.20138933709751966,
+            "DriveEFTime": 2.5e-08,
+            "DriveEFPulse": {
+                "function": "drag",
+                "beta": 0,
+                "sigma": 0.25
+            },
+            "ReadoutFrequency": 7706164147.889423,
+            "ReadoutTime": 2e-06,
+            "ResetTime": 0.0002,
+            "T1GE": 7.182611970354617e-06,
+            "T2GE": 0,
+            "T2GE_star": 1.2000000000000002e-05,
+            "T1EF": 1.2761651374995475e-05,
+            "T2EF": 0,
+            "T2EF_star": 1.2000000000000063e-05,
+            "ReadoutQi": 1,
+            "ReadoutQc": 1,
+            "ReadoutQl": 1
+        },
+        {
+            "Name": "Q4",
+            "ChiGE": 0,
+            "DriveGE": 6718665718.788185,
+            "DriveEF": 6530356666.666408,
+            "DriveGEAmplitudeX": 0.5271339303748288,
+            "DriveGEAmplitudeXon2": 0.2646137216271411,
+            "DriveGETime": 2.5e-08,
+            "DriveGEPulse": {
+                "function": "drag",
+                "beta": 0,
+                "sigma": 0.25
+            },
+            "DriveEFAmplitudeX": 0.4470129663054446,
+            "DriveEFAmplitudeXon2": 0.22350648315272237,
+            "DriveEFTime": 2.5e-08,
+            "DriveEFPulse": {
+                "function": "drag",
+                "beta": 0,
+                "sigma": 0.25
+            },
+            "ReadoutFrequency": 7857333913.013659,
+            "ReadoutTime": 2e-06,
+            "ResetTime": 0.0002,
+            "T1GE": 2.0119330502370563e-05,
+            "T2GE": 0,
+            "T2GE_star": 1.2000000000000002e-05,
+            "T1EF": 3.1743295288130574e-05,
+            "T2EF": 0,
+            "T2EF_star": 3.194871902071372e-05,
+            "ReadoutQi": 1,
+            "ReadoutQc": 1,
+            "ReadoutQl": 1
+        }
+    ],
+    "Couplers": [
+        {
+            "Linkage": [
+                "Q1",
+                "Q2"
+            ],
+            "ZI_QuantumElement": "TunableTransmonCouplerFixed",
+            "ZI_QuantumElementEx": {
+                "flux": "Q2/flux",
+                "flux_aux": "Q0/flux"
+            },
+            "Amplitude": 0.4012592245076064,
+            "AmplitudeAux": 0.4,
+            "Length": 7.308293526544249e-08,
+            "Pulse": {
+                "function": "gaussian_square",
+                "sigma": 0.5
+            }
+        },
+        {
+            "Linkage": [
+                "Q0",
+                "Q2"
+            ],
+            "ZI_QuantumElement": "TunableTransmonCouplerFixed",
+            "ZI_QuantumElementEx": {
+                "flux": "Q2/flux",
+                "flux_aux": "Q1/flux"
+            },
+            "Amplitude": -0.37606368080939623,
+            "AmplitudeAux": 1,
+            "Length": 4.580204883870442e-08,
+            "Pulse": {
+                "function": "gaussian_square",
+                "sigma": 0.5
+            }
+        },
+        {
+            "Linkage": [
+                "Q2",
+                "Q3"
+            ],
+            "ZI_QuantumElement": "TunableTransmonCouplerFixed",
+            "ZI_QuantumElementEx": {
+                "flux": "Q3/flux"
+            },
+            "Amplitude": 0.4239934926865787,
+            "AmplitudeAux": 0,
+            "Length": 7.86534170515831e-08,
+            "Pulse": {
+                "function": "gaussian_square",
+                "sigma": 0.5
+            }
+        },
+        {
+            "Linkage": [
+                "Q2",
+                "Q4"
+            ],
+            "ZI_QuantumElement": "TunableTransmonCouplerFixed",
+            "ZI_QuantumElementEx": {
+                "flux": "Q4/flux"
+            },
+            "Amplitude": 0.40249999999999997,
+            "AmplitudeAux": 0.0,
+            "Length": 8.008248970404083e-08,
+            "Pulse": {
+                "function": "gaussian_square",
+                "sigma": 0.5
+            }
+        }
+    ]
+}

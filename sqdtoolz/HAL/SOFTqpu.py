@@ -247,4 +247,3 @@ class SOFTqpu(HALbase, ZIbase):
         self._qubits = dict_config.get('Qubits', [])
         self._qubit_couplings = dict_config.get('QubitCouplings', [])
 
-SOFTqpu.create_summary_config_from_json('QPU_configQW.json', 'QPU_summary.json')

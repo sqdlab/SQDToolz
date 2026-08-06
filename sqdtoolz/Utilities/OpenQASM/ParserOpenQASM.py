@@ -631,7 +631,7 @@ class ParserOpenQASM:
                 ret_list.append((cur_qreg,m))
         return ret_list
 
-    def create_schedule(self, params:ScheduleParametersBase):
+    def create_schedule(self, params:ScheduleParametersBase, flatten_blocks=False):
         #Initialise qubits and sync times
         phys_qubit_ids = list(self._qreg_phys_mapping.values())
         #
@@ -736,7 +736,10 @@ class ParserOpenQASM:
                     #Don't need to check if it's SQDQasmCommandType.END_BLOCK as it's the end...
             final_blocks.append(final_commands)
         #
-        return {'commands':final_blocks, 'meas_store_ids': meas_store_ids}
+        ret_dict = {'commands':final_blocks, 'meas_store_ids': meas_store_ids}
+        if flatten_blocks:
+            ret_dict = {'commands':[item for sublist in ret_dict['commands'] for item in sublist], 'meas_store_ids':ret_dict['meas_store_ids']}
+        return ret_dict
 
     def _process_delay(self, delay_params, dt_time):
         if delay_params[1] == 's':

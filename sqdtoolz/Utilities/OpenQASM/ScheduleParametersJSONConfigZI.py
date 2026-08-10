@@ -41,11 +41,14 @@ class ScheduleParametersJSONConfigZI(ScheduleParametersBase):
 
     def get_duration2QG(self, qubit1_phys_index:int, qubit2_phys_index:int, gate_type:list) -> float:
         #Find the coupler...
+        found = False
         for cur_cplr in self.config_data['Couplers']:
             qubit1 = cur_cplr['Linkage'][0]
             qubit2 = cur_cplr['Linkage'][1]
             if self.config_data['Qubits'][qubit1_phys_index]['Name'] == qubit1 and self.config_data['Qubits'][qubit2_phys_index]['Name'] == qubit2:
+                found = True
                 break
+        assert found, f"There is no 2-qubit coupling between physical qubits {qubit1_phys_index} and {qubit2_phys_index}"
         assert gate_type[0] == 'ctrl' and gate_type[1][0] == 'Z', "Only supporting CZ at the moment..."
         return cur_cplr['Length']
     

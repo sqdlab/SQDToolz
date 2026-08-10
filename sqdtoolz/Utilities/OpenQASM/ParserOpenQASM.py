@@ -12,6 +12,7 @@ import bokeh
 from bokeh.models import PanTool
 from sqdtoolz.Utilities.FileJSON import SerialiseJSON
 from enum import Enum, auto
+from pathlib import Path
 
 class SQDQasmCommandType(Enum):
     GATE = auto()
@@ -493,7 +494,13 @@ class QubitCollector(openqasm3.visitor.QASMVisitor):
 
 class ParserOpenQASM:
     def __init__(self, main_file: str, source_dirs: list[str], **kwargs):
-        self._extract_includes(main_file, source_dirs)
+        if 'main_qasm' in kwargs:
+            assert main_file == '', "Do not give a file path if supplying the main QASM a direct string in the argument 'main_qasm'"
+            main_file = ('str', kwargs.pop('main_qasm'))
+        else:
+            main_file = ('file', main_file)
+
+        source_dirs = source_dirs + [str(Path(__file__).parent) + "/includes/"]
         self._overall_includes = []
         self._get_include_tree([main_file], self._overall_includes, source_dirs)
         #
@@ -503,7 +510,10 @@ class ParserOpenQASM:
         #Note that this is only here for the purpose of the get_qubit_registers function...
         collector = QubitCollector()
         for m, cur_file in enumerate(self._overall_includes):
-            ast = openqasm3.parser.parse(self._open_file_strip_comments(cur_file))
+            if cur_file[0] == 'file':
+                ast = openqasm3.parser.parse(self._open_file_strip_comments(cur_file[1]))
+            else:
+                ast = openqasm3.parser.parse(cur_file[1])
             collector.visit(ast)
         self._qregs = collector.qubits
         #
@@ -534,7 +544,10 @@ class ParserOpenQASM:
         self._visitor = SQDQasmVisitor(self._qreg_phys_mapping)
         self._command_blocks = []
         for m, cur_file in enumerate(self._overall_includes):
-            ast = openqasm3.parser.parse(self._open_file_strip_comments(cur_file))
+            if cur_file[0] == 'file':
+                ast = openqasm3.parser.parse(self._open_file_strip_comments(cur_file[1]))
+            else:
+                ast = openqasm3.parser.parse(cur_file[1])
             self._process_block(ast.statements)
         pass
 
@@ -556,19 +569,25 @@ class ParserOpenQASM:
         for cur_include in cur_includes:
             assert not cur_include in cur_includes_stack, f"There is a circular dependency with {cur_include}."
             self._get_include_tree(cur_includes_stack + [cur_include], overall_includes, source_dirs)
-        overall_includes.append(self._find_file(current_file, source_dirs))
+        if current_file[0] == 'file':
+            overall_includes.append(('file', self._find_file(current_file[1], source_dirs)))
+        else:
+            overall_includes.append(('str', current_file[1]))
         return
 
     def _extract_includes(self, file_path: str, source_dirs: list[str]):
-        file_path = self._find_file(file_path, source_dirs)
-        #################
-        lines = self._open_file_strip_comments(file_path)
-        lines = "".join(lines).replace('\n','').split(';')
+        if file_path[0] == 'file':
+            file_path = self._find_file(file_path[1], source_dirs)
+            lines = self._open_file_strip_comments(file_path)
+            lines = "".join(lines)
+        else:
+            lines = file_path[1]
+        lines = lines.replace('\n','').split(';')
         inc_files = []
         for line in lines:
-            leLine = line.strip().lower()
+            leLine = line.replace('}','').strip().lower()
             if leLine.startswith("include"):
-                inc_files.append(leLine.replace('\'','\"').split("\"")[-2])
+                inc_files.append(('file', leLine.replace('\'','\"').split("\"")[-2]))
         return inc_files
 
     def _open_file_strip_comments(self, file_path):

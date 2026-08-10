@@ -10,11 +10,12 @@ class SerialiseJSON:
         """Serialize a NumPy array to a compressed base64 string."""
         buf = io.BytesIO()
         np.save(buf, arr, allow_pickle=False)
+        compressed = zlib.compress(buf.getvalue())
         if use_hex:
-            return zlib.compress(buf.getvalue()).hex().upper()
-        else:
-            return base64.b64encode(zlib.compress(buf.getvalue())).decode("ascii")
-
+            return compressed.hex().upper()
+        return base64.b64encode(compressed).decode("ascii")
+    
+    @staticmethod
     def decode_ndarray(data: str, use_hex=False) -> np.ndarray:
         """Deserialize a NumPy array from a compressed hexadecimal string."""
         if use_hex:

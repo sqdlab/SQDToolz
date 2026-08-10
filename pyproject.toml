@@ -25,6 +25,9 @@ dependencies = [
     "matplotlib",
     "scipy",
     "bokeh",
+    "openqasm3",
+    "openpulse",
+    "pandas==2.3.3"
 ]
 
 [project.optional-dependencies]
@@ -48,6 +51,6 @@ include = ["sqdtoolz*"]
 
 [tool.setuptools.package-data]
 sqdtoolz = [
-    "Drivers/*.py",
-    "HAL/*.py",
+    "**/*.py",
+    "sqdtoolz/Utilities/OpenQASM/includes/**/*.inc",
 ]

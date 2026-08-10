@@ -1053,3 +1053,28 @@ class ParserOpenQASM:
                     # Check condition 2: Gap is small
                     assert gap >= time_threshold, f"ZI HW limitation: the gap between multiple non-overlapping measure pulses must be at least 20-30ns. Check gap between {Miscellaneous.get_units(end_m)}s and {Miscellaneous.get_units(start_n)}s."
 
+    def check_ZI_max_shots(self, timing_schedule, qasm_qubit_params:ScheduleParametersBase, AcquisitionMode:str, AveragingType:str):
+        """
+        AcquisitionMode = Discrimination | Integration | Raw
+        AveragingType = AverageRepetitions | SingleShotCounts
+        """
+        leTable = self.tabulate_schedule(timing_schedule, qasm_qubit_params)
+        leTableMeas = leTable[leTable['gate_type'].str.contains("QMEAS", na=False)]
+        acq_mode = AcquisitionMode.lower()
+        avg_mode = AveragingType.lower()
+        if acq_mode == 'raw':
+            req_samples = 4096 * len(leTableMeas)   #TODO: Remove the 2us hard-coding on SHFQC+...
+            assert req_samples < 2**16, f"Cannot fit all the measurements into memory when using RAW mode in a single cycle of acquisition ({req_samples} samples cannot fit in 64k)."
+            if avg_mode == 'singleshotcounts':
+                return int(2**16 / req_samples * 2) #No idea why we need that extra factor of 2 here...
+            else:
+                return 2**16
+        elif acq_mode == 'discrimination':
+            if avg_mode == 'singleshotcounts':
+                assert len(leTableMeas) <= 2**16, f"Cannot take this many measurements in a single cycle of acquisition ({len(leTableMeas)} samples cannot fit in 64k)."
+                return int(2**16 / len(leTableMeas))
+            else:
+                return 2**16
+        else:
+            return 2**16
+

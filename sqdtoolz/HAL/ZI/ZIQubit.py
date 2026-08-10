@@ -7,7 +7,7 @@ from sqdtoolz.Utilities.OpenQASM import QASMCompatibleQubitSingle
 import numpy as np
 
 class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
-    def __init__(self, qubit_name, lab, instr_zi_boxes, zi_instr_phys_drive:tuple[str, str], zi_instr_phys_measure:tuple[str, str], zi_instr_phys_acquire:tuple[str, str], zi_phys_flux=("",""), zi_type="TunableTransmonQubit"):
+    def __init__(self, qubit_name, lab, instr_zi_boxes, zi_instr_phys_drive:tuple[str, str], zi_instr_phys_measure:tuple[str, str], zi_instr_phys_acquire:tuple[str, str], zi_phys_flux=("",""), zi_type="TunableTransmonQubit", **kwargs):
         HALbase.__init__(self, qubit_name)
         
         lab._register_HAL(self)
@@ -21,7 +21,7 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
         allowed_qubit_types = ["TunableTransmonQubit"]
         assert zi_type in allowed_qubit_types, f"Qubit type must be any of: {allowed_qubit_types}"
 
-        self._flux_dc = 0
+        self._flux_dc = kwargs.get('init_flux_dc', 0.0)
         self._flux_cal_obj = None
 
         self._setup_zi_connections()
@@ -35,7 +35,8 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
                    config_dict['ZI_phys_measure'],
                    config_dict['ZI_phys_acquire'],
                    config_dict.get('ZI_phys_flux', ("","")),
-                   config_dict['ZI_qubit_type'])
+                   config_dict['ZI_qubit_type'],
+                   init_flux_dc = config_dict.get('FluxDC',0.0))
 
     def __getattr__(self, name):
         if name in self.__dict__:
@@ -186,6 +187,10 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
             self.DriveEF = 5.1e9
             self.ReadoutFrequency = 7.0e9
             self.FluxRange = 1
+            #DO NOT SET FluxDC! This will set the full calibration while the other qubits are uninitialised; this can inadvertently zero their fluxes (default values in ZI calibration)...
+            #Just setting the calibration parameter (not pushing it to the device)
+            setattr(self._zi_qubit.parameters, 'flux_offset_voltage', self._flux_dc)
+            self._instr_zi.device_setup.set_calibration(self._zi_qubit.calibration())
 
             self._zi_qops = TunableTransmonOperations
 

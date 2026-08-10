@@ -48,6 +48,7 @@ defcal x $0 {
 
 float[64] a = 5;
 a = 0;
+a += 1;
 angle vtheta = pi / 4;
 
 rx(vtheta) q;

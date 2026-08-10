@@ -511,11 +511,18 @@ class ParserOpenQASM:
             self._qreg_phys_mapping = kwargs.pop('mapping')
         else:
             self._qreg_phys_mapping = {}
-            for cur_qreg in collector.qubits:
-                for m in range(collector.qubits[cur_qreg]):
+            for cur_qreg in self._qregs:
+                for m in range(self._qregs[cur_qreg]):
                     self._qreg_phys_mapping[(cur_qreg,m)] = len(self._qreg_phys_mapping)
         #
         self._measure_label = kwargs.get('measure_label', "∅")
+
+    def get_qregs(self):
+        leQregs = []
+        for cur_qreg in self._qregs:
+            for m in range(self._qregs[cur_qreg]):
+                leQregs += [(cur_qreg,m)]
+        return 
 
     def set_qreg_physical_mapping(self, mapping):
         """

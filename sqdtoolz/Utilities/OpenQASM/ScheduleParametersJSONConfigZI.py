@@ -2,15 +2,23 @@ from sqdtoolz.Utilities.OpenQASM import ScheduleParametersBase, QASMCompatibleQu
 import json
 
 class ScheduleParametersJSONConfigZI(ScheduleParametersBase):
-    def __init__(self, json_file_path):
+    def __init__(self, json_dict:dict):
+        """
+        NOTE: json_dict is the output from SOFTqpu.create_summary_config_from_json.
+        TODO: Given that it's only 2-3 attributes, it's left hard-coded. But it must change as ExpZIqubit starts to support other qubit types...
+        """
+        self.config_data = json_dict
+    
+    @classmethod
+    def fromFile(cls, json_file_path):
         """
         NOTE: json_file_path is the output from SOFTqpu.create_summary_config_from_json.
         TODO: Given that it's only 2-3 attributes, it's left hard-coded. But it must change as ExpZIqubit starts to support other qubit types...
         """
         with open(json_file_path, 'r') as f:
             config_data = json.load(f)
-        self.config_data = config_data
-    
+        return cls(config_data)
+
     def get_duration(self, phys_qubit_index:int, gate_type:list|tuple) -> float:
         cur_qubit = self.config_data['Qubits'][phys_qubit_index]
         gate = gate_type[0]

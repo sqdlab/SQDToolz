@@ -114,6 +114,8 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
                 print(f"Warning: The qubit type for {qubit_name} has changed from {self._qubit_type} to {qubit_type}. The qubit parameters will now be erased and reset!")  #TODO: Maybe look into transferrable ones later?
                 self._qubit_type = qubit_type
             else:
+                #Just synchronise with the device setup in case it has been changed...
+                self._instr_zi.device_setup.set_calibration(self._zi_qubit.calibration())
                 return
         else:
             self._qubit_type = qubit_type

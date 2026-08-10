@@ -532,7 +532,7 @@ class ParserOpenQASM:
         for cur_qreg in self._qregs:
             for m in range(self._qregs[cur_qreg]):
                 leQregs += [(cur_qreg,m)]
-        return 
+        return leQregs
 
     def set_qreg_physical_mapping(self, mapping):
         """

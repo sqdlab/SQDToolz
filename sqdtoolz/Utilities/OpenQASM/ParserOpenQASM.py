@@ -493,6 +493,16 @@ class QubitCollector(openqasm3.visitor.QASMVisitor):
     def visit_QubitDeclaration(self, node):
         self.qubits[node.qubit.name] = 1 if node.size == None else node.size.value
 
+class BitCollector(openqasm3.visitor.QASMVisitor):
+    def __init__(self):
+        self.bits = {}
+    def visit_ClassicalDeclaration(self, node):
+        if isinstance(node.type, openqasm3.ast.BitType):
+            if node.type.size == None:
+                reg_size = 1
+            else:
+                reg_size = node.type.size.value
+            self.bits[node.identifier.name] = reg_size
 
 
 class ParserOpenQASM:
@@ -513,14 +523,17 @@ class ParserOpenQASM:
         #
         #Collect just the qubit declarations (don't need to go through loops or scoping brackets as they should only exist in the global scope anyway)
         #Note that this is only here for the purpose of the get_qubit_registers function...
-        collector = QubitCollector()
+        collectorQ = QubitCollector()
+        collectorC = BitCollector()
         for m, cur_file in enumerate(self._overall_includes):
             if cur_file[0] == 'file':
                 ast = openqasm3.parser.parse(self._open_file_strip_comments(cur_file[1]))
             else:
                 ast = openqasm3.parser.parse(cur_file[1])
-            collector.visit(ast)
-        self._qregs = collector.qubits
+            collectorQ.visit(ast)
+            collectorC.visit(ast)
+        self._qregs = collectorQ.qubits
+        self._cregs = collectorC.bits
         #
         if 'mapping' in kwargs:
             self._qreg_phys_mapping = kwargs.pop('mapping')

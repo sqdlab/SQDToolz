@@ -6,7 +6,8 @@ from sqdtoolz.HAL.ZI.ZIQuantumElement import ZIQuantumElement
 from sqdtoolz.HAL.ZI.QuantumElements.TunableTransmonCouplerFixed import TunableTransmonCouplerFixed
 from sqdtoolz.Laboratory import Laboratory
 from sqdtoolz.ExperimentConfiguration import ExperimentConfiguration
-from sqdtoolz.Experiments.Experimental.ExpZIQASM import ExpZIQASM
+from sqdtoolz.Experiments.Experimental.ExpZIQASM import ExpZIQASM, ExpZIQASMDataViewer
+import numpy as np
 
 lab = Laboratory(instr_config_file = "tests/ZI_Basic.yaml", save_dir = "mySaves\\")
 
@@ -50,3 +51,37 @@ exp = ExpZIQASM('test', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Qubit2', 'Qubit4'], 
 qregs = exp.get_qubit_regs()
 exp.set_qubit_reg_to_ZI_mappings({('q',0):'Qubit4',('q',1):'Qubit2'})
 lab.run_single(exp, debug_skip_experiment=True)
+ledv = ExpZIQASMDataViewer(exp._file_path)
+print(ledv.get_inner_slicing_vars())
+print(np.array(ledv.get_data('c')).shape)
+#
+acq_params = {}
+acq_params['AcquisitionMode'] = "DISCRIMINATION"
+acq_params['AveragingOrder'] = 'SingleShot'
+lab.run_single(exp, debug_skip_experiment=True, override_ACQ_params=acq_params)
+ledv = ExpZIQASMDataViewer(exp._file_path)
+print(ledv.get_inner_slicing_vars())
+print(np.array(ledv.get_data('c')).shape)
+#
+acq_params['AcquisitionMode'] = "INTEGRATION"
+acq_params['AveragingOrder'] = 'SingleShot'
+lab.run_single(exp, debug_skip_experiment=True, override_ACQ_params=acq_params)
+ledv = ExpZIQASMDataViewer(exp._file_path)
+print(ledv.get_inner_slicing_vars())
+print(np.array(ledv.get_data('c')).shape)
+#
+acq_params['AcquisitionMode'] = "RAW"
+acq_params['AveragingOrder'] = 'SingleShot'
+acq_params['NumRepetitions'] = 2
+lab.run_single(exp, debug_skip_experiment=True, override_ACQ_params=acq_params)
+ledv = ExpZIQASMDataViewer(exp._file_path)
+print(ledv.get_inner_slicing_vars())
+print(np.array(ledv.get_data('c')).shape)
+#
+acq_params['AcquisitionMode'] = "RAW"
+acq_params['AveragingOrder'] = 'SweepBeforeAverage'
+acq_params['NumRepetitions'] = 2
+lab.run_single(exp, debug_skip_experiment=True, override_ACQ_params=acq_params)
+ledv = ExpZIQASMDataViewer(exp._file_path)
+print(ledv.get_inner_slicing_vars())
+print(np.array(ledv.get_data('c')).shape)

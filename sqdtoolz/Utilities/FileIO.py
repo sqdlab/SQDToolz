@@ -7,7 +7,10 @@ import json
 from h5py._hl.files import File
 import numpy as np
 import itertools
-import xarray as xr
+try:
+    import xarray as xr
+except (ModuleNotFoundError, ImportError):
+    pass
 
 from datetime import datetime
 

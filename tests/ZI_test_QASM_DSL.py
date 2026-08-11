@@ -6,7 +6,8 @@ from sqdtoolz.HAL.ZI.ZIQuantumElement import ZIQuantumElement
 from sqdtoolz.HAL.ZI.QuantumElements.TunableTransmonCouplerFixed import TunableTransmonCouplerFixed
 from sqdtoolz.Laboratory import Laboratory
 from sqdtoolz.ExperimentConfiguration import ExperimentConfiguration
-from sqdtoolz.Experiments.Experimental.ExpZIQASM import ExpZIQASM, ExpZIQASMDataViewer
+from sqdtoolz.Experiments.Experimental.ExpZIQASM import ExpZIQASM
+from sqdtoolz.Experiments.Experimental.ExpZIQASMDataViewer import ExpZIQASMDataViewer
 import numpy as np
 
 lab = Laboratory(instr_config_file = "tests/ZI_Basic.yaml", save_dir = "mySaves\\")

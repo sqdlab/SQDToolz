@@ -27,7 +27,8 @@ dependencies = [
     "bokeh",
     "openqasm3",
     "openpulse",
-    "pandas==2.3.3"
+    "pandas==2.3.3",
+    "h5py"
 ]
 
 [project.optional-dependencies]

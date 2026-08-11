@@ -5,7 +5,7 @@ gate rx(theta) a { U(theta, -pi/2,pi/2) a; }
 // rotation around Y-axis
 gate ry(theta) a { U(theta,0,0) a; }
 // rotation around Z axis
-gate rz(phi) a { u1(phi) a; }
+gate rz(phi) a { U(0,0,phi) a; }
 
 // Pauli gate: bit-flip
 gate x a { U(pi,0,pi) a; }

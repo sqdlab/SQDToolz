@@ -13,6 +13,7 @@ from bokeh.models import PanTool
 from sqdtoolz.Utilities.FileJSON import SerialiseJSON
 from enum import Enum, auto
 from pathlib import Path
+from sqdtoolz.Utilities.Miscellaneous import Miscellaneous
 
 class SQDQasmCommandType(Enum):
     GATE = auto()
@@ -309,6 +310,7 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
         elif isinstance(argument, openqasm3.ast.UnaryExpression):
             if argument.op.name == '-':
                 return -self._eval_arg(argument.expression)
+            assert False, f"Unsupported unary operation {argument.op.name}."
         elif isinstance(argument, openqasm3.ast.BinaryExpression):
             lhs = self._eval_arg(argument.lhs)
             rhs = self._eval_arg(argument.rhs)
@@ -898,6 +900,7 @@ class ParserOpenQASM:
         arr_end_times = []
         arr_gate_types = []
         arr_col_intens = []
+        arr_operations = []
         #
         for cur_sec_ind,cur_sec_ops in enumerate(gate_schedule['commands']):
             cur_qubit = cur_sec_ops['qubit_index']
@@ -914,6 +917,7 @@ class ParserOpenQASM:
                     cur_qubit_gate_time_indices[x] += cur_gate_time
                     arr_end_times.append(cur_qubit_gate_time_indices[x])
                     arr_gate_types.append(cur_name)
+                    arr_operations.append('W')
                     arr_col_intens.append(cur_sec_ind/len(gate_schedule['commands']))
                 continue
             elif isinstance(cur_qubit, (list,tuple)):
@@ -931,16 +935,21 @@ class ParserOpenQASM:
                     arr_start_times.append(start_time)
                     arr_end_times.append(end_time)
                     arr_gate_types.append( self._get_1QG_name(*(cur_sec_ops['sequence'][1])) )
+                    arr_operations.append(cur_sec_ops['sequence'][1][0])
                     arr_col_intens.append(cur_sec_ind/len(gate_schedule['commands']))
                     continue
             #Process it as a 1QG
             for cur_gate in cur_sec_ops['sequence']:
                 if cur_gate[0] == 'Reset':
                     cur_name = 'Reset'
+                    arr_operations.append('R')
                 elif cur_gate[0] == 'Measure':
                     cur_name = self._measure_label
+                    arr_operations.append('M')
                 else:
                     cur_name = self._get_1QG_name(*cur_gate)
+                    arr_operations.append(cur_gate[0])
+
                 cur_gate_time = qubit_params.get_duration(cur_qubit, cur_gate)
                 #
                 arr_qubits.append(cur_qubit)
@@ -958,17 +967,24 @@ class ParserOpenQASM:
             'start_time':arr_start_times,
             'end_time':arr_end_times,
             'gate_type':arr_gate_types,
-            'col_intensity':arr_col_intens
+            'col_intensity':arr_col_intens,
+            'operation':arr_operations
         })
 
         return df
 
-    def plot_schedule(self, gate_schedule, qubit_params:ScheduleParametersBase, output_file_path:str, title: str = "Quantum Circuit Timeline (Simplified Data Model)"):
+    def plot_schedule(self, gate_schedule, qubit_params:ScheduleParametersBase, output_file_path:str, title: str = "", debug_colour_scheme=False):
         """
         Generates an interactive Bokeh timeline plot using a simplified data model.
         """
 
         df = self.tabulate_schedule(gate_schedule, qubit_params)
+        
+        end_times = df['end_time'].to_numpy()
+        norm_fac, norm_prefix = Miscellaneous.get_metric_multiplier(end_times)
+        df['start_time'] /= norm_fac
+        df['end_time'] /= norm_fac
+        
         df['duration'] = df['end_time'] - df['start_time']
         df['centre'] = (df['start_time']+df['end_time'])/2
         df['durationBy4'] = df['duration']/4
@@ -980,14 +996,24 @@ class ParserOpenQASM:
         
         wheel_zoom = bokeh.models.WheelZoomTool(dimensions="width")
         wheel_zoom.modifiers = {"ctrl": True}
-        p = bokeh.plotting.figure(width=1000, height=500, title=title,x_axis_label="Time",y_axis_label="Qubit Index",x_axis_type="linear",
-                                  y_range=(-0.5, num_qubits - 0.5),tools="",active_scroll=wheel_zoom, sizing_mode="stretch_width"
+        p = bokeh.plotting.figure(width=1000, height=500, title=title,x_axis_label=f"Time ({norm_prefix}s)",y_axis_label="Physical Qubit Index",x_axis_type="linear",
+                                  y_range=bokeh.models.Range1d(num_qubits - 0.5, -0.5), tools="",active_scroll=wheel_zoom, sizing_mode="stretch_width"
         )
         p.add_tools(PanTool(dimensions="width"), wheel_zoom, bokeh.models.BoxZoomTool(dimensions="width"), bokeh.models.ResetTool())
+        p.yaxis.ticker = list(range(num_qubits))
+        p.xaxis.axis_label_text_font_size = "16pt"
+        p.yaxis.axis_label_text_font_size = "16pt"
+        p.xaxis.major_label_text_font_size = "14pt"
+        p.yaxis.major_label_text_font_size = "14pt"
 
         #Plot 1Q gates
         source_1q = bokeh.models.ColumnDataSource(df[df['qubitsAux'] == -1])
-        mapper = bokeh.transform.linear_cmap('col_intensity', palette=bokeh.palettes.Viridis256, low=0, high=1)
+        if debug_colour_scheme:
+            mapper = bokeh.transform.linear_cmap('col_intensity', palette=bokeh.palettes.Viridis256, low=0, high=1)
+        else:
+            gate_types = ['X', 'Y', 'Z', 'M', 'D', 'W', 'R']
+            gate_colors = ['#0077BB', '#33BBEE', '#009988', '#CC3311', '#BBBBBB', '#EE3377', '#BBBBBB']
+            mapper = bokeh.transform.factor_cmap('operation', palette=gate_colors, factors=gate_types)
         rect_renderer = p.rect(
             x='centre', 
             y='qubits', 
@@ -1013,6 +1039,21 @@ class ParserOpenQASM:
             source=source_2q, line_color="black", fill_color=mapper, alpha=1.0,
         )
         p.text(x='centre', y='qubits', text='gate_type', source=source_2q, text_align='center', text_baseline='middle', text_color="black")
+
+        z_source = bokeh.models.ColumnDataSource( df[(df['operation'] == 'Z') & (df['qubitsAux'] == -1)] )
+        p.text(
+            x='centre',
+            y='qubits',
+            text='gate_type',
+            source=z_source,
+            text_align='center',
+            text_baseline='middle',
+            text_color='black',
+            background_fill_color='#009988',
+            background_fill_alpha=0.99,
+            border_line_color='black',
+            border_line_alpha=1.0,
+        )
 
         p.legend.click_policy = "hide"
         bokeh.io.save(p, output_file_path)

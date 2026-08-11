@@ -20,8 +20,5 @@ class ScheduleParametersBase:
     def get_duration2QG(self, qubit1_phys_index:int, qubit2_phys_index:int, gate_type:list) -> float:
         raise NotImplementedError()
 
-    @property
-    def dt(self):
+    def dt(self, signal_type=''):
         raise NotImplementedError()
-
-

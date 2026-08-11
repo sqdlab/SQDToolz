@@ -52,6 +52,10 @@ class ScheduleParametersJSONConfigZI(ScheduleParametersBase):
         assert gate_type[0] == 'ctrl' and gate_type[1][0] == 'Z', "Only supporting CZ at the moment..."
         return cur_cplr['Length']
     
-    @property
-    def dt(self):
-        return 1.0/2e9  #TODO: Maybe make this properly query it?
+    def dt(self, signal_type='drive'):
+        if signal_type == 'drive' or signal_type == 'measure':
+            return 1.0/2e9
+        elif signal_type == 'flux':
+            return 1.0/2.4e9    #TODO: Should this be a Python fraction object instead as it's a recurring decimal?
+        else:
+            assert False, f"Invalid signal ZI line type: {signal_type}."

@@ -22,6 +22,8 @@ The qubits in `ExpZIQASM` are mapped onto hardware either by default in the orde
 
 The scheduler in `ParserOpenQASM` adds bubbles (i.e. delays to pad the section) when sections must align (e.g. a two-qubit gate). To manually align multiple qubits so that future gates all start from that point, use the multi-qubit delay instruction as specified by the standard (e.g. `delay[0] q1, q2;`). The delay value can be zero to enforce just the alignment.
 
+In the case of using the *Zurich Instruments* combination of *SHFQC* and *HDAWG*, the evaluation of `dt` is taken to be 2Gs/s to match the drive/measure pulse sample rates. However, it will automatically evaluate as 2.4Gs/s when evaluating custom pulse waveforms on flux lines.
+
 ## For Loops
 
 So *OpenQASM3* specifies that `for` loops are to be executed as a sequential instruction. That is, there cannot be two parallel `for` loops; this aligns with the hardware restriction on *LabOneQ* as well. Thus, a `for` loop will be considered as a single section that slots in sequentially with the other instructions. However, there cannot be two such `for` loops being a child of the outer `for` loop. That is, in summary:
@@ -58,7 +60,7 @@ To make ease of timing, the following alignment rules shall be enforced:
 - All `play` functions within a `defcal` block start from the same time point (unless they are on the same line; in which case they play sequentially)
 - All `play` functions from different `defcal` blocks must play sequentially.
 
-Thus, if there was a `rx` on a drive line on a given qubit, and `cpl` on its flux line, these pulses must appear sequentially. If they were wrapped in the same `defcal` block then they play concurrently. The compiler implicitly adds a 
+Thus, if there was a `rx` on a drive line on a given qubit, and `cpl` on its flux line, these pulses must appear sequentially. If they were wrapped in the same `defcal` block then they play concurrently. The compiler implicitly adds a synchronisation point for the given qubit upon playing the custom pulses in the `defcal` block.
 
 ## Variable scoping
 

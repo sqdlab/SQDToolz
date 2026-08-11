@@ -685,7 +685,7 @@ class ParserOpenQASM:
                     if cur_command['type'] == SQDQasmCommandType.GATE:
                         cur_qubit_commands[cur_command['targets'][0]].append(self._process_1Q_gate(cur_command['angles']))
                     elif cur_command['type'] == SQDQasmCommandType.DELAY:
-                        cur_qubit_commands[cur_command['targets'][0]].append(('D', self._process_delay(cur_command['length'], params.dt)))
+                        cur_qubit_commands[cur_command['targets'][0]].append(('D', self._process_delay(cur_command['length'], params.dt())))  #Using Drive/Measure lines as the baseline dt...
                     elif cur_command['type'] == SQDQasmCommandType.MEASURE:
                         cur_meas_id = f'm{meas_index}'
                         cur_qubit_commands[cur_command['qubit'][0]].append(('Measure',cur_meas_id))   #TODO: Check if multi-qubit registers can be stored/measured in OpenQASM3?
@@ -744,14 +744,14 @@ class ParserOpenQASM:
                             last_sync_command_indices[cur_phys_qubit_index] = len(final_commands)-1
                     elif cur_command['type'] == SQDQasmCommandType.DELAY:
                         for cur_phys_qubit_index in cur_targ_phys_indices:
-                            cur_delay_cmd = ('D', self._process_delay(cur_command['length'], params.dt))
+                            cur_delay_cmd = ('D', self._process_delay(cur_command['length'], params.dt()))  #Using Drive/Measure lines as the baseline dt...
                             if cur_delay_cmd[1] > 0: #Don't add the command if the delay is 0...
                                 cur_play_after_index = None if last_sync_command_indices[cur_phys_qubit_index] == -1 else last_sync_command_indices[cur_phys_qubit_index]
                                 final_commands.append({'qubit_index': cur_phys_qubit_index, 'custom_waveform':False, 'sequence': [cur_delay_cmd], 'after':cur_play_after_index, 'length':cur_delay_cmd[1]})
                                 qubit_sync_times[cur_phys_qubit_index] += cur_delay_cmd[1]
                                 last_sync_command_indices[cur_phys_qubit_index] = len(final_commands)-1
                     elif cur_command['type'] == SQDQasmCommandType.DEF_CAL:
-                        cur_pulse_seq = self._process_defcal_command(cur_command, params.dt)
+                        cur_pulse_seq = self._process_defcal_command(cur_command, params)
                         cur_play_after_index = None if len(final_commands) == 0 else len(final_commands)-1
                         gate_duration = cur_pulse_seq['length']
                         final_commands.append({'qubit_index': cur_targ_phys_indices, 'custom_waveform':True, 'sequence': cur_pulse_seq['play_commands'], 'after':cur_play_after_index, 'length':gate_duration})
@@ -800,7 +800,7 @@ class ParserOpenQASM:
         else:
             assert False, f"A gate is required on axis {axis}. Convert it into equivalent rotations about the basis axes X/Y/Z."
 
-    def _process_defcal_command(self, dict_command:dict, dt_time):
+    def _process_defcal_command(self, dict_command:dict, params:ScheduleParametersBase):
         pulse_lengths = {}
         for cur_target in dict_command['targets']:
             pulse_lengths[('drive', cur_target)] = 0
@@ -808,6 +808,7 @@ class ParserOpenQASM:
             pulse_lengths[('measure', cur_target)] = 0
         #Process the lengths based on the waveforms...
         for cur_cmd in dict_command['play_commands']:
+            dt_time = params.dt(cur_cmd['frame_var'][0])
             if cur_cmd['type'] == 'pulse_attribute':
                 cur_len = 0
             elif cur_cmd['waveform_var']['type'] in ['gaussian']:

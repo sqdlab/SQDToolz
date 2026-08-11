@@ -210,6 +210,11 @@ class ExpZIqubit(Experiment):
                     ch['value'] = dict_data[cur_ch].wave
                 channels[cur_ch] = ch
             plots = []
+            def find_non_constant_areas(arr):
+                mask = arr*2
+                mask[1:] -= mask[:-1]
+                mask[:-1] -= mask[1:]
+                return mask != 0
             for name, data in channels.items():
                 plot_kwargs = {}
                 if plots:
@@ -229,12 +234,15 @@ class ExpZIqubit(Experiment):
                     BoxZoomTool(dimensions="width"),
                     ResetTool())
                 if 'value' in data:
-                    source = ColumnDataSource({'time': data['time'], 'value': data['value']})
+                    mask = find_non_constant_areas(data["value"])
+                    source = ColumnDataSource({"time": data["time"][mask],"value": data["value"][mask]})
                     p.line(x="time", y="value", source=source,
                         line_width=2, color='black', legend_label="value")
                 else:
-                    source_real = ColumnDataSource({'time': data['time'], 'real': data['real']})
-                    source_imag = ColumnDataSource({'time': data['time'], 'imag': data['imag']})
+                    mask = find_non_constant_areas(data["real"])
+                    source_real = ColumnDataSource({'time': data['time'][mask], 'real': data['real'][mask]})
+                    mask = find_non_constant_areas(data["imag"])
+                    source_imag = ColumnDataSource({'time': data['time'][mask], 'imag': data['imag'][mask]})
                     p.line(x="time", y="real", source=source_real,
                         line_width=2, color='red', legend_label="real")
                     p.line(x="time", y="imag", source=source_imag,

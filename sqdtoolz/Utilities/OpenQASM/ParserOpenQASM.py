@@ -1,3 +1,4 @@
+import shutil
 import os
 import re
 import openqasm3
@@ -499,8 +500,10 @@ class ParserOpenQASM:
         if 'main_qasm' in kwargs:
             assert main_file == '', "Do not give a file path if supplying the main QASM a direct string in the argument 'main_qasm'"
             main_file = ('str', kwargs.pop('main_qasm'))
+
         else:
             main_file = ('file', main_file)
+        self._main_file = (main_file[0], main_file[1])
 
         source_dirs = source_dirs + [str(Path(__file__).parent) + "/includes/"]
         self._overall_includes = []
@@ -528,6 +531,13 @@ class ParserOpenQASM:
                     self._qreg_phys_mapping[(cur_qreg,m)] = len(self._qreg_phys_mapping)
         #
         self._measure_label = kwargs.get('measure_label', "∅")
+
+    def save_main_script(self, file_path):
+        if self._main_file[0] == 'file':
+            shutil.copy2(self._main_file[1], file_path)
+        else:
+            with open(file_path, 'w', encoding="utf-8") as file:
+                file.write(self._main_file[1])
 
     def get_qregs(self):
         leQregs = []

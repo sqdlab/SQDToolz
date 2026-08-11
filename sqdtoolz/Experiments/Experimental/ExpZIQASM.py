@@ -77,18 +77,21 @@ class ExpZIQASM(ExpZIqubit):
 
         self._poqasm.check_ZI_compatibility(self._leSchedule, qasm_qubit_params, **kwargs)
 
+        self._poqasm.save_main_script(file_path + 'main.qasm')
+
         self._args['openqasm_schedule'] = self._leSchedule
         super()._run(file_path, sweep_vars, **kwargs)
 
+        acq_type = self._expt_config._hal_ACQ.AcquisitionMode
+        avg_type = self._expt_config._hal_ACQ.AveragingOrder
         self.qasm_output = {}
         for cur_meas_output in self._leSchedule['meas_store_ids']:
             cur_fileioread = self.retrieve_last_aux_dataset(self._leSchedule['meas_store_ids'][cur_meas_output])
-            #TODO: Check if single-shot...
             arr = cur_fileioread.get_numpy_array()
-            if len(arr.shape) == 2:
-                self.qasm_output[cur_meas_output] = arr[-1,0]
-            else:
-                self.qasm_output[cur_meas_output] = arr[0]
+            if acq_type == 'DISCRIMINATION':
+                self.qasm_output[cur_meas_output] = arr[...,0].tolist()
+            else: #For RAW or INTEGRATION, all values matter...
+                self.qasm_output[cur_meas_output] = arr.tolist()
         pass
 
     def _post_process(self, data):

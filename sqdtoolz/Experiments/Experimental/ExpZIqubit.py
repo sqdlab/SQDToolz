@@ -214,7 +214,10 @@ class ExpZIqubit(Experiment):
                 mask = arr*2
                 mask[1:] -= mask[:-1]
                 mask[:-1] -= mask[1:]
-                return mask != 0
+                mask = mask != 0
+                mask[0] = True
+                mask[-1] = True
+                return mask
             for name, data in channels.items():
                 plot_kwargs = {}
                 if plots:

@@ -24,9 +24,15 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
         self._flux_dc = kwargs.get('init_flux_dc', 0.0)
         self._flux_cal_obj = None
 
+        #So LabOneQ has this particular failure mode:
+        #   - Setup optimal kernels with thresholds. Note that this is not conducive with integration as it's a family of 2 comparative kernels (i.e. G vs. E, E vs. F etc.)
+        #   - Change to default kernel. It then checks that there are 2 kernels and 3 thresholds and whines when using basic integration...
+        #   - But we don't want to delete these kernels in case we switch back to discrimination mode with optimal kernels...
+        #Thus, we store them and arbitrate appropriately...
+        self._temp_readout_params = {}
+
         self._setup_zi_connections()
         self._setup_zi_qubit(zi_type)
-
 
     @classmethod
     def fromConfigDict(cls, config_dict, lab):
@@ -59,6 +65,19 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
                 assert value >= -30 and value <= 10 and value % 5 == 0, "ReadoutPower must be within [-30dBm,10dBm] in steps of 5dB"
             if name == 'DrivePower':
                 assert value >= -30 and value <= 10 and value % 5 == 0, "DrivePower must be within [-30dBm,10dBm] in steps of 5dB"
+            if name == 'ReadoutKernelType':
+                #This is the workaround highlighted in the initialiser...
+                if value == 'default':
+                    if self.ReadoutKernelType == 'optimal':
+                        self._temp_readout_params['ReadoutKernelThresholds'] = self.ReadoutKernelThresholds
+                        self._temp_readout_params['ReadoutKernelWeights'] = self.ReadoutKernelWeights
+                    self.ReadoutKernelThresholds = None
+                    self.ReadoutKernelWeights = None
+                elif value == 'optimal':
+                    if self.ReadoutKernelThresholds is None:
+                        self.ReadoutKernelThresholds = self._temp_readout_params.get('ReadoutKernelThresholds', None)
+                    if self.ReadoutKernelWeights is None:
+                        self.ReadoutKernelWeights = self._temp_readout_params.get('ReadoutKernelWeights', None)
             if name == 'FluxDC':
                 self._flux_dc = value
                 if self._zi_instr_phys_flux != "":
@@ -136,6 +155,7 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
                 'QubitQiGE': 0,
                 'QubitQiEF': 0,
                 'Fidelity1QRB':0.0
+
             }
             self._param_mappings = {
                 'ChiGE': 'ge_chi_shift',
@@ -233,6 +253,12 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
             ret_dict[cur_param] = getattr(self, cur_param)
         for cur_param in self._param_mappings_local:
             ret_dict[cur_param] = getattr(self, cur_param)
+        #
+        #This is the workaround highlighted in the initialiser...
+        if ret_dict['ReadoutKernelType'] == 'default':
+            ret_dict['ReadoutKernelThresholds'] = self._temp_readout_params.get('ReadoutKernelThresholds', None)
+            ret_dict['ReadoutKernelWeights'] = self._temp_readout_params.get('ReadoutKernelWeights', None)
+        #
         return ret_dict
 
     def _set_current_config(self, dict_config, lab):
@@ -257,6 +283,8 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
             if not (isinstance(self.ReadoutKernelWeights, list) and len(self.ReadoutKernelWeights)>0):
                 self.ReadoutKernelType = 'default'
                 self.ReadoutKernelThresholds = None
+        self._temp_readout_params['ReadoutKernelThresholds'] = self.ReadoutKernelThresholds
+        self._temp_readout_params['ReadoutKernelWeights'] = self.ReadoutKernelWeights
 
     def reset_readout_kernels(self):
         self.ReadoutKernelType = 'default'

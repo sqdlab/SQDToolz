@@ -132,6 +132,3 @@ class ExpZIQASM(ExpZIqubit):
             if file_path.is_file():
                 dest_path = dest_folder / file_path.name
                 shutil.move(str(file_path), str(dest_path))
-
-
-

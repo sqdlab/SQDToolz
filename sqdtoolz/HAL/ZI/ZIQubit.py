@@ -73,6 +73,8 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
                         self._temp_readout_params['ReadoutKernelWeights'] = self.ReadoutKernelWeights
                     self.ReadoutKernelThresholds = None
                     self.ReadoutKernelWeights = None
+                    #An additional headache where it seems to leave behind a residual threshold that breaks due to validation checks...
+                    self._instr_zi.device_setup.logical_signal_groups[self.Name].logical_signals['acquire'].calibration.threshold = None
                 elif value == 'optimal':
                     if self.ReadoutKernelThresholds is None:
                         self.ReadoutKernelThresholds = self._temp_readout_params.get('ReadoutKernelThresholds', None)

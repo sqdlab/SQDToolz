@@ -106,7 +106,9 @@ class ExpZIQASM(ExpZIqubit):
             kwargs['override_ACQ_params'] = {'AcquisitionMode':'DISCRIMINATION', 'AveragingOrder':'SweepBeforeAverage'}
 
         self._args['openqasm_schedule'] = self._leSchedule
-        super()._run(file_path, sweep_vars, **kwargs)
+        leData = super()._run(file_path, sweep_vars, **kwargs)
+        leData.release()
+        leData = None
 
         acq_type = self._expt_config._hal_ACQ.AcquisitionMode
         avg_type = self._expt_config._hal_ACQ.AveragingOrder
@@ -120,7 +122,7 @@ class ExpZIQASM(ExpZIqubit):
                 self.qasm_output[cur_meas_output] = float(arr[0])
             else: #For RAW or INTEGRATION, all values matter...
                 self.qasm_output[cur_meas_output] = 0
-        pass
+        self.close_all_read_files()
 
     def _post_process(self, data):
         os.remove(self._file_path+'data.h5')

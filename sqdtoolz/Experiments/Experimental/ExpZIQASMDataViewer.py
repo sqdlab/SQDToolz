@@ -28,19 +28,22 @@ class ExpZIQASMDataViewer:
         match self._meas_params['acq_type']:
             case 'DISCRIMINATION':
                 if self._meas_params['avg_type'] == 'SweepBeforeAverage':
-                    return []
+                    ret_val = []
                 else:
-                    return ['shot']
+                    ret_val = ['shot']
             case 'INTEGRATION':
                 if self._meas_params['avg_type'] == 'SweepBeforeAverage':
-                    return ['iq']
+                    ret_val = ['iq']
                 else:
-                    return ['shot','iq']
+                    ret_val = ['shot','iq']
             case 'RAW':
                 if self._meas_params['avg_type'] == 'SweepBeforeAverage':
-                    return ['samples','iq']
+                    ret_val = ['samples','iq']
                 else:
-                    return ['shot','samples','iq']
+                    ret_val = ['shot','samples','iq']
+        if len(self._meas_params['Sweeps'])>0:
+            ret_val = [x[0] for x in self._meas_params['Sweeps']] + ret_val
+        return ret_val
 
     def get_data(self, classical_register_name:str, classical_register_index:int|None=None):
         """

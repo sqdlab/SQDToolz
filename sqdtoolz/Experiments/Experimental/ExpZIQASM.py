@@ -113,7 +113,7 @@ class ExpZIQASM(ExpZIqubit):
         acq_type = self._expt_config._hal_ACQ.AcquisitionMode
         avg_type = self._expt_config._hal_ACQ.AveragingOrder
         with open(file_path + 'measurement_params.json', 'w') as f:
-            json.dump({'acq_type':acq_type, 'avg_type':avg_type, 'NumRepetitions':self._expt_config._hal_ACQ.NumRepetitions}, f)
+            json.dump({'acq_type':acq_type, 'avg_type':avg_type, 'NumRepetitions':self._expt_config._hal_ACQ.NumRepetitions, 'Sweeps':[(x[0].Name, x[1].size) for x in sweep_vars]}, f)
         self.qasm_output = {}
         for cur_meas_output in self._leSchedule['meas_store_ids']:
             cur_fileioread = self.retrieve_last_aux_dataset(self._leSchedule['meas_store_ids'][cur_meas_output])

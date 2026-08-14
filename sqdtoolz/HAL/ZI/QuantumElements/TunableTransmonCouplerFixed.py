@@ -17,7 +17,8 @@ class TunableTransmonCouplerFixedParameters(QuantumParameters):
     Amplitude: float = 0.5
     AmplitudeAux: float = 0.0
     Length: float = 100e-9
-    Pulse: dict = attrs.field(factory=lambda: {"function": "gaussian_square", "sigma": 0.5})
+    Pulse: dict = attrs.field(factory=lambda: {"function": "gaussian_square", "sigma": 0.5, "samples": None})
+
 
 class TunableTransmonCouplerFixed(QuantumElement, QASMCompatibleQubitMultiple):
     PARAMETERS_TYPE = TunableTransmonCouplerFixedParameters
@@ -46,8 +47,10 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
     ) -> None:
         # pulse_parameters = {"function": "gaussian_square", "sigma": 0.5}
         # flux_pulse = dsl.create_pulse(pulse_parameters, name="flux_pulse")
-        flux_pulse = dsl.create_pulse(q.parameters.Pulse, name="flux_pulse")
-
+        if q.parameters.Pulse['samples'] is None:
+            flux_pulse = dsl.create_pulse(q.parameters.Pulse, name="flux_pulse")
+        else:
+            flux_pulse = pulse_library.sampled_pulse(uid='sampled_pulse', samples=q.parameters.Pulse['samples'])
         # assert q.parameters.QubitFlux != '', "Must set QubitFlux in the coupler."
 
         dsl.play(

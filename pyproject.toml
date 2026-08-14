@@ -53,5 +53,5 @@ include = ["sqdtoolz*"]
 [tool.setuptools.package-data]
 sqdtoolz = [
     "**/*.py",
-    "sqdtoolz/Utilities/OpenQASM/includes/**/*.inc",
+    "Utilities/OpenQASM/includes/**/*.inc",
 ]

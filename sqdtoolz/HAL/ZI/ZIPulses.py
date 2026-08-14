@@ -8,13 +8,7 @@ Pulse library for use with ZI hardware. Imported with instantiation of ZIQubit.
 """
 
 @pulse_library.register_pulse_functional
-def flattop_gaussian_buffer(
-    x,
-    relative_length_flat=0.7,
-    relative_length_buffer=0.1,
-    buffer_amp_proportion=0.8, 
-    **_
-):
+def flattop_gaussian_buffer(x, relative_length_flat=0.7, relative_length_buffer=0.1, buffer_amp_proportion=0.8, **_ ):
     """
     Two-stage flat-top Gaussian pulse (right half, mirrored on the left):
 
@@ -44,30 +38,56 @@ def flattop_gaussian_buffer(
 
     # first ramp: 1 -> buffer_amp_proportion
     mask = (np.abs(x) > b0) & (np.abs(x) <= b1)
-    res[mask] = buffer_amp_proportion + (1 - buffer_amp_proportion) * np.exp(
-        -((np.abs(x[mask]) - b0) ** 2) / (2 * sigma**2)
-    )
-
+    res[mask] = buffer_amp_proportion + (1 - buffer_amp_proportion) * np.exp( -((np.abs(x[mask]) - b0) ** 2) / (2 * sigma**2) )
     # buffer plateau
     mask = (np.abs(x) > b1) & (np.abs(x) <= b2)
     res[mask] = buffer_amp_proportion
 
     # second ramp: buffer_amp_proportion -> 0
     mask = np.abs(x) > b2
-    res[mask] = buffer_amp_proportion * np.exp(
-        -((np.abs(x[mask]) - b2) ** 2) / (2 * sigma**2)
-    )
+    res[mask] = buffer_amp_proportion * np.exp( -((np.abs(x[mask]) - b2) ** 2) / (2 * sigma**2) )
 
     return res
 
 @pulse_library.register_pulse_functional
-def flattop_gaussian_buffer_asymmetric(
-    x,
-    relative_length_flat=0.7,
-    relative_length_buffer=0.1,
-    buffer_amp_proportion=0.8,
-    **_
-):
+def impulse(x, relative_location=0.0, num_samples=1, **_):
+    """
+    Discrete impulse (delta) pulse, expressed in the same x-array,
+    mask-based style as the other pulse shapes.
+
+    x is assumed to be a normalized sample-index array (e.g. via
+    np.linspace(-1, 1, num_samples)), but relative_location is
+    expressed as a fraction of total length: 0.0 = start of the
+    array, 1.0 = end, 0.5 = center. The impulse holds at amplitude 1
+    for `num_samples` consecutive samples starting at that location;
+    every other sample is zero.
+
+    relative_location : fraction of total length (0-1) at which the
+                         impulse starts
+    num_samples        : number of consecutive samples the impulse
+                         holds at amplitude 1
+    """
+    x = np.asarray(x, dtype=float)
+    res = np.zeros(len(x))
+    assert isinstance(num_samples, int), "Provide num_samples as an int."
+
+    # map the 0-1 fraction onto x's own domain, then snap to the
+    # nearest sample so any location value maps to a specific index
+    target = x[0] + relative_location * (x[-1] - x[0])
+    idx = np.argmin(np.abs(x - target))
+
+    end_idx = min(idx + num_samples, len(x))
+    res[idx:end_idx] = 1
+
+    return res
+
+@pulse_library.register_pulse_functional
+def square(x, **_):
+    x = np.asarray(x, dtype=float)
+    return np.ones(len(x))
+
+@pulse_library.register_pulse_functional
+def flattop_gaussian_buffer_asymmetric(x, relative_length_flat=0.7, relative_length_buffer=0.1, buffer_amp_proportion=0.8, **_ ):
     """
     Asymmetric flat-top Gaussian pulse: buffer plateau only on the
     left-hand (trailing, x < 0) side. The right-hand (leading, x > 0)
@@ -117,9 +137,7 @@ def flattop_gaussian_buffer_asymmetric(
 
     # LEFT: ramp 1 -> buffer_amp_proportion
     mask = (x < -b0_left) & (x >= -b1)
-    res[mask] = buffer_amp_proportion + (1 - buffer_amp_proportion) * np.exp(
-        -((np.abs(x[mask]) - b0_left) ** 2) / (2 * sigma_left**2)
-    )
+    res[mask] = buffer_amp_proportion + (1 - buffer_amp_proportion) * np.exp( -((np.abs(x[mask]) - b0_left) ** 2) / (2 * sigma_left**2) )
 
     # LEFT: buffer plateau
     mask = (x < -b1) & (x >= -b2)
@@ -127,9 +145,7 @@ def flattop_gaussian_buffer_asymmetric(
 
     # LEFT: ramp buffer_amp_proportion -> 0
     mask = x < -b2
-    res[mask] = buffer_amp_proportion * np.exp(
-        -((np.abs(x[mask]) - b2) ** 2) / (2 * sigma_left**2)
-    )
+    res[mask] = buffer_amp_proportion * np.exp( -((np.abs(x[mask]) - b2) ** 2) / (2 * sigma_left**2) )
 
     # RIGHT: single ramp 1 -> 0, starting from the extended plateau edge
     mask = x > b0_right
@@ -183,17 +199,21 @@ def plot_sampled_pulse(pulse, iq=True, amp_phi=False, function=None, title=None)
         ax_amp.set_title(f"{title}")
     plt.tight_layout()
     plt.show()
+    return ax;
 
 def plot_pulse(pulse, iq=True, amp_phi=False, title=None):
     if isinstance(pulse, tuple):
         sampled_pulse = pulse
         function = None
-    else:
-        assert isinstance(pulse, laboneq.dsl.experiment.pulse.PulseFunctional), "Pass a laboneq pulse."
+    elif isinstance(pulse, laboneq.dsl.experiment.pulse.PulseFunctional):
         sampled_pulse = pulse.generate_sampled_pulse()
         function = pulse.function
-    plot_sampled_pulse(sampled_pulse, iq=iq, amp_phi=amp_phi, function=function, title=title)
-    
+    elif isinstance(pulse, laboneq.dsl.experiment.pulse.PulseSampled):
+        sampled_pulse = pulse.samples
+        function = pulse.uid
+    ax = plot_sampled_pulse(sampled_pulse, iq=iq, amp_phi=amp_phi, function=function, title=title)
+    return ax;
+
 def _align_zero(ax1, ax2):
     """Rescale y-limits of two twin axes so that y=0 lines up on both."""
     y1_min, y1_max = ax1.get_ylim()
@@ -217,6 +237,8 @@ def _align_zero(ax1, ax2):
     ax1.set_ylim(*rescale(y1_min, y1_max, frac))
     ax2.set_ylim(*rescale(y2_min, y2_max, frac))
 
+# def apply_pulse_precompensation(x, filter):
+#     return 0
 
 # We need to add a few more pulse shapes in the future
 #   - Slepian

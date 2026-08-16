@@ -10,15 +10,26 @@ from laboneq.simple import *
 from laboneq_applications.qpu_types.tunable_transmon import TunableTransmonQubit
 from sqdtoolz.Utilities.OpenQASM import QASMCompatibleQubitMultiple
 from sqdtoolz.HAL.ZI.ZIQubit import ZIQubit
+import numpy as np
+from laboneq.dsl.experiment import pulse_library
+
+@pulse_library.register_pulse_functional
+def filtered_pulse(x, main_function, filter_taps, filter_delay=0, **kwargs):
+    sampling_rate = kwargs["sampling_rate"]
+    if kwargs.get("samples",None) is None:
+        pulse = pulse_library.pulse_sampler(main_function)(x,**kwargs)
+    else:
+        pulse = kwargs["samples"]*1.0
+    filtered = np.convolve(np.real(pulse), np.asarray(filter_taps), mode="full")[:pulse.shape[0]]
+    return filtered
 
 @attrs.define(kw_only=True)
 class TunableTransmonCouplerFixedParameters(QuantumParameters):
     # QubitFlux: str = ''
     Amplitude: float = 0.5
     AmplitudeAux: float = 0.0
-    Length: float = 100e-9
-    Pulse: dict = attrs.field(factory=lambda: {"function": "gaussian_square", "sigma": 0.5, "samples": None})
-
+    Length: float = 250e-9
+    Pulse: dict = attrs.field(factory=lambda: {"function": "gaussian_square", "sigma": 0.5, "samples": None, "precomp_kernel" : None})
 
 class TunableTransmonCouplerFixed(QuantumElement, QASMCompatibleQubitMultiple):
     PARAMETERS_TYPE = TunableTransmonCouplerFixedParameters
@@ -47,11 +58,14 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
     ) -> None:
         # pulse_parameters = {"function": "gaussian_square", "sigma": 0.5}
         # flux_pulse = dsl.create_pulse(pulse_parameters, name="flux_pulse")
-        if q.parameters.Pulse['samples'] is None:
-            flux_pulse = dsl.create_pulse(q.parameters.Pulse, name="flux_pulse")
+        pulse_params = q.parameters.Pulse
+        if pulse_params.get("precomp_kernel") is not None:
+            flux_pulse = dsl.create_pulse({"function": "filtered_pulse", "main_function": pulse_params["function"], "filter_taps": pulse_params["precomp_kernel"], "filter_delay": pulse_params.get("filter_delay", 0)}, name="flux_pulse")
         else:
-            flux_pulse = pulse_library.sampled_pulse(uid='sampled_pulse', samples=q.parameters.Pulse['samples'])
-        # assert q.parameters.QubitFlux != '', "Must set QubitFlux in the coupler."
+            if pulse_params.get("samples") is None:
+                flux_pulse = dsl.create_pulse(pulse_params, name="flux_pulse")
+            else:
+                flux_pulse = pulse_library.sampled_pulse(uid="sampled_pulse", samples=pulse_params["samples"])
 
         dsl.play(
             # self.qpu[q.parameters.QubitFlux].signals['flux'],
@@ -107,14 +121,3 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
                     length=length,
                 )
 
-# - How to infer qubits given the coupler in the QPU
-# - The qubits need to be inferred to choose the correct signal path
-# - In the dsl stuff:
-#   - We pass the coupler to the QOP, it should automatically infer the qubits for say the flux-pulse
-#   - For complicated gates like CX, we pass the coupler and the qubit name for control?
-#   - Easy way to grab a given fixed-coupler given a QPU and the 2 qubits involved for the gate
-#   - Ideally, it's just CX(qubit1, qubit2) - but how does it know of the coupler? Maybe it needs to be CX(qpu, qubit1, qubit2)? Here it could infer the correct coupling by using the class type QubitCoupling?
-#OR alternatively, just stick with the native gate-set:
-# - The CZ gate is symmetric w.r.t. the control/target designations
-# - The Hadamards for a CX can be added in the QASM gate set! That is, they can slot in and overlap nicely around other gates while the CZ gate acts as the impassable barrier
-# - This yields greater flexibility in scheduling etc...

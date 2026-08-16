@@ -20,7 +20,7 @@ def filtered_pulse(x, main_function, filter_taps, filter_delay=0, **kwargs):
         pulse = pulse_library.pulse_sampler(main_function)(x,**kwargs)
     else:
         pulse = kwargs["samples"]*1.0
-    filtered = np.convolve(np.real(pulse), np.asarray(filter_taps), mode="full")[:pulse.shape[0]]
+    filtered = np.convolve(np.real(pulse)*0.5, np.asarray(filter_taps), mode="full")[:pulse.shape[0]]
     return filtered
 
 @attrs.define(kw_only=True)
@@ -61,26 +61,31 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
         pulse_params = q.parameters.Pulse
         if pulse_params.get("precomp_kernel") is not None:
             flux_pulse = dsl.create_pulse({"function": "filtered_pulse", "main_function": pulse_params["function"], "filter_taps": pulse_params["precomp_kernel"], "filter_delay": pulse_params.get("filter_delay", 0)}, name="flux_pulse")
+            amp_fac = 2.0
         else:
+            amp_fac = 1.0
             if pulse_params.get("samples") is None:
                 flux_pulse = dsl.create_pulse(pulse_params, name="flux_pulse")
             else:
                 flux_pulse = pulse_library.sampled_pulse(uid="sampled_pulse", samples=pulse_params["samples"])
 
+        leAmplitude = amplitude if amplitude != None else q.parameters.Amplitude
         dsl.play(
             # self.qpu[q.parameters.QubitFlux].signals['flux'],
             q.signals['flux'],
-            amplitude=amplitude if amplitude != None else q.parameters.Amplitude,
+            amplitude=leAmplitude*amp_fac,
             length=length,
             pulse=flux_pulse,
         )
 
         aux_signal = q.signals.get("flux_aux")
         if aux_signal is not None:
+            pulse_parameters = {"function": "gaussian_square", "sigma": 0.5}
+            flux_pulse_aux = dsl.create_pulse(pulse_parameters, name="flux_pulse_aux")
             aux_amp = amplitude_aux if amplitude_aux is not None else q.parameters.AmplitudeAux
             dsl.play(
                 aux_signal,
-                pulse=flux_pulse,
+                pulse=flux_pulse_aux,
                 amplitude=aux_amp,
                 length=length,
             )
@@ -95,16 +100,25 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
     ) -> None:
         # pulse_parameters = {"function": "gaussian_square", "sigma": 0.5}
         # flux_pulse = dsl.create_pulse(pulse_parameters, name="flux_pulse")
-        flux_pulse = dsl.create_pulse(q.parameters.Pulse, name="flux_pulse")
+        pulse_params = q.parameters.Pulse
+        if pulse_params.get("precomp_kernel") is not None:
+            flux_pulse = dsl.create_pulse({"function": "filtered_pulse", "main_function": pulse_params["function"], "filter_taps": pulse_params["precomp_kernel"], "filter_delay": pulse_params.get("filter_delay", 0)}, name="flux_pulse")
+            amp_fac = 2.0
+        else:
+            amp_fac = 1.0
+            if pulse_params.get("samples") is None:
+                flux_pulse = dsl.create_pulse(pulse_params, name="flux_pulse")
+            else:
+                flux_pulse = pulse_library.sampled_pulse(uid="sampled_pulse", samples=pulse_params["samples"])
 
-        if amplitude is None:
-            amplitude = q.parameters.Amplitude
+
+        leAmplitude = amplitude if amplitude != None else q.parameters.Amplitude
         if length is None:
             length = q.parameters.Length
             
         dsl.play(
             q.signals["flux"],
-            amplitude=amplitude,
+            amplitude=leAmplitude*amp_fac,
             length=length,
             # phase=phase,
             pulse=flux_pulse,
@@ -112,11 +126,13 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
 
         aux_signal = q.signals.get("flux_aux")
         if aux_signal is not None:
+            pulse_parameters = {"function": "gaussian_square", "sigma": 0.5}
+            flux_pulse_aux = dsl.create_pulse(pulse_parameters, name="flux_pulse_aux")
             amplitude_aux = q.parameters.AmplitudeAux
             if amplitude_aux is not None:
                 dsl.play(
                     aux_signal,
-                    pulse=flux_pulse,
+                    pulse=flux_pulse_aux,
                     amplitude=amplitude_aux,
                     length=length,
                 )

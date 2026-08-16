@@ -851,28 +851,40 @@ class ParserOpenQASM:
         return dict_command
 
     def get_axis_angle_from_unitary(self, unitary_angles):
-        #Based on their definition here: https://openqasm.com/language/gates.html
-        #That is for theta,phi,lambda, it's a ZYZ rotation done via lambda, theta and phi...
-        vtheta,vphi,vlambda = unitary_angles
-        matU = 1/2*np.array([[1+np.exp(1j*vtheta), -1j*np.exp(1j*vlambda)*(1-np.exp(1j*vtheta))],
-                             [1j*np.exp(1j*vphi)*(1-np.exp(1j*vtheta)), np.exp(1j*(vlambda+vphi))*(1+np.exp(1j*vtheta))]])
-        #Note that R(x) = cos(x/2)*I_2 - i*sin(x/2)*(n.sigma)
-        pauli_I2 = (matU[0,0]+matU[1,1])/2
-        pauli_Z  = ((matU[0,0]-matU[1,1]))/2
-        pauli_X = ((matU[0,1]+matU[1,0]))/2
-        pauli_Y = ((matU[0,1]-matU[1,0]))/2j
-        #Calculate global phase
-        pauli_vec = np.array([pauli_I2, pauli_X/-1j, pauli_Y/-1j, pauli_Z/-1j])
-        global_phase = np.exp(-1j*np.angle(pauli_vec[np.argmax(np.abs(pauli_vec))]))
-        pauli_vec *= global_phase
-        #
-        #It's now in a form: cos(x/2)*I_2 + sin(x/2)*(n.sigma)
-        rotation_axis = pauli_vec[1:]
-        sin_angle_2 = np.linalg.norm(rotation_axis)
-        rotation_axis = rotation_axis / sin_angle_2
-        rotation_angle = 2*np.arctan2(np.real(sin_angle_2), np.real(pauli_vec[0]))
+        """
+        Convert OpenQASM U(theta, phi, lambda) parameters to
+        axis-angle representation.
+        Based on their definition here: https://openqasm.com/language/gates.html
 
-        return np.real(rotation_axis), rotation_angle
+        Returns:
+            rotation_axis : np.ndarray, shape (3,)
+            rotation_angle : float
+        """
+        theta, phi, lam = unitary_angles
+        matU = np.array([[np.cos(theta / 2), -np.exp(1j * lam) * np.sin(theta / 2)],
+                         [np.exp(1j * phi) * np.sin(theta / 2), np.exp(1j * (phi + lam)) * np.cos(theta / 2)]], dtype=complex)
+        # Remove global phase so that det(U) = 1.
+        detU = np.linalg.det(matU)
+        matU *= np.exp(-0.5j * np.angle(detU))  #Note that for a 2x2 matrix, pulling a global factor out squares it...
+        #U = a I - i (bx X + by Y + bz Z) with: a  = cos(angle/2) and bi = sin(angle/2) * n_i
+        a = 0.5 * np.trace(matU)
+        bx = 0.5j * (matU[0, 1] + matU[1, 0])
+        by = 0.5  * (matU[1, 0] - matU[0, 1])
+        bz = 0.5j * (matU[0, 0] - matU[1, 1])
+        b = np.array([bx, by, bz], dtype=complex)
+        #Numerical cleanup
+        a = np.real_if_close(a).item()
+        b = np.real_if_close(b).astype(float)
+        #Normalize against tiny numerical errors
+        a = float(np.clip(np.real(a), -1.0, 1.0))
+        sin_half_angle = np.linalg.norm(b)
+        #Identity / zero rotation
+        if sin_half_angle < 1e-12:
+            return np.array([0.0, 0.0, 1.0]), 0.0
+        #Make angle lie in [0, 2*pi]
+        rotation_angle = 2.0 * np.arctan2(sin_half_angle, a)
+        rotation_axis = b / sin_half_angle
+        return rotation_axis, rotation_angle
 
     def _normalise_name(self, axis, angle):
         if axis[0]>1-1e-6:

@@ -25,7 +25,7 @@ class ExpZIBenchmarkETH(ExpZIqubit):
 
         self._fit_vals = []
 
-        extra_gate_seqs = kwargs.get('extra_gate_seqs', [])
+        extra_gate_seqs = kwargs.pop('extra_gate_seqs', [])
 
         self._gate_seqs = [
             ['I'],

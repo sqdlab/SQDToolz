@@ -215,6 +215,9 @@ def create_experiment(
                         number_resets=opts.active_reset_repetitions,
                         measure_section_length=max_measure_section_length,
                     )
+                else:
+                    for q in qubits:
+                        qop.passive_reset(q)
                 with dsl.section(name=f"main_drive_seq{seq}", alignment=SectionAlignment.RIGHT):
                     for m,q in enumerate(qubits):
                         for cur_gate in gate_lists[seq][m]:
@@ -263,8 +266,9 @@ def create_experiment(
                         sec = qop.measure(q, dsl.handles.result_handle(q.uid))
                         # Fix the length of the measure section
                         sec.length = max_measure_section_length
-                        qop.passive_reset(q)
-                        
+
+        for q in qubits:
+            qop.passive_reset(q)
         if opts.use_cal_traces:
             qop.calibration_traces.omit_section(
                 qubits=qubits,

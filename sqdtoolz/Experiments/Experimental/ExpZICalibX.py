@@ -19,7 +19,8 @@ class ExpZICalibX(ExpZIqubit):
         kwargs['update'] = False
 
         self._fit_vals = []
-        self._fit_data = {}
+        self._fit_data = []
+        self._prev_angle = 0.0
 
         assert calib_denominator in [1,2], "Either supply 'calib_denominator' with 1 or 2 for X or X/2 gate calibration"
         self._calib_denominator = calib_denominator
@@ -82,9 +83,13 @@ class ExpZICalibX(ExpZIqubit):
             ax.plot(data_x, pop_probs, 'o-')
             ax.plot(data_x, func(sol.x), 'ro')
             if self._calib_denominator == 2:
-                ax.set_title(f"Actual X/2 angle: {(1+sol.x[0]/100) * 90}")
+                ax.set_title(f"Actual X/2 angle: {(1+sol.x[0]/100) * 90} \n Previous angle: {self._prev_angle}")
+                self._prev_angle = (1+sol.x[0]/100) * 90
+                fit_data['angle'] = self._prev_angle
             else:
-                ax.set_title(f"Actual X angle: {(1+sol.x[0]/100) * 180}")                
+                ax.set_title(f"Actual X angle: {(1+sol.x[0]/100) * 180} \n Previous angle: {self._prev_angle}")
+                self._prev_angle = (1+sol.x[0]/100) * 180    
+                fit_data['angle'] = self._prev_angle          
             ax.legend(['Raw', 'Fit'])
 
             fig.savefig(self._file_path + f'fitted_plot_{qubit_dataset}.png')
@@ -94,9 +99,32 @@ class ExpZICalibX(ExpZIqubit):
                 plt.close(fig)
             #
             np.save(self._file_path + f'fitted_data_{qubit_dataset}.npy', fit_data)
-            self._fit_data = fit_data
+            fit_data['pop_probs'] = pop_probs
+            fit_data['fitted_pop_probs'] = func(sol.x)
+            fit_data['calib_denominator'] = self._calib_denominator
+            self._fit_data.append({'qubit_name': qubit_dataset, 'data': fit_data})
             #TODO: Generalise it for EF later?
             self._fit_vals.append({'qubit_obj': self._hal_QPU.get_qubit_obj(qubit_dataset), 'Gate_Corr_Fac':fit_data['Gate_Corr_Fac']})
+
+    @staticmethod
+    def plot_fitted_results(ax, data:dict, qubit_name=None):
+        data_x = np.arange(0, len(data['pop_probs']), 1)
+        data_y = data['pop_probs']
+        fit = data['fitted_pop_probs'] 
+        ax.set_ylabel(r'Normalised $e$-Population')
+        ax.set_xlabel('Gates')
+        ax.grid(visible=True, which='minor'); ax.grid(visible=True, which='major', color='k')
+        ax.plot(data_x, data_y, 'kx')
+        ax.plot(data_x, fit, 'r-')
+        if qubit_name is not None:
+            qstring = f'{qubit_name} '
+        else:
+            qstring = ''
+        if data['calib_denominator'] == 2:
+            ax.set_title(f"{qstring}Actual X/2 angle: {data['angle']}")
+        else:
+            ax.set_title(f"{qstring}Actual X angle: {data['angle']}")                
+        ax.legend(['Raw', 'Fit'])
 
     def update_qubits(self, reverse_parity = False):
         assert len(self._fit_vals) > 0, "Must run Ramsey Experiment before qubits can be updated."

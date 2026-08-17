@@ -487,6 +487,12 @@ class IdentifierCollector(openqasm3.visitor.QASMVisitor):
             self.visit(cur_stmt)
         return sorted(self.names)
 
+class IncludeCollector(openqasm3.visitor.QASMVisitor):
+    def __init__(self):
+        self.includes = []
+    def visit_Include(self, node):
+        self.includes.append(node.filename)
+
 class QubitCollector(openqasm3.visitor.QASMVisitor):
     def __init__(self):
         self.qubits = {}
@@ -590,7 +596,15 @@ class ParserOpenQASM:
 
     def _get_include_tree(self, cur_includes_stack: list[str], overall_includes: list[str], source_dirs: list[str]):
         current_file = cur_includes_stack[-1]
-        cur_includes = self._extract_includes(current_file, source_dirs)
+        #
+        collectorI = IncludeCollector()
+        if current_file[0] == 'file':
+            ast = openqasm3.parser.parse(self._open_file_strip_comments(current_file[1]))
+        else:
+            ast = openqasm3.parser.parse(current_file[1])
+        collectorI.visit(ast)
+        cur_includes = [('file',self._find_file(x, source_dirs)) for x in collectorI.includes]
+        #
         for cur_include in cur_includes:
             assert not cur_include in cur_includes_stack, f"There is a circular dependency with {cur_include}."
             self._get_include_tree(cur_includes_stack + [cur_include], overall_includes, source_dirs)
@@ -599,21 +613,6 @@ class ParserOpenQASM:
         else:
             overall_includes.append(('str', current_file[1]))
         return
-
-    def _extract_includes(self, file_path: str, source_dirs: list[str]):
-        if file_path[0] == 'file':
-            file_path = self._find_file(file_path[1], source_dirs)
-            lines = self._open_file_strip_comments(file_path)
-            lines = "".join(lines)
-        else:
-            lines = file_path[1]
-        lines = lines.replace('\n','').split(';')
-        inc_files = []
-        for line in lines:
-            leLine = line.replace('}','').strip().lower()
-            if leLine.startswith("include"):
-                inc_files.append(('file', leLine.replace('\'','\"').split("\"")[-2]))
-        return inc_files
 
     def _open_file_strip_comments(self, file_path):
         with open(file_path, encoding="utf-8") as file: #If it is not UTF-8, it'll read the pi symbol as the Euro symbol etc...
@@ -624,7 +623,6 @@ class ParserOpenQASM:
         # lines = lines.split('\n')
         # lines = [x.strip() for x in lines if x != '']
         return '\n'.join(lines)
-
     
     def _process_block(self, statements:list):
         #Separate the block into bits that must be run strictly sequentially - e.g. for-loops etc...

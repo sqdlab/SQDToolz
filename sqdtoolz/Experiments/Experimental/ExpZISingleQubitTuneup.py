@@ -6,7 +6,9 @@ from sqdtoolz.Experiments.Experimental.ExpZIqubit import ExpZIqubit
 from sqdtoolz.Experiments.Experimental.ExpZIRabi import ExpZIRabi
 from sqdtoolz.Experiments.Experimental.ExpZIRamsey import ExpZIRamsey
 from sqdtoolz.Experiments.Experimental.ExpZIT1 import ExpZIT1
+from sqdtoolz.Experiments.Experimental.ExpZICalibX import ExpZICalibX
 from sqdtoolz.Utilities.Miscellaneous import Miscellaneous
+from laboneq_applications.experiments import drag_q_scaling
 import matplotlib.pyplot as plt
 import matplotlib.gridspec
 from pathlib import Path
@@ -83,6 +85,22 @@ class ExpZISingleQubitTuneup:
             max_t1_time = kwargs.pop('t1_max', 100e-6)
             max_t1_points = kwargs.pop('t1_points', 40)
             self._t1_times = np.linspace(0,max_t1_time, max_t1_points)
+        
+        # fine tuneup
+        self._ramsey_slow_detuning = kwargs.pop('ramsey_fine_detuning', 0.125e6)
+        if 'ramsey_fine_times' in kwargs:
+            self._ramsey_fine_times = kwargs.pop('ramsey_fine_times')
+            assert not 'ramsey_fine_max' in kwargs, "Do not supply 'ramsey_fine_max' if supplying 'ramsey_fine_times'"
+            assert not 'ramsey_fine_points' in kwargs, "Do not supply 'ramsey_fine_points' if supplying 'ramsey_fine_times'"
+        else:
+            max_slow_time = kwargs.pop('ramsey_fine_max', 60e-6)
+            max_slow_points = kwargs.pop('ramsey_fine_points', 120)
+            self._ramsey_slow_times = np.linspace(0, max_slow_time, max_slow_points)
+        #
+        self._q_scalings = kwargs.pop('drag_q_scalings', np.linspace(0.00, 0.05, 51))
+        self._num_gates_calibX_short = kwargs.pop('num_gates_calibX_short', 200)
+        self._num_gates_calibX_long = kwargs.pop('num_gates_calibX_long', 800)
+        self._reverse_parity_calibX = kwargs.pop('reverse_parity_calibX', False)
 
     def run(self, lab):
         fig = plt.figure(layout="constrained"); fig.set_figwidth(12); fig.set_figheight(12)
@@ -222,4 +240,70 @@ class ExpZISingleQubitTuneup:
 
         fig.savefig(str(Path(exp._file_path).parent) + '/Overview.png')
         fig.show()
+
+    def run_fine_tuneup(self, lab):
+        fig = plt.figure(layout="constrained"); fig.set_figwidth(12); fig.set_figheight(12)
+        gs = matplotlib.gridspec.GridSpec(5, 2, figure=fig)
+        fig.suptitle(f"Fine tuneup {self._qubit_id}", fontsize=16, fontweight='bold')
+        
+        lab.group_open(self._name + '_fine')
+        ##############################
+        #
+        #FINE AND SLOW RAMSEY
+        #
+        exp = ExpZIRamsey(f'ramsey_fine_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], delays=[self._ramsey_fine_times], detunings=[self._ramsey_fine_detuning], ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
+        lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages)
+        #
+        leData = exp.retrieve_last_aux_dataset(self._qubit_id)
+        ax = fig.add_subplot(gs[3, 1])
+        fitted_data = np.load(exp._file_path + f"fitted_data_{self._qubit_id}.npy", allow_pickle=True).item()
+        arr = leData.get_numpy_array()
+        data_x = leData.param_vals[0]
+        ExpZIRamsey.plot_fitted_results(ax, data_x, fitted_data['amplitude_raw'], self._qubit_id, fitted_data, True)
+        sigFigs = 4
+        ax.set_title(f"Ramsey Δ={Miscellaneous.get_units(self._ramsey_slow_detuning,4)}Hz, f={Miscellaneous.get_units(fitted_data['frequency'],4)}Hz, T2*={Miscellaneous.get_units(fitted_data['T2*'],4)}s")
+        exp.update_qubits(assume_detuned_above=self._assume_detuned_above)
+        ##############################
+        #
+        #DRAG OPTIMISATION
+        #
+        self._qubit.DriveGEPulse['function'] = 'drag'
+        exp = ExpZIDragScaling(f'drag_scaling_{self._qubit_id}', self._expt_config, drag_q_scaling, self._qpu, [self._qubit_id], q_scalings=[self._q_scalings], update=True, ZI_plot=self._individual_plots)
+        lab.run_single(exp)
+        ##############################
+        # 
+        #X CALIB
+        #
+        #short
+        exp = ExpZICalibX(f'CalibX_short_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=1, num_gates=self._num_gates_calibX_short)
+        lab.run_single(exp, skip_timing_diagrams=True)
+        prev_angle = exp._prev_angle
+        exp.update_qubits(reverse_parity=self._reverse_parity_calibX)
+        #long
+        exp = ExpZICalibX(f'CalibX_long_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=1, num_gates=self._num_gates_calibX_long)
+        lab.run_single(exp, skip_timing_diagrams=True)
+        cur_angle = exp._prev_angle
+        if abs(180-cur_angle) > abs(180-prev_angle):
+            exp.update_qubits(reverse_parity=not self._reverse_parity_calibX)
+        else:
+            exp.update_qubits(reverse_parity=self._reverse_parity_calibX)
+        ##############################
+        #
+        #X/2 CALIB
+        #
+        #short
+        exp = ExpZICalibX(f'CalibXon2_short_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=2, num_gates=self._num_gates_calibX_short)
+        lab.run_single(exp, skip_timing_diagrams=True)
+        prev_angle = exp._prev_angle
+        exp.update_qubits(reverse_parity=self._reverse_parity_calibX)
+        #long
+        exp = ExpZICalibX(f'CalibXon2_long_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=2, num_gates=self._num_gates_calibX_long)
+        lab.run_single(exp, skip_timing_diagrams=True)
+        cur_angle = exp._prev_angle
+        if abs(90-cur_angle) > abs(90-prev_angle):
+            exp.update_qubits(reverse_parity=not self._reverse_parity_calibX)
+        else:
+            exp.update_qubits(reverse_parity=self._reverse_parity_calibX)
+
+        lab.group_close(self._name)
 

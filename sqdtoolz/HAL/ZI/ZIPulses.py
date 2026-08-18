@@ -153,10 +153,12 @@ def flattop_gaussian_buffer_asymmetric(x, relative_length_flat=0.7, relative_len
 
     return res
 
-
-
-def plot_sampled_pulse(pulse, iq=True, amp_phi=False, function=None, title=None):
+def plot_sampled_pulse(pulse, iq=True, amp_phi=False, function=None, title=None, ax=None, **kwargs):
     assert isinstance(pulse, tuple), "Provide a sampled pulse, which should be a tuple containing an array of time points, and an equal length array of complex values."
+    label = kwargs.pop('label', '')
+    color1 = kwargs.pop('color1', 'tab:blue')
+    color2 = kwargs.pop('color2', 'tab:orange')
+    color = kwargs.pop('color', 'tab:blue')
     if amp_phi:
         iq = False
     assert iq ^ amp_phi, "Either 'iq' or 'amp_phi' must be True."
@@ -172,9 +174,10 @@ def plot_sampled_pulse(pulse, iq=True, amp_phi=False, function=None, title=None)
     times = times*1e9
     samples = np.asarray(samples)
     if iq:
-        fig, ax = plt.subplots(figsize=(8,4))
-        ax.plot(times, samples.real, label="I", color="tab:blue")
-        ax.plot(times, samples.imag, label="Q", color="tab:orange")
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(8,4))
+        ax.plot(times, samples.real, label=f"{label} I", linestyle='-', color=color)
+        ax.plot(times, samples.imag, label=f"{label} Q", linestyle='--', color=color)
         ax.set_xlabel("t (ns)")
         ax.set_ylabel("Amplitude")
         ax.legend()
@@ -183,25 +186,28 @@ def plot_sampled_pulse(pulse, iq=True, amp_phi=False, function=None, title=None)
         amplitude = np.abs(samples)
         phase = np.angle(samples)
         #
-        fig, ax_amp = plt.subplots(figsize=(8, 4))
+        if ax is None:
+            fig, ax_amp = plt.subplots(figsize=(8, 4))
+        else:
+            ax_amp = ax
         ax_phi = ax_amp.twinx()
         #
-        line_amp, = ax_amp.plot(times, amplitude, color="tab:blue", label="Amplitude")
+        line_amp, = ax_amp.plot(times, amplitude, color=color1, label=f"{label} Amplitude")
         ax_amp.set_xlabel("t (ns)")
-        ax_amp.set_ylabel("Amp", color="tab:blue")
-        ax_amp.tick_params(axis="y", labelcolor="tab:blue")
+        ax_amp.set_ylabel("Amp", color=color1)
+        ax_amp.tick_params(axis="y", labelcolor=color1)
         #
-        line_phi, = ax_phi.plot(times, phase, color="tab:orange", label="Phase")
-        ax_phi.set_ylabel("$\phi$ (rad)", color="tab:orange")
-        ax_phi.tick_params(axis="y", labelcolor="tab:orange")
+        line_phi, = ax_phi.plot(times, phase, color=color2, label=f"{label} Phase")
+        ax_phi.set_ylabel("$\phi$ (rad)", color=color2)
+        ax_phi.tick_params(axis="y", labelcolor=color2)
         #
         _align_zero(ax_amp, ax_phi)
         ax_amp.set_title(f"{title}")
     plt.tight_layout()
-    plt.show()
-    return ax;
+    if kwargs.pop('show_plot', True):
+        plt.show()
 
-def plot_pulse(pulse, iq=True, amp_phi=False, title=None):
+def plot_pulse(pulse, iq=True, amp_phi=False, title=None, ax=None, **kwargs):
     if isinstance(pulse, tuple):
         sampled_pulse = pulse
         function = None
@@ -211,8 +217,7 @@ def plot_pulse(pulse, iq=True, amp_phi=False, title=None):
     elif isinstance(pulse, laboneq.dsl.experiment.pulse.PulseSampled):
         sampled_pulse = pulse.samples
         function = pulse.uid
-    ax = plot_sampled_pulse(sampled_pulse, iq=iq, amp_phi=amp_phi, function=function, title=title)
-    return ax;
+    ax = plot_sampled_pulse(sampled_pulse, iq=iq, amp_phi=amp_phi, function=function, title=title, ax=ax, **kwargs)
 
 def _align_zero(ax1, ax2):
     """Rescale y-limits of two twin axes so that y=0 lines up on both."""

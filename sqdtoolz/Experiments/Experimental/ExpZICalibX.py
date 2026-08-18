@@ -20,7 +20,7 @@ class ExpZICalibX(ExpZIqubit):
         kwargs['update'] = False
 
         self._fit_vals = []
-        self._fit_data = {}
+        self._fit_data = []
         self._prev_angle = 0.0
         self._only_every_n = kwargs.pop('only_every_n', 1)
 
@@ -129,7 +129,7 @@ class ExpZICalibX(ExpZIqubit):
         ax.legend(['Raw', 'Fit'])
 
     def update_qubits(self, reverse_parity = False):
-        assert len(self._fit_vals) > 0, "Must run Ramsey Experiment before qubits can be updated."
+        assert len(self._fit_vals) > 0, "Must run ExpZICalibX Experiment before qubits can be updated."
         while len(self._fit_vals) > 0:
             cur_fit = self._fit_vals.pop(0)
             if reverse_parity:

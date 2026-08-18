@@ -172,7 +172,7 @@ class SOFTqpu(HALbase, ZIbase):
                         'ReadoutFrequency', 'ReadoutTime', 'ResetTime',
                         'T1GE', 'T2GE_star', 'T2GE', 'T1EF', 'T2EF_star', 'T2EF',
                         'ReadoutQi', 'ReadoutQc', 'ReadoutQl', 'ChiGE',
-                        'Fidelity1QRB']
+                        'Fidelity1QRB', 'FidelityReadout']
         cur_qubit_names = [x for x in data['Qubits']]
         for cur_qubit in data['Qubits']:
             dict_cur_qubit = data['HALs'][data['Qubits'][cur_qubit]]
@@ -219,6 +219,8 @@ class SOFTqpu(HALbase, ZIbase):
                 r'$Q_i^{\text{read}}$':         [f'{x.ReadoutQi:.4g}' for x in leQubits],
                 r'$P^{\text{read}}$ (dBm)':     [f'{x.ReadoutPower:.4g}' for x in leQubits],
                 r'$A^{\text{read}}$':           [f'{x.ReadoutAmplitude:.4g}' for x in leQubits],
+                r'F_{\text{avg}}^{\text{read}}':[f'{x.ReadoutFidelity:.4g}' for x in leQubits],
+                r'F_{\text{Clifford}':          [f'{x.Fidelity1QRB:.4g}' for x in leQubits],
                }
         df = pd.DataFrame(data)
         print(df.to_markdown(index=False))

@@ -264,7 +264,7 @@ class ExpZISingleQubitTuneup:
         ExpZIRamsey.plot_fitted_results(ax, data_x, fitted_data['amplitude_raw'], self._qubit_id, fitted_data, True)
         sigFigs = 4
         ax.set_title(f"Ramsey Δ={Miscellaneous.get_units(self._ramsey_slow_detuning,4)}Hz, f={Miscellaneous.get_units(fitted_data['frequency'],4)}Hz, T2*={Miscellaneous.get_units(fitted_data['T2*'],4)}s")
-        exp.update_qubits(assume_detuned_above=self._assume_detuned_above)
+        exp.update_qubits(assume_detuned_above=self._assume_detuned_above) if self._update_live else 0
         ##############################
         #
         #DRAG OPTIMISATION
@@ -276,7 +276,7 @@ class ExpZISingleQubitTuneup:
         else:
             self._qubit.DriveGEPulse['function'] = 'drag'
             prev_pulse = None
-        exp = ExpZIDragScaling(f'drag_scaling_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], q_scalings=[self._q_scalings], update=True, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
+        exp = ExpZIDragScaling(f'drag_scaling_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], q_scalings=[self._q_scalings], update=self._update_live, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
         lab.run_single(exp)
         ax = fig.add_subplot(gs[1, 0:2])
         ExpZIDragScaling.plot_fitted_results(ax, exp._data['beta'], exp._data)
@@ -293,7 +293,7 @@ class ExpZISingleQubitTuneup:
         exp = ExpZICalibX(f'CalibX_short_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=1, num_gates=self._num_gates_calibX_short, dont_show_plot=not self._individual_plots)
         lab.run_single(exp, skip_timing_diagrams=True)
         prev_angle = exp._prev_angle
-        exp.update_qubits(reverse_parity=self._reverse_parity_calibX)
+        exp.update_qubits(reverse_parity=self._reverse_parity_calibX) if self._update_live else 0
         if self._qubit.DriveGEAmplitudeX > 1:
             self._qubit.DriveGEAmplitudeX = 1
         ax1 = fig.add_subplot(gs[2, 0])
@@ -303,9 +303,9 @@ class ExpZISingleQubitTuneup:
         lab.run_single(exp, skip_timing_diagrams=True)
         cur_angle = exp._prev_angle
         if abs(180-cur_angle) > abs(180-prev_angle):
-            exp.update_qubits(reverse_parity=not self._reverse_parity_calibX)
+            exp.update_qubits(reverse_parity=not self._reverse_parity_calibX) if self._update_live else 0
         else:
-            exp.update_qubits(reverse_parity=self._reverse_parity_calibX)
+            exp.update_qubits(reverse_parity=self._reverse_parity_calibX) if self._update_live else 0
         if self._qubit.DriveGEAmplitudeX > 1:
             self._qubit.DriveGEAmplitudeX = 1
         ax2 = fig.add_subplot(gs[2, 1:3], sharey=ax1)
@@ -318,7 +318,7 @@ class ExpZISingleQubitTuneup:
         exp = ExpZICalibX(f'CalibXon2_short_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=2, num_gates=self._num_gates_calibX_short, dont_show_plot=not self._individual_plots)
         lab.run_single(exp, skip_timing_diagrams=True)
         prev_angle = exp._prev_angle
-        exp.update_qubits(reverse_parity=self._reverse_parity_calibX)
+        exp.update_qubits(reverse_parity=self._reverse_parity_calibX) if self._update_live else 0
         if self._qubit.DriveGEAmplitudeXon2 > 1:
             self._qubit.DriveGEAmplitudeXon2 = 1
         ax1 = fig.add_subplot(gs[3, 0])
@@ -328,9 +328,9 @@ class ExpZISingleQubitTuneup:
         lab.run_single(exp, skip_timing_diagrams=True)
         cur_angle = exp._prev_angle
         if abs(90-cur_angle) > abs(90-prev_angle):
-            exp.update_qubits(reverse_parity=not self._reverse_parity_calibX)
+            exp.update_qubits(reverse_parity=not self._reverse_parity_calibX) if self._update_live else 0
         else:
-            exp.update_qubits(reverse_parity=self._reverse_parity_calibX)
+            exp.update_qubits(reverse_parity=self._reverse_parity_calibX) if self._update_live else 0
         if self._qubit.DriveGEAmplitudeXon2 > 1:
             self._qubit.DriveGEAmplitudeXon2 = 1
         ax2 = fig.add_subplot(gs[3, 1:3], sharey=ax1)

@@ -18,6 +18,7 @@ class ExpZIResOptimal(ExpZIqubit):
         if self._calc_single_shot_fidelities:
             kwargs['do_analysis'] = False   #The default ZI analysis will fail in this mode...
         self._fit_data = {}
+        self._readout_fidelity = 0.0
         super().__init__(name, expt_config, dispersive_shift, hal_QPU, qubit_ids, **kwargs)
     
     def _run(self, file_path, sweep_vars=[], **kwargs):
@@ -140,7 +141,8 @@ class ExpZIResOptimal(ExpZIqubit):
                 #
                 axA = fig.add_subplot(gs[4, m])
                 leIQDiscs[maxFidInds[-1]].plot_assignment_matrix(axA, sigFigs=2)
-                axA.set_title(f"Mean: {(leIQDiscs[maxFidInds[-1]].get_average_fidelity()*100):.4g}%")
+                self._readout_fidelity = (leIQDiscs[maxFidInds[-1]].get_average_fidelity()*100)
+                axA.set_title(f"Mean: {self._readout_fidelity:.4g}%")
                 if m > 0:
                     ax.set_ylabel('')
                     axA.set_ylabel('')
@@ -176,6 +178,7 @@ class ExpZIResOptimal(ExpZIqubit):
             assert transition in ['ge', 'ef', 'gf', 'total'], "Invalid transition (must be either 'ge', 'ef', 'gf' or 'total')"
             ind = ['ge', 'ef', 'gf', 'total'].index(transition)
         qubit_obj.ReadoutFrequency = float( self._fit_data['freqs'][ self._fit_data['maxSepIndices'][ind] ] )
+        qubit_obj.FidelityReadout = self._readout_fidelity
 
     def update_qubits_by_fidelity(self, state_fidelity:str='Mean'):
         """
@@ -192,6 +195,7 @@ class ExpZIResOptimal(ExpZIqubit):
             assert state_fidelity in ['g', 'e', 'f', 'mean'], "Invalid state (must be either 'g', 'e', 'f' or 'mean')"
             ind = ['g', 'e', 'f', 'mean'].index(state_fidelity)
         qubit_obj.ReadoutFrequency = float( self._fit_data['freqs'][ self._fit_data['maxFidIndices'][ind] ] )
+        qubit_obj.FidelityReadout = self._readout_fidelity
 
     def print_best_frequencies_by_separation(self):
         assert len(self._fit_data) > 0, "Must run experiment first."

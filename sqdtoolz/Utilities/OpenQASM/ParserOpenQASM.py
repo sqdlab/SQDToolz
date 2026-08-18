@@ -259,7 +259,9 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
         cur_delay = self._eval_arg(node.duration)
         if not isinstance(cur_delay, tuple):    #Typically must have unit, but 0 delay doesn't require units...abs
             cur_delay = (cur_delay, 's')
-        qargs = [self._eval_qarg(x) for x in node.qubits]
+        qargs = []
+        for cur_qubits in node.qubits:
+            qargs += self._eval_qarg(cur_qubits, allow_entire_regs=True)
         self._commands.append({'type':SQDQasmCommandType.DELAY, 'targets':qargs, 'length':cur_delay})
 
     def visit_QuantumMeasurementStatement(self, node):
@@ -272,18 +274,30 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
         leLoopRange = np.arange(self._eval_arg(node.start), self._eval_arg(node.end)+leStep/2, leStep)
         self._last_loop_range = leLoopRange      
 
-    def _eval_qarg(self, qarg):
+    def _eval_qarg(self, qarg, allow_entire_regs=False):
         #It returns a list as a register passed without indices implies automatic slicing over all the individual qubits within the register...
         #NOTE: Quantum types cannot be an array, so the only Indexed Identifier will be [[n]] for the register index n...
         if isinstance(qarg, openqasm3.ast.Identifier):
             #Qubits cannot be sent as the entire register to quantum gates etc. Thus, it's fine to just presume index-0 here...
-            cur_qubit = (qarg.name,0)
+            #Unless it's a multi-qubit delay...
+            if allow_entire_regs:
+                ret_qubits = []
+                for cur_qubit in self._qarg_stack[-1]:
+                    if cur_qubit[0] == qarg.name:
+                        ret_qubits.append(self._qarg_stack[-1][cur_qubit])
+                assert len(ret_qubits) > 0, f"The qubit register '{qarg.name}' is undefined."
+                return ret_qubits
+            else:
+                cur_qubit = (qarg.name,0)
             assert cur_qubit in self._qarg_stack[-1], f"The qubit register '{qarg.name}' is undefined."
             return self._qarg_stack[-1][cur_qubit]
         elif isinstance(qarg, openqasm3.ast.IndexedIdentifier):
             assert qarg.name.name in self._qubits, f"The qubit register '{qarg.name.name}' is undefined."
             cur_qubit = (qarg.name.name, self._eval_arg(qarg.indices[0][0]))    #Indexed qubits should only appear in the global scope anyway...
-            return self._qarg_stack[-1][cur_qubit]
+            if allow_entire_regs:
+                return [self._qarg_stack[-1][cur_qubit]]
+            else:
+                return self._qarg_stack[-1][cur_qubit]
 
     def _eval_bits_arg(self, bit_arg):
         #NOTE: Quantum types cannot be an array, so the only Indexed Identifier will be [[n]] for the register index n...

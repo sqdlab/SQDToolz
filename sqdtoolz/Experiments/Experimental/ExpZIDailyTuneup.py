@@ -11,7 +11,7 @@ from laboneq_applications.experiments import time_traces
 import matplotlib.pyplot as plt
 import matplotlib.gridspec
 from pathlib import Path
-from datetime import date
+import datetime
 import shutil
 
 class ExpZIDailyTuneup:
@@ -30,7 +30,7 @@ class ExpZIDailyTuneup:
         self._print_summary = kwargs.pop('print_summary', True)
         # self._config_file_name = kwargs.pop('config_file_name', '')
         self._save_summary_config_from_json = kwargs.pop('save_summary_config_from_json', True)
-        self._summary_json_file = kwargs.pop('summary_json_file', f'{date.today():%Y%m%d}_QPUsummary.json')
+        self._summary_json_file = kwargs.pop('summary_json_file', f'{datetime.date.today():%Y%m%d}_QPUsummary.json')
         if self._save_config==False:
             self._save_summary_config_from_json=False
 

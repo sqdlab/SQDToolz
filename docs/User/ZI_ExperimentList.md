@@ -1,5 +1,6 @@
 # List of ZI experiments
-A list of all current experiments for ZI hardware. Detailed documentation of each experiment is still a work in progress. The source code for these experiments can be found in `sqdtoolz/Experiments/Experimental/`.
+A list of all current experiments for ZI hardware. The source code for these experiments can be found in `sqdtoolz/Experiments/Experimental/`.
+> **Note:** this list should be considered a work in progress, as experiments are still under development.
 
 ### Table of contents
 This table of contents is given in roughly the order experiments would be needed for tuneup and experimentation on a new qubit chip.

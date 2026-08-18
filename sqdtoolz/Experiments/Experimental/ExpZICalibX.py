@@ -115,7 +115,7 @@ class ExpZICalibX(ExpZIqubit):
         ax.set_xlabel('Gates')
         ax.grid(visible=True, which='minor'); ax.grid(visible=True, which='major', color='k')
         ax.plot(data_x, data_y, 'kx')
-        ax.plot(data_x, fit, 'r-')
+        ax.plot(data_x, fit, 'ro-', lw=1)
         if qubit_name is not None:
             qstring = f'{qubit_name} '
         else:

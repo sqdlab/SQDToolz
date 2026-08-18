@@ -9,7 +9,8 @@ from sqdtoolz.Experiments.Experimental.ExpZIT1 import ExpZIT1
 from sqdtoolz.Experiments.Experimental.ExpZICalibX import ExpZICalibX
 from sqdtoolz.Experiments.Experimental.ExpZIDragScaling import ExpZIDragScaling
 from sqdtoolz.Utilities.Miscellaneous import Miscellaneous
-# from laboneq_applications.experiments import drag_q_scaling
+from laboneq.dsl.experiment import pulse_library
+from sqdtoolz.HAL.ZI import ZIPulses
 import matplotlib.pyplot as plt
 import matplotlib.gridspec
 from pathlib import Path
@@ -244,7 +245,7 @@ class ExpZISingleQubitTuneup:
 
     def run_fine_tuneup(self, lab):
         fig = plt.figure(layout="constrained"); fig.set_figwidth(12); fig.set_figheight(12)
-        gs = matplotlib.gridspec.GridSpec(4, 2, figure=fig)
+        gs = matplotlib.gridspec.GridSpec(4, 3, figure=fig)
         fig.suptitle(f"Fine tuneup {self._qubit_id}", fontsize=16, fontweight='bold')
         
         lab.group_open(self._name + '_fine')
@@ -256,7 +257,7 @@ class ExpZISingleQubitTuneup:
         lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages)
         #
         leData = exp.retrieve_last_aux_dataset(self._qubit_id)
-        ax = fig.add_subplot(gs[0, :])
+        ax = fig.add_subplot(gs[0, 0:3])
         fitted_data = np.load(exp._file_path + f"fitted_data_{self._qubit_id}.npy", allow_pickle=True).item()
         arr = leData.get_numpy_array()
         data_x = leData.param_vals[0]
@@ -268,53 +269,71 @@ class ExpZISingleQubitTuneup:
         #
         #DRAG OPTIMISATION
         #
-        self._qubit.DriveGEPulse['function'] = 'drag'
-        exp = ExpZIDragScaling(f'drag_scaling_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], q_scalings=[self._q_scalings], update=True, ZI_plot=self._individual_plots)
+        ax_p = fig.add_subplot(gs[1, 2])
+        if self._qubit.DriveGEPulse['function']=='drag':
+            p_prev = pulse_library.drag(uid="prev_pulse", beta=self._qubit.DriveGEPulse['beta'], sigma=self._qubit.DriveGEPulse['sigma'], length=self._qubit.DriveGETime)
+            ZIPulses.plot_pulse(p_prev, ax=ax_p, label='Previous pulse', color='tab:blue', show_plot=False)
+        else:
+            self._qubit.DriveGEPulse['function'] = 'drag'
+            prev_pulse = None
+        exp = ExpZIDragScaling(f'drag_scaling_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], q_scalings=[self._q_scalings], update=True, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
         lab.run_single(exp)
-        ax = fig.add_subplot(gs[1, :])
+        ax = fig.add_subplot(gs[1, 0:2])
         ExpZIDragScaling.plot_fitted_results(ax, exp._data['beta'], exp._data)
+        # get new DRAG pulse
+        new_pulse = self._qubit.DriveGEPulse
+        p_new = pulse_library.drag(uid="new_pulse", beta=new_pulse['beta'], sigma=new_pulse['sigma'], length=self._qubit.DriveGETime)
+        ZIPulses.plot_pulse(p_new, ax=ax_p, label='New pulse', color='tab:orange', show_plot=False)
         ##############################
         # 
         #X CALIB
         #
         #short
-        exp = ExpZICalibX(f'CalibX_short_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=1, num_gates=self._num_gates_calibX_short)
+        exp = ExpZICalibX(f'CalibX_short_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=1, num_gates=self._num_gates_calibX_short, dont_show_plot=not self._individual_plots)
         lab.run_single(exp, skip_timing_diagrams=True)
         prev_angle = exp._prev_angle
         exp.update_qubits(reverse_parity=self._reverse_parity_calibX)
-        ax = fig.add_subplot(gs[2, 0])
-        ExpZICalibX.plot_fitted_results(ax, exp._fit_data[0]['data'], exp._fit_data[0]['qubit_name'])
+        if self._qubit.DriveGEAmplitudeX > 1:
+            self._qubit.DriveGEAmplitudeX = 1
+        ax1 = fig.add_subplot(gs[2, 0])
+        ExpZICalibX.plot_fitted_results(ax1, exp._fit_data[0]['data'], exp._fit_data[0]['qubit_name'])
         #long
-        exp = ExpZICalibX(f'CalibX_long_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=1, num_gates=self._num_gates_calibX_long)
+        exp = ExpZICalibX(f'CalibX_long_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=1, num_gates=self._num_gates_calibX_long, dont_show_plot=not self._individual_plots)
         lab.run_single(exp, skip_timing_diagrams=True)
         cur_angle = exp._prev_angle
         if abs(180-cur_angle) > abs(180-prev_angle):
             exp.update_qubits(reverse_parity=not self._reverse_parity_calibX)
         else:
             exp.update_qubits(reverse_parity=self._reverse_parity_calibX)
-        ax = fig.add_subplot(gs[2, 1])
-        ExpZICalibX.plot_fitted_results(ax, exp._fit_data[0]['data'], exp._fit_data[0]['qubit_name'])
+        if self._qubit.DriveGEAmplitudeX > 1:
+            self._qubit.DriveGEAmplitudeX = 1
+        ax2 = fig.add_subplot(gs[2, 1:3], sharey=ax1)
+        ExpZICalibX.plot_fitted_results(ax2, exp._fit_data[0]['data'], exp._fit_data[0]['qubit_name'])
         ##############################
         #
         #X/2 CALIB
         #
         #short
-        exp = ExpZICalibX(f'CalibXon2_short_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=2, num_gates=self._num_gates_calibX_short)
+        exp = ExpZICalibX(f'CalibXon2_short_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=2, num_gates=self._num_gates_calibX_short, dont_show_plot=not self._individual_plots)
         lab.run_single(exp, skip_timing_diagrams=True)
         prev_angle = exp._prev_angle
         exp.update_qubits(reverse_parity=self._reverse_parity_calibX)
-        ax = fig.add_subplot(gs[3, 0])
-        ExpZICalibX.plot_fitted_results(ax, exp._fit_data[0]['data'], exp._fit_data[0]['qubit_name'])
+        if self._qubit.DriveGEAmplitudeXon2 > 1:
+            self._qubit.DriveGEAmplitudeXon2 = 1
+        ax1 = fig.add_subplot(gs[3, 0])
+        ExpZICalibX.plot_fitted_results(ax1, exp._fit_data[0]['data'], exp._fit_data[0]['qubit_name'])
         #long
-        exp = ExpZICalibX(f'CalibXon2_long_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=2, num_gates=self._num_gates_calibX_long)
+        exp = ExpZICalibX(f'CalibXon2_long_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=2, num_gates=self._num_gates_calibX_long, dont_show_plot=not self._individual_plots)
         lab.run_single(exp, skip_timing_diagrams=True)
         cur_angle = exp._prev_angle
         if abs(90-cur_angle) > abs(90-prev_angle):
             exp.update_qubits(reverse_parity=not self._reverse_parity_calibX)
         else:
             exp.update_qubits(reverse_parity=self._reverse_parity_calibX)
-        ax = fig.add_subplot(gs[3, 1])
-        ExpZICalibX.plot_fitted_results(ax, exp._fit_data[0]['data'], exp._fit_data[0]['qubit_name'])
+        if self._qubit.DriveGEAmplitudeXon2 > 1:
+            self._qubit.DriveGEAmplitudeXon2 = 1
+        ax2 = fig.add_subplot(gs[3, 1:3], sharey=ax1)
+        ExpZICalibX.plot_fitted_results(ax2, exp._fit_data[0]['data'], exp._fit_data[0]['qubit_name'])
 
-        lab.group_close(self._name)
+        lab.group_close()
 

@@ -85,5 +85,6 @@ class ExpZIDragScaling(ExpZIqubit):
             ax.set_title(fr"{data['qubit_name']}: DRAG scaling ($\beta={best_x}$)")
         else:
             ax.set_title(fr"DRAG scaling ($\beta={best_x}$)")
+        ax.legend()
             
 

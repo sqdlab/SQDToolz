@@ -23,6 +23,7 @@ import laboneq.simple as lbeqs
 from laboneq import workflow
 from laboneq.simple import (
     AveragingMode,
+    AcquisitionType,
     Experiment,
     SectionAlignment,
     SweepParameter,
@@ -56,13 +57,14 @@ if TYPE_CHECKING:
 
 import numpy as np
 
-@workflow.workflow(name="single_qubit_gates_sweep")
+@workflow.workflow(name="single_qubit_gates_sweep2")
 def experiment_workflow(
     session: Session,
     qpu: QPU,
     qubits: QuantumElements | list[str] | str,
     gate_lists: list[list[list]],
     coordinate_system: str = 'RH',
+    chunk_count: int =1,
     # TODO: Update the type hint for the temporary_parameters argument when the new
     # qubit class is available. Same for other experiment workflows.
     temporary_parameters: dict[str | tuple[str, str, str], dict | QuantumParameters]
@@ -123,7 +125,8 @@ def experiment_workflow(
         temp_qpu,
         qubits,
         gate_lists,
-        coordinate_system
+        coordinate_system,
+        chunk_count
         # quarter_time=quarter_time,
     )
     compiled_exp = compile_experiment(session, exp)
@@ -136,6 +139,8 @@ def experiment_workflow(
     workflow.return_(result)
 
 
+
+
 @workflow.task
 @dsl.qubit_experiment
 def create_experiment(
@@ -143,6 +148,7 @@ def create_experiment(
     qubits: QuantumElements,
     gate_lists: list[list[list]],
     coordinate_system: str = 'RH',
+    chunk_count: int = 1,
     options: TuneupExperimentOptions | None = None,
 ) -> Experiment:
     """Creates an Amplitude Rabi experiment Workflow.
@@ -198,83 +204,85 @@ def create_experiment(
     # integration lengths.
     max_measure_section_length = qpu.measure_section_length(qubits)
     qop = qpu.quantum_operations
+
+    sequence_sweep = SweepParameter(values=np.asarray(range(len(gate_lists))))
+
     with dsl.acquire_loop_rt(
         count=opts.count,
         averaging_mode=opts.averaging_mode,
         acquisition_type=opts.acquisition_type,
         repetition_mode=opts.repetition_mode,
         repetition_time=opts.repetition_time,
-        reset_oscillator_phase=opts.reset_oscillator_phase,
     ):
-        with dsl.section(name="main", alignment=SectionAlignment.RIGHT):
-            for seq in range(len(gate_lists)):
-                if opts.active_reset:
-                    qop.active_reset(
-                        qubits,
+
+        with dsl.sweep(parameter=sequence_sweep, chunk_count=chunk_count) as seq_no:
+            if opts.active_reset:
+                qop.active_reset(
+                    qubits,
+                    active_reset_states=opts.active_reset_states,
+                    number_resets=opts.active_reset_repetitions,
+                    measure_section_length=max_measure_section_length,
+                )  
+            for m, q in enumerate(qubits):
+                with dsl.section(uid=f"{q.uid}_drive_{sequence_sweep}", alignment=SectionAlignment.RIGHT):
+                    #fix section length to maximum pulse length * maximum sequence length
+                    with dsl.match(sweep_parameter=seq_no):
+                        for val in seq_no.values:
+                            with dsl.case(val):
+                                seq = val
+                                for cur_gate in gate_lists[seq][m]:
+                                    _,params = q.transition_parameters('ge')
+                                    if isinstance(cur_gate, (tuple, list)):
+                                        assert len(cur_gate) == 2, "Arbitrary rotations must be specified as a tuple - e.g. ('Rx',0.02)."
+                                        if cur_gate[0] == 'Rz':
+                                            qop.rz(q,cur_gate[1])
+                                        elif cur_gate[0] == 'Ry':
+                                            qop.ry(q,cur_gate[1])
+                                        elif cur_gate[0] == 'Rx':
+                                            qop.rx(q,cur_gate[1])
+                                        else:
+                                            assert False, "The gate type for arbitrary rotations must be 'Rx', 'Ry' or 'Rz'."
+                                    elif cur_gate == 'X':
+                                        qop.rx(q,np.pi)
+                                    elif cur_gate == 'X/2':
+                                        qop.x90(q)
+                                    elif cur_gate == '-X/2':
+                                        qop.rx(q, -np.pi/2, amplitude=-params['amplitude_pi2'])
+                                    elif cur_gate == 'Y':
+                                        qop.ry(q,np.pi)
+                                    elif cur_gate == 'Y/2':
+                                        qop.y90(q)
+                                    elif cur_gate == '-Y/2':
+                                        qop.ry(q, -np.pi/2, amplitude=-params['amplitude_pi2'])
+                                    elif cur_gate == 'Z':
+                                        qop.rz(q,np.pi)
+                                    elif cur_gate == 'Z/2':
+                                        if coordinate_system == 'RH':
+                                            qop.rz(q,-np.pi/2)
+                                        else:
+                                            qop.rz(q,np.pi/2)
+                                    elif cur_gate == '-Z/2':
+                                        if coordinate_system == 'RH':
+                                            qop.rz(q,np.pi/2)
+                                        else:
+                                            qop.rz(q,-np.pi/2)
+                                    elif cur_gate == 'H':
+                                        qop.rz(q,np.pi)
+                                        qop.ry(q,np.pi/2)
+                                
+
+                with dsl.section(uid=f"{q.uid}_main_measure_{sequence_sweep}", alignment=SectionAlignment.LEFT, 
+                                    play_after=f"{q.uid}_drive_{sequence_sweep}"):
+                        sec = qop.measure(q, dsl.handles.result_handle(q.uid))
+                        sec.length = max_measure_section_length
+                        qop.passive_reset(q)
+                ##Causes Errors if placed outside loop
+                if opts.use_cal_traces:
+                    qop.calibration_traces.omit_section(
+                        qubits=q,
+                        states=opts.cal_states,
+                        active_reset=opts.active_reset,
                         active_reset_states=opts.active_reset_states,
-                        number_resets=opts.active_reset_repetitions,
+                        active_reset_repetitions=opts.active_reset_repetitions,
                         measure_section_length=max_measure_section_length,
                     )
-                else:
-                    for q in qubits:
-                        qop.passive_reset(q)
-                with dsl.section(name=f"main_drive_seq{seq}", alignment=SectionAlignment.RIGHT):
-                    for m,q in enumerate(qubits):
-                        for cur_gate in gate_lists[seq][m]:
-                            _,params = q.transition_parameters('ge')
-                            if isinstance(cur_gate, (tuple, list)):
-                                assert len(cur_gate) == 2, "Arbitrary rotations must be specified as a tuple - e.g. ('Rx',0.02)."
-                                if cur_gate[0] == 'Rz':
-                                    qop.rz(q,cur_gate[1])
-                                elif cur_gate[0] == 'Ry':
-                                    qop.ry(q,cur_gate[1])
-                                elif cur_gate[0] == 'Rx':
-                                    qop.rx(q,cur_gate[1])
-                                else:
-                                    assert False, "The gate type for arbitrary rotations must be 'Rx', 'Ry' or 'Rz'."
-                            elif cur_gate == 'X':
-                                qop.rx(q,np.pi)
-                            elif cur_gate == 'X/2':
-                                qop.x90(q)
-                            elif cur_gate == '-X/2':
-                                qop.rx(q, -np.pi/2, amplitude=-params['amplitude_pi2'])
-                            elif cur_gate == 'Y':
-                                qop.ry(q,np.pi)
-                            elif cur_gate == 'Y/2':
-                                qop.y90(q)
-                            elif cur_gate == '-Y/2':
-                                qop.ry(q, -np.pi/2, amplitude=-params['amplitude_pi2'])
-                            elif cur_gate == 'Z':
-                                qop.rz(q,np.pi)
-                            elif cur_gate == 'Z/2':
-                                if coordinate_system == 'RH':
-                                    qop.rz(q,-np.pi/2)
-                                else:
-                                    qop.rz(q,np.pi/2)
-                            elif cur_gate == '-Z/2':
-                                if coordinate_system == 'RH':
-                                   qop.rz(q,np.pi/2)
-                                else:
-                                   qop.rz(q,-np.pi/2)
-                            elif cur_gate == 'H':
-                                qop.rz(q,np.pi)
-                                qop.ry(q,np.pi/2)
-
-
-                with dsl.section(name=f"main_measure_seq{seq}", alignment=SectionAlignment.LEFT):
-                    for q in qubits:
-                        sec = qop.measure(q, dsl.handles.result_handle(q.uid))
-                        # Fix the length of the measure section
-                        sec.length = max_measure_section_length
-
-        for q in qubits:
-            qop.passive_reset(q)
-        if opts.use_cal_traces:
-            qop.calibration_traces.omit_section(
-                qubits=qubits,
-                states=opts.cal_states,
-                active_reset=opts.active_reset,
-                active_reset_states=opts.active_reset_states,
-                active_reset_repetitions=opts.active_reset_repetitions,
-                measure_section_length=max_measure_section_length,
-            )

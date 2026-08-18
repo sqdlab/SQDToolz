@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from sqdtoolz.Utilities.DataFitting import*
 from sqdtoolz.Utilities.Miscellaneous import Miscellaneous
 from sqdtoolz.Experiments.Experimental.ZI import single_qubit_gates_sweep
+
 import scipy.optimize
 from sqdtoolz.Utilities.DataFitting import DFitSinusoid
 
@@ -19,19 +20,20 @@ class ExpZICalibX(ExpZIqubit):
         kwargs['update'] = False
 
         self._fit_vals = []
-        self._fit_data = []
+        self._fit_data = {}
         self._prev_angle = 0.0
+        self._only_every_n = kwargs.pop('only_every_n', 1)
 
         assert calib_denominator in [1,2], "Either supply 'calib_denominator' with 1 or 2 for X or X/2 gate calibration"
         self._calib_denominator = calib_denominator
 
         num_gates = kwargs.pop('num_gates', 20)
         if calib_denominator == 2:
-            kwargs['gate_lists']=[[['X/2']*n]*len(qubit_ids) for n in range(1,num_gates+1)]
+            kwargs['gate_lists']=[[['X/2']*n]*len(qubit_ids) for n in range(1,num_gates+1) if n % self._only_every_n == 0]
         else:
-            kwargs['gate_lists']=[[['X']*n]*len(qubit_ids) for n in range(1,num_gates+1)]
-        self._n_vals = np.arange(1,num_gates+1)
-
+            kwargs['gate_lists']=[[['X']*n]*len(qubit_ids) for n in range(1,num_gates+1) if n % self._only_every_n == 0]
+      
+        self._n_vals = np.array([n for n in range(1,num_gates+1) if n % self._only_every_n == 0])
         super().__init__(name, expt_config, single_qubit_gates_sweep, hal_QPU, qubit_ids, **kwargs)
     
     def _post_process(self, data):

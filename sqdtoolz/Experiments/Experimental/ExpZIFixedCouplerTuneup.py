@@ -64,7 +64,7 @@ class ExpZIFixedCouplerTuneup:
         exp = ExpZIChevrons2QFixedCoupler(f'flux_pulse_{self._qubit_ids[0]}_{self._qubit_ids[1]}', self._expt_config, self._qpu, self._qubit_ids,
                                           amplitudes=self._flux_amp_range, wait_times=self._wait_times,
                                           single_shot=True, dont_show_plot=not self._individual_plots)
-        lab.run_single(exp)
+        lab.run_single(exp, raw_pulse_sheet_duration=1e-3)
         #
         #
         fitted_data = np.load(exp._file_path + f'fitted_data.npy', allow_pickle=True).item()
@@ -99,7 +99,7 @@ class ExpZIFixedCouplerTuneup:
         exp2 = ExpZIChevrons2QFixedCoupler(f'flux_pulse_{self._qubit_ids[0]}_{self._qubit_ids[1]}_single', lab.CONFIG('ZI'), lab.HAL('QPU'), self._qubit_ids,
                                            amplitudes=np.array([exp.cur_coupler_obj.Amplitude]), wait_times=self._wait_times,
                                            single_shot=True, dont_show_plot=not self._individual_plots)
-        lab.run_single(exp2)
+        lab.run_single(exp2, raw_pulse_sheet_duration=1e-3)
         #
         fitted_data2 = np.load(exp2._file_path + f'fitted_data.npy', allow_pickle=True).item()
         leCounts = fitted_data2['pop_qubit_amps_times'][qubit_ind,state_ind][0] #Slice out the single amplitude...

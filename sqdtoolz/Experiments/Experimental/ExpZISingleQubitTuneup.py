@@ -106,6 +106,8 @@ class ExpZISingleQubitTuneup:
         self._only_every_n_short = kwargs.pop('only_every_n_short', 3)
         self._only_every_n_long = kwargs.pop('only_every_n_long', 11)
 
+        self._kwargs = kwargs
+
     def run(self, lab):
         fig = plt.figure(layout="constrained"); fig.set_figwidth(12); fig.set_figheight(12)
         gs = matplotlib.gridspec.GridSpec(5, 2, figure=fig)
@@ -250,7 +252,7 @@ class ExpZISingleQubitTuneup:
         gs = matplotlib.gridspec.GridSpec(4, 3, figure=fig)
         fig.suptitle(f"Fine tuneup {self._qubit_id}", fontsize=16, fontweight='bold')
         
-        lab.group_open(self._name + '_fine')
+        lab.group_open(self._name)
         ##############################
         #
         #FINE AND SLOW RAMSEY
@@ -316,7 +318,8 @@ class ExpZISingleQubitTuneup:
 
         exp = ExpZICalibX(f'CalibX_long_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=1, only_every_n=self._only_every_n_long, num_gates=self._num_gates_calibX_long, dont_show_plot=not self._individual_plots)
         lab.run_single(exp, skip_timing_diagrams=True)
-        assert abs(180-cur_angle) < 0.1, "Gate Calibration Failed, Try manually for now"
+        if self._kwargs.pop('assert_gate_calibration', True):
+            assert abs(180-cur_angle) < 0.1, "Gate Calibration Failed, Try manually for now"
         #TODO: If we reach this error should code in some edge case automation
         ax2 = fig.add_subplot(gs[2, 1:3], sharey=ax1)
         ExpZICalibX.plot_fitted_results(ax2, exp._fit_data[0]['data'], exp._fit_data[0]['qubit_name'])
@@ -348,7 +351,8 @@ class ExpZISingleQubitTuneup:
         exp = ExpZICalibX(f'CalibXon2_long_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=2, only_every_n=self._only_every_n_long, num_gates=self._num_gates_calibX_long, dont_show_plot=not self._individual_plots)
         lab.run_single(exp, skip_timing_diagrams=True)
         cur_angle = exp._prev_angle
-        assert abs(90-cur_angle) < 0.1, "Gate Calibration Failed, Try manually for now"
+        if self._kwargs.pop('assert_gate_calibration', True):
+            assert abs(90-cur_angle) < 0.1, "Gate Calibration Failed, Try manually for now"
         #TODO: If we reach this error should code in some edge case automation
         ax2 = fig.add_subplot(gs[3, 1:3], sharey=ax1)
         ExpZICalibX.plot_fitted_results(ax2, exp._fit_data[0]['data'], exp._fit_data[0]['qubit_name'])

@@ -284,6 +284,7 @@ class ExpZISingleQubitTuneup:
         new_pulse = self._qubit.DriveGEPulse
         p_new = pulse_library.drag(uid="new_pulse", beta=new_pulse['beta'], sigma=new_pulse['sigma'], length=self._qubit.DriveGETime)
         ZIPulses.plot_pulse(p_new, ax=ax_p, label='New pulse', color='tab:orange', show_plot=False)
+        ax_p.set_title('Pulse viewer')
         ##############################
         # 
         #X CALIB
@@ -337,3 +338,5 @@ class ExpZISingleQubitTuneup:
 
         lab.group_close()
 
+        fig.savefig(str(Path(exp._file_path).parent) + '/FinetuneOverview.png')
+        fig.show()

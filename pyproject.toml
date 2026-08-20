@@ -35,7 +35,7 @@ dependencies = [
 full = [
     "qcodes>=0.21.0",
     "pyvisa-py",
-    "resonator_tools @ git+https://github.com/6biscuits/resonator_tools.git",
+    "resonator-tools",
     "ply",
     "laboneq",
     "laboneq-applications",

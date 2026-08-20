@@ -19,7 +19,9 @@ class ScheduleParametersSoftQPUZI(ScheduleParametersBase):
         return self._qpu.get_qubit_obj(self.mapping[phys_qubit_index]).get_measure_duration()
 
     def get_duration2QG(self, qubit1_phys_index:int, qubit2_phys_index:int, gate_type:list) -> float:
-        zi_elem,_ = self._qpu.get_qubit_coupling_objs(self.mapping[qubit1_phys_index], self.mapping[qubit2_phys_index])[0].get_ZI_parameters()
+        cur_cplrs = self._qpu.get_qubit_coupling_objs(self.mapping[qubit1_phys_index], self.mapping[qubit2_phys_index])
+        assert len(cur_cplrs) != 0, f"There is no 2-qubit coupling between physical qubits {qubit1_phys_index} and {qubit2_phys_index}"
+        zi_elem,_ = cur_cplrs[0].get_ZI_parameters()    #Presume that the 0th coupler is the main 2QG coupler...
         return zi_elem.get_gate_duration(gate_type, [self._qpu.get_qubit_obj(self.mapping[qubit1_phys_index]), self._qpu.get_qubit_obj(self.mapping[qubit2_phys_index])])
     
     def dt(self, signal_type='drive'):

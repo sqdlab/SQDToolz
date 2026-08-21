@@ -19,6 +19,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import laboneq.simple as lbeqs
+from laboneq.core.types.enums import section_timing_mode
 
 from laboneq import workflow
 from laboneq.simple import (
@@ -252,7 +253,7 @@ def create_experiment(
                     after = le_UIDs[cur_section['after']]
                 else:
                     after = None
-                with dsl.section(name=f"sec{m}", alignment=SectionAlignment.LEFT, play_after=after):
+                with dsl.section(name=f"sec{m}", alignment=SectionAlignment.LEFT, play_after=after, section_timing_mode=section_timing_mode.SectionTimingMode.STRICT):
                     current_section_uid = dsl.active_section().uid
                     le_UIDs.append(current_section_uid)
                     if cur_section['custom_waveform']:

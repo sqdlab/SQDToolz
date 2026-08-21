@@ -1,6 +1,7 @@
 from sqdtoolz.HAL.HALbase import HALbase
 from sqdtoolz.ExperimentSpecification import ExperimentSpecification
 from sqdtoolz.HAL.ZI.ZIbase import ZIbase
+from sqdtoolz.HAL.ZI.ZIQuantumElement import ZIQuantumElement
 from sqdtoolz.Variable import VariableInternalTransient
 from sqdtoolz.Utilities.FileIO import FileIODatalogger, FileIOReader
 from sqdtoolz.Utilities.FileJSON import SQDJSONEncoder, SerialiseJSON
@@ -187,7 +188,9 @@ class SOFTqpu(HALbase, ZIbase):
             cur_cplr_name = cur_cplr[2][0][0]
             # cur_dict_cplr = {**cur_dict_cplr, **{x for x in }}
             cur_data_cplr = data['HALs'][ data['QubitCouplings'][cur_cplr_name] ]
-            final_json['Couplers'].append({**cur_dict_cplr,**{x:cur_data_cplr[x] for x in cur_data_cplr if x in keys_to_copy}})
+            cur_cplr_dict = {**cur_dict_cplr,**{x:cur_data_cplr[x] for x in cur_data_cplr if x in keys_to_copy}}
+            cur_cplr_dict['qubits_involved'] = ZIQuantumElement.get_involved_qubits_from_config_dict(cur_data_cplr)
+            final_json['Couplers'].append(cur_cplr_dict)
         #
         with open(summary_output_json_file_path, 'w') as outfile:
             json.dump(final_json, outfile, indent=4, cls=SQDJSONEncoder)

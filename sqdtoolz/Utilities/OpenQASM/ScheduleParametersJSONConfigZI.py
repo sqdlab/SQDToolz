@@ -28,7 +28,7 @@ class ScheduleParametersJSONConfigZI(ScheduleParametersBase):
             case 'D':
                 return gate_type[1]
             case 'Measure':
-                return self.get_duration_measurement(phys_qubit_index)
+                return self.get_measurement_params(phys_qubit_index)['duration']
             case 'X' | 'X/2' | 'Y' | 'Y/2' | 'H':
                 return cur_qubit['DriveGETime']
             case 'Z' | 'Z/2':
@@ -36,10 +36,10 @@ class ScheduleParametersJSONConfigZI(ScheduleParametersBase):
             case 'Reset':
                 return cur_qubit['ResetTime']
 
-    def get_duration_measurement(self, phys_qubit_index:int):
-        return self.config_data['Qubits'][phys_qubit_index]['ReadoutTime']
+    def get_measurement_params(self, phys_qubit_index:int):
+        return {'duration': self.config_data['Qubits'][phys_qubit_index]['ReadoutTime'], 'align_step': 8e-9}    #Assuming 2Gs/s
 
-    def get_duration2QG(self, qubit1_phys_index:int, qubit2_phys_index:int, gate_type:list) -> float:
+    def get_duration2QG(self, qubit1_phys_index:int, qubit2_phys_index:int, gate_type:list) -> dict:
         #Find the coupler...
         found = False
         for cur_cplr in self.config_data['Couplers']:
@@ -50,7 +50,15 @@ class ScheduleParametersJSONConfigZI(ScheduleParametersBase):
                 break
         assert found, f"There is no 2-qubit coupling between physical qubits {qubit1_phys_index} and {qubit2_phys_index}"
         assert gate_type[0] == 'ctrl' and gate_type[1][0] == 'Z', "Only supporting CZ at the moment..."
-        return cur_cplr['Length']
+        #
+        cur_signal_qubits = cur_cplr['qubits_involved']
+        cur_phys_qubits_signals = [next((m for m, item in enumerate(self.config_data['Qubits']) if item["Name"] == x), -1) for x in cur_signal_qubits]
+        cur_phys_qubits_signals = [x for x in cur_phys_qubits_signals if x != qubit1_phys_index and x != qubit2_phys_index]
+        #
+        return {
+            'duration': cur_cplr['Length'],
+            'aux_qubits': cur_phys_qubits_signals
+        }
     
     def dt(self, signal_type='drive'):
         if signal_type == 'drive' or signal_type == 'measure':

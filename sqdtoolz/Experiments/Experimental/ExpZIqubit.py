@@ -93,9 +93,11 @@ class ExpZIqubit(Experiment):
         sig = inspect.signature(self._workflow_module.experiment_workflow._func)    #This is the function that uses the workflow decorator to create the workflow... Otherwise it just retursn 'args' and 'kwargs'
         zi_wfw_params = list(sig.parameters.keys())
         if 'qubit' in zi_exp_params:    #TODO: Refactor and use the zi_wfw or zi_exp as appropriate. It is a bit too hacky right now...
-            qubit_kwarg = {'qubit': leQubits[0]}
+            qubit_kwarg = {'qubit': leQubits[0].uid}
+            qubit_kwarg_objs = {'qubit': leQubits[0]}
         else:
-            qubit_kwarg = {'qubits': leQubits}
+            qubit_kwarg = {'qubits': [x.uid for x in leQubits]}
+            qubit_kwarg_objs = {'qubits': leQubits}
 
         min_buffer_between_acq = kwargs.get('min_buffer_between_acquisitions', 40e-9)
         assert min_buffer_between_acq >= 20e-9, "The minimum buffer between acquisitions recommended by the ZI hardware team is 20ns."
@@ -106,11 +108,11 @@ class ExpZIqubit(Experiment):
                 temp_states = self._args.pop('states')
                 for cur_state in temp_states:
                     self._args['state'] = cur_state
-                    execution_time += self._estimate_experiment_params(kwargs,leSession,leQPU,leQubits,qubit_kwarg,options,file_path, f'_{cur_state}', min_buffer_between_acq)
+                    execution_time += self._estimate_experiment_params(kwargs,leSession,leQPU,leQubits,qubit_kwarg_objs,options,file_path, f'_{cur_state}', min_buffer_between_acq)
                 self._args.pop('state')
                 self._args['states'] = temp_states
             else:
-                execution_time = self._estimate_experiment_params(kwargs,leSession,leQPU,leQubits,qubit_kwarg,options,file_path, min_acq_buffer=min_buffer_between_acq)
+                execution_time = self._estimate_experiment_params(kwargs,leSession,leQPU,leQubits,qubit_kwarg_objs,options,file_path, min_acq_buffer=min_buffer_between_acq)
             #Another hack for the case where they iterate once per qubit in the experiment for a given workflow...
             if 'qubits' in zi_wfw_params and not ('qubits' in zi_exp_params) and 'qubit' in zi_exp_params:
                 execution_time *= len(leQubits)
@@ -156,7 +158,7 @@ class ExpZIqubit(Experiment):
     def _post_process(self, data):
         pass
 
-    def _estimate_experiment_params(self, kwargs,leSession,leQPU,leQubits,qubit_kwarg,options,file_path, file_name_suffix='', min_acq_buffer=40e-9):
+    def _estimate_experiment_params(self, kwargs,leSession,leQPU,leQubits,qubit_kwarg_objs,options,file_path, file_name_suffix='', min_acq_buffer=40e-9):
         """
         Just calculates the experiment execution time and generates the pulse-sheets etc.
         """
@@ -169,7 +171,7 @@ class ExpZIqubit(Experiment):
         if print_pulse_sheet or print_est_time:
             temp_exp = self._workflow_module.create_experiment(
                         leQPU,
-                        **qubit_kwarg,
+                        **qubit_kwarg_objs,
                         options=options.base._task_options['create_experiment'],    #TODO: Look into pitfalls here, but it needs to be converted into actual options here anyway...
                         **{x:self._args[x] for x in self._args if x in zi_exp_params})
             compiled_exp = compile_experiment(leSession, temp_exp)

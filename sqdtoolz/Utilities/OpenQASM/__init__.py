@@ -14,10 +14,10 @@ class ScheduleParametersBase:
     def get_duration(self, phys_qubit_index:int, gate_type:str|list|tuple) -> float:
         raise NotImplementedError()
     
-    def get_duration_measurement(self, phys_qubit_index:int):
+    def get_measurement_params(self, phys_qubit_index:int) -> dict:
         return NotImplementedError()
 
-    def get_duration2QG(self, qubit1_phys_index:int, qubit2_phys_index:int, gate_type:list) -> float:
+    def get_duration2QG(self, qubit1_phys_index:int, qubit2_phys_index:int, gate_type:list) -> dict:
         raise NotImplementedError()
 
     def dt(self, signal_type=''):

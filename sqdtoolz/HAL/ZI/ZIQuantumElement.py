@@ -83,6 +83,14 @@ class ZIQuantumElement(HALbase, ZIbase):
             ret_val.append( cur_signal_path.split('/')[0] )
         return ret_val
 
+    @staticmethod
+    def get_involved_qubits_from_config_dict(config_dict):
+        ret_val = []
+        for cur_signal in config_dict['ZI_QuantumElementEx']:
+            cur_signal_path = config_dict['ZI_QuantumElementEx'][cur_signal]
+            ret_val.append( cur_signal_path.split('/')[0] )
+        return ret_val
+
     def get_ZI_parameters(self):
         return self._zi_qelem, self._zi_qops
 

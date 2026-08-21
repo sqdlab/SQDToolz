@@ -69,7 +69,7 @@ class ExpZIQASM(ExpZIqubit):
 
         qasm_qubit_params = ScheduleParametersSoftQPUZI(self._hal_QPU,{m:leQubitNames[m] for m in range(len(leQubitNames))})
         #
-        self._leSchedule = self._poqasm.create_schedule(qasm_qubit_params, flatten_blocks=True, phys_qubit_ids=[x for x in range(len(leQubitNames))])
+        self._leSchedule = self._poqasm.create_schedule(qasm_qubit_params, flatten_blocks=True)
 
         # leTable = self._poqasm.tabulate_schedule(self._leSchedule, qasm_qubit_params)
         # for m in range(len(self._leScheduleBlocks['commands'])):

@@ -15,9 +15,7 @@ There are two classes of documentation provided for this stack:
 
 ## Installation instructions:
 
-The installation is done by cloning the repository and running the setup file via pip. Note that it is done in the editable mode so that one may modify the stack and push changes to GIT without upsetting the pip package manager. Two possible modes are given here depending on whether one uses Anaconda or normal Python:
-
-### Using Anaconda Python
+Although SQDToolz is on PyPI to satisfy other dependency chains, it is typically installed by cloning the repository and running the setup file via pip as an editable installation. Note that it is done in the editable mode so that one may modify the stack and push changes to GIT without upsetting the pip package manager. If the goal is to simply install the latest standalone release, then just run `pip install sqdtoolz[full]` after activating the venv (i.e. no need to clone the repository etc.). Omit `[full]` if the instrumentation/control stack need not be installed.
 
 Run Anaconda prompt and run the following command to create an environment (in this example, the name is sqdtoolz_env):
 
@@ -46,34 +44,12 @@ pip install -e sqdtoolz[full]
 
 This should install all required dependencies.
 
-### Using Normal Python
+## Updating new required packages
 
-Choose a sensible folder in which to install the virtual environment. Then run the usual command:
-
-```
-python3 -m venv name_of_venv
-```
-
-Now activate the environment in the usual manner (i.e. run the script `activate` in the /Scripts folder inside the new virtual environment folder) in command line. Now choose a different folder (i.e. not in the virtual environment folder) to house the SQDToolz folder (idea is to create an editable folder such that the code can be modified and pushed without upsetting the pip package manager). Once navigating to this folder, run the usual GIT clone:
+Just log into the virtual environment, navigate to the sqdtoolz folder and then run:
 
 ```
-cd C:/Users/....../myFolder/
-git clone https://github.com/sqdlab/sqdtoolz.git
-```
-
-Now (noting that the command line is still inside the active virtual environment), run:
-
-```
-pip install -e sqdtoolz
-```
-This should install all required dependencies.
-
-### Updating new required packages
-
-Just log into the virtual environment, navigate to the sqdtoolz folder (where `requirements.txt` is stored) and then run:
-
-```
-python -m pip install -r requirements.txt
+python -m pip install -e sqdtoolz[full]
 ```
 
 ## Basic design overview:

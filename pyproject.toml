@@ -41,11 +41,18 @@ full = [
     "laboneq-applications",
 ]
 
+[dependency-groups]
+dev = [
+    "build>=1.5.0",
+    "twine>=6.2.0",
+]
+
 [project.urls]
 Homepage = "https://github.com/sqdlab/sqdtoolz"
 
 [tool.setuptools]
 include-package-data = true
+license-files = ["LICENSE"]
 
 [tool.setuptools.packages.find]
 include = ["sqdtoolz*"]

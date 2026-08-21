@@ -23,7 +23,7 @@ def round_to_samplerate(awgobj, arr):
     step = 1.0 / awgobj.SampleRate
     return np.around(arr / step) * step
 
-lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir/')
+lab = Laboratory('UnitTests/UTestExperimentConfiguration.yaml', 'test_save_dir/')
 
 lab.load_instrument('virACQ')
 lab.load_instrument('virDDG')

@@ -28,7 +28,7 @@ class TestHALInstantiation(unittest.TestCase):
         return np.around(arr / step) * step
     
     def initialise(self):
-        self.lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir/')
+        self.lab = Laboratory('UnitTests/UTestExperimentConfiguration.yaml', 'test_save_dir/')
 
         self.lab.load_instrument('virACQ')
         self.lab.load_instrument('virDDG')
@@ -665,7 +665,7 @@ class TestSaveLoad(unittest.TestCase):
         return np.sum(np.abs(arr1 - arr2)) < 1e-15
 
     def initialise(self):
-        self.lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir/')
+        self.lab = Laboratory('UnitTests/UTestExperimentConfiguration.yaml', 'test_save_dir/')
 
         self.lab.load_instrument('virACQ')
         self.lab.load_instrument('virDDG')

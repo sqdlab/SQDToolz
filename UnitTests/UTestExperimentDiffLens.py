@@ -15,7 +15,7 @@ import numpy as np
 import time
 
 
-new_lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir/')
+new_lab = Laboratory('UnitTests/UTestExperimentConfiguration.yaml', 'test_save_dir/')
 
 new_lab.load_instrument('virACQ')
 new_lab.load_instrument('virDDG')

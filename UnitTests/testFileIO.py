@@ -29,9 +29,9 @@ import unittest
 
 class TestExpFileIO(unittest.TestCase):
     def initialise(self):
-        self.lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir/')
+        self.lab = Laboratory('UnitTests/UTestExperimentConfiguration.yaml', 'test_save_dir/')
 
-        self.lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir/')
+        self.lab = Laboratory('UnitTests/UTestExperimentConfiguration.yaml', 'test_save_dir/')
 
         self.lab.load_instrument('virACQ')
         self.lab.load_instrument('virDDG')

@@ -27,7 +27,7 @@ class TestSegments(unittest.TestCase):
     ERR_TOL = 5e-13
 
     def initialise(self):
-        self.lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir/')
+        self.lab = Laboratory('UnitTests/UTestExperimentConfiguration.yaml', 'test_save_dir/')
 
         self.lab.load_instrument('virAWG')
         awg_wfm = WaveformAWG("Wfm1", self.lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9)
@@ -835,7 +835,7 @@ class TestSegments(unittest.TestCase):
 
 class TestAWGChecks(unittest.TestCase):
     def initialise(self):
-        self.lab = Laboratory('UnitTests\\UTestExperimentConfiguration.yaml', 'test_save_dir/')
+        self.lab = Laboratory('UnitTests/UTestExperimentConfiguration.yaml', 'test_save_dir/')
 
         self.lab.load_instrument('virAWG')
         awg_wfm = WaveformAWG("Wfm1", self.lab, [('virAWG', 'CH1'), ('virAWG', 'CH2')], 1e9)

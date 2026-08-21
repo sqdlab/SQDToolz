@@ -56,6 +56,6 @@ class ScheduleParametersJSONConfigZI(ScheduleParametersBase):
         if signal_type == 'drive' or signal_type == 'measure':
             return 1.0/2e9
         elif signal_type == 'flux':
-            return 1.0/2.4e9    #TODO: Should this be a Python fraction object instead as it's a recurring decimal?
+            return 1.0/2.0e9    #TODO: Should this be a Python fraction object instead as it's a recurring decimal?
         else:
             assert False, f"Invalid signal ZI line type: {signal_type}."

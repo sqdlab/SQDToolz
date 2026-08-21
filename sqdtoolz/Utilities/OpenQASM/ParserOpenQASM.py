@@ -695,9 +695,10 @@ class ParserOpenQASM:
                 ret_list.append((cur_qreg,m))
         return ret_list
 
-    def create_schedule(self, params:ScheduleParametersBase, flatten_blocks=False):
+    def create_schedule(self, params:ScheduleParametersBase, flatten_blocks=False, phys_qubit_ids = []):
         #Initialise qubits and sync times
-        phys_qubit_ids = list(self._qreg_phys_mapping.values())
+        if len(phys_qubit_ids) == 0:
+            phys_qubit_ids = list(self._qreg_phys_mapping.values())
         #
         meas_store_ids = {}
         meas_index = 0

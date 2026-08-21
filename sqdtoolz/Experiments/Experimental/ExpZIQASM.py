@@ -67,10 +67,7 @@ class ExpZIQASM(ExpZIqubit):
 
         leQubitNames = [self._hal_QPU.get_qubit_obj(x).Name for x in self._qubit_ids] #Still allowing integer/string-based indexing on the qubit_ids...
 
-        mapping_physQid_QPUQubitindex = {}
-        for cur_qreg in self._final_qreg_phys_mapping:
-            mapping_physQid_QPUQubitindex[self._final_qreg_phys_mapping[cur_qreg]] = leQubitNames[self._final_qreg_phys_mapping[cur_qreg]]
-        qasm_qubit_params = ScheduleParametersSoftQPUZI(self._hal_QPU,mapping_physQid_QPUQubitindex)
+        qasm_qubit_params = ScheduleParametersSoftQPUZI(self._hal_QPU,{m:leQubitNames[m] for m in range(len(leQubitNames))})
         #
         self._leSchedule = self._poqasm.create_schedule(qasm_qubit_params, flatten_blocks=True)
 

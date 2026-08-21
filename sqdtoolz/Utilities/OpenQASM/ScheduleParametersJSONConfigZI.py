@@ -19,6 +19,9 @@ class ScheduleParametersJSONConfigZI(ScheduleParametersBase):
             config_data = json.load(f)
         return cls(config_data)
 
+    def get_phys_qubit_ids(self) -> list[int]:
+        return [x for x in range(len(self.config_data['Qubits']))]
+
     def get_duration(self, phys_qubit_index:int, gate_type:list|tuple) -> float:
         cur_qubit = self.config_data['Qubits'][phys_qubit_index]
         gate = gate_type[0]

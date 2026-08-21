@@ -11,6 +11,9 @@ class QASMCompatibleQubitMultiple:
         raise NotImplementedError()
 
 class ScheduleParametersBase:
+    def get_phys_qubit_ids(self) -> list[int]:
+        raise NotImplementedError()
+
     def get_duration(self, phys_qubit_index:int, gate_type:str|list|tuple) -> float:
         raise NotImplementedError()
     

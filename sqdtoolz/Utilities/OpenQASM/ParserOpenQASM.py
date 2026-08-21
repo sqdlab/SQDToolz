@@ -695,10 +695,9 @@ class ParserOpenQASM:
                 ret_list.append((cur_qreg,m))
         return ret_list
 
-    def create_schedule(self, params:ScheduleParametersBase, flatten_blocks=False, phys_qubit_ids = []):
+    def create_schedule(self, params:ScheduleParametersBase, flatten_blocks=False):
         #Initialise qubits and sync times
-        if len(phys_qubit_ids) == 0:
-            phys_qubit_ids = list(self._qreg_phys_mapping.values())
+        phys_qubit_ids = params.get_phys_qubit_ids()
         #
         meas_store_ids = {}
         meas_index = 0
@@ -965,7 +964,7 @@ class ParserOpenQASM:
         ax.add_artist(mpatch.Circle((x,y), 0.2, facecolor=col))
 
     def tabulate_schedule(self, gate_schedule, qubit_params:ScheduleParametersBase):
-        phys_qubit_ids = list(self._qreg_phys_mapping.values())
+        phys_qubit_ids = qubit_params.get_phys_qubit_ids()
         cur_qubit_gate_time_indices = {x:0.0 for x in phys_qubit_ids}
         #
         arr_qubits = []

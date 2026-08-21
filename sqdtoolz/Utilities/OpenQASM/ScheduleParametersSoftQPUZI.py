@@ -7,6 +7,9 @@ class ScheduleParametersSoftQPUZI(ScheduleParametersBase):
         self._qpu = softQPU_ZI
         self.mapping = mapping  #This maps the physical qubit index in QASM onto the softQPU IDs...
     
+    def get_phys_qubit_ids(self) -> list[int]:
+        return [x for x in self.mapping]
+
     def get_duration(self, phys_qubit_index:int, gate_type:str|list|tuple) -> float:
         if isinstance(gate_type, (list,tuple)):
             if gate_type[0] == 'D':

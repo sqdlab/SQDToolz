@@ -222,7 +222,7 @@ class SOFTqpu(HALbase, ZIbase):
                 r'$Q_i^{\text{read}}$':         [f'{x.ReadoutQi:.4g}' for x in leQubits],
                 r'$P^{\text{read}}$ (dBm)':     [f'{x.ReadoutPower:.4g}' for x in leQubits],
                 r'$A^{\text{read}}$':           [f'{x.ReadoutAmplitude:.4g}' for x in leQubits],
-                r'F_{\text{avg}}^{\text{read}}':[f'{x.ReadoutFidelity:.4g}' for x in leQubits],
+                r'F_{\text{avg}}^{\text{read}}':[f'{x.FidelityReadout:.4g}' for x in leQubits],
                 r'F_{\text{Clifford}':          [f'{x.Fidelity1QRB:.4g}' for x in leQubits],
                }
         df = pd.DataFrame(data)

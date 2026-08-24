@@ -32,9 +32,20 @@ lab.HAL('QPU').add_qubit_coupling('Q1', 'Q2', lab.HAL('Cpl12'))
 lab.HAL('QPU').add_qubit_coupling('Q3', 'Q2', lab.HAL('Cpl32'))
 lab.HAL('QPU').add_qubit_coupling('Q4', 'Q2', lab.HAL('Cpl42'))
 
+# SOFTqpu.create_summary_config_from_json('tests/ZI_Test_QASM_config.json', 'tests/ZI_test_QASM_JSONScheduler_summary.json')
+SOFTqpu.load_config(lab, file_path='tests/ZI_Test_QASM_config.json')
+
+acq_params = {}
+acq_params['AcquisitionMode'] = "DISCRIMINATION"
+acq_params['AveragingOrder'] = 'SingleShot'
+#
+for cur_qubit in ['Q0', 'Q1', 'Q2', 'Q3', 'Q4']:
+    if acq_params['AcquisitionMode'] == "DISCRIMINATION":
+        lab.HAL(cur_qubit).ReadoutKernelType = 'optimal'
+
 ZIACQ('ZIacq', lab, 'zi_boxes')
 ExperimentConfiguration('ZI', lab, 0, [], 'ZIacq')
 exp = ExpZIQASM('test', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0', 'Q1', 'Q2', 'Q3', 'Q4'], 'tests/ZI_Test_QASM3.qasm', source_dirs=['tests/'])
 qregs = exp.get_qubit_regs()
 # exp.set_qubit_reg_to_ZI_mappings({('q',0):'Qubit2',('q',1):'Qubit4'})
-lab.run_single(exp, debug_skip_experiment=True)
+lab.run_single(exp, debug_skip_experiment=True, override_ACQ_params=acq_params, raw_pulse_sheet_duration=1e-3)

@@ -266,8 +266,10 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
         self._commands.append({'type':SQDQasmCommandType.DELAY, 'targets':qargs, 'length':cur_delay})
 
     def visit_QuantumMeasurementStatement(self, node):
-        qargs = [self._eval_qarg(node.measure.qubit)]   #TODO: Expand to support registers expanding...
-        self._commands.append( {'type': SQDQasmCommandType.MEASURE, 'targets': qargs, 'store': self._eval_bits_arg(node.target)} )
+        qargs = self._eval_qarg(node.measure.qubit, allow_entire_regs=True)   #TODO: Expand to support registers expanding...
+        stores = self._eval_bits_arg(node.target)
+        assert len(qargs) == len(stores), f"The qubit register {node.measure.qubit.name} does not match the size of the classical bit register {node.target.name}."
+        self._commands.append( {'type': SQDQasmCommandType.MEASURE, 'targets': qargs, 'store': stores} )
 
     def visit_RangeDefinition(self, node):
         leStep = 1 if node.step==None else self._eval_arg(node.step)
@@ -798,10 +800,10 @@ class ParserOpenQASM:
                             qubit_sync_times[cur_phys_qubit_index] += gate_duration   #TODO: Must add 2QG time and pass this in - perhaps by a graph?
                             last_sync_command_indices[cur_phys_qubit_index] = len(final_commands)-1
                     elif cur_command['type'] == SQDQasmCommandType.MEASURE:
-                        for cur_phys_qubit_index in cur_targ_phys_indices:
+                        for ind_reg, cur_phys_qubit_index in enumerate(cur_targ_phys_indices):
                             cur_meas_id = f'm{meas_index}'
                             cur_meas_cmd = ('Measure', cur_meas_id)
-                            meas_store_ids[cur_command['store'][0]] = cur_meas_id
+                            meas_store_ids[cur_command['store'][ind_reg]] = cur_meas_id
                             meas_index += 1
                             #
                             cur_play_after_index = None if last_sync_command_indices[cur_phys_qubit_index] == -1 else last_sync_command_indices[cur_phys_qubit_index]

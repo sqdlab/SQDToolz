@@ -20,5 +20,6 @@ gate h a { z a; ry(pi/2) a; }
 // 2-Qubit native CZ
 gate cz a, b { ctrl @ z a, b; }
 
-// Derived 2-Qubit CX
+//Derived Gates
 gate cx a,b { h b; cz a,b; h b; }
+gate swap a,b {cx a,b; cx b,a; cx a,b;}

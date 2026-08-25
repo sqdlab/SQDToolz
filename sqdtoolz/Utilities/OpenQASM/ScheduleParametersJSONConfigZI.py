@@ -48,7 +48,7 @@ class ScheduleParametersJSONConfigZI(ScheduleParametersBase):
         for cur_cplr in self.config_data['Couplers']:
             qubit1 = cur_cplr['Linkage'][0]
             qubit2 = cur_cplr['Linkage'][1]
-            if self.config_data['Qubits'][qubit1_phys_index]['Name'] == qubit1 and self.config_data['Qubits'][qubit2_phys_index]['Name'] == qubit2:
+            if self.config_data['Qubits'][qubit1_phys_index]['Name'] == qubit1 and self.config_data['Qubits'][qubit2_phys_index]['Name'] == qubit2 or self.config_data['Qubits'][qubit1_phys_index]['Name'] == qubit2 and self.config_data['Qubits'][qubit2_phys_index]['Name'] == qubit1:
                 found = True
                 break
         assert found, f"There is no 2-qubit coupling between physical qubits {qubit1_phys_index} and {qubit2_phys_index}"

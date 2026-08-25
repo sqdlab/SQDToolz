@@ -1153,8 +1153,7 @@ class ParserOpenQASM:
                     # Check for overlap: max(starts) < min(ends)
                     overlap = max(start_m, start_n) < min(end_m, end_n)
                     # Check condition 1: Overlap AND different start times
-                    Miscellaneous
-                    assert not (overlap and start_m != start_n), f"ZI HW limitation: overlapping measure pulses at {Miscellaneous.get_units(start_m)}s and {Miscellaneous.get_units(start_n)}s do not start at the same time."
+                    assert not (overlap and np.abs(start_m-start_n)>qasm_qubit_params.dt()/4), f"ZI HW limitation: overlapping measure pulses at {Miscellaneous.get_units(start_m)}s and {Miscellaneous.get_units(start_n)}s do not start at the same time."
             #
             ###################
             #Gap check

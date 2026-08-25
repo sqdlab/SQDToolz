@@ -31,6 +31,10 @@ class ExpZIqubit(Experiment):
         self._transition = kwargs.pop('transition', 'ge')
         #
         self._plot_ZI = kwargs.pop('ZI_plot', False)
+        self._skip_ZI_analysis = kwargs.pop('skip_ZI_analysis', True)
+        if self._plot_ZI:
+            #Cannot plot_ZI without executing the ZI analysis workflow...
+            self._skip_ZI_analysis = False
         self._args = kwargs
         self._show_pulse_sheet = kwargs.pop('show_pulse_sheet', False)
     
@@ -55,6 +59,8 @@ class ExpZIqubit(Experiment):
             getattr(options, 'transition')(self._transition)
         if hasattr(options, 'close_figures'):
             options.close_figures(not self._plot_ZI)
+        if hasattr(options, 'do_analysis'):
+            getattr(options, 'do_analysis')(not self._skip_ZI_analysis)
         if hasattr(options, 'cal_states'):
             #Automatically default to transition for calibration states... Note that this only matters if use_cal_traces is True...
             getattr(options, 'cal_states')( self._args.get('cal_states', self._transition) )
@@ -116,7 +122,7 @@ class ExpZIqubit(Experiment):
             #Another hack for the case where they iterate once per qubit in the experiment for a given workflow...
             if 'qubits' in zi_wfw_params and not ('qubits' in zi_exp_params) and 'qubit' in zi_exp_params:
                 execution_time *= len(leQubits)
-                qubit_kwarg = {'qubits': leQubits}
+                qubit_kwarg = {'qubits': [x.uid for x in leQubits]}
 
             if kwargs.get('print_estimated_execution_time',True):
                 print(f"Expected Runtime: {execution_time:.3f}s")

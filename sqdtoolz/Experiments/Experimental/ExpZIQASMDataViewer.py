@@ -3,6 +3,7 @@ from pathlib import Path
 import shutil
 from sqdtoolz.Utilities.FileIO import FileIOReader
 import json
+import numpy as np
 
 class ExpZIQASMDataViewer:
     def __init__(self, expziqasm_data_folder_path):
@@ -19,10 +20,13 @@ class ExpZIQASMDataViewer:
         leData = FileIOReader(file_path)
         arr = leData.get_numpy_array()
         if self._meas_params['acq_type'] == 'DISCRIMINATION':
-            arr = arr[...,0]
+            arr = np.array(arr[...,0], dtype=int)
         if arr.size == 1:
             arr = float(arr)
         return arr
+
+    def get_number_of_shots(self):
+        return self._meas_params['NumRepetitions']
 
     def get_inner_slicing_vars(self):
         match self._meas_params['acq_type']:

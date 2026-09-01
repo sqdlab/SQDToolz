@@ -165,7 +165,7 @@ class TestQasmAlignment(unittest.TestCase):
 
         self.cleanup()
 
-class TestQasmDefinitions(unittest.TestCase):
+class TestQasmGeneral(unittest.TestCase):
     ERR_TOL = 5e-13
 
     def initialise(self):
@@ -288,6 +288,87 @@ class TestQasmDefinitions(unittest.TestCase):
         assert len(M) == 2 and set(M["qubits"]) == {1, 2}, "Delay4 has synthesis error where there is not exactly 2 aligned measurements on qubits 1 and 2"
 
         self.cleanup()
+
+    def test_measure(self):
+        self.initialise()
+       
+        oqasm, leScheduleParams, leScheduleTable = self._get_table('UnitTests/QASM/Measure1.qasm', 'UnitTests/QASM/config_summary.json', {('q',0):1,('q',1):2})
+        #
+        X = leScheduleTable[leScheduleTable["operation"] == "X"]
+        Y = leScheduleTable[leScheduleTable["operation"] == "Y"]
+        R = leScheduleTable[leScheduleTable["operation"] == "R"]
+        M = leScheduleTable[leScheduleTable["operation"] == "M"]
+        assert len(X) == 2, "Measure1 has synthesis error where there are not exactly 2 X gates."
+        assert len(Y) == 2, "Measure1 has synthesis error where there are not exactly 1 Y gates."
+        assert X.iloc[0]["qubits"] == 1, "Measure1 has synthesis error where X gate is not on qubit 1."
+        assert Y.iloc[0]["qubits"] == 1, "Measure1 has synthesis error where the first Y gate is not on qubit 1."
+        assert Y.iloc[1]["qubits"] == 2, "Measure1 has synthesis error where the second Y gate is not on qubit 2."
+        assert np.abs(Y.iloc[0]["start_time"] - X.iloc[0]["start_time"] - leScheduleParams.get_duration(1, ('X',np.pi))) < 1e-12, "Measure1 has synthesis error where Y does not follow X correctly."
+        assert np.abs(R.iloc[0]["start_time"] - Y.iloc[0]["end_time"]) < 1e-12, "Measure1 has incorrectly scheduled the Measure."
+        assert np.abs(X.iloc[1]["start_time"] - Y.iloc[0]["end_time"] - leScheduleParams.get_duration(0, ('Reset',))) < 1e-12, "Measure1 has synthesis error where Y does not follow X correctly."
+        assert np.abs(Y.iloc[1]["start_time"]) < 1e-12, "Measure1 has synthesis error where the second Y does not start at the beginning."
+        assert len(M) == 2 and set(M["qubits"]) == {1, 2}, "Measure1 has synthesis error where there is not exactly 2 aligned measurements on qubits 1 and 2"
+
+        #Multi-qubit Measure
+        oqasm, leScheduleParams, leScheduleTable = self._get_table('UnitTests/QASM/Measure2.qasm', 'UnitTests/QASM/config_summary.json', {('q',0):1,('q',1):2})
+        #
+        X = leScheduleTable[leScheduleTable["operation"] == "X"]
+        Y = leScheduleTable[leScheduleTable["operation"] == "Y"]
+        R = leScheduleTable[leScheduleTable["operation"] == "R"]
+        M = leScheduleTable[leScheduleTable["operation"] == "M"]
+        assert len(X) == 2, "Measure2 has synthesis error where there are not exactly 2 X gates."
+        assert len(Y) == 2, "Measure2 has synthesis error where there are not exactly 1 Y gates."
+        assert X.iloc[0]["qubits"] == 1, "Measure2 has synthesis error where X gate is not on qubit 1."
+        assert Y.iloc[0]["qubits"] == 1, "Measure2 has synthesis error where the first Y gate is not on qubit 1."
+        assert Y.iloc[1]["qubits"] == 2, "Measure2 has synthesis error where the second Y gate is not on qubit 2."
+        assert np.abs(Y.iloc[0]["start_time"] - X.iloc[0]["start_time"] - leScheduleParams.get_duration(1, ('X',np.pi))) < 1e-12, "Measure2 has synthesis error where Y does not follow X correctly."
+        assert np.abs(R.iloc[0]["start_time"] - Y.iloc[0]["end_time"]) < 1e-12, "Measure2 has incorrectly scheduled the Measure."
+        assert np.abs(X.iloc[1]["start_time"] - Y.iloc[0]["end_time"] - leScheduleParams.get_duration(0, ('Reset',))) < 1e-12, "Measure2 has synthesis error where Y does not follow X correctly."
+        assert np.abs(Y.iloc[1]["start_time"] - leScheduleParams.get_duration(1, ('Reset',))) < 1e-12, "Measure2 has synthesis error where the second Y does not start at the beginning."
+        assert len(M) == 2 and set(M["qubits"]) == {1, 2}, "Measure2 has synthesis error where there is not exactly 2 aligned measurements on qubits 1 and 2"
+
+        self.cleanup()
+
+    def test_reset(self):
+        self.initialise()
+       
+        oqasm, leScheduleParams, leScheduleTable = self._get_table('UnitTests/QASM/Reset1.qasm', 'UnitTests/QASM/config_summary.json', {('q',0):1,('q',1):2})
+        #
+        X = leScheduleTable[leScheduleTable["operation"] == "X"]
+        Y = leScheduleTable[leScheduleTable["operation"] == "Y"]
+        R = leScheduleTable[leScheduleTable["operation"] == "R"]
+        M = leScheduleTable[leScheduleTable["operation"] == "M"]
+        assert len(X) == 2, "Reset1 has synthesis error where there are not exactly 2 X gates."
+        assert len(Y) == 2, "Reset1 has synthesis error where there are not exactly 1 Y gates."
+        assert X.iloc[0]["qubits"] == 1, "Reset1 has synthesis error where X gate is not on qubit 1."
+        assert Y.iloc[0]["qubits"] == 1, "Reset1 has synthesis error where the first Y gate is not on qubit 1."
+        assert Y.iloc[1]["qubits"] == 2, "Reset1 has synthesis error where the second Y gate is not on qubit 2."
+        assert np.abs(Y.iloc[0]["start_time"] - X.iloc[0]["start_time"] - leScheduleParams.get_duration(1, ('X',np.pi))) < 1e-12, "Reset1 has synthesis error where Y does not follow X correctly."
+        assert np.abs(R.iloc[0]["start_time"] - Y.iloc[0]["end_time"]) < 1e-12, "Reset1 has incorrectly scheduled the reset."
+        assert np.abs(X.iloc[1]["start_time"] - Y.iloc[0]["end_time"] - leScheduleParams.get_duration(0, ('Reset',))) < 1e-12, "Reset1 has synthesis error where Y does not follow X correctly."
+        assert np.abs(Y.iloc[1]["start_time"]) < 1e-12, "Reset1 has synthesis error where the second Y does not start at the beginning."
+        assert len(M) == 2 and set(M["qubits"]) == {1, 2}, "Reset1 has synthesis error where there is not exactly 2 aligned measurements on qubits 1 and 2"
+
+        #Multi-qubit reset
+        oqasm, leScheduleParams, leScheduleTable = self._get_table('UnitTests/QASM/Reset2.qasm', 'UnitTests/QASM/config_summary.json', {('q',0):1,('q',1):2})
+        #
+        X = leScheduleTable[leScheduleTable["operation"] == "X"]
+        Y = leScheduleTable[leScheduleTable["operation"] == "Y"]
+        R = leScheduleTable[leScheduleTable["operation"] == "R"]
+        M = leScheduleTable[leScheduleTable["operation"] == "M"]
+        assert len(X) == 2, "Reset2 has synthesis error where there are not exactly 2 X gates."
+        assert len(Y) == 2, "Reset2 has synthesis error where there are not exactly 1 Y gates."
+        assert X.iloc[0]["qubits"] == 1, "Reset2 has synthesis error where X gate is not on qubit 1."
+        assert Y.iloc[0]["qubits"] == 1, "Reset2 has synthesis error where the first Y gate is not on qubit 1."
+        assert Y.iloc[1]["qubits"] == 2, "Reset2 has synthesis error where the second Y gate is not on qubit 2."
+        assert np.abs(Y.iloc[0]["start_time"] - X.iloc[0]["start_time"] - leScheduleParams.get_duration(1, ('X',np.pi))) < 1e-12, "Reset2 has synthesis error where Y does not follow X correctly."
+        assert np.abs(R.iloc[0]["start_time"] - Y.iloc[0]["end_time"]) < 1e-12, "Reset2 has incorrectly scheduled the reset."
+        assert np.abs(X.iloc[1]["start_time"] - Y.iloc[0]["end_time"] - leScheduleParams.get_duration(0, ('Reset',))) < 1e-12, "Reset2 has synthesis error where Y does not follow X correctly."
+        assert np.abs(Y.iloc[1]["start_time"] - leScheduleParams.get_duration(1, ('Reset',))) < 1e-12, "Reset2 has synthesis error where the second Y does not start at the beginning."
+        assert len(M) == 2 and set(M["qubits"]) == {1, 2}, "Reset2 has synthesis error where there is not exactly 2 aligned measurements on qubits 1 and 2"
+
+        self.cleanup()
+
 
 class TestQasmControlFlows(unittest.TestCase):
     ERR_TOL = 5e-13
@@ -481,7 +562,7 @@ class TestQasmControlFlows(unittest.TestCase):
         self.cleanup()
 
 if __name__ == '__main__':
-    temp = TestQasmControlFlows()
-    temp.test_ForLoops()
+    temp = TestQasmGeneral()
+    temp.test_measure()
     # unittest.main()
 

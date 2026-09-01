@@ -322,8 +322,9 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
         return self._eval_arg(node)
 
     def visit_QuantumReset(self, node):
-        qargs = self._eval_qarg(node.qubits)    #TODO: Look into whole-register reset...
-        self._commands.append({'type':SQDQasmCommandType.RESET, 'targets':qargs})
+        qargs = self._eval_qarg(node.qubits, allow_entire_regs=True)
+        for m in range(len(qargs)):
+            self._commands.append({'type':SQDQasmCommandType.RESET, 'targets':qargs[m]})
 
     def visit_QuantumBarrier(self, node):
         # self._commands.append({'type':'barrier'})
@@ -341,7 +342,8 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
         qargs = self._eval_qarg(node.measure.qubit, allow_entire_regs=True)   #TODO: Expand to support registers expanding...
         stores = self._eval_bits_arg(node.target)
         assert len(qargs) == len(stores), f"The qubit register {node.measure.qubit.name} does not match the size of the classical bit register {node.target.name}."
-        self._commands.append( {'type': SQDQasmCommandType.MEASURE, 'targets': qargs, 'store': stores} )
+        for m in range(len(qargs)):
+            self._commands.append( {'type': SQDQasmCommandType.MEASURE, 'targets': qargs[m], 'store': stores[m]} )
 
     def visit_RangeDefinition(self, node):
         leStep = 1 if node.step==None else self._eval_arg(node.step)
@@ -792,8 +794,6 @@ class ParserOpenQASM:
                     sync_command = True
                 elif cur_command['type'] == SQDQasmCommandType.DEF_CAL:
                     sync_command = True
-                elif cur_command['type'] == SQDQasmCommandType.MEASURE:
-                    sync_command = True
 
                 if not sync_command:
                     if cur_command['type'] == SQDQasmCommandType.GATE:
@@ -801,8 +801,32 @@ class ParserOpenQASM:
                     elif cur_command['type'] == SQDQasmCommandType.DELAY:
                         cur_qubit_commands[cur_command['targets'][0]].append(('D', self._process_delay(cur_command['length'], params.dt())))  #Using Drive/Measure lines as the baseline dt...
                     elif cur_command['type'] == SQDQasmCommandType.RESET:
-                        #Reset does not synchronise
-                        cur_qubit_commands[cur_command['targets']].append(('Reset',)) #TODO: Adapt to multi-qubit registers
+                        cur_qubit_commands[cur_command['targets']].append(('Reset',))
+                    elif cur_command['type'] == SQDQasmCommandType.MEASURE:
+                        cur_phys_qubit_index = cur_command['targets']   #Shouldn't be a list for Measure...
+                        cur_meas_id = f'm{meas_index}'
+                        cur_meas_cmd = ('Measure', cur_meas_id)
+                        meas_store_ids[cur_command['store']] = cur_meas_id
+                        meas_index += 1
+                        #
+                        cur_play_after_index = None if last_sync_command_indices[cur_phys_qubit_index] == -1 else last_sync_command_indices[cur_phys_qubit_index]
+                        meas_params = params.get_measurement_params(cur_phys_qubit_index)
+                        delay_offset = 0
+                        meas_duration = meas_params['duration']
+                        if 'align_step' in meas_params and meas_params['align_step'] > 0:
+                            cur_step_multiple = qubit_sync_times[cur_phys_qubit_index] / meas_params['align_step']
+                            min_granularity = params.dt() / meas_params['align_step']
+                            if cur_step_multiple - int(cur_step_multiple) > min_granularity/2:
+                                delay_offset = (1 - cur_step_multiple + int(cur_step_multiple)) * meas_params['align_step']
+                                #Errors occur when combining delay with measure, so separating the sections...
+                                final_commands.append({'qubit_index': cur_phys_qubit_index, 'custom_waveform':False, 'sequence': [('D', float(delay_offset))], 'after':cur_play_after_index, 'length':delay_offset})
+                                qubit_sync_times[cur_phys_qubit_index] += delay_offset
+                                last_sync_command_indices[cur_phys_qubit_index] = len(final_commands)-1                                             
+                        #
+                        cur_play_after_index = None if last_sync_command_indices[cur_phys_qubit_index] == -1 else last_sync_command_indices[cur_phys_qubit_index]
+                        final_commands.append({'qubit_index': cur_phys_qubit_index, 'custom_waveform':False, 'sequence': [cur_meas_cmd], 'after':cur_play_after_index, 'length':meas_duration})
+                        qubit_sync_times[cur_phys_qubit_index] += meas_duration
+                        last_sync_command_indices[cur_phys_qubit_index] = len(final_commands)-1
                 else:
                     ####
                     #Calculate new synchronisation point
@@ -870,32 +894,7 @@ class ParserOpenQASM:
                         #Set all gate-sequences on these qubits to be synchronised to come after this new multi-qubit gate...
                         for cur_phys_qubit_index in cur_targ_phys_indices:
                             qubit_sync_times[cur_phys_qubit_index] += gate_duration   #TODO: Must add 2QG time and pass this in - perhaps by a graph?
-                            last_sync_command_indices[cur_phys_qubit_index] = len(final_commands)-1
-                    elif cur_command['type'] == SQDQasmCommandType.MEASURE:
-                        for ind_reg, cur_phys_qubit_index in enumerate(cur_targ_phys_indices):
-                            cur_meas_id = f'm{meas_index}'
-                            cur_meas_cmd = ('Measure', cur_meas_id)
-                            meas_store_ids[cur_command['store'][ind_reg]] = cur_meas_id
-                            meas_index += 1
-                            #
-                            cur_play_after_index = None if last_sync_command_indices[cur_phys_qubit_index] == -1 else last_sync_command_indices[cur_phys_qubit_index]
-                            meas_params = params.get_measurement_params(cur_phys_qubit_index)
-                            delay_offset = 0
-                            meas_duration = meas_params['duration']
-                            if 'align_step' in meas_params and meas_params['align_step'] > 0:
-                                cur_step_multiple = qubit_sync_times[cur_phys_qubit_index] / meas_params['align_step']
-                                min_granularity = params.dt() / meas_params['align_step']
-                                if cur_step_multiple - int(cur_step_multiple) > min_granularity/2:
-                                    delay_offset = (1 - cur_step_multiple + int(cur_step_multiple)) * meas_params['align_step']
-                                    #Errors occur when combining delay with measure, so separating the sections...
-                                    final_commands.append({'qubit_index': cur_phys_qubit_index, 'custom_waveform':False, 'sequence': [('D', float(delay_offset))], 'after':cur_play_after_index, 'length':delay_offset})
-                                    qubit_sync_times[cur_phys_qubit_index] += delay_offset
-                                    last_sync_command_indices[cur_phys_qubit_index] = len(final_commands)-1                                             
-                            #
-                            cur_play_after_index = None if last_sync_command_indices[cur_phys_qubit_index] == -1 else last_sync_command_indices[cur_phys_qubit_index]
-                            final_commands.append({'qubit_index': cur_phys_qubit_index, 'custom_waveform':False, 'sequence': [cur_meas_cmd], 'after':cur_play_after_index, 'length':meas_duration})
-                            qubit_sync_times[cur_phys_qubit_index] += meas_duration
-                            last_sync_command_indices[cur_phys_qubit_index] = len(final_commands)-1                                             
+                            last_sync_command_indices[cur_phys_qubit_index] = len(final_commands)-1                                           
                     #Don't need to check if it's SQDQasmCommandType.END_BLOCK as it's the end...
             final_blocks.append(final_commands)
         #

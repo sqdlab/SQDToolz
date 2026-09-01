@@ -20,7 +20,7 @@ The qubits in `ExpZIQASM` are mapped onto hardware either by default in the orde
 
 ## Alignment/Timing
 
-The scheduler in `ParserOpenQASM` adds bubbles (i.e. delays to pad the section) when sections must align (e.g. a two-qubit gate - this includes auxiliary qubits as well!). To manually align multiple qubits so that future gates all start from that point, use the multi-qubit delay instruction as specified by the standard (e.g. `delay[0] q1, q2;`). The delay value can be zero to enforce just the alignment.
+The scheduler in `ParserOpenQASM` adds bubbles (i.e. delays to pad the section) when sections must align (e.g. a two-qubit gate - this includes auxiliary qubits as well!). To manually align multiple qubits so that future gates all start from that point, use the multi-qubit delay instruction as specified by the standard (e.g. `delay[0] q1, q2;`). The delay value can be zero to enforce just the alignment. **NOTE: multi-qubit reset/measure instructions do not align like a multi-qubit delay.** That is, the individual qubit resets/measures can be rescheduled as separate instructions across the qubits as they simply break out into individual statements.
 
 In the case of using the *Zurich Instruments* combination of *SHFQC* and *HDAWG*, the evaluation of `dt` is taken to be 2Gs/s to match the drive/measure pulse sample rates. However, it will automatically evaluate as ~~2.4Gs/s~~ 2Gs/s (it'll synchronise when both are in use) when evaluating custom pulse waveforms on flux lines.
 

@@ -281,7 +281,7 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
             return
         else:
             #or cur_func_name in self._def?
-            assert self._gate_defs, f"Line {node.span.start_line}: Function '{node.name.name}' is undefined"
+            assert node.name.name in self._gate_defs, f"Line {node.span.start_line}: Function '{node.name.name}' is undefined. Note that OpenQASM3 does NOT permit forward declarations. Functions must be explicitly declared before using."
             leFunc = self._gate_defs[node.name.name]
             num_extra_modifiers = len(node.modifiers)
             self._extra_mod_stack = self._extra_mod_stack + node.modifiers
@@ -923,7 +923,7 @@ class ParserOpenQASM:
         elif axis[2]>1-1e-6:
             return ('Z', angle)
         elif axis[2] < -1+1e-6:
-            return ('Z', angle)
+            return ('Z', -angle)
         else:
             assert False, f"A gate is required on axis {axis}. Convert it into equivalent rotations about the basis axes X/Y/Z."
 
@@ -1038,6 +1038,7 @@ class ParserOpenQASM:
         arr_gate_types = []
         arr_col_intens = []
         arr_operations = []
+        arr_op_angles = []
         #
         for cur_sec_ind,cur_sec_ops in enumerate(gate_schedule['commands']):
             cur_qubit = cur_sec_ops['qubit_index']
@@ -1055,6 +1056,7 @@ class ParserOpenQASM:
                     arr_end_times.append(cur_qubit_gate_time_indices[x])
                     arr_gate_types.append(cur_name)
                     arr_operations.append('W')
+                    arr_op_angles.append(0)
                     arr_col_intens.append(cur_sec_ind/len(gate_schedule['commands']))
                 continue
             elif isinstance(cur_qubit, (list,tuple)):
@@ -1073,6 +1075,7 @@ class ParserOpenQASM:
                     arr_end_times.append(end_time)
                     arr_gate_types.append( self._get_1QG_name(*(cur_sec_ops['sequence'][1])) )
                     arr_operations.append(cur_sec_ops['sequence'][1][0])
+                    arr_op_angles.append(cur_sec_ops['sequence'][1][1])
                     arr_col_intens.append(cur_sec_ind/len(gate_schedule['commands']))
                     continue
             #Process it as a 1QG
@@ -1080,12 +1083,15 @@ class ParserOpenQASM:
                 if cur_gate[0] == 'Reset':
                     cur_name = 'Reset'
                     arr_operations.append('R')
+                    arr_op_angles.append(0)
                 elif cur_gate[0] == 'Measure':
                     cur_name = self._measure_label
                     arr_operations.append('M')
+                    arr_op_angles.append(0)
                 else:
                     cur_name = self._get_1QG_name(*cur_gate)
                     arr_operations.append(cur_gate[0])
+                    arr_op_angles.append(cur_gate[1])
 
                 cur_gate_time = qubit_params.get_duration(cur_qubit, cur_gate)
                 #
@@ -1105,7 +1111,8 @@ class ParserOpenQASM:
             'end_time':arr_end_times,
             'gate_type':arr_gate_types,
             'col_intensity':arr_col_intens,
-            'operation':arr_operations
+            'operation':arr_operations,
+            'angle':arr_op_angles
         })
 
         return df

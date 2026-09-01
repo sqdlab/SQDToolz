@@ -660,6 +660,9 @@ class ParserOpenQASM:
         """
         Given as key-value pairs where key is a key from get_qubit_regs and value is the index of the physical qubit
         """
+        all_qregs = self.get_qregs()
+        for cur_mapping in mapping:
+            assert cur_mapping in all_qregs, f"The qubit register {cur_mapping} does not exist in the QASM script to map."
         self._qreg_phys_mapping = mapping
 
     def perform_parsing(self):

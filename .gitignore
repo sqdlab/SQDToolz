@@ -17,3 +17,4 @@ dist/sqdtoolz-0.0.1.dev1-py3.9.egg
 *.vscode/
 mySaves/
 dist/
+*laboneq_output/

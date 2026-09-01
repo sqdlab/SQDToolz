@@ -600,8 +600,52 @@ class TestQasmControlFlows(unittest.TestCase):
 
         self.cleanup()
 
+class TestQasmOpenPulse(unittest.TestCase):
+    ERR_TOL = 5e-13
+
+    def initialise(self):
+        pass
+    
+    def cleanup(self):
+        pass
+
+    def arr_equality(self, arr1, arr2):
+        if arr1.size != arr2.size:
+            return False
+        return np.max(np.abs(arr1 - arr2)) < self.ERR_TOL
+    
+    def _get_table(self, qasm_path, schedule_params_path, qreg_phys_mapping):
+        oqasm = ParserOpenQASM(qasm_path, [], measure_label='QMEAS')
+        oqasm.set_qreg_physical_mapping(qreg_phys_mapping)
+        oqasm.perform_parsing()
+        leScheduleParams = ScheduleParametersJSONConfigZI.fromFile(schedule_params_path)
+        leSchedule = oqasm.create_schedule(leScheduleParams, flatten_blocks=True)
+        leScheduleTable = oqasm.tabulate_schedule(leSchedule, leScheduleParams)
+        oqasm.check_ZI_compatibility(leSchedule, leScheduleParams)
+        return oqasm, leScheduleParams, leScheduleTable
+
+    def test_Substitution(self):
+        self.initialise()
+
+        #Check that the X-gate on Qubit 2 is overridden...
+        oqasm, leScheduleParams, leScheduleTable = self._get_table('UnitTests/QASM/OpenPulseSub1.qasm', 'UnitTests/QASM/config_summary.json', {('q',0):1,('q',1):2})
+        #
+        X = leScheduleTable[leScheduleTable["operation"] == "X"]
+        W = leScheduleTable[leScheduleTable["operation"] == "W"]
+        M = leScheduleTable[leScheduleTable["operation"] == "M"]
+        assert len(X) == 1, "OpenPulseSub1 has synthesis error where there is not exactly one 'X' gate."
+        assert X.iloc[0]["qubits"] == 1, "OpenPulseSub1 has synthesis error where X gate is not on qubit 1."
+        assert W.iloc[0]["qubits"] == 2, "OpenPulseSub1 has synthesis error where overridden X gate is not on qubit 2."
+        assert np.abs(X.iloc[0]["end_time"] - X.iloc[0]["start_time"] - leScheduleParams.get_duration(1, ('X',np.pi))) < 1e-12, "OpenPulseSub1 has synthesis error on X-gate duration."
+        assert np.abs(X.iloc[0]["start_time"]) < 1e-12, "OpenPulseSub1 has synthesis error on X-gate scheduling."
+        assert np.abs(W.iloc[0]["end_time"] - W.iloc[0]["start_time"] - 83e-9) < 1e-12, "OpenPulseSub1 has synthesis error on overridden X-gate duration."
+        assert np.abs(W.iloc[0]["start_time"]) < 1e-12, "OpenPulseSub1 has synthesis error on overridden X-gate scheduling."
+        assert len(M) == 2 and set(M["qubits"]) == {1, 2}, "OpenPulseSub1 has synthesis error where there is not exactly 2 aligned measurements on qubits 1 and 2"
+
+        self.cleanup()
+
 if __name__ == '__main__':
-    temp = TestQasmGeneral()
-    temp.test_indexed_decl()
+    temp = TestQasmOpenPulse()
+    temp.test_Substitution()
     # unittest.main()
 

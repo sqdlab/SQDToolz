@@ -58,3 +58,4 @@ Zurich Instruments (ZI) related objects and functions:
 - [Single qubit tuneup (standard and fine-tuning)](ZI_SingleQubitTuneup.md)
 - [Flux line calibration with Cryoscope](ZI_Cryoscope.md)
 - [Fully automated daily tuneup](ZI_DailyTuneup.md)
+- [Tomography workflow for density matrices](ZI_DensityMatrix.md)

@@ -243,3 +243,65 @@ class DataDensityMatrix:
                 ax.set_zlim(-1.1 * max_val, 1.1 * max_val)
             ax.view_init(elev=25, azim=-55)
         fig.tight_layout()
+
+    @staticmethod
+    def generate_tomography_qasm(state_prep, num_qubits, qasm_header_str=None, save=None, qasm_include="stdgates_transmon_fixed_coupler.inc"):
+        '''
+        Generates a QASM script which does full N-qubit tomography
+        for a given state_prep, which is a string containing a QASM script for preparation
+        of a target state (for example, a two qubit Bell state).
+
+        The tomography is ordered such that the bases are measured according to the standard
+        arrangement of Pauli matrices: 
+            II...I, II...X, II...Y, II...Z, ..., ZZ...Z
+        
+        The start of the QASM script, with the include file, and the register setup. Defaults to:
+            f"""OPENQASM 3;
+            include "{qasm_include}";
+
+            bit[{((num_qubits*4)**num_qubits)/2}] c;
+            qubit[{num_qubits}] q;
+            """
+        
+        The qasm script is returned as a string, or can be saved as a file by passing a
+        filename to the save argument, for example: save="test.qasm".
+        '''
+        assert isinstance(num_qubits, int)
+        assert isinstance(state_prep, str)
+        #
+        N = int(num_qubits)
+        if qasm_header_str is None:
+            qasm_str = f'OPENQASM 3;\ninclude "{qasm_include}";\n\nbit[{int(((N*4)**N)/2)}] c;\nqubit[{N}] q;\n'
+        else:
+            qasm_str = qasm_header_str
+        
+        paulis = sorted({'I', 'X', 'Y', 'Z'})
+        pauli_combinations = list(itertools.product(paulis, repeat=N))
+        # imports, register etc.
+        for m, bases in enumerate(pauli_combinations):
+            assert len(bases)==N
+            qasm_str += f"\n//"
+            for b in range(N):
+                qasm_str += f"{bases[b]}"
+            qasm_str += "\n" + state_prep + "delay[0] q;\n"
+            # do rotations to measure different bases
+            for q in range(N):
+                if bases[q]=='X':
+                    qasm_str += f"ry(-pi/2) q[{q}];\n"
+                if bases[q]=='Y':
+                    qasm_str += f"rx(pi/2) q[{q}];\n"
+            # add delay before measurements 
+            qasm_str += "delay[0] q;\n"
+            # measures
+            for c in range(N):
+                if bases[c] != 'I':
+                    qasm_str += f"c[{m*N + c}] = measure q[{c}];\n"
+
+        if save is not None: 
+            assert isinstance(save, str)
+            if not save.endswith(".qasm"):
+                save += ".qasm"
+            with open(save, "w") as f:
+                f.write(qasm_str)
+
+        return qasm_str

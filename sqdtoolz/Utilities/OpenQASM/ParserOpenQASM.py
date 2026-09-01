@@ -25,6 +25,76 @@ class SQDQasmCommandType(Enum):
     DEF_CAL = auto()
     END_BLOCK = auto()
 
+class SQDDurationLiteral:
+    _UNIT_TO_SECONDS = {
+        openqasm3.ast.TimeUnit.ns: 1e-9,
+        openqasm3.ast.TimeUnit.us: 1e-6,
+        openqasm3.ast.TimeUnit.ms: 1e-3,
+        openqasm3.ast.TimeUnit.s: 1.0,
+    }
+
+    def __init__(self, parsed_duration_literal:openqasm3.ast.DurationLiteral, expr=None):
+        if expr is not None:
+            self._expr = _expr
+            return
+        leValue = float(parsed_duration_literal.value)
+        leUnit = parsed_duration_literal.unit
+        if leUnit == openqasm3.ast.TimeUnit.dt:
+            self._expr = ("dt", leValue)
+        else:
+            self._expr = ("s", leValue * self._UNIT_TO_SECONDS[leUnit])
+
+    @classmethod
+    def _from_expr(cls, expr):
+        obj = cls.__new__(cls)
+        obj._expr = expr
+        return obj
+
+    def resolve(self, dt_seconds):
+        def evaluate(expr):
+            op = expr[0]
+            match op:
+                case "s":
+                    return expr[1]
+                case "dt":
+                    return expr[1] * dt_seconds
+                case "+":
+                    return evaluate(expr[1]) + evaluate(expr[2])
+                case "-":
+                    return evaluate(expr[1]) - evaluate(expr[2])
+                case "*":
+                    return evaluate(expr[1]) * expr[2]
+                case "/":
+                    return evaluate(expr[1]) / expr[2]
+                case "neg":
+                    return -evaluate(expr[1])
+            raise ValueError(f"Unknown duration expression: {op}")
+        return evaluate(self._expr)
+
+    def __add__(self, other):
+        assert isinstance(other, SQDDurationLiteral), "Can only add duration variables/values together (make sure scalars have units if they are intended to be seconds)."
+        return self._from_expr(("+", self._expr, other._expr))
+
+    def __sub__(self, other):
+        assert isinstance(other, SQDDurationLiteral), "Can only subtract duration variables/values together (make sure scalars have units if they are intended to be seconds)."
+        return self._from_expr(("-", self._expr, other._expr))
+
+    def __mul__(self, scalar):
+        assert isinstance(scalar, (int, float)), "Only scalar multiplication supported for duration variables/values."
+        return self._from_expr(("*", self._expr, scalar))
+
+    def __rmul__(self, scalar):
+        return self.__mul__(scalar)
+
+    def __neg__(self):
+        return self._from_expr(("neg", self._expr))
+
+    def __truediv__(self, scalar):
+        assert isinstance(scalar, (int, float)), "Only scalar division supported for duration variables/values."
+        assert scalar != 0, "Cannot divide by zero."
+        return self._from_expr(("/", self._expr, scalar))
+
+
 class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
     def __init__(self, qreg_phys_mapping:dict):
         super().__init__()
@@ -132,7 +202,7 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
         #TODO: Check op and properly implement this... Also, check the set_var_in_cur_scope command. It doesn't traverse the stack?
         cur_val = self.get_var_in_cur_scope(node.lvalue.name)
         new_val = self._eval_arg(node.rvalue)
-        match node.op:
+        match node.op.name:
             case '=':
                 self.set_var_in_cur_scope(node.lvalue.name, new_val)
             case '+=':
@@ -175,6 +245,10 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
             assert not (node.identifier.name in self._variables_cal_stack[-1]), f"Variable {node.identifier.name} already defined in this pulse-calibration scope."
             val = self._eval_arg(node.init_expression) if node.init_expression != None else []
             self._variables_cal_stack[-1][node.identifier.name] = ['waveform_literal',val]
+        elif isinstance(node.type, openpulse.ast.DurationType):
+            assert not (node.identifier.name in self._variables_stack[-1]), f"Variable {node.identifier.name} already defined in this scope."
+            val = self._eval_arg(node.init_expression) if node.init_expression != None else []
+            self.add_var_in_cur_scope(node.identifier.name, node.type, val)    #TODO: Look into not ignoring the bit-size and use numpy for that?
 
 
     
@@ -258,8 +332,6 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
 
     def visit_DelayInstruction(self, node):
         cur_delay = self._eval_arg(node.duration)
-        if not isinstance(cur_delay, tuple):    #Typically must have unit, but 0 delay doesn't require units...abs
-            cur_delay = (cur_delay, 's')
         qargs = []
         for cur_qubits in node.qubits:
             qargs += self._eval_qarg(cur_qubits, allow_entire_regs=True)
@@ -324,7 +396,7 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
             else:
                 return self.get_var_in_cur_scope(argument.name, search_global_scope)
         elif isinstance(argument, openqasm3.ast.DurationLiteral):
-            return (argument.value, argument.unit.name)
+            return SQDDurationLiteral(argument)
         elif isinstance(argument, openqasm3.ast.UnaryExpression):
             if argument.op.name == '-':
                 return -self._eval_arg(argument.expression)
@@ -402,7 +474,7 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
             assert (units[0] == None or units[1] == None) or (units[0] == units[1]), "Inconsistent units in subtraction."
             ret_val = val_lhs - val_rhs
         elif operator == '*':
-            assert (units[0] == None or units[1] == None), "Cannot multiply two numbers with different (dimensioned) units."
+            assert (units[0] == None or units[1] == None), "Cannot multiply two numbers with units."
             ret_val = val_lhs * val_rhs
         elif operator == '/':
             assert (units[0] == None or units[1] == None), "Cannot divide two numbers with different (dimensioned) units."
@@ -833,19 +905,9 @@ class ParserOpenQASM:
         return ret_dict
 
     def _process_delay(self, delay_params, dt_time):
-        if delay_params[1] == 's':
-            return delay_params[0]
-        elif delay_params[1] == 'ms':
-            return delay_params[0] * 1e-3
-        elif delay_params[1] == 'µs' or delay_params[1] == 'us':
-            return delay_params[0] * 1e-6
-        elif delay_params[1] == 'ns':
-            return delay_params[0] * 1e-9
-        elif delay_params[1] == 'dt':
-            return delay_params[0] * dt_time
-        else:
-            assert False, f"Cannot interpret delay parameters {delay_params}."
-
+        if isinstance(delay_params, SQDDurationLiteral):
+            return delay_params.resolve(dt_time)
+        return delay_params #Case when it's just 0...
 
     def _process_1Q_gate(self, unitary_angles):
         axis, angle = self.get_axis_angle_from_unitary(unitary_angles)

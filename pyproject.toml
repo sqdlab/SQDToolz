@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sqdtoolz"
-version = "0.9.2.dev1"
+version = "0.9.3.dev1"
 description = "toolbox to control and run experiments"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
     { name = "Prasanna Pakkiam", email = "p.pakkiam@uq.edu.au" },
-    { name = "Rohit Beriwal", email = "r.beriwal@uq.edu.au" }
+    { name = "Rohit Beriwal", email = "f20150302d@alumni.bits-pilani.ac.in" }
 ]
 keywords = ["control toolbox", "timing"]
 

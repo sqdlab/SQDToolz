@@ -45,7 +45,8 @@ for cur_qubit in ['Q0', 'Q1', 'Q2', 'Q3', 'Q4']:
 
 ZIACQ('ZIacq', lab, 'zi_boxes')
 ExperimentConfiguration('ZI', lab, 0, [], 'ZIacq')
-exp = ExpZIQASM('test', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0', 'Q1', 'Q2', 'Q3', 'Q4'], 'tests/ZI_Test_QASM3.qasm', source_dirs=['tests/'])
+exp = ExpZIQASM('test', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0', 'Q1', 'Q2', 'Q3', 'Q4'], 'tests/ZI_Test_QASM4.qasm', source_dirs=['tests/'])
 qregs = exp.get_qubit_regs()
+# exp.set_qubit_reg_to_ZI_mappings({('q',0):'Q0',('q',1):'Q2'})
 # exp.set_qubit_reg_to_ZI_mappings({('q',0):'Qubit2',('q',1):'Qubit4'})
 lab.run_single(exp, debug_skip_experiment=True, override_ACQ_params=acq_params, raw_pulse_sheet_duration=1e-3)

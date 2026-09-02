@@ -45,11 +45,19 @@ lab.HAL('QPU').add_qubit_coupling('Qubit2', 'Qubit4', lab.HAL('Cpl24'))
 # lab.run_single(exp, debug_skip_experiment=True)
 
 
+# ZIACQ('ZIacq', lab, 'zi_boxes')
+# ExperimentConfiguration('ZI', lab, 0, [], 'ZIacq')
+# exp = ExpZIQASM('test', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Qubit2', 'Qubit4'], 'tests/ZI_Test_QASM1.qasm', source_dirs=['tests/'])
+# qregs = exp.get_qubit_regs()
+# exp.set_qubit_reg_to_ZI_mappings({('q',0):'Qubit4',('q2',0):'Qubit2'})
+# lab.run_single(exp, debug_skip_experiment=True)
+
+
 ZIACQ('ZIacq', lab, 'zi_boxes')
 ExperimentConfiguration('ZI', lab, 0, [], 'ZIacq')
-exp = ExpZIQASM('test', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Qubit2', 'Qubit4'], 'tests/ZI_Test_QASM1.qasm', source_dirs=['tests/'])
+exp = ExpZIQASM('test', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Qubit2', 'Qubit4'], 'tests/ZI_Test_QASM2.qasm', source_dirs=['tests/'])
 qregs = exp.get_qubit_regs()
-exp.set_qubit_reg_to_ZI_mappings({('q',0):'Qubit4',('q2',0):'Qubit2'})
+exp.set_qubit_reg_to_ZI_mappings({('q',0):'Qubit2',('q',1):'Qubit4'})
 lab.run_single(exp, debug_skip_experiment=True)
 
 # ZIACQ('ZIacq', lab, 'zi_boxes')

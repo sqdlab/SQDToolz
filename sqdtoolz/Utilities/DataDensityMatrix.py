@@ -248,14 +248,15 @@ class DataDensityMatrix:
     def generate_tomography_qasm(state_prep, num_qubits, qasm_header_str=None, save=None, qasm_include="stdgates_transmon_fixed_coupler.inc"):
         '''
         Generates a QASM script which does full N-qubit tomography
-        for a given state_prep, which is a string containing a QASM script for preparation
-        of a target state (for example, a two qubit Bell state).
+        for a given state_prep, which is a string containing a QASM script 
+        for preparation of a target state (for example, a two qubit Bell state).
 
-        The tomography is ordered such that the bases are measured according to the standard
-        arrangement of Pauli matrices: 
+        The tomography is ordered such that the bases are measured according 
+        to the standard arrangement of Pauli matrices: 
             II...I, II...X, II...Y, II...Z, ..., ZZ...Z
         
-        The start of the QASM script, with the include file, and the register setup. Defaults to:
+        The start of the QASM script (qasm_header_str) with the include file, 
+        and the register setup defaults to:
             f"""OPENQASM 3;
             include "{qasm_include}";
 
@@ -263,8 +264,8 @@ class DataDensityMatrix:
             qubit[{num_qubits}] q;
             """
         
-        The qasm script is returned as a string, or can be saved as a file by passing a
-        filename to the save argument, for example: save="test.qasm".
+        The qasm script is returned as a string, or can be saved as a file by 
+        passing a filename to the save argument, for example: save="test.qasm".
         '''
         assert isinstance(num_qubits, int)
         assert isinstance(state_prep, str)

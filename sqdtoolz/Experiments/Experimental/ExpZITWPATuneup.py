@@ -12,19 +12,19 @@ class ExpZITWPATuneup(ExpZIqubit):
         self._hal_twpa = hal_twpa
         self._iq_blob_data = {}
         self._dont_show_plot = kwargs.pop('dont_show_plot', False)
-        self._plot_all_qubits = kwargs.pop('plot_all_qubits', False)
+        self._plot_all_qubits = kwargs.pop('plot_all_qubits', True)
         self._update_qubit = kwargs.pop('update_qubit_params', True)
         self._optimum_twpa_point = {'Frequency': self._hal_twpa.Frequency, 'Power':self._hal_twpa.Power}
 
         if 'twpa_freq_range' in kwargs:
             self._twpa_freq_range = kwargs.pop('twpa_freq_range')
         else:
-            self._twpa_freq_range =self._hal_twpa.Frequency
+            self._twpa_freq_range = np.linspace(-5e6, 5e6, 20) + self._hal_twpa.Frequency
     
         if 'twpa_power_range' in kwargs:
             self._twpa_power_range = kwargs.pop('twpa_power_range')
         else:
-            self._twpa_power_range = self._hal_twpa.Power
+            self._twpa_power_range = np.linspace(-2.5, 2.5, 10) + self._hal_twpa.Power
 
         super().__init__(name, expt_config, iq_blobs, hal_QPU, qubit_ids, states="ge", **kwargs)
 
@@ -71,7 +71,6 @@ class ExpZITWPATuneup(ExpZIqubit):
         opt_indicies = np.where(snr_db_total == snr_db_total.max())
         freqs, powers, _ = sweep_vals
         if not self._dont_show_plot:
-            #TODO: add plots for each qubit
             if len(freqs)>1 and len(powers)>1: #2D sweep
                 fig = plt.figure(layout="constrained"); fig.set_figwidth(12); fig.set_figheight(12)
                 self._optimum_twpa_point['Frequency'] = freqs[opt_indicies[0]]

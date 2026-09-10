@@ -952,9 +952,11 @@ there is no `detunings` requirement here.
 
 #### Example snippet
 ```python
+from sqdtoolz.Experiments.Experimental.ExpZIT1 import ExpZIT1
 
+exp = ExpZIT1('T1_Q0', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0', 'Q1', 'Q2'], update=False)
+lab.run_single(exp)
 ```
-
 
 #### Analysis, Fitting and Outputs
 
@@ -1058,6 +1060,15 @@ Any remaining keyword arguments are passed through to `ExpZIqubit.__init__`
 `use_cal_traces`, `transition`, `ZI_plot`, `show_pulse_sheet`, and unmatched
 kwargs).
 
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZITWPATuneup import ExpZITWPATuneup
+
+exp = ExpZITWPATuneup(f'TWPA_TuneUp', lab.CONFIG('ZI'), lab.HAL('QPU'), lab.HAL('mw_twpa'), ['Q2', 'Q0', 'Q1', 'Q3', 'Q4'], twpa_power_range = np.linspace(17, 20, 10))
+lab.run_single(exp)
+```
+
+
 #### Analysis, Fitting and Outputs
 
 `_post_process` only executes its body when `self._states == 'ge'`; for any
@@ -1144,3 +1155,91 @@ A number of things in the current implementation are worth being aware of:
   qubit's saved plot, leaving only the last qubit's figure on disk.
 - **`self._chi`** (from the `chi` kwarg) and **`self._xUnits`** (from
   `plot_x_units`) are stored but never read again anywhere in the class.
+
+___
+
+### ExpZITWPATuneup
+
+`class ExpZITWPATuneup(ExpZIqubit)`
+
+#### Description
+
+`ExpZITWPATuneup` sweeps a TWPA (traveling-wave parametric amplifier) pump's
+frequency and power and, for one or more qubits, uses the LabOne Q
+`iq_blobs` experiment to measure ground/excited-state IQ-blob separation at
+each pump setting. It converts that separation into an SNR (in dB) per
+qubit, sums the per-qubit SNR across all requested qubits, and (optionally)
+updates the TWPA's `Frequency` and `Power` to the pump setting that
+maximised the combined SNR.
+
+The state comparison is hardcoded to ground/excited (`'ge'`).
+
+#### Arguments
+
+##### Positional
+
+| Argument | Type | Description |
+|---|---|---|
+| `name` | `str` | Name of the experiment. |
+| `expt_config` | — | Experiment configuration object, passed through to `ExpZIqubit`. |
+| `hal_QPU` | — | The QPU HAL object; used by `ExpZIqubit` to look up each qubit object. |
+| `hal_twpa` | — | The TWPA pump HAL object. Its `Frequency` and `Power` properties are what gets swept (via `VariablePropertyTransient`), and — if enabled — overwritten with the pump setting found to maximise SNR. |
+| `qubit_ids` | `list[str]` (or as accepted by `ExpZIqubit`) | The qubit(s) to measure IQ-blob SNR on at each pump point. Also stored as `self._qubit_ids`. Per-qubit SNR (in dB) is summed across all listed qubits to find a single joint-optimum pump setting. |
+
+##### Keyword arguments
+
+| Argument | Type / Default | Description |
+|---|---|---|
+| `dont_show_plot` | `bool`, default `False` | Popped; stored as `self._dont_show_plot`. If `True`, suppresses all plotting in `_post_process` — see [Known issues](#known-issues) regarding the side effect this has on updating the TWPA. |
+| `plot_all_qubits` | `bool`, default `True` | Popped; stored as `self._plot_all_qubits`. If `True` and the sweep is a genuine 2D frequency/power sweep, also plots an individual SNR heatmap per qubit in addition to the combined heatmap. Has no effect on a 1D sweep. |
+| `update_qubit_params` | `bool`, default `True` | Popped; stored as `self._update_qubit`. If `True`, after post-processing, sets `hal_twpa.Frequency`/`hal_twpa.Power` to the values held in `self._optimum_twpa_point` — see [Known issues](#known-issues) for a crash case this can trigger. |
+| `twpa_freq_range` | array-like, default 20 points linearly spaced across `hal_twpa.Frequency ± 5 MHz` | Popped; stored as `self._twpa_freq_range`. The pump frequency sweep points. |
+| `twpa_power_range` | array-like, default 10 points linearly spaced across `hal_twpa.Power ± 2.5` | Popped; stored as `self._twpa_power_range`. The pump power sweep points. |
+
+`states` is always passed to `ExpZIqubit.__init__` as `"ge"` and is not
+accepted as a keyword argument here — see
+[Known issues](#known-issues) regarding what happens if a caller supplies
+one anyway. Any other remaining keyword arguments are passed through to
+`ExpZIqubit.__init__` (see `ExpZIRabi`'s documentation for how `ExpZIqubit`
+itself handles `use_cal_traces`, `transition`, `ZI_plot`,
+`show_pulse_sheet`, and unmatched kwargs).
+
+#### Analysis, Fitting and Outputs
+
+`_run` requires `sweep_vars` to be empty — the pump sweep is instead defined
+entirely by `twpa_freq_range`/`twpa_power_range` at construction time. It
+wraps `hal_twpa.Frequency`/`Power` in `VariablePropertyTransient` objects and
+runs the underlying `ExpZIqubit`/`iq_blobs` experiment over frequency
+(outer) then power (inner).
+
+`_post_process` runs the following for each qubit:
+
+- Retrieves the `{qubit}_calib` dataset (IQ-blob calibration data collected
+  at each pump frequency/power point for the ground- and excited-state
+  preparations).
+- Computes the mean I/Q position of the ground-state and excited-state
+  clouds (averaged over repetitions), and the cloud separation
+  `d = |Δ(I, Q)|` between them.
+- Computes a noise estimate `sigma` as the average of the ground- and
+  excited-cloud standard deviations (from the summed I/Q variances).
+- Computes a voltage SNR `d / (2·sigma)`, squares it to a power SNR, floors
+  any non-positive values to avoid `log(0)`, and converts to `snr_db`.
+
+It then sums `snr_db` across all requested qubits into `snr_db_total` and
+locates the pump setting(s) at its maximum via `np.where`. Depending on the
+shape of the sweep:
+
+- **2D sweep** (both frequency and power have more than one point): plots a
+  combined SNR heatmap (frequency vs. power) with the optimum point marked,
+  and — if `plot_all_qubits` is `True` — a grid of per-qubit SNR heatmaps.
+  Sets `self._optimum_twpa_point['Frequency']`/`['Power']` from the located
+  maximum.
+- **1D sweep** (only frequency or only power varies): intended to plot SNR
+  vs. the swept parameter for the combined total and each qubit — see
+  [Known issues](#known-issues), as this branch currently cannot complete
+  without raising an exception.
+
+Finally, if `update_qubit_params` was `True`, `hal_twpa.Frequency` and
+`hal_twpa.Power` are set from `self._optimum_twpa_point`.
+
+This class does not save any `.npy` fit-data file.

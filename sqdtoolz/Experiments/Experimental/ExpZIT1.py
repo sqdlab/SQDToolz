@@ -11,7 +11,7 @@ class ExpZIT1(ExpZIqubit):
         self._dont_show_plot = kwargs.pop('dont_show_plot', False)
         assert (not 'update' in kwargs) or ('update' in kwargs and not kwargs['update']), "Don't set 'update=True'. The updates shall be done by calling update_qubit after running the experiment."
         kwargs['update'] = False
-        kwargs['delays'] = kwargs.pop('delays', [np.linspace(0, 150e-6, 25)])
+        kwargs['delays'] = kwargs.pop('delays', [np.linspace(0, 150e-6, 25)]*len(qubit_ids))
         self._fit_vals = []
         self._expect_rise = kwargs.pop('expect_rise', False)    #Only for unnormalised fitting
         super().__init__(name, expt_config, lifetime_measurement, hal_QPU, qubit_ids, **kwargs)

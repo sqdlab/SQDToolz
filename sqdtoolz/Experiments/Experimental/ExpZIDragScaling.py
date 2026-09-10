@@ -15,6 +15,7 @@ class ExpZIDragScaling(ExpZIqubit):
 
         self._dont_show_plot = kwargs.pop('dont_show_plot', False)
         self._update_qubits = kwargs.pop('update', True)
+        self._num_fit_points = kwargs.pop('num_fit_points', 501)
 
         self._data = {}
 
@@ -24,7 +25,7 @@ class ExpZIDragScaling(ExpZIqubit):
         for qubit_dataset in self._qubit_ids:
             if self._normalise_data:
                 #Get calibration data
-                dnorm = ExpZIqubit.normalise_qubit_data(self.retrieve_last_dataset(qubit_dataset+'_calib'), 'ge')
+                dnorm = ExpZIqubit.normalise_qubit_data(self.retrieve_last_dataset(qubit_dataset+'_calib'), 'ge', )
             #
             fig, ax = plt.subplots(1)
             fig.set_figheight(5); fig.set_figwidth(10)
@@ -36,19 +37,27 @@ class ExpZIDragScaling(ExpZIqubit):
                 #
                 data_x = leData.param_vals[0]
                 if self._normalise_data:
-                    data_y[i] = dnorm.normalise_data(arr, ax=ax)
+                    data_y[i] = dnorm.normalise_data(arr, ax=None)
                 else:
                     data_y[i] = np.sqrt(arr[:,0]**2 + arr[:,1]**2)
                 #
+                data_x_smooth = np.linspace(np.min(data_x), np.max(data_x), self._num_fit_points)
                 m, c = np.polyfit(data_x, data_y[i], deg=1)
-                data_y[f'{i}_fit'] = m*data_x + c
+                data_y[f'{i}_fit'] = m*data_x_smooth + c
 
             self._data = data_y | {'beta': data_x} | {'qubit_name': qubit_dataset}
 
             if self._normalise_data:
-                ExpZIDragScaling.plot_fitted_results(ax, self._data['beta'], self._data, self._normalise_data, qubit_dataset)
+                best_x = ExpZIDragScaling.plot_fitted_results(ax, self._data['beta'], self._data, self._normalise_data, qubit_dataset)
             else:
-                ExpZIDragScaling.plot_fitted_results(ax, self._data['beta'], self._data, self._normalise_data, qubit_dataset)
+                best_x = ExpZIDragScaling.plot_fitted_results(ax, self._data['beta'], self._data, self._normalise_data, qubit_dataset)
+
+            if self._update_qubits:
+                self._hal_QPU.get_qubit_obj(qubit_dataset).DriveGEPulse = {
+                    'function': 'drag',
+                    'beta': best_x,
+                    'sigma': 0.25
+                }
 
             fig.savefig(self._file_path + f'fitted_plot_{qubit_dataset}.png')
             if not self._dont_show_plot:
@@ -62,12 +71,13 @@ class ExpZIDragScaling(ExpZIqubit):
         cs = {'xx': 'tab:blue', 'xy': 'tab:orange', 'xmy': 'tab:green'}
         for i in ['xx', 'xy', 'xmy']:
             ax.scatter(data_x, data[i], marker='x', color=cs[i], label=i)
-            ax.plot(data_x, data[f'{i}_fit'], color=cs[i], linestyle='-')
+            data_x_smooth = np.linspace(np.min(data_x), np.max(data_x), len(data[f'{i}_fit']))
+            ax.plot(data_x_smooth, data[f'{i}_fit'], color=cs[i], linestyle='-')
         
         fit_stack = np.array([data[f'{i}_fit'] for i in ['xx', 'xy', 'xmy']])  # shape (3, N)
         spread = fit_stack.max(axis=0) - fit_stack.min(axis=0)  # or use np.std(fit_stack, axis=0)
         best_idx = np.argmin(spread)
-        best_x = data_x[best_idx]
+        best_x = data_x_smooth[best_idx]
         best_y = fit_stack[:, best_idx].mean()  # average of the three fit values there
 
         ax.plot(best_x, best_y, marker='o', color='black', markersize=8, zorder=5)
@@ -86,5 +96,6 @@ class ExpZIDragScaling(ExpZIqubit):
         else:
             ax.set_title(fr"DRAG scaling ($\beta={best_x}$)")
         ax.legend()
-            
+
+        return best_x
 

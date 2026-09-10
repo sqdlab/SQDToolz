@@ -46,6 +46,7 @@ class ExpZIFixedCouplerTuneup:
 
     def run(self, lab):
         fig = plt.figure(figsize=(12, 7.5))
+        fig.suptitle(f"Coupler tuneup: {self._qubit_ids[0]}{self._qubit_ids[1]}")
         # Outer grid: 2 columns
         outer = fig.add_gridspec(1, 2, wspace=0.15)
         # Left column: top:bottom = 1:3
@@ -91,7 +92,8 @@ class ExpZIFixedCouplerTuneup:
             opt_amp = float(data_x[int(np.argmax(data_y))])
         ax10.vlines([opt_amp], np.min(fitted_data['wait_times'])/norm_fac, np.max(fitted_data['wait_times'])/norm_fac, color='white', linestyle='dashed')
         #
-        exp.cur_coupler_obj.Amplitude = opt_amp
+        if self._update_live:
+            exp.cur_coupler_obj.Amplitude = opt_amp
         ##############################
         #
         #TIME SWEEP
@@ -142,7 +144,8 @@ class ExpZIFixedCouplerTuneup:
         ax11.set_ylabel('Population')
         ax01.grid(); ax11.grid()
         #
-        exp.cur_coupler_obj.Length = float(peaks_x[extremum_ind])*norm_fac
+        if self._update_live:
+            exp.cur_coupler_obj.Length = float(peaks_x[extremum_ind])*norm_fac
         ##############################
         lab.group_close()
         #

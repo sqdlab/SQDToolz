@@ -153,7 +153,9 @@ class ExpZIResOptimal(ExpZIqubit):
             else:
                 axFids.legend(['G','E','F','Mean'])
         
-        self._fit_data = {'freqs':freqs, 'maxSepIndices':maxSepInds, 'maxFidIndices':maxFidInds, 'discriminators':leIQDiscs}
+            self._fit_data = {'freqs':freqs, 'maxSepIndices':maxSepInds, 'maxFidIndices':maxFidInds, 'discriminators':leIQDiscs}
+        else:
+            self._fit_data = {'freqs':freqs, 'maxSepIndices':maxSepInds}
 
         fig.subplots_adjust(hspace=0.1)
         fig.tight_layout()
@@ -222,3 +224,4 @@ class ExpZIResOptimal(ExpZIqubit):
         assert self._calc_single_shot_fidelities, "Must run the experiment in single-shot by setting calc_single_shot_fidelities to True."
         ind = np.argmin(np.abs(frequency-self._fit_data['freqs']))
         ExpZIBlobs.plot_fitted_results(self._fit_data['discriminators'][ind], f"(Frequency: {Miscellaneous.get_units(self._fit_data['freqs'][ind])}Hz)")
+

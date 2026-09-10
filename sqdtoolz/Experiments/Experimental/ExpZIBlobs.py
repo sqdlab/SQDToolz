@@ -81,3 +81,10 @@ class ExpZIBlobs(ExpZIqubit):
         #
         fig.suptitle(f"Average Fidelity: {leDIQD.get_average_fidelity()*100:.4g}% {extra_title}", y=0.92)
         return fig
+
+
+    def get_correction_matrices(self):
+        ret_mats = []
+        for m,qubit in enumerate(self._qubit_ids): 
+            ret_mats.append(np.linalg.inv(self._leDIQDs[m].get_assignment_probabilities().T))
+        return ret_mats

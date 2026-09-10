@@ -30,7 +30,7 @@ class ExpZICryoscope:
         assert len(self._qubit_ids) >1 , "Also must define a second qubit as it will attempt to optimise a pulse specific to each coupler element"
 
         self._amplitudes = kwargs.pop('amplitudes', np.linspace(0.3, 0.3, 1))
-        self._lengths = kwargs.pop('lengths', np.linspace(0.0, 300e-9, (1/2.0)*1e-9))
+        self._lengths = kwargs.pop('lengths', np.arange(0.0, 300e-9, (1/2.0)*1e-9))
         self._transition = kwargs.pop('transition', 'ge')
 
         self._normalise_data = kwargs.pop('normalise_data', True)
@@ -44,42 +44,47 @@ class ExpZICryoscope:
         assert self.Ec_over_h is not None, "Must provide Ec_over_h for the qubit to convert frequency shift to flux for pulse reconstruction."
         self.norm_window = kwargs.pop('norm_window', None)
         
-        def run(self, lab):
-            qubit = self._qubit_ids[0]
+    def run(self, lab):
+        kwargs = self._kwargs
+        qubit = self._qubit_ids[0]
 
-            lab.group_open(self._name)
-            # x90 - measures <Y>
-            exp_X = ExpZIqubit(f'cryoscope_{qubit}_X90', self._expt_config, cryo_scope, self._hal_QPU, self._qubit_ids, 
-                            lengths=self._lengths, 
-                            amplitudes=self._amplitudes,
-                            y90=False,
-                            **self._kwargs
-                            )
-            lab.run_single(exp_X, **kwargs)
-            #
-            dataX90 = exp_X.retrieve_last_dataset(qubit)
-            if self._normalise_data:
-                self.data['calibX'] = exp_X.retrieve_last_dataset(qubit+'_calib')
+        lab.group_open(self._name)
+        # x90 - measures <Y>
+        exp_X = ExpZIqubit(f'cryoscope_{qubit}_X90', self._expt_config, cryo_scope, self._hal_QPU, self._qubit_ids, 
+                        lengths=self._lengths, 
+                        amplitudes=self._amplitudes,
+                        y90=False,
+                        **self._kwargs
+                        )
+        lab.run_single(exp_X, **kwargs)
+        #
+        dataX90 = exp_X.retrieve_last_dataset(qubit)
+        if self._normalise_data:
+            self.data['calibX'] = exp_X.retrieve_last_dataset(qubit+'_calib')
 
-            # y90 - measures <X>
-            exp_Y = ExpZIqubit(f'cryoscope_{qubit}_Y90', self._expt_config, cryo_scope, self._hal_QPU, self._qubit_ids, 
-                            lengths=self._lengths, 
-                            amplitudes=self._amplitudes,
-                            y90=True,
-                            **self._kwargs
-                            )
-            lab.run_single(exp_Y, **kwargs)
-            #
-            dataY90 = exp_Y.retrieve_last_dataset(qubit)
-            if self._normalise_data:
-                self.data['calibY'] = exp_Y.retrieve_last_dataset(qubit+'_calib')
+        # y90 - measures <X>
+        exp_Y = ExpZIqubit(f'cryoscope_{qubit}_Y90', self._expt_config, cryo_scope, self._hal_QPU, self._qubit_ids, 
+                        lengths=self._lengths, 
+                        amplitudes=self._amplitudes,
+                        y90=True,
+                        **self._kwargs
+                        )
+        lab.run_single(exp_Y, **kwargs)
+        #
+        dataY90 = exp_Y.retrieve_last_dataset(qubit)
+        if self._normalise_data:
+            self.data['calibY'] = exp_Y.retrieve_last_dataset(qubit+'_calib')
 
-            lab.group_close()
+        lab.group_close()
 
-            self.data['Y'] = dataX90.get_numpy_array()
-            self.data['X'] = dataY90.get_numpy_array()
-            self.data['tau'] = dataX90.param_vals[1]
-            self.data['amplitude'] = dataX90.param_vals[0]
+        self.data['Y'] = dataX90.get_numpy_array()
+        self.data['X'] = dataY90.get_numpy_array()
+        self.data['tau'] = dataX90.param_vals[1]
+        self.data['amplitude'] = dataX90.param_vals[0]
+
+        self.post_process()
+        self.plot_summary()
+        self.fit_step_response()
 
     def post_process(self, filter_window_length=7, polyorder=2):
         assert isinstance(filter_window_length, int) and filter_window_length > 0, "filter_window_length must be a positive integer"

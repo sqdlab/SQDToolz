@@ -181,7 +181,7 @@ class SOFTqpu(HALbase, ZIbase):
         #
         #Should be fine for different coupler types - just hard-code the newer elements...
         keys_to_copy = ['ZI_QuantumElement', 'ZI_QuantumElementEx', 'Amplitude', 'AmplitudeAux',
-                        'Length', 'Pulse']
+                        'Length', 'Pulse', 'FidelityBell']
         dict_qpu = next((x for x in data['HALs'] if x['Type']=='SOFTqpu'), None)        
         for cur_cplr in dict_qpu['QubitCouplings']:
             cur_dict_cplr = {'Linkage': [cur_qubit_names[cur_cplr[0]], cur_qubit_names[cur_cplr[1]]]}

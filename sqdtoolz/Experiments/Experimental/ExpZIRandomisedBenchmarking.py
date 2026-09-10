@@ -8,19 +8,20 @@ from sqdtoolz.Experiments.Experimental.ExpCalibGE import *
 from sqdtoolz.Utilities.QubitGates import QubitGatesBase
 import json
 from sqdtoolz.Experiments.Experimental.ZI import single_qubit_gates_sweep
-from sqdtoolz.Experiments.Experimental.ZI import sinlge_qubit_gates_sweep_chunking
+from sqdtoolz.Experiments.Experimental.ZI import single_qubit_gates_sweep_chunking
 from sqdtoolz.Utilities.QubitGates import QubitGatesBase
 from sqdtoolz.Variable import VariableInternalTransient
 
-class ExpZIBenchmarkRandomised(ExpZIqubit):   
+class ExpZIRandomisedBenchmarking(ExpZIqubit):   
     def __init__(self, name, expt_config, hal_QPU, qubit_ids, **kwargs):
         self._qubit_datasets = qubit_ids
 
         self._hal_QPU = hal_QPU
 
         self._dont_show_plot = kwargs.pop('dont_show_plot', False)
-        assert (not 'update' in kwargs) or ('update' in kwargs and not kwargs['update']), "Don't set 'update=True'. The updates shall be done by calling update_qubit after running the experiment."
-        kwargs['update'] = False
+        # assert (not 'update' in kwargs) or ('update' in kwargs and not kwargs['update']), "Don't set 'update=True'; this is a diagnostic experiment."
+        # kwargs['update'] = False
+        self._update = kwargs.pop('update', True)
 
         kwargs['coordinate_system'] = kwargs.get('coordinate_system', 'RH')
         assert kwargs['coordinate_system'] in ['LH', 'RH'], "The 'coordinate_system' must be either LH or RH for left/right handed."
@@ -49,7 +50,7 @@ class ExpZIBenchmarkRandomised(ExpZIqubit):
                 self._all_seqs[int(seq_len)][int(trial)] = [cur_seq]*len(qubit_ids)
         self._all_seqs_list = kwargs['gate_lists']
         print("Done.")
-        super().__init__(name, expt_config, sinlge_qubit_gates_sweep_chunking, hal_QPU, qubit_ids, **kwargs)
+        super().__init__(name, expt_config, single_qubit_gates_sweep_chunking, hal_QPU, qubit_ids, **kwargs)
 
     def _generate_sequence(self, seq_len):
         #Keep trying to find random sequences that enable the final gate to be within the gate-set - e.g. X/2, Y will give a 45° rotation...
@@ -102,8 +103,6 @@ class ExpZIBenchmarkRandomised(ExpZIqubit):
             mean_vals = np.array(mean_vals)
             std_vals = np.array(std_vals)
 
-            
-
             axs[0].plot(seq_lens, mean_vals)
             axs[0].fill_between(seq_lens, mean_vals-std_vals, mean_vals+std_vals, alpha=0.5)
             axs[0].set_xlabel('Sequence Length')
@@ -122,5 +121,8 @@ class ExpZIBenchmarkRandomised(ExpZIqubit):
 
             fig.show()
             fig.savefig(self._file_path + 'Summary.png')
+
+            if self._update:
+                self._hal_QPU.get_qubit_obj(qubit_dataset).Fidelity1QRB = error_per_gate*100
 
         return data

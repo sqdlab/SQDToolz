@@ -145,7 +145,7 @@ class DataDensityMatrix:
         return float(np.clip(F, 0.0, 1.0))
 
 
-    def plot3D(self, target_state=None, use_abs_phase=False):
+    def plot3D(self, target_state=None, use_abs_phase=False, extra_title='', save_path=None):
         """
         Plot the real part of the density matrix as a 3D bar plot.
 
@@ -215,9 +215,9 @@ class DataDensityMatrix:
         axs[1] = fig.add_subplot(1, 2, 2, projection="3d")
         #Hack on the position of the title; may not work for more than 2 qubits?
         if target_rho is None:
-            fig.suptitle(f"Density matrix", y=0.7)
+            fig.suptitle("Density matrix" + extra_title, y=0.7)
         else:
-            fig.suptitle(f"Density matrix\nblue = reconstructed, red = target, purple = overlap", y=0.7)
+            fig.suptitle("Density matrix" + extra_title + "\nblue = reconstructed, red = target, purple = overlap", y=0.7)
 
         for m,ax in enumerate(axs):
             if target_rho is not None:
@@ -243,6 +243,8 @@ class DataDensityMatrix:
                 ax.set_zlim(-1.1 * max_val, 1.1 * max_val)
             ax.view_init(elev=25, azim=-55)
         fig.tight_layout()
+        if save_path is not None:
+            fig.savefig(save_path)
 
     @staticmethod
     def generate_tomography_qasm(state_prep, num_qubits, qasm_header_str=None, save=None, qasm_include="stdgates_transmon_fixed_coupler.inc"):

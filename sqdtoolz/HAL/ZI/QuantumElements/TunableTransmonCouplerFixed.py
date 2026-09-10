@@ -12,6 +12,8 @@ from sqdtoolz.Utilities.OpenQASM import QASMCompatibleQubitMultiple
 from sqdtoolz.HAL.ZI.ZIQubit import ZIQubit
 import numpy as np
 from laboneq.dsl.experiment import pulse_library
+from laboneq.dsl.quantum.qpu import QPU
+from laboneq_applications.typing import QuantumElements
 
 @pulse_library.register_pulse_functional
 def filtered_pulse(x, main_function, filter_taps, filter_delay=0, **kwargs):
@@ -30,12 +32,14 @@ class TunableTransmonCouplerFixedParameters(QuantumParameters):
     AmplitudeAux: float = 0.0
     Length: float = 250e-9
     Pulse: dict = attrs.field(factory=lambda: {"function": "gaussian_square", "sigma": 0.5, "samples": None, "precomp_kernel" : None})
+    CompZAngle: float = None
+    CompZAngleAux: float = None
 
 class TunableTransmonCouplerFixed(QuantumElement, QASMCompatibleQubitMultiple):
     PARAMETERS_TYPE = TunableTransmonCouplerFixedParameters
-    REQUIRED_SIGNALS = ("flux",)
-    OPTIONAL_SIGNALS = ("flux_aux",)
-
+    REQUIRED_SIGNALS = ("flux", "drive_comp")
+    OPTIONAL_SIGNALS = ("flux_aux", "drive_comp_aux")
+ 
     def get_gate_duration(self, gate:list|tuple, qubits:list[ZIQubit]):
         if isinstance(gate[1], (tuple,list)):
             gate = (gate[0], gate[1][0])    #The gate time is irrespective of angle; if that's even allowed here... Could check if it's allowed etc...
@@ -96,7 +100,7 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
         q: TunableTransmonCouplerFixed,
         phase: float = 0.0,
         amplitude: float = None,
-        length:float = None,
+        length: float = None,
     ) -> None:
         # pulse_parameters = {"function": "gaussian_square", "sigma": 0.5}
         # flux_pulse = dsl.create_pulse(pulse_parameters, name="flux_pulse")
@@ -124,7 +128,16 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
             pulse=flux_pulse,
         )
 
-        aux_signal = q.signals.get("flux_aux")
+        # z rotation to account for phase picked up by the detuned qubit
+        comp_signal = q.signals.get("drive_comp", None)
+        if comp_signal is not None and q.parameters.CompZAngle is not None:
+            dsl.play(
+                signal=comp_signal,
+                pulse=None,
+                increment_oscillator_phase=q.parameters.CompZAngle,
+            )
+
+        aux_signal = q.signals.get("flux_aux", None)
         if aux_signal is not None:
             pulse_parameters = {"function": "gaussian_square", "sigma": 0.5}
             flux_pulse_aux = dsl.create_pulse(pulse_parameters, name="flux_pulse_aux")
@@ -137,3 +150,11 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
                     length=length,
                 )
 
+        # z rotation to account for phase picked up by the auxillary qubit
+        comp_signal_aux = q.signals.get("drive_comp_aux", None)
+        if comp_signal_aux is not None and q.parameters.CompZAngleAux is not None:
+            dsl.play(
+                signal=comp_signal_aux,
+                pulse=None,
+                increment_oscillator_phase=q.parameters.CompZAngleAux,
+            )

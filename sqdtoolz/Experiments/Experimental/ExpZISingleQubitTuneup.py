@@ -88,23 +88,25 @@ class ExpZISingleQubitTuneup:
             max_t1_points = kwargs.pop('t1_points', 40)
             self._t1_times = np.linspace(0,max_t1_time, max_t1_points)
         
-        # fine tuneup
+        #
+        #
+        #FINE TUNEUP PARAMS
         self._ramsey_fine_detuning = kwargs.pop('ramsey_fine_detuning', 0.125e6)
         if 'ramsey_fine_times' in kwargs:
             self._ramsey_fine_times = kwargs.pop('ramsey_fine_times')
             assert not 'ramsey_fine_max' in kwargs, "Do not supply 'ramsey_fine_max' if supplying 'ramsey_fine_times'"
             assert not 'ramsey_fine_points' in kwargs, "Do not supply 'ramsey_fine_points' if supplying 'ramsey_fine_times'"
         else:
-            max_fine_time = kwargs.pop('ramsey_fine_max', 60e-6)
-            max_fine_points = kwargs.pop('ramsey_fine_points', 120)
+            max_fine_time = kwargs.pop('ramsey_fine_max', 50e-6)
+            max_fine_points = kwargs.pop('ramsey_fine_points', 50)
             self._ramsey_fine_times = np.linspace(0, max_fine_time, max_fine_points)
         #
-        self._q_scalings = kwargs.pop('drag_q_scalings', np.linspace(0.00, 0.05, 51))
-        self._num_gates_calibX_short = kwargs.pop('num_gates_calibX_short', 200)
-        self._num_gates_calibX_long = kwargs.pop('num_gates_calibX_long', 1000)
+        self._q_scalings = kwargs.pop('drag_q_scalings', np.linspace(0.00, 0.10, 15))
+        self._num_gates_calibX_short = kwargs.pop('num_gates_calibX_short', 201)
         self._reverse_parity_calibX = kwargs.pop('reverse_parity_calibX', False)
-        self._only_every_n_short = kwargs.pop('only_every_n_short', 3)
-        self._only_every_n_long = kwargs.pop('only_every_n_long', 11)
+        self._only_every_n_short = kwargs.pop('only_every_n_short', 15)
+        self._threshold_X = kwargs.get('X_gate_threshold', 0.01)
+        self._threshold_Xon2 = kwargs.get('Xon2_gate_threshold', 0.01)
 
         self._kwargs = kwargs
 
@@ -253,11 +255,13 @@ class ExpZISingleQubitTuneup:
         fig.suptitle(f"Fine tuneup {self._qubit_id}", fontsize=16, fontweight='bold')
         
         lab.group_open(self._name)
+
         ##############################
         #
         #FINE AND SLOW RAMSEY
         #
         print("Re-tuning Ramsey...")
+        prev = self._qubit.DriveGE
         exp = ExpZIRamsey(f'ramsey_fine_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], delays=[self._ramsey_fine_times], detunings=[self._ramsey_fine_detuning], ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
         lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages)
         #
@@ -267,97 +271,205 @@ class ExpZISingleQubitTuneup:
         arr = leData.get_numpy_array()
         data_x = leData.param_vals[0]
         ExpZIRamsey.plot_fitted_results(ax, data_x, fitted_data['amplitude_raw'], self._qubit_id, fitted_data, True)
-        sigFigs = 4
         ax.set_title(f"Ramsey Δ={Miscellaneous.get_units(self._ramsey_slow_detuning,4)}Hz, f={Miscellaneous.get_units(fitted_data['frequency'],4)}Hz, T2*={Miscellaneous.get_units(fitted_data['T2*'],4)}s")
         exp.update_qubits(assume_detuned_above=self._assume_detuned_above) if self._update_live else 0
+
+        new = self._qubit.DriveGE
+        print(f"\tf_q = {prev:.6g} Hz -> {new:.6g} Hz")
+
         ##############################
         #
         #DRAG OPTIMISATION
         #
-        print("Calibrating Drag pulses...")
-        ax_p = fig.add_subplot(gs[1, 2])
-        if self._qubit.DriveGEPulse['function']=='drag':
-            p_prev = pulse_library.drag(uid="prev_pulse", beta=self._qubit.DriveGEPulse['beta'], sigma=self._qubit.DriveGEPulse['sigma'], length=self._qubit.DriveGETime)
-            ZIPulses.plot_pulse(p_prev, ax=ax_p, label='Previous pulse', color='tab:blue', show_plot=False)
-        else:
-            self._qubit.DriveGEPulse['function'] = 'drag'
-            prev_pulse = None
-        exp = ExpZIDragScaling(f'drag_scaling_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], q_scalings=[self._q_scalings], update=self._update_live, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
-        lab.run_single(exp)
-        ax = fig.add_subplot(gs[1, 0:2])
-        ExpZIDragScaling.plot_fitted_results(ax, exp._data['beta'], exp._data)
-        # get new DRAG pulse
-        new_pulse = self._qubit.DriveGEPulse
-        p_new = pulse_library.drag(uid="new_pulse", beta=new_pulse['beta'], sigma=new_pulse['sigma'], length=self._qubit.DriveGETime)
-        ZIPulses.plot_pulse(p_new, ax=ax_p, label='New pulse', color='tab:orange', show_plot=False)
-        ax_p.set_title('Pulse viewer')
+        num_reps = self._expt_config._hal_ACQ.NumRepetitions
+        if self._kwargs.get('calibrate_drag', True):
+            print("\nCalibrating Drag pulse...")
+            prev = self._qubit.DriveGEPulse['beta'] # save original value
+            ax_p = fig.add_subplot(gs[1, 2])
+            ax = fig.add_subplot(gs[1, 0:2])
+            if self._qubit.DriveGEPulse['function']=='drag':
+                p_prev = pulse_library.drag(uid="prev_pulse", beta=self._qubit.DriveGEPulse['beta'], sigma=self._qubit.DriveGEPulse['sigma'], length=self._qubit.DriveGETime)
+                ZIPulses.plot_pulse(p_prev, ax=ax_p, label='Previous pulse', color='tab:blue', show_plot=False)
+            else:
+                self._qubit.DriveGEPulse['function'] = 'drag'
+                prev_pulse = None
+            exp = ExpZIDragScaling(f'drag_scaling_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], q_scalings=[self._q_scalings], update=self._update_live, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
+            lab.run_single(exp)
+            best_q = ExpZIDragScaling.plot_fitted_results(ax, exp._data['beta'], exp._data)
+
+            # fine tuning...
+            # print("\nCalibrating Drag pulses (fine)...")
+            self._expt_config._hal_ACQ.NumRepetitions = self._kwargs.get('num_repetitions_fine', 1024*4); self._expt_config.commit()
+            q_scalings_fine = np.linspace(-0.01, 0.01, 15) + best_q
+            exp = ExpZIDragScaling(f'drag_scaling_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], q_scalings=[q_scalings_fine], update=self._update_live, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
+            lab.run_single(exp)
+            ax.clear()
+            ExpZIDragScaling.plot_fitted_results(ax, exp._data['beta'], exp._data)
+
+            # get new DRAG pulse
+            new_pulse = self._qubit.DriveGEPulse
+            p_new = pulse_library.drag(uid="new_pulse", beta=new_pulse['beta'], sigma=new_pulse['sigma'], length=self._qubit.DriveGETime)
+            ZIPulses.plot_pulse(p_new, ax=ax_p, label='New pulse', color='tab:orange', show_plot=False)
+            ax_p.set_title('Pulse viewer')
+
+            new = self._qubit.DriveGEPulse['beta'] # new updated value
+            print(f"\tbeta = {prev:.6g} -> {new:.6g}")
+
+            self._expt_config._hal_ACQ.NumRepetitions = num_reps; self._expt_config.commit()
+
+        # ##############################
+        # #
+        # #RABI
+        # #
+        # print("\nRe-tuning Rabi...")
+        # self._expt_config._hal_ACQ.NumRepetitions = num_reps; self._expt_config.commit()
+        # exp = ExpZIRabi(f'rabi_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], amplitudes=[self._rabi_ampls], update=self._update_live, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
+        # lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages)
+
         ##############################
         # 
         #X CALIB
         #
         #short
-        print("Calibrating X Gates...")
-        exp = ExpZICalibX(f'CalibX_short_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=1, only_every_n=self._only_every_n_short, num_gates=self._num_gates_calibX_short, dont_show_plot=not self._individual_plots)
-        lab.run_single(exp, skip_timing_diagrams=True)
-        prev_angle = exp._prev_angle
-        exp.update_qubits(reverse_parity=self._reverse_parity_calibX) if self._update_live else 0
-        if self._qubit.DriveGEAmplitudeX > 1:
-            self._qubit.DriveGEAmplitudeX = 1
-        ax1 = fig.add_subplot(gs[2, 0])
-        ExpZICalibX.plot_fitted_results(ax1, exp._fit_data[0]['data'], exp._fit_data[0]['qubit_name'])
-        #long
-        exp = ExpZICalibX(f'CalibX_long_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=1, only_every_n=self._only_every_n_long, num_gates=self._num_gates_calibX_long, dont_show_plot=not self._individual_plots)
-        lab.run_single(exp, skip_timing_diagrams=True)
-        cur_angle = exp._prev_angle
-        if abs(180-cur_angle) > abs(180-prev_angle):
-            exp.update_qubits(reverse_parity=not self._reverse_parity_calibX) if self._update_live else 0
-        else:
-            exp.update_qubits(reverse_parity=self._reverse_parity_calibX) if self._update_live else 0
-        if self._qubit.DriveGEAmplitudeX > 1:
-            self._qubit.DriveGEAmplitudeX = 1
+        print("\nCalibrating X Gates...")
+        max_iterations = self._kwargs.get('max_calibX_iterations', 10)
+        exp = None
+        prev_angle = None
+        angle_best = None
+        drive_ge_best = self._qubit.DriveGEAmplitudeX
+        prev = self._qubit.DriveGEAmplitudeX # save original value
 
-        exp = ExpZICalibX(f'CalibX_long_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=1, only_every_n=self._only_every_n_long, num_gates=self._num_gates_calibX_long, dont_show_plot=not self._individual_plots)
+        exp = ExpZICalibX(f'CalibX_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=1, only_every_n=self._only_every_n_short, num_gates=self._num_gates_calibX_short, dont_show_plot=not self._individual_plots)
+        for iter in range(max_iterations):
+            # run iteration
+            lab.run_single(exp, skip_timing_diagrams=True)
+
+            if iter == 0:
+                # plot first iteration
+                ax1 = fig.add_subplot(gs[2, 0])
+                ExpZICalibX.plot_fitted_results(ax1, exp._fit_data[0]['data'], 'Initial ' + exp._fit_data[0]['qubit_name'])
+
+            cur_angle = exp._fit_data[0]['data']['angle']
+            # print(f"Iteration {iter}: {cur_angle:.6f} degrees")
+
+            # exit if current angle is below threshold
+            if abs(180 - cur_angle) < self._threshold_X:
+                angle_best = cur_angle
+                drive_ge_best = self._qubit.DriveGEAmplitudeX
+                print(f"Threshold reached on X gate after {iter} iterations: err = {abs(180 - cur_angle):.6f} < {self._threshold_X} ")
+                break
+            # if this iteration was worse than the previous, reinstantiate the previous DriveGEAmplitudeX and try again
+            elif prev_angle is not None and abs(180-cur_angle) > abs(180-prev_angle):
+                print(f"Iteration {iter}: setting updated amplitude to previous")
+                self._qubit.DriveGEAmplitudeX = drive_ge_best
+                # still try another update (we can revert if it's worse)
+                reverse_parity = not self._reverse_parity_calibX if iter % 2 == 0 else self._reverse_parity_calibX
+                exp.update_qubits(reverse_parity=reverse_parity)
+                if self._qubit.DriveGEAmplitudeX > 1:
+                    self._qubit.DriveGEAmplitudeX = 1
+            # print exit message if final iteration
+            elif iter == max_iterations - 1:
+                self._qubit.DriveGEAmplitudeX = drive_ge_best
+                print(f"WARNING: X gate unable to reach threshold, exiting with {angle_best:.6f} degree X gate.")
+            # otherwise, update the angle and try again
+            else:
+                print(f"Iteration {iter}: gate improved, updating to {cur_angle:.6f} ")
+                drive_ge_best = self._qubit.DriveGEAmplitudeX
+                reverse_parity = self._reverse_parity_calibX
+                if iter % 2 == 0:
+                    reverse_parity = not reverse_parity
+                exp.update_qubits(reverse_parity=reverse_parity)
+                angle_best = cur_angle
+                prev_angle = cur_angle
+
+                # safety check if amplitude goes over 1
+                if self._qubit.DriveGEAmplitudeX > 1:
+                    self._qubit.DriveGEAmplitudeX = 1
+
+        # final check
         lab.run_single(exp, skip_timing_diagrams=True)
-        if self._kwargs.pop('assert_gate_calibration', True):
-            assert abs(180-cur_angle) < 0.1, "Gate Calibration Failed, Try manually for now"
-        #TODO: If we reach this error should code in some edge case automation
-        ax2 = fig.add_subplot(gs[2, 1:3], sharey=ax1)
-        ExpZICalibX.plot_fitted_results(ax2, exp._fit_data[0]['data'], exp._fit_data[0]['qubit_name'])
+        ax2 = fig.add_subplot(gs[2, 1:3])
+        ax2.clear()
+        ExpZICalibX.plot_fitted_results(ax2, exp._fit_data[0]['data'], 'Final outcome ' + exp._fit_data[0]['qubit_name'])
+
+        new = self._qubit.DriveGEAmplitudeX # new updated value
+        print(f"\tX amplitude = {prev:.6g} -> {new:.6g}")
+
+        if self._kwargs.get('assert_gate_calibration', False):
+            assert abs(180 - angle_best) < self._threshold_X, f"Gate calibration did not pass error threshold: {abs(180 - angle_best):.6f} > {self._threshold_X:.6f}."
+
+
         ##############################
         #
         #X/2 CALIB
         #
         #short
-        print("Calibrating Xon2 Gates...")
-        exp = ExpZICalibX(f'CalibXon2_short_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=2, only_every_n=self._only_every_n_short, num_gates=self._num_gates_calibX_short, dont_show_plot=not self._individual_plots)
+        print("\nCalibrating X/2 Gates...")
+        max_iterations = self._kwargs.get('max_calibX_iterations', 10)
+        exp = None
+        prev_angle = None
+        angle_best = None
+        drive_geOn2_best = self._qubit.DriveGEAmplitudeXon2
+        prev = self._qubit.DriveGEAmplitudeXon2 # save original value
+
+        exp = ExpZICalibX(f'CalibXon2_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=2, only_every_n=self._only_every_n_short, num_gates=self._num_gates_calibX_short, dont_show_plot=not self._individual_plots)
+        for iter in range(max_iterations):
+            # run iteration
+            lab.run_single(exp, skip_timing_diagrams=True)
+
+            if iter == 0:
+                # plot first iteration
+                ax1 = fig.add_subplot(gs[3, 0])
+                ExpZICalibX.plot_fitted_results(ax1, exp._fit_data[0]['data'], 'Initial ' + exp._fit_data[0]['qubit_name'])
+
+            cur_angle = exp._fit_data[0]['data']['angle']
+            print(f"Iteration {iter}: {cur_angle:.6f} degrees")
+
+            # exit if current angle is below threshold
+            if abs(90 - cur_angle) < self._threshold_Xon2:
+                angle_best = cur_angle
+                drive_geOn2_best = self._qubit.DriveGEAmplitudeXon2
+                print(f"Threshold reached on X/2 gate after {iter} iterations: err = {abs(90 - cur_angle):.6f} < {self._threshold_Xon2} ")
+                break
+            # if this iteration was worse than the previous, reinstantiate the previous DriveGEAmplitudeXon2 and try again
+            elif prev_angle is not None and abs(90-cur_angle) > abs(90-prev_angle):
+                print(f"Iteration {iter}: setting updated amplitude to previous")
+                self._qubit.DriveGEAmplitudeXon2 = drive_geOn2_best
+                # still try another update (we can revert if it's worse)
+                reverse_parity = not self._reverse_parity_calibX if iter % 2 == 0 else self._reverse_parity_calibX
+                exp.update_qubits(reverse_parity=reverse_parity)
+                if self._qubit.DriveGEAmplitudeXon2 > 1:
+                    self._qubit.DriveGEAmplitudeXon2 = 1
+            # print exit message if final iteration
+            elif iter == max_iterations - 1:
+                self._qubit.DriveGEAmplitudeXon2 = drive_geOn2_best
+                print(f"WARNING: Xon2 gate unable to reach threshold, exiting with {angle_best:.6f} degree X/2 gate.")
+            # otherwise, update the angle and try again
+            else:
+                print(f"Iteration {iter}: gate improved, updating to {cur_angle:.6f} ")
+                drive_geOn2_best = self._qubit.DriveGEAmplitudeXon2
+                reverse_parity = self._reverse_parity_calibX
+                if iter % 2 == 0:
+                    reverse_parity = not reverse_parity
+                exp.update_qubits(reverse_parity=reverse_parity)
+                angle_best = cur_angle
+                prev_angle = cur_angle
+                # safety check if amplitude goes over 1
+                if self._qubit.DriveGEAmplitudeXon2 > 1:
+                    self._qubit.DriveGEAmplitudeXon2 = 1
+
+        # final check
         lab.run_single(exp, skip_timing_diagrams=True)
-        prev_angle = exp._prev_angle
-        exp.update_qubits(reverse_parity=self._reverse_parity_calibX) if self._update_live else 0
-        if self._qubit.DriveGEAmplitudeXon2 > 1:
-            self._qubit.DriveGEAmplitudeXon2 = 1
-        ax1 = fig.add_subplot(gs[3, 0])
-        ExpZICalibX.plot_fitted_results(ax1, exp._fit_data[0]['data'], exp._fit_data[0]['qubit_name'])
-        #long
-        exp = ExpZICalibX(f'CalibXon2_long_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=2, only_every_n=self._only_every_n_long, num_gates=self._num_gates_calibX_long, dont_show_plot=not self._individual_plots)
-        lab.run_single(exp, skip_timing_diagrams=True)
-        cur_angle = exp._prev_angle
-        if abs(90-cur_angle) > abs(90-prev_angle):
-            exp.update_qubits(reverse_parity=not self._reverse_parity_calibX) if self._update_live else 0
-        else:
-            exp.update_qubits(reverse_parity=self._reverse_parity_calibX) if self._update_live else 0
-        if self._qubit.DriveGEAmplitudeXon2 > 1:
-            self._qubit.DriveGEAmplitudeXon2 = 1
-            exp.update_qubits(reverse_parity=self._reverse_parity_calibX)
-        exp = ExpZICalibX(f'CalibXon2_long_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=2, only_every_n=self._only_every_n_long, num_gates=self._num_gates_calibX_long, dont_show_plot=not self._individual_plots)
-        lab.run_single(exp, skip_timing_diagrams=True)
-        cur_angle = exp._prev_angle
-        if self._kwargs.pop('assert_gate_calibration', True):
-            assert abs(90-cur_angle) < 0.1, "Gate Calibration Failed, Try manually for now"
-        #TODO: If we reach this error should code in some edge case automation
-        ax2 = fig.add_subplot(gs[3, 1:3], sharey=ax1)
-        ExpZICalibX.plot_fitted_results(ax2, exp._fit_data[0]['data'], exp._fit_data[0]['qubit_name'])
+        ax2 = fig.add_subplot(gs[3, 1:3])
+        ax2.clear()
+        ExpZICalibX.plot_fitted_results(ax2, exp._fit_data[0]['data'], 'Final outcome ' + exp._fit_data[0]['qubit_name'])
+
+        new = self._qubit.DriveGEAmplitudeXon2 # new updated value
+        print(f"\tX/2 amplitude = {prev:.6g} -> {new:.6g}")
+
+        # if self._kwargs.get('assert_gate_calibration', False):
+        #     assert abs(90 - angle_best) < self._threshold_Xon2, f"Gate calibration did not pass error threshold: {abs(90 - angle_best):.6f} > {self._threshold_Xon2:.6f}."
 
         lab.group_close()
-
         fig.savefig(str(Path(exp._file_path).parent) + '/FinetuneOverview.png')
-        fig.show()
+        # fig.show()

@@ -14,6 +14,8 @@ from sqdtoolz.HAL.ZI.QuantumElements import *
 class ZIQuantumElement(HALbase, ZIbase):
     def __init__(self, element_name, lab, cls_zi_quantum_element:type[QuantumElement], **kwargs):
         HALbase.__init__(self, element_name)
+
+        self.FidelityBell = None
         
         lab._register_HAL(self)
         self._setup_zi_element(cls_zi_quantum_element, kwargs)
@@ -99,6 +101,7 @@ class ZIQuantumElement(HALbase, ZIbase):
             'Name' : self.Name,
             'Type' : self.__class__.__name__,
             'ManualActivation' : self.ManualActivation,
+            'FidelityBell' : self.FidelityBell,
             'ZI_QuantumElement' : self._qelem_name,
             'ZI_QuantumElementEx': self.signals
             }
@@ -109,6 +112,7 @@ class ZIQuantumElement(HALbase, ZIbase):
     def _set_current_config(self, dict_config, lab):
         assert dict_config.pop('Type') == self.__class__.__name__, 'Cannot set configuration to a ZIQuantumElement with a configuration that is of type ' + dict_config['Type']
         self.ManualActivation = dict_config.pop('ManualActivation', False)
+        self.FidelityBell = dict_config.pop('FidelityBell', None)
         dict_config.pop('Name')
 
         self._setup_zi_element(globals()[dict_config.pop('ZI_QuantumElement')], dict_config.pop('ZI_QuantumElementEx'))

@@ -17,7 +17,7 @@ from pathlib import Path
 import shutil
 
 class ExpZIQASM(ExpZIqubit):   
-    def __init__(self, name, expt_config, hal_QPU, qubit_ids, qasm_file_path, **kwargs):
+    def __init__(self, name, expt_config, hal_QPU, qubit_ids, qasm_file_path = '', **kwargs):
         """
         NOTE: The physical qubit identifiers $0,$1,$2... in OpenPulse are mapped to the qubit_ids!
         """
@@ -32,7 +32,8 @@ class ExpZIQASM(ExpZIqubit):
         kwargs['coordinate_system'] = kwargs.get('coordinate_system', 'RH')
         assert kwargs['coordinate_system'] in ['LH', 'RH'], "The 'coordinate_system' must be either LH or RH for left/right handed."
 
-        self._poqasm = ParserOpenQASM(qasm_file_path, kwargs.pop('source_dirs', []), measure_label='QMEAS')
+        assert (qasm_file_path!='') ^ (('qasm_string' in kwargs) and kwargs['qasm_string'] != ''), "Either supply the path to the QASM file ('qasm_file_path') or provide it as a string via the 'qasm_string' parameter."
+        self._poqasm = ParserOpenQASM(qasm_file_path, kwargs.pop('source_dirs', []), measure_label='QMEAS', main_qasm=kwargs.pop('qasm_string', ''))
         self._final_qreg_phys_mapping = self._poqasm._qreg_phys_mapping #Copy over the default qreg to physical qubit mapping
 
         self._qregs = self._poqasm.get_qubit_registers()

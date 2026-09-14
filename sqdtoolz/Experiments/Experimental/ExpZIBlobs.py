@@ -83,8 +83,10 @@ class ExpZIBlobs(ExpZIqubit):
         return fig
 
 
-    def get_correction_matrices(self):
+    def get_correction_matrices(self, update=False):
         ret_mats = []
         for m,qubit in enumerate(self._qubit_ids): 
             ret_mats.append(np.linalg.inv(self._leDIQDs[m].get_assignment_probabilities().T))
+            if update:
+                self._hal_QPU.get_qubit_obj(qubit).CorrectionMatrix[self._states] = ret_mats[-1]
         return ret_mats

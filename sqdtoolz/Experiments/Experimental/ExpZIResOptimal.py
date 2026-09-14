@@ -9,7 +9,7 @@ from sqdtoolz.Experiments.Experimental.ExpZIBlobs import ExpZIBlobs
 class ExpZIResOptimal(ExpZIqubit):
     def __init__(self, name, expt_config, hal_QPU, qubit_ids, **kwargs):
         self._dont_show_plot = kwargs.pop('dont_show_plot', False)
-        assert (not 'update' in kwargs) or ('update' in kwargs and not kwargs['update']), "Don't set 'update=True'. This is just a diagnostic experiment."
+        assert (not 'update' in kwargs) or ('update' in kwargs and not kwargs['update']), "Don't set 'update=True'. Use update_qubits_by_fidelity(state_fidelity='ge'), or update_qubits_by_separation(transition='ge')."
         kwargs['update'] = False
         # self._fit_vals = []
         assert 'states' in kwargs, "Must provide the states to measure traces over; e.g. 'ge' or 'gef'"
@@ -17,6 +17,9 @@ class ExpZIResOptimal(ExpZIqubit):
         self._calc_single_shot_fidelities = kwargs.pop('calc_single_shot_fidelities', False)
         if self._calc_single_shot_fidelities:
             kwargs['do_analysis'] = False   #The default ZI analysis will fail in this mode...
+            if self._states != 'gef':
+                print('Setting states="gef".')
+                self._states = 'gef'
         self._fit_data = {}
         self._readout_fidelity = 0.0
         super().__init__(name, expt_config, dispersive_shift, hal_QPU, qubit_ids, **kwargs)
@@ -59,6 +62,7 @@ class ExpZIResOptimal(ExpZIqubit):
         ax_mag.set_xlabel(f'Readout Frequency ({norm_prefix}Hz)')
         axSeps.set_xlabel(f'Readout Frequency ({norm_prefix}Hz)')
         axSeps.set_ylabel('IQ separation')
+        fig.suptitle(f"{self._qubit_ids[0]} readout")
 
         ax_phase = ax_mag.twinx()
 
@@ -106,21 +110,35 @@ class ExpZIResOptimal(ExpZIqubit):
             maxSepInds.append(np.argmax(cur_diff))
             axSeps.plot([freqs[maxSepInds[-1]]/norm_fac], [cur_diff[maxSepInds[-1]]], 'o', color=leCols[m+1], label='_nolegend_')
         if len(self._states) == 2:
-            axSeps.legend(['GE'])
+            axSeps.legend(['ge'])
             leTitlesSS = ['G','E','Mean']
         else:
-            axSeps.legend(['GE', 'EF', 'GF', 'Total'])
-            leTitlesSS = ['G','E','F','Mean']
+            axSeps.legend(['ge', 'ef', 'gf', 'gef'])
+            leTitlesSS = ['GE','EF','GF','GEF']
+            leStates = ['g', 'e', 'f']
 
         if self._calc_single_shot_fidelities:
-            leIQDiscs = [DataIQDiscriminate([arrs[x][:,m,:] for x in range(len(self._states))]) for m in range(freqs.size)] 
-            leFids = [leIQDiscs[m].get_fidelities() for m in range(freqs.size)]
-            leFids = np.array(leFids)
+            #FIDELITY
+            leIQDiscsAll = []
+            leFidsAll = []
+            # ge, ef, gf combos
+            for k in range(len(self._states)):
+                leIQDiscs = [DataIQDiscriminate([arrs[x][:,m,:] for x in combs[k]]) for m in range(freqs.size)]
+                leIQDiscsAll.append(leIQDiscs)
+
+                leFids = [leIQDiscs[m].get_fidelities() for m in range(freqs.size)]
+                leFids = np.array(leFids)
+                leFidsAll.append(leFids)
+            # gef
+            leIQDiscs = [DataIQDiscriminate([arrs[x][:,m,:] for x in range(len(self._states))]) for m in range(freqs.size)]
+            leIQDiscsAll.append(leIQDiscs)
+            leFidsAll.append(np.array([leIQDiscs[m].get_fidelities() for m in range(freqs.size)]))
+
             #Gather fidelity data for each state the total
             fidData = []
             for m in range(len(self._states)):
-                fidData.append(leFids[:,m])
-            fidData.append(np.mean(leFids, axis=1))
+                fidData.append((leFidsAll[m][:,0] + leFidsAll[m][:,1])/2)
+            fidData.append(np.mean(leFidsAll[len(self._states)], axis=1))
 
             maxFidInds = []
             axFirst = None
@@ -132,16 +150,24 @@ class ExpZIResOptimal(ExpZIqubit):
                 if axFirst == None:
                     ax = fig.add_subplot(gs[3, m])
                     axFirst = ax
+                    ax.set_ylabel('Q Channel')
                 else:
-                    ax = fig.add_subplot(gs[3, m], sharey=axFirst)
-                leIQDiscs[maxFidInds[-1]].plot_points(ax)
+                    ax = fig.add_subplot(gs[3, m])
+                if m==3:
+                    leIQDiscsAll[m][maxFidInds[-1]].plot_points(ax)
+                else:
+                    leIQDiscsAll[m][maxFidInds[-1]].plot_points(ax, [leCols[combs[m][0]], leCols[combs[m][1]]])
                 ax.set_title(leTitlesSS[m])
-                ax.set_xticklabels([])
+                ax.set_xlabel('I Channel')
                 ax.set_yticklabels([])
+                ax.set_xticklabels([])
                 #
                 axA = fig.add_subplot(gs[4, m])
-                leIQDiscs[maxFidInds[-1]].plot_assignment_matrix(axA, sigFigs=2)
-                self._readout_fidelity = (leIQDiscs[maxFidInds[-1]].get_average_fidelity()*100)
+                if m == 3:
+                    leIQDiscsAll[m][maxFidInds[-1]].plot_assignment_matrix(axA, sigFigs=2)
+                else:
+                    leIQDiscsAll[m][maxFidInds[-1]].plot_assignment_matrix(axA, sigFigs=2, labels=[leStates[combs[m][0]].lower(), leStates[combs[m][1]].lower()])
+                self._readout_fidelity = (leIQDiscsAll[m][maxFidInds[-1]].get_average_fidelity()*100)
                 axA.set_title(f"Mean: {self._readout_fidelity:.4g}%")
                 if m > 0:
                     ax.set_ylabel('')
@@ -151,13 +177,13 @@ class ExpZIResOptimal(ExpZIqubit):
             if len(self._states) == 2:
                 axFids.legend(['G','E','Mean'])
             else:
-                axFids.legend(['G','E','F','Mean'])
-        
+                axFids.legend(['ge','ef','gf','gef'], loc='lower right')
+
             self._fit_data = {'freqs':freqs, 'maxSepIndices':maxSepInds, 'maxFidIndices':maxFidInds, 'discriminators':leIQDiscs}
         else:
             self._fit_data = {'freqs':freqs, 'maxSepIndices':maxSepInds}
 
-        fig.subplots_adjust(hspace=0.1)
+        # fig.subplots_adjust(hspace=0.1)
         fig.tight_layout()
 
         fig.savefig(self._file_path + f'fitted_plot_{self._qubit_ids[0]}.png')
@@ -182,46 +208,47 @@ class ExpZIResOptimal(ExpZIqubit):
         qubit_obj.ReadoutFrequency = float( self._fit_data['freqs'][ self._fit_data['maxSepIndices'][ind] ] )
         qubit_obj.FidelityReadout = self._readout_fidelity
 
-    def update_qubits_by_fidelity(self, state_fidelity:str='Mean'):
+    def update_qubits_by_fidelity(self, state_fidelity:str='gef'):
         """
-        state_fidelity is given as 'g', 'e', 'f' or 'Mean' (can capitalise etc.) to take the highest of the respective fidelities as the point.
+        state_fidelity is given as 'ge', 'ef', 'gf' or 'gef' (can capitalise etc.) to take the highest of the respective fidelities as the point.
         """
         assert len(self._fit_data) > 0, "Must run experiment first."
         assert self._calc_single_shot_fidelities, "Must run the experiment in single-shot by setting calc_single_shot_fidelities to True."
         qubit_obj = self._hal_QPU.get_qubit_obj(self._qubit_ids[0])
         state_fidelity = state_fidelity.lower()
         if len(self._states) == 2:
-            assert state_fidelity in ['g', 'e', 'mean'], "Invalid state (must be either 'g', 'e' or 'mean')"
-            ind = ['g', 'e', 'mean'].index(state_fidelity)
+            assert state_fidelity in ['ge'], "Invalid state (must 'ge')"
+            ind = ['ge'].index(state_fidelity)
         else:
-            assert state_fidelity in ['g', 'e', 'f', 'mean'], "Invalid state (must be either 'g', 'e', 'f' or 'mean')"
-            ind = ['g', 'e', 'f', 'mean'].index(state_fidelity)
+            assert state_fidelity in ['ge', 'ef', 'gf', 'gef'], "Invalid state (must be either 'ge', 'ef', 'gf' or 'gef')"
+            ind = ['ge', 'ef', 'gf', 'gef'].index(state_fidelity)
         qubit_obj.ReadoutFrequency = float( self._fit_data['freqs'][ self._fit_data['maxFidIndices'][ind] ] )
         qubit_obj.FidelityReadout = self._readout_fidelity
 
     def print_best_frequencies_by_separation(self):
         assert len(self._fit_data) > 0, "Must run experiment first."
+        print(f"{self._qubit_ids[0]}")
         if len(self._states) == 2:
-            print(f"Max GE: {Miscellaneous.get_units(self._fit_data['freqs'][ self._fit_data['maxSepIndices'][0] ])}Hz")
+            print(f"Max GE: {Miscellaneous.get_units(self._fit_data['freqs'][ self._fit_data['maxSepIndices'][0] ])}Hz\n")
         else:
             print(f"Max GE: {Miscellaneous.get_units(self._fit_data['freqs'][ self._fit_data['maxSepIndices'][0] ])}Hz")
             print(f"Max EF: {Miscellaneous.get_units(self._fit_data['freqs'][ self._fit_data['maxSepIndices'][1] ])}Hz")
-            print(f"Max GF: {Miscellaneous.get_units(self._fit_data['freqs'][ self._fit_data['maxSepIndices'][2] ])}Hz")
+            print(f"Max GF: {Miscellaneous.get_units(self._fit_data['freqs'][ self._fit_data['maxSepIndices'][2] ])}Hz\n")
 
     def print_best_frequencies_by_fidelity(self):
         assert len(self._fit_data) > 0, "Must run experiment first."
         assert self._calc_single_shot_fidelities, "Must run the experiment in single-shot by setting calc_single_shot_fidelities to True."
-        print(f"Max G: {Miscellaneous.get_units(self._fit_data['freqs'][ self._fit_data['maxFidIndices'][0] ])}Hz")
-        print(f"Max E: {Miscellaneous.get_units(self._fit_data['freqs'][ self._fit_data['maxFidIndices'][1] ])}Hz")
+        print(f"{self._qubit_ids[0]}")
+        print(f"Max GE: {Miscellaneous.get_units(self._fit_data['freqs'][ self._fit_data['maxFidIndices'][0] ])}Hz")
+        print(f"Max EF: {Miscellaneous.get_units(self._fit_data['freqs'][ self._fit_data['maxFidIndices'][1] ])}Hz")
         if len(self._states) == 2:
-            print(f"Max Mean: {Miscellaneous.get_units(self._fit_data['freqs'][ self._fit_data['maxFidIndices'][2] ])}Hz")
+            print(f"Max Mean: {Miscellaneous.get_units(self._fit_data['freqs'][ self._fit_data['maxFidIndices'][2] ])}Hz\n")
         else:
-            print(f"Max F: {Miscellaneous.get_units(self._fit_data['freqs'][ self._fit_data['maxFidIndices'][2] ])}Hz")
-            print(f"Max Mean: {Miscellaneous.get_units(self._fit_data['freqs'][ self._fit_data['maxFidIndices'][3] ])}Hz")
+            print(f"Max GF: {Miscellaneous.get_units(self._fit_data['freqs'][ self._fit_data['maxFidIndices'][2] ])}Hz")
+            print(f"Max Mean: {Miscellaneous.get_units(self._fit_data['freqs'][ self._fit_data['maxFidIndices'][3] ])}Hz\n")
 
     def plot_blobs(self, frequency):
         assert len(self._fit_data) > 0, "Must run experiment first."
         assert self._calc_single_shot_fidelities, "Must run the experiment in single-shot by setting calc_single_shot_fidelities to True."
         ind = np.argmin(np.abs(frequency-self._fit_data['freqs']))
         ExpZIBlobs.plot_fitted_results(self._fit_data['discriminators'][ind], f"(Frequency: {Miscellaneous.get_units(self._fit_data['freqs'][ind])}Hz)")
-

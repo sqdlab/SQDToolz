@@ -77,7 +77,7 @@ class ExpZIDailyTuneup:
         #READOUT RESONATOR
         #
         if self._tune_readout:
-            print(f'\nOptimising readout frequency...')
+            print(f'\nOptimising readout (GEF)...')
             exp = ExpZIResOptimal(f'DailyTuneup_{self._qubit_id}_Readout', self._expt_config, self._qpu, [self._qubit_id], states=self._transition, frequencies=self._res_freq_range, ZI_plot=self._individual_plots, calc_single_shot_fidelities=True)
             lab.run_single(exp)
             if self._update_live:
@@ -88,7 +88,6 @@ class ExpZIDailyTuneup:
                 new_freq = self._qubit.ReadoutFrequency
                 print(f"\tf_r = {prev_freq*1e-9:.6f} GHz -> {new_freq*1e-9:.6f} GHz")
                 print(f"\tF_r = {prev:.6f}% -> {new:.6f}%")
-
             ##############################
             #
             #OPTIMISE INTEGRATION WEIGHTS

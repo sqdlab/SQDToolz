@@ -64,14 +64,17 @@ class DataIQDiscriminate:
     def get_average_fidelity(self):
         return np.mean(np.diag(self._assigned_probs))
 
-    def plot_points(self, ax=None):
+    def plot_points(self, ax=None, plot_colours=None):
         if ax == None:
             fig, ax = plt.subplots(1)
         else:
             fig = None
 
         #Plot the raw data
-        leCols = plt.rcParams['axes.prop_cycle'].by_key()['color']
+        if plot_colours is None:
+            leCols = plt.rcParams['axes.prop_cycle'].by_key()['color']
+        else:
+            leCols = plot_colours
         minX = np.max([np.max(x) for x in self._calib_IQ_states])
         minY = minX
         maxX = np.min([np.min(x) for x in self._calib_IQ_states])

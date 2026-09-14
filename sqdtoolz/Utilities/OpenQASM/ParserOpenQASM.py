@@ -774,6 +774,17 @@ class ParserOpenQASM:
                 ret_list.append((cur_qreg,m))
         return ret_list
 
+    def _calc_seq_len(self, cur_seq, params, cur_phys_qubit_index):
+        cur_len = 0
+        for cur_op in cur_seq:
+            if cur_op[0] == 'D':    #It is a delay...   Note that Measure pulses shouldn't appear here...
+                cur_len += cur_op[1]
+            elif cur_op[0] == 'pulse':
+                cur_len += cur_op[1]['length']
+            else:   #It is just X/Y/Z/Measure for the gate type...
+                cur_len += params.get_duration(cur_phys_qubit_index, cur_op)
+        return cur_len
+
     def create_schedule(self, params:ScheduleParametersBase, flatten_blocks=False):
         #Initialise qubits and sync times
         phys_qubit_ids = params.get_phys_qubit_ids()
@@ -812,24 +823,20 @@ class ParserOpenQASM:
                         meas_store_ids[cur_command['store']] = cur_meas_id
                         meas_index += 1
                         #
-                        cur_play_after_index = None if last_sync_command_indices[cur_phys_qubit_index] == -1 else last_sync_command_indices[cur_phys_qubit_index]
+                        cur_meas_pos = qubit_sync_times[cur_phys_qubit_index] + self._calc_seq_len(cur_qubit_commands[cur_phys_qubit_index], params, cur_phys_qubit_index)
+                        #
                         meas_params = params.get_measurement_params(cur_phys_qubit_index)
                         delay_offset = 0
                         meas_duration = meas_params['duration']
                         if 'align_step' in meas_params and meas_params['align_step'] > 0:
-                            cur_step_multiple = qubit_sync_times[cur_phys_qubit_index] / meas_params['align_step']
+                            cur_step_multiple = cur_meas_pos / meas_params['align_step']
                             min_granularity = params.dt() / meas_params['align_step']
                             if cur_step_multiple - int(cur_step_multiple) > min_granularity/2:
                                 delay_offset = (1 - cur_step_multiple + int(cur_step_multiple)) * meas_params['align_step']
                                 #Errors occur when combining delay with measure, so separating the sections...
-                                final_commands.append({'qubit_index': cur_phys_qubit_index, 'custom_waveform':False, 'sequence': [('D', float(delay_offset))], 'after':cur_play_after_index, 'length':delay_offset})
-                                qubit_sync_times[cur_phys_qubit_index] += delay_offset
-                                last_sync_command_indices[cur_phys_qubit_index] = len(final_commands)-1                                             
+                                cur_qubit_commands[cur_phys_qubit_index].append(('D', float(delay_offset)))
                         #
-                        cur_play_after_index = None if last_sync_command_indices[cur_phys_qubit_index] == -1 else last_sync_command_indices[cur_phys_qubit_index]
-                        final_commands.append({'qubit_index': cur_phys_qubit_index, 'custom_waveform':False, 'sequence': [cur_meas_cmd], 'after':cur_play_after_index, 'length':meas_duration})
-                        qubit_sync_times[cur_phys_qubit_index] += meas_duration
-                        last_sync_command_indices[cur_phys_qubit_index] = len(final_commands)-1
+                        cur_qubit_commands[cur_phys_qubit_index].append(cur_meas_cmd)
                 else:
                     ####
                     #Calculate new synchronisation point
@@ -843,15 +850,7 @@ class ParserOpenQASM:
                     #Continue calculating new synchronisation point...
                     cur_seq_lens = {x:0 for x in cur_targ_phys_indices}
                     for cur_phys_qubit_index in cur_targ_phys_indices:
-                        cur_len = 0
-                        for cur_op in cur_qubit_commands[cur_phys_qubit_index]:
-                            if cur_op[0] == 'D':    #It is a delay...   Note that Measure pulses shouldn't appear here...
-                                cur_len += cur_op[1]
-                            elif cur_op[0] == 'pulse':
-                                cur_len += cur_op[1]['length']
-                            else:   #It is just X, Y, Z for the gate type...
-                                cur_len += params.get_duration(cur_phys_qubit_index, cur_op)
-                        cur_seq_lens[cur_phys_qubit_index] = cur_len
+                        cur_seq_lens[cur_phys_qubit_index] = self._calc_seq_len(cur_qubit_commands[cur_phys_qubit_index], params, cur_phys_qubit_index)
                     new_sync_point = np.max([qubit_sync_times[x]+cur_seq_lens[x] for x in cur_targ_phys_indices])
                     ####
                     #Pad/sequence Delays on qubits and add qubit sequences to final command list

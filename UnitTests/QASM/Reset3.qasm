@@ -7,7 +7,7 @@ bit[2] c;
 x q[0];
 y q[0];
 
-reset q[0];
+reset q;
 x q[0];
 y q[1];
 

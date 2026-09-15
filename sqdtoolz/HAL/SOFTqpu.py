@@ -104,7 +104,7 @@ class SOFTqpu(HALbase, ZIbase):
         assert found, f"There is no valid {zi_object_type} coupling between qubits {qubit1} and {qubit2}."
         return leCpler
 
-    def save_config(self, lab, file_name='', store_local=True):
+    def save_config(self, lab, file_name='', store_local=True, additional_specs=[]):
         #Not choosing to filter intrinsic parameters yet. Ultimately, many parameters can be ignored by the routines
         #like SingleQubitTuneup anyway. So it's up to those routines to decide what's mandatory and what's to be
         #overwritten... This will shift stuff like FluxDC, but again, recalibration will mandate those be checked
@@ -114,12 +114,17 @@ class SOFTqpu(HALbase, ZIbase):
         #Anyway, the idea is to reuse the cold_reload_labconfig function to instantiate/initialise the parameters...
         #Thus, the code is written to be compatible/friendly to that while adding some extra parameters to aid in the
         #user API here...
+        #Prepare the dictionary of Experiment Specifications
+        dict_specs = []
+        for cur_spec in additional_specs:
+            dict_specs.append(lab._specifications[cur_spec]._get_current_config())
+        #
         param_dict = {
                     'ActiveInstruments' : [],
                     'HALs' : [],
                     'PROCs': [],
                     'WFMTs': [],
-                    'SPECs': [],
+                    'SPECs': dict_specs,
                     'Qubits': {},
                     'QubitCouplings': {}
                     }

@@ -841,7 +841,7 @@ class ParserOpenQASM:
                     ####
                     #Calculate new synchronisation point
                     #
-                    cur_targ_phys_indices = cur_command['targets']
+                    cur_targ_phys_indices = cur_command['targets'][:]
                     #Gather auxiliary qubits that need to be synchronised
                     if cur_command['type'] == SQDQasmCommandType.GATE:
                         cur_target_gate = self._process_1Q_gate(cur_command['angles'])

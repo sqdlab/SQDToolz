@@ -833,10 +833,18 @@ class ParserOpenQASM:
                             min_granularity = params.dt() / meas_params['align_step']
                             if cur_step_multiple - int(cur_step_multiple) > min_granularity/2:
                                 delay_offset = (1 - cur_step_multiple + int(cur_step_multiple)) * meas_params['align_step']
-                                #Errors occur when combining delay with measure, so separating the sections...
                                 cur_qubit_commands[cur_phys_qubit_index].append(('D', float(delay_offset)))
                         #
-                        cur_qubit_commands[cur_phys_qubit_index].append(cur_meas_cmd)
+                        #Errors occur when combining delays/gates with measure, so separating the sections...
+                        play_after = None if last_sync_command_indices[cur_phys_qubit_index] == -1 else last_sync_command_indices[cur_phys_qubit_index]
+                        cur_seg_len = self._calc_seq_len(cur_qubit_commands[cur_phys_qubit_index], params, cur_phys_qubit_index)
+                        final_commands.append({'qubit_index': cur_phys_qubit_index, 'custom_waveform':False, 'sequence': cur_qubit_commands[cur_phys_qubit_index], 'after':play_after, 'length':cur_seg_len})
+                        #
+                        final_commands.append({'qubit_index': cur_phys_qubit_index, 'custom_waveform':False, 'sequence': [cur_meas_cmd], 'after':len(final_commands)-1, 'length':meas_duration})
+                        #
+                        cur_qubit_commands[cur_phys_qubit_index] = []
+                        qubit_sync_times[cur_phys_qubit_index] += cur_seg_len + meas_duration
+                        last_sync_command_indices[cur_phys_qubit_index] = len(final_commands)-1
                 else:
                     ####
                     #Calculate new synchronisation point

@@ -96,7 +96,7 @@ class DataDensityMatrix:
                 else:
                     ro_corr = functools.reduce(np.kron,ro_corr)
                 leProbs = ro_corr @ leProbs
-            leProbs = DataDensityMatrix._project_vector_to_probability_simplex(leProbs)
+                leProbs = DataDensityMatrix._project_vector_to_probability_simplex(leProbs)
             #The bit_count counts the number of 1s in the binary representation of the integer. Then calculate if it's even/odd parity and map to -1/+1
             expectation_values.append(np.sum([leProbs[x] * (1-2*((x).bit_count()%2)) for x in range(leProbs.shape[0])], axis=0))
             a=0

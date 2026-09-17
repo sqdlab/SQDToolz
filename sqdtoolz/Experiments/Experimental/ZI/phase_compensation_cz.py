@@ -53,7 +53,7 @@ def experiment_workflow(
     rz_angles: QubitSweepPoints,
     coupler_name: str = None,
     coordinate_system: str = 'RH',
-    main_or_aux: str = "Main",
+    main_or_aux: str = "main",
     temporary_parameters: dict[str | tuple[str, str, str], dict | QuantumParameters]
     | None = None,
     options: TuneUpWorkflowOptions | None = None,
@@ -118,7 +118,7 @@ def create_experiment(
     rz_angles: QubitSweepPoints,
     coupler_name: str = None,
     coordinate_system: str = 'RH',
-    main_or_aux: str = 'Main',
+    main_or_aux: str = 'main',
     options: TuneupExperimentOptions | None = None,
 ) -> Experiment:
     """Creates a CZ phase compensation experiment. 
@@ -162,7 +162,7 @@ def create_experiment(
             "outside the sweep."
         )
 
-    assert main_or_aux.lower() in ['main', 'aux'], "Supply 'main_or_aux' as either 'main' or 'aux'."
+    assert main_or_aux.lower() in ['main', 'aux', 'stationary'], "Supply 'main_or_aux' as either 'main', 'stationary' or 'aux'."
 
     # find the coupler (if not supplied)
     if coupler_name == None:
@@ -182,11 +182,15 @@ def create_experiment(
         assert the_coupler.signals['drive_comp_aux'] is not None, "Must assign a 'drive_comp_aux' signal in the coupler to apply phase compensation to the auxilliary qubit."
         assert the_coupler.signals['flux_aux'] is not None, "Must assign a 'flux_aux' signal in the coupler to apply AmplitudeAux."
     assert the_coupler.signals['drive_comp'] is not None, "Must assign a 'drive_comp' signal in the coupler to apply phase compensation to the main detuned qubit."
+    assert the_coupler.signals['drive_comp_stationary'] is not None, "Must assign a 'drive_comp_stationary' signal in the coupler to apply phase compensation to the stationary qubit."
 
     # find the compensation qubit
     for q in qubits:
         if main_or_aux.lower() == 'main':
             if q.uid in the_coupler.signals['flux']:
+                q_comp = q
+        elif main_or_aux.lower() == 'stationary':
+            if q.uid in the_coupler.signals['drive_comp_stationary']:
                 q_comp = q
         else:
             if q.uid in the_coupler.signals['flux_aux']:

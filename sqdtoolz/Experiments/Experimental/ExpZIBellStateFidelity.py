@@ -17,6 +17,11 @@ class ExpZIBellStateFidelity(ExpZIqubit):
 
         self._dont_show_plot = kwargs.pop('dont_show_plot', False)
         self._update_coupler = kwargs.pop('update', True)
+        self._readout_correction = kwargs.pop('readout_correction', 'ge')
+        assert self._readout_correction in ['ge', 'gef', None], "Provide readout_correction as 'ge', 'gef' or None."
+
+        self._q1_object = self._hal_QPU.get_qubit_obj(qubit_ids[0])
+        self._q2_object = self._hal_QPU.get_qubit_obj(qubit_ids[1])
 
         self._qasm_path = kwargs.pop('save_qasm_path', f'BellStateTomography{qubit_ids[0]}{qubit_ids[1]}.qasm')
 
@@ -48,11 +53,20 @@ h q[1];
         lab.run_single(exp, override_ACQ_params={'AcquisitionMode': 'DISCRIMINATION', 'AveragingOrder': 'SingleShot'})
         self._file_path = exp._file_path
 
-    def post_process(self, use_abs_phase=False):
+    def post_process(self, use_abs_phase=False, readout_correction=None):
+        if readout_correction != None:
+            self._readout_correction = readout_correction
+
         ledv = ExpZIQASMDataViewer(self._file_path)
         ledv.get_inner_slicing_vars()
-        # data = ledv.get_data('c') 
-        leRho = DataDensityMatrix.fromDataViewer(ledv)
+        #
+        if self._readout_correction is not None and self._q1_object.CorrectionMatrix[self._readout_correction] is not None and self._q2_object.CorrectionMatrix[self._readout_correction] is not None:
+            leRho = DataDensityMatrix.fromDataViewer(ledv, readout_correction_matrices=[self._q1_object.CorrectionMatrix[self._readout_correction], self._q2_object.CorrectionMatrix[self._readout_correction]])
+        elif self._readout_correction is not None:
+            print("Unable to apply readout correction as CorrectionMatrix was not found in qubit attributes. Please check the selected correction matrix (i.e. 'ge' or 'gef') is present. Continuing without readout correction.")
+            leRho = DataDensityMatrix.fromDataViewer(ledv)
+        else:
+            leRho = DataDensityMatrix.fromDataViewer(ledv)
         self._fidelity = leRho.get_fidelity_pure_state([1,0,0,1])*100
         leRho.plot3D([1,0,0,1], use_abs_phase=use_abs_phase, extra_title=f' - {self._qubit_ids[0]}{self._qubit_ids[1]}: $F={self._fidelity:.4f}$', save_path=self._file_path + 'BellState.png')
         self._purity = leRho.get_purity() 

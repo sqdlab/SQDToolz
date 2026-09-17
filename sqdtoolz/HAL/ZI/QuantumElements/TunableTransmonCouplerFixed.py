@@ -34,10 +34,11 @@ class TunableTransmonCouplerFixedParameters(QuantumParameters):
     Pulse: dict = attrs.field(factory=lambda: {"function": "gaussian_square", "sigma": 0.5, "samples": None, "precomp_kernel" : None})
     CompZAngle: float = None
     CompZAngleAux: float = None
+    CompZAngleStationary: float = None
 
 class TunableTransmonCouplerFixed(QuantumElement, QASMCompatibleQubitMultiple):
     PARAMETERS_TYPE = TunableTransmonCouplerFixedParameters
-    REQUIRED_SIGNALS = ("flux", "drive_comp")
+    REQUIRED_SIGNALS = ("flux", "drive_comp", "drive_comp_stationary")
     OPTIONAL_SIGNALS = ("flux_aux", "drive_comp_aux")
  
     def get_gate_duration(self, gate:list|tuple, qubits:list[ZIQubit]):
@@ -157,4 +158,13 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
                 signal=comp_signal_aux,
                 pulse=None,
                 increment_oscillator_phase=q.parameters.CompZAngleAux,
+            )
+
+        # z rotation to account for phase picked up by the stationary qubit
+        comp_signal_stationary = q.signals.get("drive_comp_stationary", None)
+        if comp_signal_stationary is not None and q.parameters.CompZAngleStationary is not None:
+            dsl.play(
+                signal=comp_signal_aux,
+                pulse=None,
+                increment_oscillator_phase=q.parameters.CompZAngleStationary,
             )

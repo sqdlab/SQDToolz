@@ -47,12 +47,19 @@ class ExpZIPhaseCompensation2Q(Experiment):
             print("Auxiliary qubit not found (matching signal 'flux_aux').")
         self._aux_qubit = aux_qubit
 
+        # find stationary qubit
+        flux_stationary_signal = self.cur_coupler_obj.signals.get('drive_comp_stationary', [])
+        stationary_qubit = next((q for q in self._all_qubits if q in flux_stationary_signal), None)
+        assert stationary_qubit is not None, "Stationary qubit not found (matching signal 'drive_comp_stationary')."
+        self._stationary_qubit = stationary_qubit
+
         self._kwargs = kwargs
         self.data = {}
 
     def run(self, lab):
         main_qubit = self._main_qubit
         aux_qubit = self._aux_qubit
+        stationary_qubit = self._stationary_qubit
         
         lab.group_open(self._name)
         print(f"Sweeping phase compensation on {main_qubit} (main)...")
@@ -70,7 +77,7 @@ class ExpZIPhaseCompensation2Q(Experiment):
         self.data['main_pops'] = np.mean(self.data['main_shots'], axis=0)
         self.data['angles'] = data_main.param_vals[1]
 
-        # aux qubit
+        # aux qubit (if present in the coupler)
         if aux_qubit is not None:
             print(f"Sweeping phase compensation on {aux_qubit} (auxiliary)...")
             self.cur_coupler_obj.CompZAngleAux = None
@@ -85,37 +92,61 @@ class ExpZIPhaseCompensation2Q(Experiment):
             data_aux = exp_aux.retrieve_last_dataset(aux_qubit)
             self.data['aux_shots'] = data_aux.get_numpy_array()[:,:,0]
             self.data['aux_pops'] = np.mean(self.data['aux_shots'], axis=0)
+
+        # stationary qubit
+        print(f"Sweeping phase compensation on {stationary_qubit} (stationary)...")
+        self.cur_coupler_obj.CompZAngle = None
+        exp_stationary = ExpZIqubit(f'PhaseComp_{self.cur_coupler_obj.Name}_{main_qubit}_Stationary', self._expt_config, phase_compensation_cz, self._hal_QPU, self._all_qubits, 
+                        rz_angles=self._angles, 
+                        coupler_name=self._coupler_name,
+                        main_or_aux='stationary',
+                        **self._kwargs
+                        )
+        lab.run_single(exp_stationary, **self._kwargs)
+        #
+        data_stationary = exp_stationary.retrieve_last_dataset(stationary_qubit)
+        self.data['stationary_shots'] = data_stationary.get_numpy_array()[:,:,0]
+        self.data['stationary_pops'] = np.mean(self.data['stationary_shots'], axis=0)        
+        
         lab.group_close()
         self._file_path = str(Path(exp_main._file_path).parent)
         
 
     def post_process(self):
-        fit_angles = ExpZIPhaseCompensation2Q.plot_fitted_data(self.data, main_qubit_id=self._main_qubit, coupler_id=self._coupler_name, aux_qubit_id=self._aux_qubit, save_path=self._file_path)
+        fit_angles = ExpZIPhaseCompensation2Q.plot_fitted_data(self.data, main_qubit_id=self._main_qubit, coupler_id=self._coupler_name, aux_qubit_id=self._aux_qubit, stationary_qubit_id=self._stationary_qubit, save_path=self._file_path)
         self.data['fit_angles'] = fit_angles
         if self._update:
             self.cur_coupler_obj.CompZAngle = self.data['fit_angles']['main']
             print(f"Updated {self._coupler_name}.CompZAngle to {self.data['fit_angles']['main']:.4f}")
+            #
+            self.cur_coupler_obj.CompZAngleStationary = self.data['fit_angles']['stationary']
+            print(f"Updated {self._coupler_name}.CompZAngleStationary to {self.data['fit_angles']['stationary']:.4f}")
+            #
             if self._aux_qubit is not None:
                 self.cur_coupler_obj.CompZAngleAux = self.data['fit_angles']['aux']
                 print(f"Updated {self._coupler_name}.CompZAngleAux to {self.data['fit_angles']['aux']:.4f}")
 
     @staticmethod
-    def plot_fitted_data(data, main_qubit_id=None, coupler_id=None, aux_qubit_id=None, save_path=None):
+    def plot_fitted_data(data, main_qubit_id=None, coupler_id=None, aux_qubit_id=None, stationary_qubit_id=None, save_path=None):
         # plot setup (for main and aux, or just main)
         with_aux = False
         axs = []
         fit_angles = {}
         if data.get('aux_pops', None) is not None:
             with_aux = True
-            fig, (ax_main, ax_aux) = plt.subplots(2, 1, figsize=(12, 6), sharex=True)
-            axs = [ax_main, ax_aux]
+            fig, (ax_main, ax_st, ax_aux) = plt.subplots(3, 1, figsize=(12, 9), sharex=True)
+            axs = [ax_main, ax_st, ax_aux]
         else:
-            fig, (ax_main) = plt.subplots(1, 1, figsize=(12, 4))
-            axs = [ax_main]
+            fig, (ax_main, ax_st) = plt.subplots(2, 1, figsize=(12, 6))
+            axs = [ax_main, ax_st]
         if main_qubit_id is not None:
             ax_main.set_title(f"Main qubit ({main_qubit_id})")
         else:
             ax_main.set_title(f"Main qubit")
+        if stationary_qubit_id is not None:
+            ax_st.set_title(f"Stationary qubit ({stationary_qubit_id})")
+        else:
+            ax_st.set_title(f"Stationary qubit")
         if with_aux:
             if aux_qubit_id is not None:
                 ax_aux.set_title(f"Auxiliary qubit ({aux_qubit_id})")
@@ -143,6 +174,13 @@ class ExpZIPhaseCompensation2Q(Experiment):
         ax_main.plot(main_comp_angle, np.min(main_func), 'go', label=fr"$\theta=${main_comp_angle:.4f} rad")
         fit_angles['main'] = main_comp_angle 
         ax_main.legend()
+        # stationary
+        dpkt = dfit.get_fitted_plot(angles, data['stationary_pops'], axs=ax_st)
+        stationary_func = dfit.get_plot_data_from_dpkt(angles_fine, dpkt)
+        stationary_comp_angle = angles_fine[np.argmin(stationary_func)]
+        ax_st.plot(stationary_comp_angle, np.min(stationary_func), 'go', label=fr"$\theta=${stationary_comp_angle:.4f} rad")
+        fit_angles['stationary'] = stationary_comp_angle 
+        ax_st.legend()
         # aux
         if with_aux:
             dpkt = dfit.get_fitted_plot(angles, data['aux_pops'], axs=ax_aux)
@@ -153,7 +191,7 @@ class ExpZIPhaseCompensation2Q(Experiment):
             ax_aux.legend()
             fit_angles['aux'] = aux_comp_angle
         else:
-            ax_main.set_xlabel(r'$Rz(\theta)$ (radians)')
+            ax_st.set_xlabel(r'$Rz(\theta)$ (radians)')
         if save_path is not None:
             fig.savefig(save_path + "/fitted_plot.png")
 

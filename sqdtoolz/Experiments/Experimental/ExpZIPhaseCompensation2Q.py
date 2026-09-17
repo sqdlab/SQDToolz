@@ -86,7 +86,7 @@ class ExpZIPhaseCompensation2Q(Experiment):
             self.data['aux_shots'] = data_aux.get_numpy_array()[:,:,0]
             self.data['aux_pops'] = np.mean(self.data['aux_shots'], axis=0)
         lab.group_close()
-        self._file_path = str(Path(exp_aux._file_path).parent)
+        self._file_path = str(Path(exp_main._file_path).parent)
         
 
     def post_process(self):

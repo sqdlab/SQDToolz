@@ -192,9 +192,6 @@ def create_experiment(
             if q.uid in the_coupler.signals['flux_aux']:
                 q_comp = q
 
-    # q_comp = qubits[0]
-    # drive_signal = q_comp.signals['drive']
-
     # create sweep parameter for rz
     zangle_sweep_pars = SweepParameter(f"rz_angle", rz_angles, axis_name=f"rz_angle")
 
@@ -229,10 +226,6 @@ def create_experiment(
                 with dsl.section(name="pre_drive_and_cz", alignment=SectionAlignment.LEFT):
                     with dsl.section(name="pre_drive", alignment=SectionAlignment.LEFT, length=l_flux):
                         # [ h ]
-                        # qop.rz.omit_section(q_comp, angle=np.pi/2)
-                        # qop.ry.omit_section(q_comp, angle=np.pi/2)
-                        # qop.rz.omit_section(q_comp, angle=np.pi/2)
-
                         qop.rz.omit_section(q_comp, angle=np.pi)
                         qop.ry.omit_section(q_comp, angle=np.pi/2)
 
@@ -243,10 +236,6 @@ def create_experiment(
                 with dsl.section(name="pre_drive_and_cz", alignment=SectionAlignment.LEFT):
                     with dsl.section(name="pre_drive", alignment=SectionAlignment.LEFT, length=l_flux):
                         # [ h ]
-                        # qop.rz.omit_section(q_comp, angle=np.pi/2)
-                        # qop.ry.omit_section(q_comp, angle=np.pi/2)
-                        # qop.rz.omit_section(q_comp, angle=np.pi/2)
-
                         qop.rz.omit_section(q_comp, angle=np.pi)
                         qop.ry.omit_section(q_comp, angle=np.pi/2)
 
@@ -254,16 +243,12 @@ def create_experiment(
                         # [ cz ]
                         qop.CZ.omit_section(the_coupler)
 
-            with dsl.section(name="main_phase_comp", alignment=SectionAlignment.RIGHT, length=2e-9):
+            with dsl.section(name="main_phase_comp", alignment=SectionAlignment.RIGHT):
                 # [ rz(theta) ]
                 qop.rz.omit_section(q_comp, angle=zangle_sweep_pars)
 
             with dsl.section(name="post_drive", alignment=SectionAlignment.LEFT):
                 # [ h ]
-                # qop.rz.omit_section(q_comp, angle=np.pi/2)
-                # qop.ry.omit_section(q_comp, angle=np.pi/2)
-                # qop.rz.omit_section(q_comp, angle=np.pi/2)
-
                 qop.rz.omit_section(q_comp, angle=np.pi)
                 qop.ry.omit_section(q_comp, angle=np.pi/2)
 

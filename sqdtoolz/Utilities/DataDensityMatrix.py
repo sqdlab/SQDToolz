@@ -2,6 +2,7 @@ import itertools
 import numpy as np
 import scipy.optimize
 import matplotlib.pyplot as plt
+import functools
 
 class DataDensityMatrix:
     def __init__(self, density_matrix):
@@ -10,7 +11,7 @@ class DataDensityMatrix:
         self._eigs = np.linalg.eigvalsh(density_matrix)
 
     @classmethod
-    def fromDataViewer(cls, dataviewer, dataviewer_reg='c'):
+    def fromDataViewer(cls, dataviewer, dataviewer_reg='c', readout_correction_matrices=[]):
         """
         This assumes that the data was taken with ExpZIQASM and that the data in register
         dataviewer_reg is structured as the Pauli ordering of measurements. For example, for
@@ -20,15 +21,56 @@ class DataDensityMatrix:
         so it may be None.
         """
         data = dataviewer.get_data(dataviewer_reg)
+        return cls(DataDensityMatrix.generate_rho_from_shot_data(data, dataviewer.get_number_of_shots(), readout_correction_matrices))
+
+    @classmethod
+    def fromShotData(cls, shot_data, num_shots, readout_correction_matrices=[]):
+        """
+        Given N qubits, this function takes in a list divided into groups of N where each group corresponds
+        to the measurements taken in the Pauli-ordering of measurements (for example, for two qubits, it'd
+        be II, IX, IY, IZ, XI, XX etc.). Each group of N has arrays of size given by the number of shots
+        (optionally can be None if it is an I-measurement...) with the values being 0,1,2.
+        """
+        return cls(DataDensityMatrix.generate_rho_from_shot_data(shot_data, num_shots, readout_correction_matrices))
+
+    @staticmethod
+    def _project_vector_to_probability_simplex(vec:np.ndarray):
+        """
+        Projects a vector onto the probability simplex (sum(x) = 1, x >= 0)
+        using the projection algorithm given by Lagrange multipliers.
+        """
+        #Sort entries by descending order
+        u = np.sort(vec)[::-1]
+        #Find largest K and get lambda
+        cssv = np.cumsum(u)
+        ind = np.arange(1, vec.size + 1)
+        cond = u + (1.0 / ind) * (1.0 - cssv) > 0
+        #K is the last index where the condition is True
+        K = ind[cond][-1]
+        lambda_val = (cssv[K - 1] - 1.0) / K
+        #Calculate xi
+        return np.maximum(vec - lambda_val, 0)
+
+    @staticmethod
+    def generate_rho_from_shot_data(data, num_shots, readout_correction_matrices=[]):
+        """
+        This assumes that the data was taken with ExpZIQASM and that the data in register
+        dataviewer_reg is structured as the Pauli ordering of measurements. For example, for
+        two qubits, it'd be II, IX, IY, IZ, XI, XX etc. So in this case it'd be such that every
+        two entries correspond to an array of qubit shots for the first and second qubit
+        respectively. If it is an I measurement, the array slot will be ignored in this analysis,
+        so it may be None.
+        """
         num_measurements = len(data)
         N = 0
         while (N+1) * 4**(N+1) <= num_measurements:
             N += 1
         assert N*4**N==num_measurements, "The number of measurements/qubits do not correspond. For N qubits, there should be N*4^N measurements..."
+        if len(readout_correction_matrices) > 0:
+            assert len(readout_correction_matrices) == N, "When supplying 'readout_correction_matrices', the number of matrices must match the number of qubits."
         #Assuming that data is divided into groups of N (for N qubits) for each measurement type (e.g. IXZI etc.)
         #Also assuming that measurement of 1-state gives -1 eigenvalue for X/Y/Z...
         measurements = [''.join(item) for item in itertools.product(['I','X','Y','Z'], repeat=N)]
-        num_shots = dataviewer.get_number_of_shots()
         #
         expectation_values = []
         for m,cur_measurement in enumerate(measurements):
@@ -37,22 +79,29 @@ class DataDensityMatrix:
                 continue
             cur_data_set = data[m*N:(m+1)*N]
             #
-            #Calculate expectation value
-            cur_prod = np.ones(num_shots, dtype=int)
-            valid_shots = np.ones(num_shots, dtype=bool)
-            for ind, pauli in enumerate(cur_measurement):
-                if pauli == 'I':
-                    continue    #Pauli I does not contribute...
-                cur_data = cur_data_set[ind]
-                #Any F-state (i.e. 2) invalidates the entire shot
-                valid_shots &= (cur_data != 2)
-                #0 -> +1, 1 -> -1
-                cur_prod *= 1 - 2*cur_data
-            #Calculate the product across the shot +/-1 values and take mean
-            expectation = np.mean(cur_prod[valid_shots])
-            expectation_values.append(float(expectation))
+            #Gather current operators that are not identity
+            non_id_inds = [x for x in range(N) if cur_measurement[x]!='I']
+            cur_dataset_non_id = [cur_data_set[x] for x in non_id_inds]
+            #Convert the data subset into binary...
+            cur_dataset_non_id = [cur_dataset_non_id[x]*2**x for x in range(len(cur_dataset_non_id))]
+            #Sum across it to find out which segment it belongs to (e.g. for 2 non-identity slots, the combinations are 00,01,10,11 for the indices 0,1,2,3)
+            cur_dataset_non_id = np.sum(cur_dataset_non_id, axis=0)
+            #Gather the counts and calculate probabilities
+            leProbs = np.array([np.sum(cur_dataset_non_id==x)/num_shots for x in range(2**len(non_id_inds))])
+
+            if len(readout_correction_matrices) > 0:
+                ro_corr = [readout_correction_matrices[x] for x in non_id_inds]
+                if len(ro_corr) == 1:
+                    ro_corr = ro_corr[0]
+                else:
+                    ro_corr = functools.reduce(np.kron,ro_corr)
+                leProbs = ro_corr @ leProbs
+            leProbs = DataDensityMatrix._project_vector_to_probability_simplex(leProbs)
+            #The bit_count counts the number of 1s in the binary representation of the integer. Then calculate if it's even/odd parity and map to -1/+1
+            expectation_values.append(np.sum([leProbs[x] * (1-2*((x).bit_count()%2)) for x in range(leProbs.shape[0])], axis=0))
+            a=0
         #
-        return cls(DataDensityMatrix.estimate_rho_from_expectations(np.array(expectation_values)))
+        return DataDensityMatrix.estimate_rho_from_expectations(np.array(expectation_values))
 
     @staticmethod
     def estimate_rho_from_expectations(expectation_values):
@@ -308,3 +357,62 @@ class DataDensityMatrix:
                 f.write(qasm_str)
 
         return qasm_str
+
+    def generate_simulated_shots(num_qubits, state_vector, num_repetitions, readout_confusion_matrices = []):
+        """
+        Basically generates simulated shot-measurements for density-matrix reconstruction. It then performs
+        density matrix reconstruction and returns the shot-data, the DataDensityMatrix object used in
+        reconstruction and the pure-state fidelity.
+
+        This generates a list where each entry is data structured as the Pauli ordering of measurements.
+        For example, for two qubits, it'd be II, IX, IY, IZ, XI, XX etc. So in this case it'd be such that every
+        two entries correspond to an array of qubit shots for the first and second qubit
+        respectively. If it is an I measurement, it's basically a Z (i.e. ignore it...).
+
+        It also includes readout_confusion_matrices to simulate readout infidelity (it's structured as:
+        Row = assigned, column = actual). It's 2x2 and done for G and E only.
+        """
+        psi = np.array(state_vector)
+        assert psi.size == 2**num_qubits, f"The state-vector must have {2**num_qubits} entries for {num_qubits} qubits (only {state_vector.size} entries supplied)."
+        #
+        assert len(readout_confusion_matrices) == num_qubits or len(readout_confusion_matrices) == 0, "When supplying readout_confusion_matrices, the list must be a 2x2 matrix for EVERY individual qubit."
+
+        rng = np.random.default_rng()
+
+        pauli_matrices = [np.array([[1,0],[0,1]]), np.array([[0,1],[1,0]]), np.array([[0,-1j],[1j,0]]), np.array([[1,0],[0,-1]])]
+        #This is the set of unitary operators needed to change basis before the Z-measurement...
+        pauli_map = {'I': np.identity(2), 'X': np.array([[1,1],[1,-1]])/np.sqrt(2), 'Y': np.array([[1,-1j],[1,1j]])/np.sqrt(2), 'Z': np.identity(2)}
+
+        measurements = [''.join(item) for item in itertools.product(['I','X','Y','Z'], repeat=num_qubits)]
+
+        shots = [None]*num_qubits
+        for m,cur_measurement in enumerate(measurements):
+            if m == 0:
+                continue
+            
+            cur_op = [np.identity(2) for x in range(num_qubits)]
+            for ind, pauli in enumerate(cur_measurement):
+                if pauli == 'I':
+                    continue    #Pauli I does not contribute...
+                cur_op[ind] = pauli_map[pauli]
+            psi_rot = functools.reduce(np.kron,cur_op) @ psi
+            p_comps = np.abs(psi_rot)**2
+            #Sample the probabilities to get shots
+            sampled_indices = rng.choice(psi.size, size=num_repetitions, p=p_comps) #i.e. choosing index 0-2^N for 00, 01, 10, 11 etc...
+            for n in range(num_qubits-1,-1,-1):
+                cur_qubit_shots_temp = (2**n & sampled_indices)>>n   #i.e. slicing out the nth bit for the nth qubit...
+                #
+                cur_qubit_shots = cur_qubit_shots_temp * 1
+                #Add readout infidelity
+                r = np.random.random(cur_qubit_shots_temp.shape)
+                #
+                if len(readout_confusion_matrices) > 0:
+                    p_0_to_1 = readout_confusion_matrices[n][1,0]
+                    p_1_to_0 = readout_confusion_matrices[n][0,1]
+                    cur_qubit_shots[(cur_qubit_shots_temp == 0) & (r < p_0_to_1)] = 1
+                    cur_qubit_shots[(cur_qubit_shots_temp == 1) & (r < p_1_to_0)] = 0
+                #
+                shots.append(cur_qubit_shots)
+        ddm = DataDensityMatrix.fromShotData(shots, num_repetitions, [np.linalg.inv(readout_confusion) for readout_confusion in readout_confusion_matrices])
+        fidelity = ddm.get_fidelity_pure_state(psi)
+        return shots, ddm, fidelity

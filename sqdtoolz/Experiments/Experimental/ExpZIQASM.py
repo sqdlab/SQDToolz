@@ -33,7 +33,11 @@ class ExpZIQASM(ExpZIqubit):
         assert kwargs['coordinate_system'] in ['LH', 'RH'], "The 'coordinate_system' must be either LH or RH for left/right handed."
 
         assert (qasm_file_path!='') ^ (('qasm_string' in kwargs) and kwargs['qasm_string'] != ''), "Either supply the path to the QASM file ('qasm_file_path') or provide it as a string via the 'qasm_string' parameter."
-        self._poqasm = ParserOpenQASM(qasm_file_path, kwargs.pop('source_dirs', []), measure_label='QMEAS', main_qasm=kwargs.pop('qasm_string', ''))
+        main_qasm = kwargs.pop('qasm_string', '')
+        if main_qasm != '':
+            self._poqasm = ParserOpenQASM(qasm_file_path, kwargs.pop('source_dirs', []), measure_label='QMEAS', main_qasm=main_qasm)
+        else:
+            self._poqasm = ParserOpenQASM(qasm_file_path, kwargs.pop('source_dirs', []), measure_label='QMEAS')
         self._final_qreg_phys_mapping = self._poqasm._qreg_phys_mapping #Copy over the default qreg to physical qubit mapping
 
         self._qregs = self._poqasm.get_qubit_registers()

@@ -48,13 +48,13 @@ h q[1];
         lab.run_single(exp, override_ACQ_params={'AcquisitionMode': 'DISCRIMINATION', 'AveragingOrder': 'SingleShot'})
         self._file_path = exp._file_path
 
-    def post_process(self):
+    def post_process(self, use_abs_phase=False):
         ledv = ExpZIQASMDataViewer(self._file_path)
         ledv.get_inner_slicing_vars()
         # data = ledv.get_data('c') 
         leRho = DataDensityMatrix.fromDataViewer(ledv)
         self._fidelity = leRho.get_fidelity_pure_state([1,0,0,1])*100
-        leRho.plot3D([1,0,0,1], use_abs_phase=True, extra_title=f' - {self._qubit_ids[0]}{self._qubit_ids[1]}: $F={self._fidelity:.4f}$', save_path=self._file_path + 'BellState.png')
+        leRho.plot3D([1,0,0,1], use_abs_phase=use_abs_phase, extra_title=f' - {self._qubit_ids[0]}{self._qubit_ids[1]}: $F={self._fidelity:.4f}$', save_path=self._file_path + 'BellState.png')
         self._purity = leRho.get_purity() 
         if self._update_coupler:
             cpl = self._hal_QPU.get_coupler_obj_from_qubits(self._qubit_ids[0], self._qubit_ids[1], TunableTransmonCouplerFixed)

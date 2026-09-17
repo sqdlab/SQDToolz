@@ -68,6 +68,7 @@ class ExpZIqubit(Experiment):
             if hasattr(options, x):
                 getattr(options, x)(self._args.pop(x))
 
+        #Get ZI objects - QPU, qubits, and couplers
         leQPU, leQubits, leQcouplers = self._hal_QPU.get_ZI_parameters()
         #Get integer indices of the qubits to select (from names, integers or a mix of both)
         leQubitInds = [self._hal_QPU._resolve_qubit_index(x) for x in self._qubit_ids]

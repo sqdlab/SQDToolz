@@ -115,6 +115,9 @@ class SOFTqpu(HALbase, ZIbase):
         #Thus, the code is written to be compatible/friendly to that while adding some extra parameters to aid in the
         #user API here...
         #Prepare the dictionary of Experiment Specifications
+        #additional_specs is given as a list of strings (i.e. SPEC names) - you can add the assert
+        if additional_specs != []:
+            assert isinstance(additional_specs[0], str), "Pass additional_specs as a list of strings."
         dict_specs = []
         for cur_spec in additional_specs:
             dict_specs.append(lab._specifications[cur_spec]._get_current_config())

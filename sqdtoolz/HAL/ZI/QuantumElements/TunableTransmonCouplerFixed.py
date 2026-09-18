@@ -164,7 +164,7 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
         comp_signal_stationary = q.signals.get("drive_comp_stationary", None)
         if comp_signal_stationary is not None and q.parameters.CompZAngleStationary is not None:
             dsl.play(
-                signal=comp_signal_aux,
+                signal=comp_signal_stationary,
                 pulse=None,
                 increment_oscillator_phase=q.parameters.CompZAngleStationary,
             )

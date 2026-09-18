@@ -52,7 +52,6 @@ def experiment_workflow(
     qubits: QuantumElements | list[str] | str,
     rz_angles: QubitSweepPoints,
     coupler_name: str = None,
-    coordinate_system: str = 'RH',
     main_or_aux: str = "main",
     temporary_parameters: dict[str | tuple[str, str, str], dict | QuantumParameters]
     | None = None,
@@ -76,8 +75,12 @@ def experiment_workflow(
         qubits:
             The qubits to run the experiments on, passed by UID. May be either a single
             qubit or a list of qubits.
-        coordinate_system:
-            Coordinate system to use for x, y and z axes - either LH or RH for left/right handed.
+        rz_angles:
+            Array of angles to sweep in the Rz(theta) compensation pulse.
+        main_or_aux:
+            Choose whether to apply the compensation Rz gate to the coupler's
+            'main', 'aux', or 'stationary' qubit, which are detected according
+            to the signals on the coupler
         temporary_parameters:
             The temporary parameters with which to update the quantum elements and
             topology edges. For quantum elements, the dictionary key is the quantum
@@ -102,7 +105,6 @@ def experiment_workflow(
         qubits,
         rz_angles,
         coupler_name,
-        coordinate_system,
         main_or_aux
     )
     compiled_exp = compile_experiment(session, exp)
@@ -117,7 +119,6 @@ def create_experiment(
     qubits: QuantumElements,
     rz_angles: QubitSweepPoints,
     coupler_name: str = None,
-    coordinate_system: str = 'RH',
     main_or_aux: str = 'main',
     options: TuneupExperimentOptions | None = None,
 ) -> Experiment:
@@ -129,8 +130,12 @@ def create_experiment(
         qubits:
             The qubits to run the experiments on. May be either a single
             qubit or a list of qubits.
-        coordinate_system:
-            Coordinate system to use for x, y and z axes - either LH or RH for left/right handed.
+        rz_angles:
+            Array of angles to sweep in the Rz(theta) compensation pulse.
+        main_or_aux:
+            Choose whether to apply the compensation Rz gate to the coupler's
+            'main', 'aux', or 'stationary' qubit, which are detected according
+            to the signals on the coupler.
         coupler_name:
             Name of the coupler (str) to target with the CZ.
         options:

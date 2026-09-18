@@ -323,7 +323,7 @@ class DataDensityMatrix:
         #
         N = int(num_qubits)
         if qasm_header_str is None:
-            qasm_str = f'OPENQASM 3;\ninclude "{qasm_include}";\n\nbit[{int(((N*4)**N)/2)}] c;\nqubit[{N}] q;\n'
+            qasm_str = f'OPENQASM 3;\ninclude "{qasm_include}";\n\nbit[{int(N*(4**N))}] c;\nqubit[{N}] q;\n'
         else:
             qasm_str = qasm_header_str
         

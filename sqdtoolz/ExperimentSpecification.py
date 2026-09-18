@@ -93,6 +93,14 @@ class ExperimentSpecification:
             obj = self._lab._get_resolved_obj(self._cur_mappings[cur_entry]['Destination'])
             if obj != None:
                 setattr(obj, self._cur_mappings[cur_entry]['Property'], self._cur_mappings[cur_entry]['Value'])
+   
+    def update_entries(self):
+        for cur_entry in self._cur_mappings:
+            if len(self._cur_mappings[cur_entry]['Destination']) == 0:
+                continue
+            obj = self._lab._get_resolved_obj(self._cur_mappings[cur_entry]['Destination'])
+            if obj != None:
+                self._cur_mappings[cur_entry]['Value'] = getattr(obj, self._cur_mappings[cur_entry]['Property'])
 
     def _get_targets(self):
         ret_targets = []

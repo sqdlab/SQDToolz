@@ -78,12 +78,12 @@ class ExpZIDailyTuneup:
         #
         if self._tune_readout:
             print(f'\nOptimising readout (GEF)...')
-            exp = ExpZIResOptimal(f'DailyTuneup_{self._qubit_id}_Readout', self._expt_config, self._qpu, [self._qubit_id], states=self._transition, frequencies=self._res_freq_range, ZI_plot=self._individual_plots, calc_single_shot_fidelities=True)
+            exp = ExpZIResOptimal(f'DailyTuneup_{self._qubit_id}_Readout', self._expt_config, self._qpu, [self._qubit_id], states='gef', frequencies=self._res_freq_range, ZI_plot=self._individual_plots, calc_single_shot_fidelities=True)
             lab.run_single(exp)
             if self._update_live:
                 prev = self._qubit.FidelityReadout
                 prev_freq = self._qubit.ReadoutFrequency
-                exp.update_qubits_by_fidelity(self._update_readout_by_fidelity)
+                exp.update_qubits_by_fidelity(self._update_readout_by_fidelity, state_fidelity=self._transition)
                 new = self._qubit.FidelityReadout
                 new_freq = self._qubit.ReadoutFrequency
                 print(f"\tf_r = {prev_freq*1e-9:.6f} GHz -> {new_freq*1e-9:.6f} GHz")

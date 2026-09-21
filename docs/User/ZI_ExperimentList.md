@@ -15,7 +15,7 @@ This table of contents is given in roughly the order experiments would be needed
     - [Lifetime $T_1$](#expzit1):  `ExpZIT1`
     - [Ramsey $T_2^*$](#expziramsey): `ExpZIRamsey`
 - **[Dispersive shift](#expzidispersive)** $\chi$: `ExpZIDispersive`
-- **Single shot readout and active reset:**
+- **Readout, TWPA and active reset:**
     - IQ blobs: `ExpZIBlobs`
     - Active reset tuneup: `ExpZIActiveResetTuneup`
     - TWPA optimisation: `ExpZITWPATuneup`

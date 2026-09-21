@@ -5,10 +5,10 @@ The OpenQASM3 parser has a scheduling layer that adds delays so that the section
 - `ZIQubit` - to query the single-qubit gate times
 - `QuantumOperations` class (can be accessed via the associated `QuantumElement` class) - to query the two-qubit gate times
 
-To enforce this, the classes must inherit the `QASMCompatible` abstract class. Ideally the low-level drivers should inherit this (i.e. custom `QuantumElement` classes); the individual qubit classes shall be absorbed into the `ZIQubit` HAL. Same is done for the `ZIQuantumElement` but it will just pass onto the `QuantumElement` classes. Internally it has a few constructs:
+To enforce this, the classes must inherit one of two abstract mixin classes defined in `sqdtoolz.Utilities.OpenQASM`: `QASMCompatibleQubitSingle` (a `get_gate_duration(gate)`/`get_measure_duration()` interface for single-qubit gate/measurement durations) for single-qubit gate providers, and `QASMCompatibleQubitMultiple` (a `get_gate_duration(gate, qubits)` interface) for two-qubit-gate providers. Ideally the low-level drivers should inherit these (i.e. custom `QuantumElement` classes); the individual qubit classes shall be absorbed into the `ZIQubit` HAL. Same is done for the `ZIQuantumElement` but it will just pass onto the `QuantumElement` classes. Internally it has a few constructs:
 
 - There is a `ScheduleParametersBase` that is passed onto `ParserOpenQASM` when creating schedules. This is used to query the required parameters such as gate durations etc.
-- There is a `ScheduleParametersSoftQPUZI` class that is used to gobble up `softQPU` objects and extract said qubit gate parameters as required for scheduling. Internally this is set to call the `QASMCompatible` methods within the individual qubits/couplers...
+- There is a `ScheduleParametersSoftQPUZI` class that is used to gobble up `softQPU` objects and extract said qubit gate parameters as required for scheduling. Internally this is set to call the `QASMCompatibleQubitSingle`/`QASMCompatibleQubitMultiple` methods within the individual qubits/couplers...
 
 In summary:
 

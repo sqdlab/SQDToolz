@@ -70,10 +70,10 @@ Below is an example of the output plots.
 from sqdtoolz.Experiments.Experimental.ExpZISingleQubitTuneup import ExpZISingleQubitTuneup
 
 exp = ExpZISingleQubitTuneup('FineTuneupTest', lab.CONFIG('ZI'), lab.HAL('QPU'), 
-        'Q3', num_gates_calibX_short=30, num_gates_calibX_long=60)
+        'Q3', num_gates_calibX_short=101, only_every_n_short=10, max_calibX_iterations=5)
 exp.run_fine_tuneup(lab)
 ```
-> **Note:** `run_fine_tuneup` relies on `self._q_scalings`, `self._ramsey_fine_*`, `self._num_gates_calibX_*`, and `self._reverse_parity_calibX`, all of which are parsed from `**kwargs` in `__init__` — the same instance used for `run` can be reused for `run_fine_tuneup` without re-specifying shared parameters (e.g. readout/qubit frequency ranges), since only the fine-tuneup-specific keyword arguments above are consumed by this method.
+> **Note:** `run_fine_tuneup` relies on `self._q_scalings`, `self._ramsey_fine_*`, `self._num_gates_calibX_short`, `self._only_every_n_short`, `self._reverse_parity_calibX`, `self._threshold_X`, and `self._threshold_Xon2`, all of which are parsed from `**kwargs` in `__init__` — the same instance used for `run` can be reused for `run_fine_tuneup` without re-specifying shared parameters (e.g. readout/qubit frequency ranges), since only the fine-tuneup-specific keyword arguments above are consumed by this method. Note also that `max_calibX_iterations` and `assert_gate_calibration` are read with `kwargs.get(...)` (not `.pop(...)`) directly from `self._kwargs` inside `run_fine_tuneup` itself, rather than being parsed in `__init__` — so they remain visible in `self._kwargs` alongside any truly-unconsumed keyword arguments.
 
 ### Description
 
@@ -85,13 +85,19 @@ The measurement sequence and attributes set by each measurement in `run_fine_tun
     - `ramsey_fine_max`: Maximum timepoint for the fine Ramsey experiment (can only be provided as an alternative to `ramsey_fine_times`). Defaults to `60e-6`.
     - `ramsey_fine_points`: Number of points in the fine Ramsey experiment (can only be provided as an alternative to `ramsey_fine_times`). Defaults to `120`.
     - `ramsey_assume_detuned_above`: Passed through to `exp.update_qubits(assume_detuned_above=...)` to resolve the sign ambiguity of the fitted detuning. Defaults to `True`.
-2. **DRAG optimisation:** Switches the qubit's drive pulse (`DriveGEPulse['function']`) to `'drag'` (if not already) and sweeps the DRAG $Q$-scaling parameter to minimise leakage/phase errors. Sets `DriveGEPulse['beta']`. The pulse viewer panel compares the previous and newly-calibrated DRAG pulses.
-    - `drag_q_scalings`: Array of $Q$-scaling values to sweep. Defaults to `np.linspace(0.00, 0.05, 51)`.
-3. **X calibration:** A pair of `ExpZICalibX` measurements (short and long gate-count sequences) used to precisely calibrate the $X$ gate amplitude and resolve its parity. Sets `DriveGEAmplitudeX` (clamped to a maximum of `1`).
-    - `num_gates_calibX_short`: Number of gate repetitions for the short calibration sequence. Defaults to `200`.
-    - `num_gates_calibX_long`: Number of gate repetitions for the long calibration sequence. Defaults to `800`.
-    - `reverse_parity_calibX`: Initial parity assumption used when updating the qubit amplitude; automatically flipped if the long sequence disagrees with the short sequence. Defaults to `False`.
-4. **X/2 calibration:** The same short/long `ExpZICalibX` procedure as above, but calibrated against a $90°$ target rotation instead of $180°$. Sets `DriveGEAmplitudeXon2` (clamped to a maximum of `1`).
-    - Uses the same `num_gates_calibX_short`, `num_gates_calibX_long`, and `reverse_parity_calibX` arguments as the X calibration step.
+2. **DRAG optimisation** *(skipped if `calibrate_drag=False`)*: Switches the qubit's drive pulse (`DriveGEPulse['function']`) to `'drag'` (if not already) and sweeps the DRAG $Q$-scaling parameter over a coarse range to locate the optimal value, then re-runs with a finer $\pm0.01$ window centred on that coarse optimum (at a higher repetition count) to refine it. Sets `DriveGEPulse['beta']`. The pulse viewer panel compares the previous and newly-calibrated DRAG pulses.
+    - `calibrate_drag`: If `False`, skips the DRAG optimisation step entirely, leaving the existing `DriveGEPulse['beta']` unchanged. Defaults to `True`.
+    - `drag_q_scalings`: Array of $Q$-scaling values to sweep in the coarse pass. Defaults to `np.linspace(0.00, 0.10, 15)`.
+    - `num_repetitions_fine`: Number of repetitions (`NumRepetitions`) used for the fine DRAG pass; the acquisition's repetition count is temporarily set to this value then restored afterwards. Defaults to `1024*4` (i.e. `4096`).
+3. **X calibration:** An iterative `ExpZICalibX` loop (rather than a single short/long pair) used to precisely calibrate the $X$ gate amplitude and resolve its parity. Each iteration runs a short, `only_every_n_short`-gate sequence; if the fitted rotation angle is within `X_gate_threshold` of $180°$, the loop exits early. If an iteration is worse than the previous one, the qubit amplitude is reverted to the best-so-far value and the parity guess is flipped before retrying. Otherwise the improvement is accepted, the qubit's `DriveGEAmplitudeX` is updated (clamped to a maximum of `1`), and the loop continues. Sets `DriveGEAmplitudeX`.
+    - `num_gates_calibX_short`: Number of gate repetitions per iteration. Defaults to `201`.
+    - `only_every_n_short`: The `only_every_n` parameter passed to `ExpZICalibX` (only every $n$-th gate-count point in the sequence is sampled). Defaults to `15`.
+    - `max_calibX_iterations`: Maximum number of iterations before giving up (with a printed warning) and reverting to the best amplitude found. Defaults to `10`.
+    - `reverse_parity_calibX`: Initial parity assumption used when updating the qubit amplitude; the loop flips it on alternating iterations and whenever an iteration regresses. Defaults to `False`.
+    - `X_gate_threshold`: Convergence threshold, in degrees of deviation from $180°$, at which the loop exits early. Read with `kwargs.get(...)` rather than `.pop(...)`, so it also remains visible in `self._kwargs`. Defaults to `0.01`.
+    - `assert_gate_calibration`: If `True`, raises an `AssertionError` after this step if the best angle found is not within `X_gate_threshold` of $180°$. Defaults to `False`.
+4. **X/2 calibration:** The same iterative `ExpZICalibX` loop as the X calibration step, reusing `num_gates_calibX_short`, `only_every_n_short`, `max_calibX_iterations`, and `reverse_parity_calibX`, but calibrated against a $90°$ target rotation instead of $180°$ (`calib_denominator=2`). Sets `DriveGEAmplitudeXon2` (clamped to a maximum of `1`).
+    - `Xon2_gate_threshold`: Convergence threshold, in degrees of deviation from $90°$, at which the loop exits early. Read with `kwargs.get(...)` rather than `.pop(...)`. Defaults to `0.01`.
+    - **Note:** unlike the X calibration step, the equivalent `assert_gate_calibration` check for this step is currently commented out in the source, so `assert_gate_calibration` has no effect on the X/2 calibration outcome — it only asserts against the X gate's angle.
 
-As with `run`, all steps are wrapped in a grouped experiment (named `'{name}_fine'`), and an aggregate figure of all fine tuneup results is saved to the measurement directory as `FinetuneOverview.png`.
+As with `run`, all steps are wrapped in a grouped experiment — opened via `lab.group_open(self._name)`, i.e. the *same* group name passed to the constructor, not a separate `'{name}_fine'` name as might be assumed if `run` and `run_fine_tuneup` were called under two different group scopes. An aggregate figure of all fine tuneup results is saved to the measurement directory as `FinetuneOverview.png`. This method is used in the [daily tuneup](ZI_DailyTuneup.md) routine.

@@ -99,3 +99,13 @@ leRho.get_purity(), leRho.get_fidelity_pure_state([1,0,0,1])
 ```
 
 The above snippet processes the `ExpZIQASmDataViewer` object to generate the density matrix and produce a 3D skyscraper plot. The state purity $\text{Tr}(\rho^2)$, and the pure state fidelity $F=\bra{\Psi}\rho\ket{\Psi}$ can also be directly calculated.
+
+### Correcting for readout infidelity
+
+`DataDensityMatrix.fromDataViewer(dataviewer, dataviewer_reg='c', readout_correction_matrices=[])` accepts an optional `readout_correction_matrices` argument: a list of one $2\times2$ readout-confusion-correction matrix per qubit (row = assigned outcome, column = actual outcome), applied to each measured Pauli-expectation's probability distribution before it's converted into an expectation value. When more than one qubit's non-identity operator appears in a given Pauli string, the relevant per-qubit matrices are combined via a Kronecker product before being applied. After correction, the resulting probabilities are re-projected onto the physical probability simplex (`sum(p) = 1, p >= 0`) to guard against small negative/over-unity values introduced by the correction. If supplied, the list must have exactly as many entries as there are qubits in the tomography (i.e. it must match `num_qubits`); leave it as the default `[]` to skip correction entirely.
+
+### Alternative/testing entry points
+
+Besides `fromDataViewer`, two other constructors are available:
+- `DataDensityMatrix.fromShotData(shot_data, num_shots, readout_correction_matrices=[])`: builds the density matrix directly from a list of shot arrays already in Pauli-ordering (the same structure `fromDataViewer` extracts from the data viewer), for cases where the raw shot data comes from somewhere other than `ExpZIQASMDataViewer`.
+- `DataDensityMatrix.generate_simulated_shots(num_qubits, state_vector, num_repetitions, readout_confusion_matrices=[])` (static): generates simulated Pauli-ordered shot data for a given ideal state vector (optionally injecting readout infidelity via per-qubit $2\times2$ confusion matrices), reconstructs the density matrix from it, and returns the shot data, the resulting `DataDensityMatrix` object, and the pure-state fidelity — useful for sanity-checking the reconstruction/correction pipeline against a known state without running real hardware.

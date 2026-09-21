@@ -10,22 +10,34 @@ This table of contents is given in roughly the order experiments would be needed
 - **[Qubit spectroscopy](#expziqubitspec):** `ExpZIQubitSpec`
     - [Qubit spectroscopy flux sweep](#expziqubitfluxsweep): `ExpZIQubitFluxSweep`
     - [Qubit spectroscopy power sweep](#expziqubitpowersweep): `ExpZIQubitPowerSweep`
-- **Time domain:** `ExpZIRabiRamseyT1`
+- **[Time domain](#expzirabiramseyt1):** `ExpZIRabiRamseyT1`
     - [Amplitude Rabi](#expzirabi): `ExpZIRabi`
     - [Lifetime $T_1$](#expzit1):  `ExpZIT1`
     - [Ramsey $T_2^*$](#expziramsey): `ExpZIRamsey`
 - **[Dispersive shift](#expzidispersive)** $\chi$: `ExpZIDispersive`
+- **[DRAG scaling](#expzidragscaling):** `ExpZIDragScaling`
 - **Readout, TWPA and active reset:**
-    - IQ blobs: `ExpZIBlobs`
-    - Active reset tuneup: `ExpZIActiveResetTuneup`
-    - TWPA optimisation: `ExpZITWPATuneup`
-    - Lifetime $T_1$ (single shot): `ExpZIT1SingleShot`
-    - Resonator frequency for optimised readout fidelity: `ExpZIResOptimal`
-- **Single qubit $X$ gate calibration:** `ExpZICalibX`
+    - [IQ blobs](#expziblobs): `ExpZIBlobs`
+    - [Active reset tuneup](#expziactiveresettuneup): `ExpZIActiveResetTuneup`
+    - [TWPA optimisation](#expzitwpatuneup): `ExpZITWPATuneup`
+    - [Lifetime $T_1$ (single shot)](#expzit1singleshot): `ExpZIT1SingleShot`
+    - [Resonator frequency for optimised readout fidelity](#expziresoptimal): `ExpZIResOptimal`
+    - [Readout amplitude + frequency sweep for optimised single-shot fidelity](#expziresoptimalampsweepss): `ExpZIResOptimalAmpSweepSS`
+- **[Single qubit $X$ gate calibration](#expzicalibx):** `ExpZICalibX`
+- **[Single-qubit randomised benchmarking](#expzirandomisedbenchmarking):** `ExpZIRandomisedBenchmarking`
+- **[Single-qubit gate-set benchmarking (ETH-style)](#expzibenchmarketh):** `ExpZIBenchmarkETH`
 - ***ef* characterisation**
-  - **Chevrons:** `ExpZIChevrons`
+  - **[Chevrons](#expzichevrons):** `ExpZIChevrons`
   - **Time domain:** `ExpZIRabiRamseyT1`
-- **QASM implementation:** `ExpZIQASM`
+- **[QASM implementation](#expziqasm):** `ExpZIQASM`
+    - [QASM data viewer](#expziqasmdataviewer): `ExpZIQASMDataViewer`
+- **Two-qubit gate tuneup:**
+    - [Flux-pulse chevrons on a fixed coupler](#expzichevrons2qfixedcoupler): `ExpZIChevrons2QFixedCoupler`
+    - [Fixed-coupler CZ tuneup (amplitude + length)](#expzifixedcouplertuneup): `ExpZIFixedCouplerTuneup`
+    - [CZ phase compensation](#expziphasecompensation2q): `ExpZIPhaseCompensation2Q`
+    - [Bell-state fidelity](#expzibellstatefidelity): `ExpZIBellStateFidelity`
+- **[Cryoscope (flux-pulse distortion calibration)](#expzicryoscope):** `ExpZICryoscope`
+- **[Automated daily tuneup routine](#expzidailytuneup):** `ExpZIDailyTuneup`
 
 Other documented experiments include:
 - **Automated single qubit tuneup:** `ExpZISingleQubitTuneup` ([see the dedicated documentation](ZI_SingleQubitTuneup.md))
@@ -1012,6 +1024,108 @@ no `assume_detuned_above`/`t2_only` arguments — this method takes none.
 
 ___
 
+### ExpZIRabiRamseyT1
+
+`class ExpZIRabiRamseyT1`
+
+#### Description
+
+`ExpZIRabiRamseyT1` is an orchestration class (not an `ExpZIqubit` subclass) that
+runs a standard single-qubit time-domain characterisation sequence — amplitude
+Rabi, a fast and a slow Ramsey, and $T_1$ — back-to-back on a single qubit, for
+either the `ge` or `ef` transition, and assembles the results into one summary
+figure. It is the class referenced as "Time domain" for both the ground-state
+characterisation and the *ef* characterisation sections of the [table of
+contents](#table-of-contents).
+
+Internally it runs [`ExpZIRabi`](#expzirabi) (twice — once uncalibrated to
+obtain calibration traces, once calibrated), two [`ExpZIRamsey`](#expziramsey)
+experiments (a "fast" one with a larger detuning to pin down the frequency
+quickly, and a "slow" one with a smaller detuning for a more precise $T_2^*$),
+and [`ExpZIT1`](#expzit1) — calling each sub-experiment's `update_qubits()` (or
+passing `update=`) as it goes, so by the end of `run()` the qubit's drive
+frequency, $T_2^*$, and $T_1$ (for the selected transition) have all been
+updated in place.
+
+#### Arguments
+
+##### Positional
+
+| Argument | Type | Description |
+|---|---|---|
+| `name` | `str` | Name used to group the sub-experiments (`lab.group_open`/`group_close`). |
+| `expt_config` | — | Experiment configuration object passed through to each sub-experiment. |
+| `hal_QPU` | — | The QPU HAL object; used to look up the qubit object. |
+| `qubit_id` | `str` | The single qubit to characterise. |
+
+##### Keyword arguments
+
+| Argument | Type / Default | Description |
+|---|---|---|
+| `states` | `str`, default `'ge'` | Which transition to characterise: `'ge'` or `'ef'`. Also accepted positionally as the 5th argument. |
+| `qubit_spec_LO_power` | `float`, default `-20` | Stored but not directly referenced in `run()` — retained for parity with related tuneup classes. |
+| `qubit_time_domain_LO_power` | `float`, default `10` | Set on the qubit's `DrivePower` property before running the Rabi/Ramsey/T1 sequence. |
+| `ef_guess` | `float`, default `qubit.DriveEF` | Stored but not directly referenced in `run()` (the *ef* drive frequency actually used comes from whatever is already set on the qubit / from the Ramsey fits). |
+| `res_is_trough` | `bool`, default `True` | Stored but not referenced in `run()` (no resonator spectroscopy is performed by this class). |
+| `individual_plots` | `bool`, default `False` | If `True`, each sub-experiment's own per-experiment plot is shown live (`dont_show_plot=not individual_plots` is passed through to each sub-experiment). |
+| `update_params_live` | `bool`, default `True` | Passed as `update=` to the Rabi sub-experiments, and gates whether the fast-Ramsey/T1 results are committed via their `update_qubits()` calls (the slow-Ramsey update is always called, but only takes effect via its own semantics). |
+| `enable_ZI_log_messages` | `bool`, default `False` | Controls `disable_ZI_logging` (inverted) passed to `lab.run_single()` for every sub-experiment. |
+| `ramsey_assume_detuned_above` | `bool`, default `True` | Passed as `assume_detuned_above` to the slow Ramsey's `update_qubits()` call. |
+| `rabi_amplitudes` | array-like | The Rabi drive-amplitude sweep. Mutually exclusive with `rabi_points`. |
+| `rabi_points` | `int`, default `30` | Number of points for a `linspace(0, 1, ...)` Rabi amplitude sweep, used only if `rabi_amplitudes` is not supplied. |
+| `ramsey_fast_detuning` | `float`, default `2e6` | Artificial detuning (Hz) for the fast Ramsey. |
+| `ramsey_fast_times` / `ramsey_fast_max` / `ramsey_fast_points` | array-like / `float` (default `2e-6`) / `int` (default `40`) | Either supply the full `ramsey_fast_times` array, or let it be built as `linspace(0, ramsey_fast_max, ramsey_fast_points)`. |
+| `ramsey_slow_detuning` | `float`, default `0.125e6` | Artificial detuning (Hz) for the slow Ramsey. |
+| `ramsey_slow_times` / `ramsey_slow_max` / `ramsey_slow_points` | array-like / `float` (default `60e-6`) / `int` (default `60`) | Either supply the full `ramsey_slow_times` array, or let it be built as `linspace(0, ramsey_slow_max, ramsey_slow_points)`. |
+| `t1_times` / `t1_max` / `t1_points` | array-like / `float` (default `100e-6`) / `int` (default `40`) | Either supply the full `t1_times` array, or let it be built as `linspace(0, t1_max, t1_points)`. |
+
+Any remaining keyword arguments are stored but not forwarded to the
+sub-experiments (unlike most other `ExpZI*` classes, `ExpZIRabiRamseyT1` does
+not accept arbitrary passthrough kwargs into `ExpZIqubit`).
+
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIRabiRamseyT1 import ExpZIRabiRamseyT1
+
+exp = ExpZIRabiRamseyT1('ge_char_Q0', lab.CONFIG('ZI'), lab.HAL('QPU'), 'Q0', states='ge',
+  rabi_points=25, ramsey_fast_detuning=3e6, ramsey_slow_detuning=0.1e6, t1_max=150e-6)
+exp.run(lab)
+```
+
+#### Methods
+
+##### `run(lab)`
+
+1. Opens a `lab` experiment group named `name`.
+2. Sets `DrivePower` to `qubit_time_domain_LO_power` and, for the selected
+   transition, sets the $X$/$X/2$ amplitudes to `1.0`/`0.5` as a starting point.
+3. Runs an uncalibrated `ExpZIRabi` (with `use_cal_traces=False`) followed by a
+   calibrated `ExpZIRabi` over `rabi_amplitudes`, updating the qubit's
+   amplitudes if `update_params_live` is `True`, and plots the fitted Rabi
+   oscillation.
+4. Runs the fast `ExpZIRamsey` over `ramsey_fast_times`/`ramsey_fast_detuning`,
+   plots it, and calls `exp.update_qubits()` to correct the drive frequency.
+5. Runs the slow `ExpZIRamsey` over `ramsey_slow_times`/`ramsey_slow_detuning`,
+   plots it, and calls `exp.update_qubits(assume_detuned_above=
+   ramsey_assume_detuned_above)` to further refine the drive frequency and set
+   $T_2^*$.
+6. Runs `ExpZIT1` over `t1_times`, plots it, and calls `exp.update_qubits()` to
+   set $T_1$.
+7. Closes the `lab` experiment group.
+
+#### Outputs
+
+A single 3-row summary figure (Rabi on the top row; fast and slow Ramsey side
+by side on the middle row; $T_1$ on the bottom row) is saved as
+`Overview_{states}.png` in the parent directory of the last sub-experiment's
+output folder, and left open for interactive display (this class has no
+`dont_show_plot` option of its own — only the individual sub-experiment plots
+are gated by `individual_plots`). No `.npy` fit-data file is written by this
+class itself; each sub-experiment's own `fitted_data_{qubit_id}.npy` is
+produced as usual.
+
+___
+
 ### ExpZIDispersive
 
 `class ExpZIDispersive(ExpZIqubit)`
@@ -1062,9 +1176,10 @@ kwargs).
 
 #### Example snippet
 ```python
-from sqdtoolz.Experiments.Experimental.ExpZITWPATuneup import ExpZITWPATuneup
+from sqdtoolz.Experiments.Experimental.ExpZIDispersive import ExpZIDispersive
 
-exp = ExpZITWPATuneup(f'TWPA_TuneUp', lab.CONFIG('ZI'), lab.HAL('QPU'), lab.HAL('mw_twpa'), ['Q2', 'Q0', 'Q1', 'Q3', 'Q4'], twpa_power_range = np.linspace(17, 20, 10))
+exp = ExpZIDispersive('dispersive_Q0', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0'],
+  fit_type='Circlefit', calc_thermal_photons=True, update=True)
 lab.run_single(exp)
 ```
 
@@ -1158,6 +1273,263 @@ A number of things in the current implementation are worth being aware of:
 
 ___
 
+### ExpZIDragScaling
+
+`class ExpZIDragScaling(ExpZIqubit)`
+
+#### Description
+
+`ExpZIDragScaling` calibrates the DRAG (Derivative Removal by Adiabatic Gate)
+quadrature-scaling factor $\beta$ for a single qubit's $X$ drive pulse, using
+the Zurich Instruments LabOne Q `drag_q_scaling` experiment. For a sweep of
+$\beta$ values, it measures three sequences intended to converge on the same
+excited-state population when the DRAG correction is right (labelled `xx`,
+`xy`, `xmy` internally, following the underlying LabOne Q workflow's own
+sequence naming), fits a straight line to each vs. $\beta$, and locates the
+$\beta$ at which the three lines are closest together (minimum spread) as the
+optimal scaling. Optionally updates the qubit's `DriveGEPulse` with the fitted
+$\beta$.
+
+#### Arguments
+
+##### Positional
+
+| Argument | Type | Description |
+|---|---|---|
+| `name` | `str` | Name of the experiment. |
+| `expt_config` | — | Experiment configuration object passed through to `ExpZIqubit`. |
+| `hal_QPU` | — | The QPU HAL object; used to look up the qubit object and (optionally) write the fitted $\beta$ back to it. |
+| `qubit_ids` | `list[str]` | Must contain exactly one qubit ID (the constructor asserts `len(qubit_ids)==1`). |
+
+##### Keyword arguments
+
+| Argument | Type / Default | Description |
+|---|---|---|
+| `q_scalings` | `list[array-like]`, default `[np.linspace(0.00, 0.05, 51)]` | The DRAG quadrature-scaling ($\beta$) values to sweep, wrapped in a one-element list (one qubit only) and forwarded to the `drag_q_scaling` workflow. |
+| `dont_show_plot` | `bool`, default `False` | If `True`, the fitted plot is saved and closed rather than displayed. |
+| `update` | `bool`, default `True` | If `True`, sets the qubit's `DriveGEPulse` to `{'function': 'drag', 'beta': <fitted beta>, 'sigma': 0.25}` after fitting. Also forwarded to `ExpZIqubit.__init__` as `update=`. |
+| `num_fit_points` | `int`, default `501` | Number of points in the fine `beta` grid used when evaluating each linear fit for the minimum-spread search. |
+
+Any remaining keyword arguments are passed through to `ExpZIqubit.__init__`
+(see [`ExpZIRabi`](#expzirabi) for how `ExpZIqubit` itself handles
+`use_cal_traces`, `transition`, `ZI_plot`, `show_pulse_sheet`, and unmatched
+kwargs). Note this class always normalises to the `'ge'` transition inside
+`_post_process`, regardless of `transition`.
+
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIDragScaling import ExpZIDragScaling
+
+exp = ExpZIDragScaling('drag_Q0', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0'],
+  q_scalings=[np.linspace(-0.1, 0.1, 41)], update=True)
+lab.run_single(exp)
+```
+
+#### Analysis, Fitting and Outputs
+
+For the single qubit in `qubit_ids`, `_post_process` retrieves three datasets
+(`{qubit}_xx`, `{qubit}_xy`, `{qubit}_xmy`) and, for each:
+
+- Computes `data_y` either as normalised excited-state population (via
+  `ExpZIqubit.normalise_qubit_data` on the `{qubit}_calib` dataset, if
+  `self._normalise_data` is `True`) or as raw IQ magnitude, `sqrt(I²+Q²)`.
+- Fits a straight line (`np.polyfit`, degree 1) to `data_y` vs. `beta`
+  (`q_scalings`), evaluated on a fine grid of `num_fit_points` points.
+
+The three fitted lines (`xx_fit`, `xy_fit`, `xmy_fit`) are then compared at
+every point of the fine grid: the spread (`max − min` across the three lines)
+is computed, and the $\beta$ value minimising that spread is taken as the
+optimal DRAG scaling. If `update` is `True`, the qubit's `DriveGEPulse` is set
+to a DRAG pulse dict using this $\beta$ (with a fixed `sigma=0.25`).
+
+##### Outputs
+
+- **Plot**: A figure showing the three raw traces (scatter) and their linear
+  fits, with the located optimum marked, is always generated via the static
+  `plot_fitted_results` method and saved to `fitted_plot_{qubit_id}.png` in
+  the experiment's file path. It is displayed interactively unless
+  `dont_show_plot` is `True`, in which case it is closed after saving.
+- **Fit data**: This class does not save a `.npy` fit-data file; the fitted
+  traces are only kept on the instance (`self._data`).
+
+##### `plot_fitted_results(ax, data_x, data, data_normalised=True, qubit_name=None)`
+
+Static helper used to render the DRAG scaling fit onto a given axis: scatters
+each of the `xx`/`xy`/`xmy` traces against $\beta$ with its corresponding
+linear fit overlaid, marks the located optimum with a black circle, labels the
+y-axis according to `data_normalised`, and titles the axis with the qubit name
+and fitted $\beta$. Returns the fitted optimal $\beta$ value.
+
+___
+
+### ExpZIBlobs
+
+`class ExpZIBlobs(ExpZIqubit)`
+
+#### Description
+
+`ExpZIBlobs` is a diagnostic experiment that measures single-shot IQ "blobs"
+(readout calibration clouds) for one or more qubits using the Zurich
+Instruments LabOne Q `iq_blobs` experiment, and reports single-shot readout
+fidelity from the resulting clouds via `DataIQDiscriminate`. It is purely
+diagnostic — the constructor forbids `update=True` — but exposes helper
+methods to compute per-qubit fidelities, an SNR estimate, and (optionally) to
+push readout correction (confusion) matrices onto the qubit objects.
+
+#### Arguments
+
+##### Positional
+
+| Argument | Type | Description |
+|---|---|---|
+| `name` | `str` | Name of the experiment. |
+| `expt_config` | — | Experiment configuration object passed through to `ExpZIqubit`. |
+| `hal_QPU` | — | The QPU HAL object; used to look up each qubit object and (optionally) write correction matrices back to it. |
+| `qubit_ids` | `list[str]` (or as accepted by `ExpZIqubit`) | The qubit(s) to measure IQ blobs for. |
+
+##### Keyword arguments
+
+| Argument | Type / Default | Description |
+|---|---|---|
+| `dont_show_plot` | `bool`, default `False` | If `True`, each qubit's blob/assignment-matrix plot is saved and closed rather than displayed. |
+| `states` | `str`, default `'ge'` | Read (not popped, so also forwarded to the ZI workflow). Determines which states `optimal_fidelity()`/`get_correction_matrices()` operate over. |
+| `update` | — | **Not settable.** The constructor asserts `update` is either absent or falsy, then forcibly sets `kwargs['update'] = False` — this is a diagnostic-only experiment. |
+
+Any remaining keyword arguments are passed through to `ExpZIqubit.__init__`
+(see [`ExpZIRabi`](#expzirabi) for how `ExpZIqubit` itself handles
+`use_cal_traces`, `transition`, `ZI_plot`, `show_pulse_sheet`, and unmatched
+kwargs forwarded to the `iq_blobs` workflow call).
+
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIBlobs import ExpZIBlobs
+
+exp = ExpZIBlobs('blobs_Q0', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0'], states='gef')
+lab.run_single(exp)
+print(exp.get_fidelities())
+```
+
+#### Analysis, Fitting and Outputs
+
+`_post_process` retrieves each qubit's `{qubit}_calib` dataset and constructs
+a `DataIQDiscriminate` object from it (via
+`DataIQDiscriminate.fromZIcalibFileIOReader`), storing them in
+`self._leDIQDs`. For each qubit, the static `plot_fitted_results` method
+renders the IQ scatter and the resulting assignment (confusion) matrix onto a
+two-panel figure, titled with the average single-shot fidelity, saved to
+`fitted_plot_{qubit_id}.png`. No `.npy` fit-data file is saved by this class.
+
+##### `get_fidelities(average=True)`
+
+Returns each qubit's average single-shot fidelity (`average=True`, the
+default) or the full per-state fidelity array (`average=False`), read from
+the stored `DataIQDiscriminate` objects. Requires the experiment to have been
+run first.
+
+##### `optimal_fidelity()`
+
+Computes an SNR (in dB) for each qubit directly from the raw `{qubit}_calib`
+data (ground/excited cloud separation over the combined I/Q standard
+deviation, converted to a power SNR), storing the result in
+`self._iq_blob_data[qubit]`. Only supports `'ge'`-type states (asserts `'f'
+not in self._states`).
+
+##### `plot_fitted_results(leDIQD, extra_title='')` *(static)*
+
+Renders a two-panel figure — the raw IQ scatter (`leDIQD.plot_points`) and the
+assignment matrix (`leDIQD.plot_assignment_matrix`) — titled with the average
+fidelity, and returns the `Figure` object.
+
+##### `get_correction_matrices(update=False)`
+
+Returns the inverse assignment-probability matrix for each qubit (usable as a
+readout correction/confusion matrix), and if `update` is `True`, also writes
+each one onto the corresponding qubit's `CorrectionMatrix[self._states]`
+dictionary entry.
+
+___
+
+### ExpZIActiveResetTuneup
+
+`class ExpZIActiveResetTuneup()`
+
+#### Description
+
+`ExpZIActiveResetTuneup` is an orchestration class (not an `ExpZIqubit`
+subclass) that automates the tuneup steps needed to enable active reset on
+one or more qubits: (optionally) calibrating the $X/2$ gate via repeated
+[`ExpZICalibX`](#expzicalibx) runs, measuring passive-reset readout fidelity
+via IQ blobs, computing optimal integration kernels from time traces, and
+finally re-measuring IQ blobs with active reset enabled.
+
+#### Arguments
+
+##### Positional
+
+| Argument | Type | Description |
+|---|---|---|
+| `name` | `str` | Name used to group the sub-experiments (`lab.group_open`/`group_close`). |
+| `expt_config` | — | Experiment configuration object passed through to each sub-experiment. |
+| `hal_QPU` | — | The QPU HAL object; used to look up each qubit object. |
+| `qubit_ids` | `list[str]` | The qubit(s) to tune up active reset for. |
+
+##### Keyword arguments
+
+| Argument | Type / Default | Description |
+|---|---|---|
+| `dont_show_plot` | `bool`, default `False` | Stored but not directly referenced in `run()` (plotting is delegated entirely to the sub-experiments it runs). |
+| `update_qubit_params` | `bool`, default `True` | Stored but not directly referenced in `run()` — qubit properties (`ResetTime`, `IntegrationKernelType`) are instead set unconditionally as part of the routine. |
+| `reset_time` | `float`, default `0.1e-6` | The `ResetTime` applied to each qubit once optimal integration weights have been computed, ahead of the final active-reset IQ-blobs measurement. |
+| `Xcalib_gates` | `int`, default `50` | Number of gate repetitions (`num_gates`) used in each [`ExpZICalibX`](#expzicalibx) call during the $X/2$-gate calibration step. |
+| `states` | `str`, default `'ge'` | The states measured by the passive- and active-reset IQ-blobs sub-experiments. |
+| `reset_repititions` | `int`, default `3` | Number of active-reset repetitions (`active_reset_repetitions`) passed to the final IQ-blobs sub-experiment. |
+| `skip_gate_calibration` | `bool`, default `False` | If `True`, skips the $X/2$-gate calibration step entirely and proceeds straight to the readout-fidelity/integration-weight steps. |
+
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIActiveResetTuneup import ExpZIActiveResetTuneup
+
+exp = ExpZIActiveResetTuneup('activeReset_Q0', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0'],
+  reset_time=0.15e-6, reset_repititions=4)
+exp.run(lab)
+```
+
+#### Methods
+
+##### `run(lab)`
+
+1. Opens a `lab` experiment group named `name`.
+2. **Unless `skip_gate_calibration` is `True`** (and asserting the
+   acquisition's `AveragingMode` is not `"DISCRIMINATION"`/`"RAW"`): for each
+   qubit, sets `ResetTime` to `max(5·T1GE, 200 μs)` and
+   `IntegrationKernelType='default'`, then runs [`ExpZICalibX`](#expzicalibx)
+   twice back-to-back to check for a sign/parity flip between runs (comparing
+   the fitted correction factor), calling `update_qubits(reverse_parity=...)`
+   accordingly, and finally re-runs with `3×Xcalib_gates` for a refined
+   calibration.
+3. Runs an `ExpZIqubit`-based `iq_blobs` experiment (with `ZI_plot=False`) over
+   all `qubit_ids` to obtain passive-reset fidelities
+   (`self._qubit_fidelities`), warning if any qubit's fidelity is below `0.8`.
+4. Temporarily sets `NumRepetitions` to `2**14` and, for each qubit (after
+   asserting `|ReadoutLO − ReadoutFrequency| < 500e6`), runs an
+   `ExpZIqubit`-based `time_traces` experiment with `update=True` to compute
+   optimal integration weights, then sets `ResetTime=reset_time` and
+   `IntegrationKernelType='optimal'`. Restores the original `NumRepetitions`
+   afterwards.
+5. Runs a final `ExpZIqubit`-based `iq_blobs` experiment with
+   `active_reset=True`, `active_reset_repetitions=reset_repititions`, and
+   `active_reset_states=states`, to measure active-reset fidelity.
+6. Closes the `lab` experiment group.
+
+#### Outputs
+
+All plots and fit data are produced by the sub-experiments it runs
+(`ExpZICalibX`'s fitted plots, and each `ExpZIqubit`-based sub-experiment's
+own ZI-generated outputs); `ExpZIActiveResetTuneup` itself does not save any
+additional plot or `.npy` file.
+
+___
+
 ### ExpZITWPATuneup
 
 `class ExpZITWPATuneup(ExpZIqubit)`
@@ -1204,6 +1576,15 @@ one anyway. Any other remaining keyword arguments are passed through to
 itself handles `use_cal_traces`, `transition`, `ZI_plot`,
 `show_pulse_sheet`, and unmatched kwargs).
 
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZITWPATuneup import ExpZITWPATuneup
+
+exp = ExpZITWPATuneup('TWPA_TuneUp', lab.CONFIG('ZI'), lab.HAL('QPU'), lab.HAL('mw_twpa'),
+  ['Q2', 'Q0', 'Q1', 'Q3', 'Q4'], twpa_power_range=np.linspace(17, 20, 10))
+lab.run_single(exp)
+```
+
 #### Analysis, Fitting and Outputs
 
 `_run` requires `sweep_vars` to be empty — the pump sweep is instead defined
@@ -1243,3 +1624,1274 @@ Finally, if `update_qubit_params` was `True`, `hal_twpa.Frequency` and
 `hal_twpa.Power` are set from `self._optimum_twpa_point`.
 
 This class does not save any `.npy` fit-data file.
+
+___
+
+### ExpZIT1SingleShot
+
+`class ExpZIT1SingleShot(ExpZIqubit)`
+
+#### Description
+
+`ExpZIT1SingleShot` runs a qubit energy-relaxation (`T1`) measurement in
+single-shot/discriminated mode on one or more qubits, using the Zurich
+Instruments LabOne Q `lifetime_measurement` experiment forced into
+`AveragingOrder='SingleShot'`, `AcquisitionMode='DISCRIMINATION'`. Rather than
+fitting an exponential to an averaged decay (as [`ExpZIT1`](#expzit1) does),
+it computes the per-time-point population of each measured state ($g$, $e$,
+$f$) directly from the single-shot outcome counts, and plots all three
+population traces vs. wait time. It is purely diagnostic — the constructor
+forbids `update=True`.
+
+#### Arguments
+
+##### Positional
+
+| Argument | Type | Description |
+|---|---|---|
+| `name` | `str` | Name of the experiment. |
+| `expt_config` | — | Experiment configuration object passed through to `ExpZIqubit`. |
+| `hal_QPU` | — | The QPU HAL object; used to look up each qubit object. |
+| `qubit_ids` | `list[str]` (or as accepted by `ExpZIqubit`) | The qubit(s) to run the single-shot $T_1$ experiment on. |
+
+##### Keyword arguments
+
+| Argument | Type / Default | Description |
+|---|---|---|
+| `dont_show_plot` | `bool`, default `False` | If `True`, each qubit's population plot is saved and closed rather than displayed. |
+| `expect_rise` | `bool`, default `False` | Popped and stored (`self._expect_rise`) but not currently used — a `# TODO: fit T1 to f state` comment in `_post_process` notes that fitting is not yet implemented for this class. |
+| `update` | — | **Not settable.** As in `ExpZIT1`, the constructor asserts `update` is either absent or falsy, then forcibly sets `kwargs['update'] = False`. |
+
+Any remaining keyword arguments are passed through to `ExpZIqubit.__init__`
+(see [`ExpZIRabi`](#expzirabi) for how `ExpZIqubit` itself handles
+`use_cal_traces`, `transition`, `ZI_plot`, `show_pulse_sheet`, and unmatched
+kwargs forwarded to the `lifetime_measurement` workflow call).
+
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIT1SingleShot import ExpZIT1SingleShot
+
+exp = ExpZIT1SingleShot('T1_singleshot_Q0', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0'],
+  delays=[np.linspace(0, 100e-6, 40)])
+lab.run_single(exp)
+```
+
+#### Analysis, Fitting and Outputs
+
+For each qubit, `_post_process` retrieves the discriminated single-shot
+dataset and, for every wait-time point, bins the per-shot outcome (`0`, `1`,
+or `2`, corresponding to $g$/$e$/$f$) into a population fraction via
+`np.bincount`. It then plots all three population traces ($g$, $e$, $f$) vs.
+wait time (with the time axis auto-scaled to a sensible SI prefix), titled
+according to `self._transition` (`'Initialising E'` for `'ge'`, `'Initialising
+F'` for `'ef'`).
+
+##### Outputs
+
+- **Plot**: Always generated and saved to `fitted_plot_{qubit_id}.png` in the
+  experiment's file path. Displayed interactively unless `dont_show_plot` is
+  `True`, in which case it is closed after saving.
+- **Fit data**: No `.npy` file is saved and no $T_1$ value is fitted or
+  extracted by this class — it is purely a visual diagnostic of the raw
+  single-shot state populations (fitting $T_1$ from the $f$-state population
+  is a noted but unimplemented `TODO`).
+
+___
+
+### ExpZIResOptimal
+
+`class ExpZIResOptimal(ExpZIqubit)`
+
+#### Description
+
+`ExpZIResOptimal` sweeps the readout frequency and, for each of the qubit's
+prepared states (`'ge'` or `'gef'`), measures the resonator response using the
+Zurich Instruments LabOne Q `dispersive_shift` experiment. It plots the IQ
+magnitude/phase and the pairwise state separation vs. frequency for every
+pair of states, and — if `calc_single_shot_fidelities` is enabled — also
+computes per-frequency single-shot readout fidelities (via
+`DataIQDiscriminate`) for every state pairing plus the combined mean. Unlike
+most `ExpZI*` classes, updates are **not** automatic: two separate
+`update_qubits_by_*` methods must be called explicitly afterwards to commit
+whichever frequency (by maximum IQ separation, or by maximum fidelity) is
+desired.
+
+#### Arguments
+
+##### Positional
+
+| Argument | Type | Description |
+|---|---|---|
+| `name` | `str` | Name of the experiment. |
+| `expt_config` | — | Experiment configuration object passed through to `ExpZIqubit`. |
+| `hal_QPU` | — | The QPU HAL object; used to look up the qubit object and (via `update_qubits_by_*`) write the chosen frequency back to it. |
+| `qubit_ids` | `list[str]` | Only the first qubit (`qubit_ids[0]`) is used — this experiment only supports one qubit at a time. |
+
+##### Keyword arguments
+
+| Argument | Type / Default | Description |
+|---|---|---|
+| `dont_show_plot` | `bool`, default `False` | If `True`, the summary plot is saved and closed rather than displayed. |
+| `states` | `str`, **required** | Which states to prepare and measure — `'ge'` or `'gef'`. The constructor asserts `'states' in kwargs`. |
+| `calc_single_shot_fidelities` | `bool`, default `False` | If `True`, forces `states='gef'` (printing a notice if a different value was supplied), sets `do_analysis=False` on the ZI workflow (since the default ZI analysis doesn't support this mode), and runs the sweep in single-shot mode (`AveragingOrder='SingleShot'`) so that per-frequency single-shot fidelities can be computed. |
+| `update` | — | **Not settable.** The constructor asserts `update` is either absent or falsy, then forcibly sets `kwargs['update'] = False` — updates must go through `update_qubits_by_separation()`/`update_qubits_by_fidelity()`. |
+
+Any remaining keyword arguments are passed through to `ExpZIqubit.__init__`
+(see [`ExpZIRabi`](#expzirabi) for how `ExpZIqubit` itself handles
+`use_cal_traces`, `transition`, `ZI_plot`, `show_pulse_sheet`, and unmatched
+kwargs forwarded to the `dispersive_shift` workflow call, most notably
+`frequencies`).
+
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIResOptimal import ExpZIResOptimal
+
+exp = ExpZIResOptimal('resOptimal_Q0', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0'],
+  states='gef', frequencies=np.linspace(6.0e9, 6.05e9, 101), calc_single_shot_fidelities=True)
+lab.run_single(exp)
+exp.update_qubits_by_fidelity(state_fidelity='gef')
+```
+
+#### Analysis, Fitting and Outputs
+
+`_post_process` retrieves one dataset per prepared state (`{qubit}_g`,
+`{qubit}_e`, and — if `'gef'` — `{qubit}_f`) and, for each, computes the IQ
+magnitude and (unwrapped) phase vs. frequency, plotted on a shared magnitude
+axis with a twin phase axis. For every pairwise combination of states (`ge`
+only for two states; `ge`, `ef`, `gf` — plus the summed `gef` — for three), it
+computes the Euclidean IQ separation vs. frequency and marks the frequency of
+maximum separation. If `calc_single_shot_fidelities` is `True`, it
+additionally builds a `DataIQDiscriminate` per frequency point for each state
+pairing (and for the full 3-state combination), computes the mean pairwise
+fidelity at each frequency, plots per-state fidelity curves with their maxima
+marked, and renders the best-fidelity IQ scatter/assignment-matrix for each
+pairing. `self._readout_fidelity` is set to the last-plotted pairing's average
+fidelity.
+
+##### Outputs
+
+- **Plot**: A single multi-panel summary figure — magnitude/phase, IQ
+  separation, and (if `calc_single_shot_fidelities`) fidelity curves plus
+  per-pairing blob/assignment-matrix panels — is always generated and saved
+  to `fitted_plot_{qubit_id}.png`. Displayed interactively unless
+  `dont_show_plot` is `True`.
+- **Fit data**: `self._fit_data` stores `freqs`, `maxSepIndices` (and, if
+  single-shot, `maxFidIndices` and `discriminators`) — kept in memory only, no
+  `.npy` file is written.
+
+##### `update_qubits_by_separation(transition='Total')`
+
+Sets the qubit's `ReadoutFrequency` to the frequency of maximum IQ separation
+for the requested `transition` (`'ge'`, `'ef'`, `'gf'`, or `'total'`), and
+`FidelityReadout` to `self._readout_fidelity`. Requires the experiment to have
+been run first.
+
+##### `update_qubits_by_fidelity(state_fidelity='gef')`
+
+Sets the qubit's `ReadoutFrequency` to the frequency of maximum single-shot
+fidelity for the requested state combination (`'ge'`, `'ef'`, `'gf'`, or
+`'gef'`), and `FidelityReadout` to `self._readout_fidelity`. Requires
+`calc_single_shot_fidelities=True` to have been used when running.
+
+##### `print_best_frequencies_by_separation()` / `print_best_frequencies_by_fidelity()`
+
+Print the best frequency for each state pairing (by separation, or by
+fidelity respectively) in human-readable units.
+
+##### `plot_blobs(frequency)`
+
+Plots the IQ scatter/assignment-matrix for the discriminator closest to the
+given `frequency`. Requires `calc_single_shot_fidelities=True`.
+
+___
+
+### ExpZIResOptimalAmpSweepSS
+
+`class ExpZIResOptimalAmpSweepSS(ExpZIqubit)`
+
+#### Description
+
+`ExpZIResOptimalAmpSweepSS` extends the idea behind
+[`ExpZIResOptimal`](#expziresoptimal) with `calc_single_shot_fidelities=True`
+into a 2D sweep: for every readout amplitude in a swept range, it re-measures
+the full single-shot dispersive-shift response across frequency for the
+`'g'`, `'e'`, and `'f'` states, then computes IQ separation and single-shot
+fidelity as functions of *both* frequency and amplitude, producing 2D heatmaps
+for each. This lets the optimal readout point be chosen jointly over
+frequency and amplitude, rather than at a fixed amplitude.
+
+#### Arguments
+
+##### Positional
+
+| Argument | Type | Description |
+|---|---|---|
+| `name` | `str` | Name of the experiment. |
+| `expt_config` | — | Experiment configuration object passed through to `ExpZIqubit`. |
+| `hal_QPU` | — | The QPU HAL object; used to look up the qubit object and (via `update_qubits_by_*`) write the chosen frequency/amplitude back to it. |
+| `qubit_ids` | `list[str]` | Must contain exactly one qubit (the constructor asserts `len(qubit_ids)==1`). |
+
+##### Keyword arguments
+
+| Argument | Type / Default | Description |
+|---|---|---|
+| `dont_show_plot` | `bool`, default `False` | If `True`, the summary plot is saved and closed rather than displayed. |
+| `amplitude_range` | array-like, default `np.linspace(0.01, 0.9, 10)` | The readout amplitude values to sweep, applied to the qubit's `ReadoutAmplitude` property (temporarily, via a `VariablePropertyTransient`; the amplitude is restored to its pre-experiment value in `_post_process`). |
+| `update` | — | **Not settable.** The constructor asserts `update` is either absent or falsy, then forcibly sets `kwargs['update'] = False` — updates must go through `update_qubits_by_separation()`/`update_qubits_by_fidelity()`. |
+
+The `states` are hardcoded to `'gef'` internally (`self._states = 'gef'`) and
+are not accepted as a keyword argument. Any remaining keyword arguments are
+passed through to `ExpZIqubit.__init__` (see [`ExpZIRabi`](#expzirabi) for how
+`ExpZIqubit` itself handles `use_cal_traces`, `transition`, `ZI_plot`,
+`show_pulse_sheet`, and unmatched kwargs forwarded to the `dispersive_shift`
+workflow call, most notably `frequencies`).
+
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIResOptimalAmpSweepSS import ExpZIResOptimalAmpSweepSS
+
+exp = ExpZIResOptimalAmpSweepSS('resOptimalAmpSweep_Q0', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0'],
+  frequencies=np.linspace(6.0e9, 6.05e9, 51), amplitude_range=np.linspace(0.05, 0.8, 8))
+lab.run_single(exp)
+exp.update_qubits_by_fidelity(state_fidelity='gef')
+```
+
+#### Analysis, Fitting and Outputs
+
+`_run` sweeps the qubit's `ReadoutAmplitude` (via a `VariablePropertyTransient`)
+over `amplitude_range` as the outer loop around the underlying single-shot
+`dispersive_shift` sweep over frequency. `_post_process` then, for every
+combination of states (`ge`, `ef`, `gf`, and the combined `gef`), computes:
+
+- The mean-cloud IQ separation as a 2D array (amplitude × frequency), plotted
+  as a heatmap with the point of maximum separation marked.
+- A `DataIQDiscriminate` per (amplitude, frequency) point and the resulting
+  mean fidelity, likewise plotted as a heatmap with its maximum marked; the
+  best-fidelity IQ scatter and assignment matrix for each state pairing are
+  also rendered.
+
+##### Outputs
+
+- **Plot**: A single large multi-panel figure (separation heatmaps, fidelity
+  heatmaps, and per-pairing blob/assignment-matrix panels) is always
+  generated and saved to `fitted_plot_{qubit_id}.png`. Displayed
+  interactively unless `dont_show_plot` is `True`.
+- **Fit data**: `self._fit_data` stores `freqs`, `amps`,
+  `maxSepAmpIndices`/`maxSepFreqIndices`, `maxFidAmpIndices`/
+  `maxFidFreqIndices`, and `discriminators` — kept in memory only, no `.npy`
+  file is written.
+
+##### `update_qubits_by_separation(transition='Total')` / `update_qubits_by_fidelity(state_fidelity='gef')`
+
+As in [`ExpZIResOptimal`](#expziresoptimal), but set **both**
+`ReadoutFrequency` and `ReadoutAmplitude` from the located 2D optimum (by
+separation or by fidelity respectively), plus `FidelityReadout`.
+
+##### `print_best_parameters_by_separation()` / `print_best_parameters_by_fidelity()`
+
+Print the best (frequency, amplitude) pair for each state pairing (by
+separation, or by fidelity respectively).
+
+##### `plot_blobs(frequency, amplitude)`
+
+Plots the IQ scatter/assignment-matrix for the discriminator closest to the
+given `(frequency, amplitude)` point.
+
+___
+
+### ExpZICalibX
+
+`class ExpZICalibX(ExpZIqubit)`
+
+#### Description
+
+`ExpZICalibX` calibrates the rotation angle of the qubit's $X$ or $X/2$ gate
+by repeating it $n=1,2,\dots$ times (an "error amplification" sequence) and
+fitting the resulting population oscillation to extract a correction factor
+for the drive amplitude. It is the building block used elsewhere (e.g.
+[`ExpZIActiveResetTuneup`](#expziactiveresettuneup)) to fine-tune single-qubit
+gates. Updates are not automatic — `update_qubits()` must be called
+afterwards.
+
+#### Arguments
+
+##### Positional
+
+| Argument | Type | Description |
+|---|---|---|
+| `name` | `str` | Name of the experiment. |
+| `expt_config` | — | Experiment configuration object passed through to `ExpZIqubit`. |
+| `hal_QPU` | — | The QPU HAL object; used to look up each qubit object and (via `update_qubits()`) write the correction factor back to it. |
+| `qubit_ids` | `list[str]` (or as accepted by `ExpZIqubit`) | The qubit(s) to calibrate. |
+| `calib_denominator` | `int`, default `1` | Whether to calibrate the $X$ gate (`1`) or the $X/2$ gate (`2`). Must be `1` or `2`. |
+
+##### Keyword arguments
+
+| Argument | Type / Default | Description |
+|---|---|---|
+| `dont_show_plot` | `bool`, default `False` | If `True`, each qubit's fitted plot is saved and closed rather than displayed. |
+| `only_every_n` | `int`, default `1` | Only include every `n`-th gate-repetition count in the swept sequence (e.g. `2` skips every other count), to shorten the experiment. At least 4 surviving points are required — the constructor asserts this. |
+| `num_gates` | `int`, default `20` | The maximum number of gate repetitions swept, i.e. the sequence sweeps `1, 2, ..., num_gates` repetitions of the selected gate (subject to `only_every_n`). |
+| `expected_corr_sign` | `None`/`1`/`-1`, default `None` | If set, constrains the fitted correction percentage to be non-negative (`1`) or non-positive (`-1`), narrowing the fit's search bounds; `None` allows either sign. |
+| `update` | — | **Not settable.** The constructor asserts `update` is either absent or falsy, then forcibly sets `kwargs['update'] = False` — updates must go through `update_qubits()`. |
+
+Any remaining keyword arguments are passed through to `ExpZIqubit.__init__`
+(see [`ExpZIRabi`](#expzirabi) for how `ExpZIqubit` itself handles
+`use_cal_traces`, `transition`, `ZI_plot`, `show_pulse_sheet`, and unmatched
+kwargs).
+
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZICalibX import ExpZICalibX
+
+exp = ExpZICalibX('calibX_Q0', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0'], 1, num_gates=30)
+lab.run_single(exp)
+exp.update_qubits()
+```
+
+#### Analysis, Fitting and Outputs
+
+For each qubit, `_fit_single_qubit` normalises the raw IQ data into excited-
+state population using the `{qubit}_calib` dataset, then fits the population
+vs. gate-repetition-count `n` to a model function — $\cos((n-1)(1+c/100)\pi)$
+(for the $X$ gate) or $\sin((n-1)(1+c/100)\pi/2)$ (for $X/2$), each multiplied
+by an exponential decay envelope $e^{-(n-1)/(100d)}$ and offset by $0.5$ —
+using a coarse grid search for an initial guess followed by
+`scipy.optimize.curve_fit`. The fitted correction percentage `c` gives the
+gate correction factor: `Gate_Corr_Fac = 1/(1+c/100)` (or its
+$X$-gate-equivalent mirrored form if `(1+c/100) ≥ 1`). Basic goodness-of-fit
+diagnostics are printed if a fitted parameter sits at its search bound, or if
+$R^2 < 0.8$.
+
+##### Outputs
+
+- **Plot**: For each qubit, a fitted plot (population vs. gate count, with
+  the fitted curve overlaid, titled with the fitted rotation angle in
+  degrees) is always saved to `fitted_plot_{qubit_id}.png`. Displayed
+  interactively unless `dont_show_plot` is `True`.
+- **Fit data**: Always saved to `fitted_data_{qubit_id}.npy`, containing the
+  fit parameters, their uncertainties, $R^2$, the fitted angle, and `n_vals`.
+- Qubits whose fit raises an exception are recorded in `self._failed_qubits`
+  and skipped by `update_qubits()`.
+
+##### `plot_fitted_results(ax, data, qubit_name=None)` *(static)*
+
+Renders a previously-saved fit dict (`data`, e.g. loaded from
+`fitted_data_{qubit_id}.npy`) onto a given axis — raw population vs. gate
+count with the fit overlaid, titled with the fitted rotation angle.
+
+##### `update_qubits(reverse_parity=False)`
+
+Commits the fitted correction factor to each qubit that had a successful fit:
+multiplies `DriveGEAmplitudeXon2` (if `calib_denominator=2`) or
+`DriveGEAmplitudeX` (if `calib_denominator=1`) by the correction factor (or by
+`2 − Gate_Corr_Fac` if `reverse_parity` is `True`, to flip the correction's
+sign when a sign ambiguity has been identified — see
+[`ExpZIActiveResetTuneup`](#expziactiveresettuneup)'s two-run parity check).
+Qubits in `self._failed_qubits` are skipped with a printed warning. Requires
+the experiment to have been run first.
+
+___
+
+### ExpZIRandomisedBenchmarking
+
+`class ExpZIRandomisedBenchmarking(ExpZIqubit)`
+
+#### Description
+
+`ExpZIRandomisedBenchmarking` runs standard single-qubit Clifford-equivalent
+randomised benchmarking on one or more qubits, using the
+`single_qubit_gates_sweep_chunking` LabOne Q workflow. Random gate sequences
+of increasing length (drawn from the gate set $\{X, X/2, -X/2, Y, Y/2,
+-Y/2\}$) are generated such that each sequence's final gate returns the qubit
+to the excited state, multiple random trials are measured per sequence
+length, and the decay of the resulting survival probability with sequence
+length is fit (on a log scale) to extract an average error-per-gate, which can
+be written back to the qubit's `Fidelity1QRB` property.
+
+#### Arguments
+
+##### Positional
+
+| Argument | Type | Description |
+|---|---|---|
+| `name` | `str` | Name of the experiment. |
+| `expt_config` | — | Experiment configuration object passed through to `ExpZIqubit`. |
+| `hal_QPU` | — | The QPU HAL object; used to look up each qubit object and (optionally) write the fitted error rate back to it. |
+| `qubit_ids` | `list[str]` (or as accepted by `ExpZIqubit`) | The qubit(s) to benchmark; the same random gate sequences are applied to every qubit in the list. |
+
+##### Keyword arguments
+
+| Argument | Type / Default | Description |
+|---|---|---|
+| `dont_show_plot` | `bool`, default `False` | Popped and stored (`self._dont_show_plot`), but note `_post_process` always calls `fig.show()` regardless — see the source for the caveat that this flag is not currently wired up to suppress display. |
+| `update` | `bool`, default `True` | If `True`, writes the fitted error-per-gate (as a percentage) to each qubit's `Fidelity1QRB` property. |
+| `sequence_lengths` | `list[int]`, default `[3,4,5,6,7,8,9,10,11,12]` | The Clifford-equivalent sequence lengths to benchmark. |
+| `num_trials` | `int`, default `5` | Number of independently-generated random sequences measured per sequence length. |
+| `rb_seed` | `int`, default `88` | Seed for the `numpy` random generator used to draw gate sequences, for reproducibility. |
+| `coordinate_system` | `str`, default `'RH'` | Must be `'LH'` or `'RH'` (left/right-handed); forwarded to the ZI workflow. |
+
+Any remaining keyword arguments are passed through to `ExpZIqubit.__init__`
+(see [`ExpZIRabi`](#expzirabi) for how `ExpZIqubit` itself handles
+`use_cal_traces`, `transition`, `ZI_plot`, `show_pulse_sheet`, and unmatched
+kwargs).
+
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIRandomisedBenchmarking import ExpZIRandomisedBenchmarking
+
+exp = ExpZIRandomisedBenchmarking('rb_Q0', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0'],
+  sequence_lengths=[4, 8, 16, 32, 64, 128], num_trials=8, update=True)
+lab.run_single(exp)
+```
+
+#### Analysis, Fitting and Outputs
+
+For each qubit, `_post_process` normalises the raw IQ data into excited-state
+population (via `ExpZIqubit.normalise_qubit_data` on the `{qubit}_calib`
+dataset), then, for each sequence length, discards trials whose population is
+below `0.8` (as a crude outlier filter) and averages the remaining trials'
+population to get a mean survival probability and its standard deviation.
+The $z$-projection (`mean − 0.5`) is fit to an exponential decay in log-space
+via `np.polyfit(seq_lens, log(zProj), deg=1)`, and the error-per-gate is
+`exp(slope)`.
+
+##### Outputs
+
+- **Plot**: A two-panel figure — raw per-trial population vs. sequence length
+  (with the mean and standard-deviation band overlaid) on the left, and the
+  log-space linear fit (with fitted error-per-gate in the title) on the
+  right — is always generated, shown, and saved as `Summary.png` in the
+  experiment's file path.
+- **Fit data**: No `.npy` file is saved by this class.
+- If `update` is `True`, `Fidelity1QRB` is set to the fitted error-per-gate
+  (as a percentage) for each qubit.
+
+___
+
+### ExpZIBenchmarkETH
+
+`class ExpZIBenchmarkETH(ExpZIqubit)`
+
+#### Description
+
+`ExpZIBenchmarkETH` benchmarks single-qubit gate fidelity by running a fixed
+set of short gate sequences (the "ETH-style" gate-set benchmark: identity,
+single $X$/$Y$ (and half-)rotations, pairs of gates, and combinations
+involving a virtual $Z/2$) and comparing the measured excited-state
+population for each sequence against the population predicted by ideal gate
+matrices. Unlike `ExpZIRandomisedBenchmarking`, it does not fit a single
+error-per-gate number — it is a qualitative diagnostic that visualises
+measured-vs-ideal population per sequence.
+
+#### Arguments
+
+##### Positional
+
+| Argument | Type | Description |
+|---|---|---|
+| `name` | `str` | Name of the experiment. |
+| `expt_config` | — | Experiment configuration object passed through to `ExpZIqubit`. |
+| `hal_QPU` | — | The QPU HAL object; used to look up each qubit object. |
+| `qubit_ids` | `list[str]` (or as accepted by `ExpZIqubit`) | The qubit(s) to benchmark; the same fixed gate sequences are applied to every qubit in the list. |
+
+##### Keyword arguments
+
+| Argument | Type / Default | Description |
+|---|---|---|
+| `dont_show_plot` | `bool`, default `False` | If `True`, each qubit's bar-chart plot is saved and closed rather than displayed. |
+| `extra_gate_seqs` | `list[list[str]]`, default `[]` | Additional gate sequences appended to the fixed built-in set of 21 sequences (identity, $X$, $\pm X/2$, $Y$, $\pm Y/2$, gate pairs, $Z/2$-containing sequences, and Hadamard-based sequences). |
+| `coordinate_system` | `str`, default `'RH'` | Must be `'LH'` or `'RH'` (left/right-handed); forwarded to the ZI workflow. |
+| `update` | — | **Not settable.** The constructor asserts `update` is either absent or falsy, then forcibly sets `kwargs['update'] = False` — this is a diagnostic-only experiment. |
+
+Any remaining keyword arguments are passed through to `ExpZIqubit.__init__`
+(see [`ExpZIRabi`](#expzirabi) for how `ExpZIqubit` itself handles
+`use_cal_traces`, `transition`, `ZI_plot`, `show_pulse_sheet`, and unmatched
+kwargs).
+
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIBenchmarkETH import ExpZIBenchmarkETH
+
+exp = ExpZIBenchmarkETH('benchmarkETH_Q0', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0'])
+lab.run_single(exp)
+```
+
+#### Analysis, Fitting and Outputs
+
+For each qubit, `_post_process` normalises the raw IQ data into excited-state
+population (via `ExpZIqubit.normalise_qubit_data` on the `{qubit}_calib`
+dataset), giving one measured population per sequence. For each sequence in
+the fixed (plus any `extra_gate_seqs`) set, the ideal expected population is
+computed by composing the corresponding ideal single-qubit rotation matrices
+(via `QubitGatesBase.get_rotation_from_Pauli_Matrix`) and applying them to the
+ground state.
+
+##### Outputs
+
+- **Plot**: For each qubit, a bar chart of measured population per sequence
+  (bars) with the ideal predicted population overlaid as horizontal tick
+  marks, is always generated and saved to `Benchmarks_{qubit_dataset}.png` in
+  the experiment's file path. Displayed interactively unless `dont_show_plot`
+  is `True`.
+- **Fit data**: No `.npy` file is saved and no qubit parameter is updated by
+  this class.
+
+___
+
+### ExpZIChevrons
+
+`class ExpZIChevrons(ExpZIqubit)`
+
+#### Description
+
+`ExpZIChevrons` runs a "chevron" experiment on a single qubit's *ef*
+transition — sweeping drive frequency and pulse duration together using the
+`qubit_single_chevron` LabOne Q workflow — to locate the *ef* transition
+frequency from the characteristic chevron pattern in a frequency/time colour
+map. It fits a Lorentzian to the per-frequency signal variance (which peaks
+at resonance, since off-resonant driving produces less oscillation over the
+swept durations) to extract the frequency. An explicit call to
+`update_qubits()` is required to commit the fitted frequency.
+
+#### Arguments
+
+##### Positional
+
+| Argument | Type | Description |
+|---|---|---|
+| `name` | `str` | Name of the experiment. |
+| `expt_config` | — | Experiment configuration object passed through to `ExpZIqubit`. |
+| `hal_QPU` | — | The QPU HAL object; used to look up the qubit object and (via `update_qubits()`) write the fitted frequency back to it. |
+| `qubit_ids` | `list[str]` | Must contain exactly one qubit (the constructor asserts `len(qubit_ids)==1`). |
+
+##### Keyword arguments
+
+| Argument | Type / Default | Description |
+|---|---|---|
+| `dont_show_plot` | `bool`, default `False` | If `True`, the fitted plot is saved and closed rather than displayed. |
+
+Any remaining keyword arguments are passed through to `ExpZIqubit.__init__`
+(see [`ExpZIRabi`](#expzirabi) for how `ExpZIqubit` itself handles
+`use_cal_traces`, `transition`, `ZI_plot`, `show_pulse_sheet`, and unmatched
+kwargs forwarded to the `qubit_single_chevron` workflow call, most notably the
+frequency/duration sweep values). This is typically used with
+`transition='ef'`, since the chevron pattern here is intended for locating the
+*ef* transition.
+
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIChevrons import ExpZIChevrons
+
+exp = ExpZIChevrons('chevrons_Q0', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0'], transition='ef')
+lab.run_single(exp)
+exp.update_qubits()
+```
+
+#### Analysis, Fitting and Outputs
+
+`_post_process` retrieves the 2D dataset (frequency × pulse duration) and
+computes the IQ phase, $\mathrm{atan2}(Q, I)$, at every point. For each
+frequency, the variance of the phase across all swept durations is computed —
+this variance is largest near resonance, where the Rabi-like oscillation
+sweeps through a wide range of phase values, and small off-resonance. A
+Lorentzian (`DFitPeakLorentzian`) is fit to this variance-vs-frequency trace
+to extract the resonant frequency, stored in `self._fit_freq`.
+
+##### Outputs
+
+- **Plot**: A two-row figure — the frequency-vs-variance trace with its
+  Lorentzian fit on top, and the phase colour map (frequency vs. duration)
+  with a vertical dashed line at the fitted frequency below — is always
+  generated and saved to `fitted_plot_{qubit_id}.png`. Displayed
+  interactively unless `dont_show_plot` is `True`.
+- **Fit data**: No `.npy` file is saved by this class; the fitted frequency is
+  only kept on the instance (`self._fit_freq`) until `update_qubits()` is
+  called.
+
+##### `update_qubits()`
+
+Commits the fitted frequency to the qubit's `DriveEF` (if `self._transition ==
+'ef'`) or `DriveGE` property otherwise, then clears `self._fit_freq`. Asserts
+the experiment has already been run (`self._fit_freq is not None`).
+
+___
+
+### ExpZIQASM
+
+`class ExpZIQASM(ExpZIqubit)`
+
+#### Description
+
+`ExpZIQASM` compiles and runs an OpenQASM script on the QPU by parsing it (via
+`ParserOpenQASM`), scheduling it against the SOFT-QPU/ZI hardware timing model
+(`ScheduleParametersSoftQPUZI`), and executing it through the
+`oqasm_scheduled_qubits` LabOne Q workflow. It is the underlying execution
+engine used by higher-level experiments such as
+[`ExpZIBellStateFidelity`](#expzibellstatefidelity), but can also be used
+directly to run an arbitrary QASM circuit and retrieve its measurement
+outcomes. Results are moved into a `data/` subfolder and are best inspected
+via [`ExpZIQASMDataViewer`](#expziqasmdataviewer).
+
+#### Arguments
+
+##### Positional
+
+| Argument | Type | Description |
+|---|---|---|
+| `name` | `str` | Name of the experiment. |
+| `expt_config` | — | Experiment configuration object passed through to `ExpZIqubit`. |
+| `hal_QPU` | — | The QPU HAL object; used to look up each physical qubit that QASM registers get mapped onto. |
+| `qubit_ids` | `list[str]` (or as accepted by `ExpZIqubit`) | The physical qubits available for the QASM script's registers to be mapped onto (by default, mapped in declaration order — see [`set_qubit_reg_to_ZI_mappings`](#set_qubit_reg_to_zi_mappingsmapping)). |
+| `qasm_file_path` | `str`, default `''` | Path to the QASM source file. Mutually exclusive with supplying `qasm_string` in `kwargs` (the constructor asserts exactly one of the two is given). |
+
+##### Keyword arguments
+
+| Argument | Type / Default | Description |
+|---|---|---|
+| `dont_show_plot` | `bool`, default `False` | Popped and stored (`self._dont_show_plot`), though this class's own `_post_process` does not itself generate a plot (the QASM schedule is instead rendered to an HTML file — see the Outputs section below). |
+| `qasm_string` | `str` | The QASM source as a string, used instead of `qasm_file_path`. |
+| `source_dirs` | `list[str]`, default `[]` | Additional directories to search for `include`d QASM source files. |
+| `coordinate_system` | `str`, default `'RH'` | Must be `'LH'` or `'RH'` (left/right-handed); forwarded to the ZI workflow. |
+| `update` | — | **Not settable.** The constructor asserts `update` is either absent or falsy, then forcibly sets `kwargs['update'] = False`. |
+
+Any remaining keyword arguments are passed through to `ExpZIqubit.__init__`
+(see [`ExpZIRabi`](#expzirabi) for how `ExpZIqubit` itself handles
+`use_cal_traces`, `transition`, `ZI_plot`, `show_pulse_sheet`, and unmatched
+kwargs).
+
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIQASM import ExpZIQASM
+
+exp = ExpZIQASM('qasm_test', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0', 'Q1'], 'bell_state.qasm')
+regs = exp.get_qubit_regs()
+exp.set_qubit_reg_to_ZI_mappings({('q', 0): 'Q0', ('q', 1): 'Q1'})
+lab.run_single(exp, override_ACQ_params={'AcquisitionMode': 'DISCRIMINATION', 'AveragingOrder': 'SingleShot'})
+```
+
+#### Methods
+
+##### `get_qubit_regs()`
+
+Returns the qubit registers declared/used in the QASM script (as parsed by
+`ParserOpenQASM`).
+
+##### `set_qubit_reg_to_ZI_mappings(mapping)`
+
+Given as key-value pairs where the key is a qubit register tuple (as returned
+by `get_qubit_regs()`) and the value is the (string) name of the physical
+qubit HAL object it should be mapped onto, re-maps the QASM registers before
+running. Asserts the mapping covers exactly the registers used by the script,
+and that every mapped qubit name exists in `qubit_ids`.
+
+##### `_run(file_path, sweep_vars=[], **kwargs)`
+
+Parses the QASM script, builds the physical schedule, writes an interactive
+schedule visualisation and the compiled main script/measurement-mapping JSON
+to disk, forces `AcquisitionMode`/`AveragingOrder` into a QASM-compatible
+combination (`DISCRIMINATION`/`SweepBeforeAverage` by default) if not already
+set appropriately, then defers to `ExpZIqubit._run` to actually execute the
+schedule. After execution, `self.qasm_output` is populated with each
+measurement's outcome (only meaningfully for the
+`DISCRIMINATION`+`SweepBeforeAverage` combination — otherwise a placeholder
+`0`).
+
+#### Outputs
+
+- `compiled_qasm_schedule.html` — an interactive visualisation of the
+  compiled hardware schedule, written to the experiment's file path.
+- `main.qasm` — the resolved/flattened QASM source actually executed.
+- `measurement_mapping.json` — declared classical registers and their mapping
+  to internal measurement IDs.
+- `measurement_params.json` — the acquisition/averaging mode and sweep sizes
+  used, needed by [`ExpZIQASMDataViewer`](#expziqasmdataviewer) to interpret
+  the raw data.
+- A `data/` subfolder containing one `.h5` file per measurement ID (the
+  top-level `data.h5` produced by the base `Experiment` machinery is removed,
+  since QASM measurement results are stored per-measurement instead).
+
+___
+
+### ExpZIQASMDataViewer
+
+`class ExpZIQASMDataViewer`
+
+#### Description
+
+`ExpZIQASMDataViewer` is a lightweight reader for the output folder produced
+by [`ExpZIQASM`](#expziqasm) — it is not itself an experiment (it has no
+`run`/`_run` method), just a helper for pulling out data for a given
+classical register by name/index, correctly reshaped according to how the
+QASM run's acquisition/averaging mode was configured. It is used internally
+by [`ExpZIBellStateFidelity`](#expzibellstatefidelity) to feed measurement
+data into `DataDensityMatrix.fromDataViewer`.
+
+#### Arguments
+
+##### Positional
+
+| Argument | Type | Description |
+|---|---|---|
+| `expziqasm_data_folder_path` | `str` | Path to the output folder of a completed [`ExpZIQASM`](#expziqasm) run (i.e. its `_file_path`, containing `measurement_mapping.json`, `measurement_params.json`, and the `data/` subfolder). |
+
+`ExpZIQASMDataViewer` takes no keyword arguments.
+
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIQASMDataViewer import ExpZIQASMDataViewer
+
+ledv = ExpZIQASMDataViewer(exp._file_path)   # exp is a completed ExpZIQASM run
+print(ledv.get_inner_slicing_vars())
+data = ledv.get_data('c', 0)
+```
+
+#### Methods
+
+##### `get_number_of_shots()`
+
+Returns the `NumRepetitions` recorded in `measurement_params.json`.
+
+##### `get_inner_slicing_vars()`
+
+Returns the list of "inner" (non-swept) axis names present in each stored
+measurement array — depends on the recorded `acq_type`
+(`'DISCRIMINATION'`/`'INTEGRATION'`/`'RAW'`) and `avg_type`
+(`'SweepBeforeAverage'` or not) — e.g. `['shot']`, `['iq']`, `['shot','iq']`,
+`['samples','iq']`, or `['shot','samples','iq']`, prefixed by any swept
+variable names.
+
+##### `get_data(classical_register_name, classical_register_index=None)`
+
+Returns the stored data for the given classical register. If
+`classical_register_index` is `None`, returns a list with one entry per bit
+in that register (`None` for any bit that was never measured into); otherwise
+returns just that bit's data array (discriminated data is cast to `int`, and
+a single-element array is unwrapped to a Python `float`).
+
+___
+
+### ExpZIChevrons2QFixedCoupler
+
+`class ExpZIChevrons2QFixedCoupler(ExpZIqubit)`
+
+#### Description
+
+`ExpZIChevrons2QFixedCoupler` sweeps a fixed coupler's flux-pulse amplitude
+together with a wait time, using the
+`calibrate_tunable_transmon_fixed_coupler_osc` LabOne Q workflow, to produce
+the classic two-qubit "chevron" pattern used to find the CZ (or similar
+flux-pulse) interaction point between two qubits joined by a tunable-frequency
+fixed coupler. It automatically discovers and includes any additional qubits
+involved with the coupler (e.g. auxiliary lines), and — in single-shot mode —
+computes state populations directly from discriminated outcomes for every
+qubit measured.
+
+#### Arguments
+
+##### Positional
+
+| Argument | Type | Description |
+|---|---|---|
+| `name` | `str` | Name of the experiment. |
+| `expt_config` | — | Experiment configuration object passed through to `ExpZIqubit`. |
+| `hal_QPU` | — | The QPU HAL object; used to look up the coupler and qubit objects. |
+| `qubit_ids` | `list[str]` | The two coupled qubits, e.g. `['Q0', 'Q2']`. May be extended in place with any additional qubits the coupler object reports as involved (with a printed warning). |
+
+##### Keyword arguments
+
+| Argument | Type / Default | Description |
+|---|---|---|
+| `dont_show_plot` | `bool`, default `False` | If `True`, the resulting figure is saved and closed rather than displayed. |
+| `amplitudes` | array-like, **required** | The coupler flux-pulse amplitude values to sweep. The constructor asserts `'amplitudes' in kwargs`. |
+| `plot_with_frequency` | `bool`, default `True` | If `True` and the tuned qubit has `FluxConversionParams` set, overlays a secondary frequency axis (converted from flux amplitude) on the amplitude axis. |
+| `single_shot` | `bool`, default `False` | If `True`, forces `AveragingOrder='SingleShot'`, `AcquisitionMode='DISCRIMINATION'` and plots discriminated $g$/$e$/$f$ population heatmaps for every qubit in `qubit_ids`; if `False`, forces `AveragingOrder='DEFAULT'`, `AcquisitionMode='DEFAULT'` and plots IQ magnitude instead. |
+| `show_single_qubit` | `bool` or `str`, default `False` | Only meaningful when `single_shot=False`: if `True`, shows only `qubit_ids[0]`'s trace; if a qubit-ID string (must be in `qubit_ids`), shows only that qubit's trace; if `False`, shows every qubit. |
+
+Any remaining keyword arguments are passed through to `ExpZIqubit.__init__`
+(see [`ExpZIRabi`](#expzirabi) for how `ExpZIqubit` itself handles
+`use_cal_traces`, `transition`, `ZI_plot`, `show_pulse_sheet`, and unmatched
+kwargs forwarded to the workflow call, most notably `wait_times`). Note:
+`_run` asserts that no external `sweep_vars` are supplied — the amplitude
+sweep is the only sweep this class allows.
+
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIChevrons2QFixedCoupler import ExpZIChevrons2QFixedCoupler
+
+exp = ExpZIChevrons2QFixedCoupler('chevron2Q_Q0Q2', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0', 'Q2'],
+  amplitudes=np.linspace(0.0, 0.5, 41), wait_times=np.linspace(1e-9, 250e-9, 30), single_shot=True)
+lab.run_single(exp, raw_pulse_sheet_duration=1e-3)
+```
+
+#### Analysis, Fitting and Outputs
+
+`_run` wraps the coupler's `Amplitude` in a `VariablePropertyTransient` and
+sweeps it over `amplitudes` alongside the underlying workflow's own
+`wait_times` sweep. In `_post_process`:
+
+- **If `single_shot` is `True`**: for every qubit, computes the fraction of
+  shots landing in each of states $g$/$e$/$f$ as a function of (amplitude,
+  wait time), plots each as a heatmap (one row per qubit, one column per
+  state), and saves the raw per-qubit population arrays to `fitted_data.npy`
+  (as `{'qubits':..., 'wait_times':..., 'flux_amps':..., 'pop_qubit_amps_times':...}`
+  — this is the file consumed by
+  [`ExpZIFixedCouplerTuneup`](#expzifixedcouplertuneup)).
+- **Otherwise**: for the qubit(s) selected by `show_single_qubit`, plots the
+  raw IQ magnitude as a heatmap (amplitude vs. wait time). No `.npy` file is
+  saved in this mode.
+
+In both modes, if the tuned qubit has `FluxConversionParams` set and
+`plot_with_frequency` is `True`, a secondary frequency axis is added above the
+amplitude axis on the top row of panels.
+
+##### Outputs
+
+A single figure (one row per qubit, in single-shot mode; a stacked column of
+per-qubit panels otherwise) is always generated and saved to
+`fitted_plot.png`. Displayed interactively unless `dont_show_plot` is `True`.
+
+___
+
+### ExpZIFixedCouplerTuneup
+
+`class ExpZIFixedCouplerTuneup`
+
+#### Description
+
+`ExpZIFixedCouplerTuneup` is an orchestration class (not an `ExpZIqubit`
+subclass) that automates finding a fixed coupler's optimal CZ-gate flux-pulse
+amplitude and length. It first runs a 2D chevron sweep (via
+[`ExpZIChevrons2QFixedCoupler`](#expzichevrons2qfixedcoupler)) across flux
+amplitude and wait time to locate the amplitude at which the target state's
+population varies most (maximum variance across wait time — indicating the
+strongest interaction), then fixes that amplitude and re-runs a 1D wait-time
+sweep, fitting a cubic spline to locate the desired extremum (a maximum or
+minimum in population) as the optimal pulse length. Both results can be
+committed live to the coupler object.
+
+#### Arguments
+
+##### Positional
+
+| Argument | Type | Description |
+|---|---|---|
+| `name` | `str` | Name used to group the sub-experiments (`lab.group_open`/`group_close`). |
+| `expt_config` | — | Experiment configuration object passed through to each sub-experiment. |
+| `hal_QPU` | — | The QPU HAL object; used to look up the coupler and qubit objects. |
+| `qubit_ids` | `list[str]` | The two coupled qubits, e.g. `['Q0', 'Q2']`. |
+| `fit_qubit` | `str` | Which of the measured qubits' population to use for locating the interaction amplitude/length (must match one of the qubits present in the chevron sweep's output, including any auto-added coupler-involved qubits). |
+
+##### Keyword arguments
+
+| Argument | Type / Default | Description |
+|---|---|---|
+| `fit_state` | `str`, default `'E'` | Which state (`'G'`/`'E'`/`'F'`) of `fit_qubit` to use for locating the interaction amplitude and the pulse-length extremum. |
+| `pop_fit_extremum` | `str`, default `'max'` | Whether to locate a `'max'` or `'min'` in the wait-time population trace when fitting the optimal pulse length via the spline. |
+| `variance_fit_type` | `str`, default `'default'` | Whether the optimal amplitude is taken from the Lorentzian fit's centre (`'default'`) or from the raw data point with maximum variance (`'max'`). |
+| `individual_plots` | `bool`, default `False` | If `True`, each sub-experiment's own per-experiment plot is shown live (`dont_show_plot=not individual_plots` passed through). |
+| `update_params_live` | `bool`, default `True` | If `True`, updates the coupler's `Amplitude` and `Length` in-place with the located optima as the routine proceeds. |
+| `enable_ZI_log_messages` | `bool`, default `False` | Stored but not directly referenced in `run()`. |
+| `flux_amp_range` / `flux_amp_span` / `flux_amp_points` | array-like / `float` (default `0.05`) / `int` (default `11`) | Either supply the full `flux_amp_range` array, or let it be built as `coupler.Amplitude + linspace(-flux_amp_span/2, flux_amp_span/2, flux_amp_points)`. |
+| `wait_times` / `wait_time_max` / `wait_time_points` | array-like / `float` (default `250e-9`) / `int` (default `30`) | Either supply the full `wait_times` array, or let it be built as `linspace(1e-9, wait_time_max, wait_time_points)`. |
+
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIFixedCouplerTuneup import ExpZIFixedCouplerTuneup
+
+exp = ExpZIFixedCouplerTuneup('cplTuneup_Q0Q2', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0', 'Q2'],
+  fit_qubit='Q0', flux_amp_points=17, flux_amp_span=0.03)
+exp.run(lab)
+```
+
+#### Methods
+
+##### `run(lab)`
+
+1. Opens a `lab` experiment group named `name` and sets up a 2×2 figure grid
+   (variance-vs-amplitude / amplitude-vs-time heatmap on the left,
+   population-vs-time / extremum-fit on the right).
+2. Runs [`ExpZIChevrons2QFixedCoupler`](#expzichevrons2qfixedcoupler) over
+   `flux_amp_range`/`wait_times` in single-shot mode, and loads its saved
+   `fitted_data.npy`.
+3. Fits a Lorentzian to the variance (over wait time) of `fit_qubit`'s
+   `fit_state` population vs. flux amplitude, and locates the optimal
+   amplitude (per `variance_fit_type`). If `update_params_live` is `True`,
+   commits it to the coupler's `Amplitude`.
+4. Re-runs `ExpZIChevrons2QFixedCoupler` with a single fixed amplitude (the
+   one just located) over the same `wait_times`, to get a clean 1D
+   population-vs-time trace.
+5. Fits a cubic spline (`scipy.interpolate.CubicSpline`) to that trace, finds
+   its stationary points via the spline's derivative, estimates the
+   oscillation period from the median spacing between them, and selects the
+   stationary point closest to one period as the pulse-length extremum (per
+   `pop_fit_extremum`). If `update_params_live` is `True`, commits it to the
+   coupler's `Length`.
+6. Closes the `lab` experiment group and saves the combined summary figure.
+
+#### Outputs
+
+A single 4-panel summary figure, `Overview.png`, saved in the parent
+directory of the chevron sweep's output folder, and always left open for
+interactive display (this class has no `dont_show_plot` option of its own).
+
+___
+
+### ExpZIPhaseCompensation2Q
+
+`class ExpZIPhaseCompensation2Q(Experiment)`
+
+#### Description
+
+`ExpZIPhaseCompensation2Q` calibrates the single-qubit $Z$-rotation ("virtual
+phase") compensation angles needed around a two-qubit CZ-type gate on a fixed
+coupler, for the coupler's main (flux-pulsed) qubit, its stationary
+(spectator) qubit, and — if present — an auxiliary qubit sharing the flux
+line. For each role, it sweeps a compensating $R_z(\theta)$ angle around a
+Ramsey-like echo sequence and fits a sinusoid to locate the angle that
+restores the qubit to its ideal state, committing the results to the
+coupler's `CompZAngle`/`CompZAngleStationary`/`CompZAngleAux` properties.
+
+#### Arguments
+
+##### Positional
+
+| Argument | Type | Description |
+|---|---|---|
+| `name` | `str` | Name of the experiment. |
+| `expt_config` | — | Experiment configuration object passed through to each sub-experiment. Must already have `AcquisitionMode='DISCRIMINATION'` and `AveragingOrder='SingleShot'` set on its acquisition HAL — the constructor asserts both. |
+| `hal_QPU` | — | The QPU HAL object; used to look up the coupler and qubit objects. |
+| `qubit_ids` | `list[str]` | Must contain more than one qubit, e.g. the two coupled qubits `['Q0', 'Q2']`. |
+
+##### Keyword arguments
+
+| Argument | Type / Default | Description |
+|---|---|---|
+| `normalise_data` | `bool`, default `True` | Stored (`self._normalise_data`) but not directly consumed by this class's own `post_process` (which works from raw discriminated shots) — provided for parity/forwarding to the underlying `ExpZIqubit` sub-experiments. |
+| `states` | `str`, default `'ge'` | Stored as `self._transition`; forwarded to the sub-experiments. |
+| `update_coupler` | `bool`, default `False` | If `True`, commits the fitted compensation angles to the coupler object when `post_process()` is called. |
+| `rz_angles` | array-like, default `np.linspace(0, 2π, 11)` | The virtual $R_z(\theta)$ compensation angles to sweep for each role (main/stationary/aux). |
+| `coupler_obj` | coupler object, default `None` | The coupler to calibrate. If not supplied, it is looked up via `hal_QPU.get_coupler_obj_from_qubits(qubit_ids[0], qubit_ids[1], TunableTransmonCouplerFixed)`. |
+| `coupler_name` | `str`, default `None` | Overwritten internally to `self.cur_coupler_obj.Name` regardless of what is passed — effectively unused as an independent input. |
+
+Any remaining keyword arguments are passed through to each `ExpZIqubit`
+sub-experiment. The main/aux/stationary qubit roles are auto-detected from the
+coupler's `signals` dict (`'flux'`, `'flux_aux'`, `'drive_comp_stationary'`)
+— the constructor asserts a main and a stationary qubit are found (an
+auxiliary qubit is optional, with a printed notice if absent).
+
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIPhaseCompensation2Q import ExpZIPhaseCompensation2Q
+
+exp = ExpZIPhaseCompensation2Q('phaseComp_Q0Q2', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0', 'Q2'],
+  rz_angles=np.linspace(0, 2*np.pi, 21), update_coupler=True)
+exp.run(lab)
+exp.post_process()
+```
+
+#### Methods
+
+##### `run(lab)`
+
+Opens a `lab` experiment group named `name`, then runs the
+`phase_compensation_cz` LabOne Q workflow once per role — main (with the
+coupler's own `CompZAngle` reset to `None` first), auxiliary (if present, with
+`CompZAngleAux` reset to `None`), and stationary (with `CompZAngle` reset to
+`None` again) — each sweeping `rz_angles`, storing the resulting per-angle
+population traces in `self.data`.
+
+##### `post_process()`
+
+Calls the static `plot_fitted_data` to fit and plot all measured roles, then
+— if `update_coupler` is `True` — commits the fitted `CompZAngle`,
+`CompZAngleStationary`, and (if measured) `CompZAngleAux` to the coupler
+object.
+
+##### `plot_fitted_data(data, main_qubit_id=None, coupler_id=None, aux_qubit_id=None, stationary_qubit_id=None, save_path=None)` *(static)*
+
+For each measured role, fits a sinusoid (`DFitSinusoid`) to population vs.
+$R_z(\theta)$ and locates the angle minimising the fitted curve (the
+compensation angle that best restores the ideal population), plotting each
+role's data/fit on its own panel. Returns a dict of fitted angles keyed by
+role (`'main'`, `'stationary'`, and — if present — `'aux'`).
+
+#### Outputs
+
+A summary figure (2 or 3 panels, depending on whether an auxiliary qubit is
+present) is saved to `fitted_plot.png` in the parent directory shared by the
+sub-experiments' output. No `.npy` fit-data file is saved.
+
+___
+
+### ExpZIBellStateFidelity
+
+`class ExpZIBellStateFidelity(ExpZIqubit)`
+
+#### Description
+
+`ExpZIBellStateFidelity` prepares a two-qubit Bell state (via a QASM circuit:
+reset, Hadamards, a CZ, and a final Hadamard) on a pair of qubits joined by a
+fixed coupler, performs two-qubit state tomography by executing the resulting
+QASM script through [`ExpZIQASM`](#expziqasm), reconstructs the density
+matrix (`DataDensityMatrix`), and reports the state fidelity and purity
+relative to the ideal Bell state. Optionally commits the fidelity to the
+coupler's `FidelityBell` property.
+
+#### Arguments
+
+##### Positional
+
+| Argument | Type | Description |
+|---|---|---|
+| `name` | `str` | Name used both for the experiment and to group sub-experiments. |
+| `expt_config` | — | Experiment configuration object passed through to the underlying `ExpZIQASM` run. |
+| `hal_QPU` | — | The QPU HAL object; used to look up the qubit and coupler objects. |
+| `qubit_ids` | `list[str]` | Must contain exactly two qubits, e.g. `['Q0', 'Q2']` (the constructor asserts `len(qubit_ids)==2`). |
+
+##### Keyword arguments
+
+| Argument | Type / Default | Description |
+|---|---|---|
+| `dont_show_plot` | `bool`, default `False` | Popped and stored (`self._dont_show_plot`), though not directly referenced by the provided `run`/`post_process` methods (the 3D density-matrix plot is always saved via `leRho.plot3D`). |
+| `update` | `bool`, default `True` | If `True`, writes the measured Bell-state fidelity to the coupler's `FidelityBell` property when `post_process()` is called. |
+| `readout_correction` | `'ge'`/`'gef'`/`None`, default `'ge'` | Which readout-correction matrix (from each qubit's `CorrectionMatrix` dict — see [`ExpZIBlobs.get_correction_matrices`](#get_correction_matricesupdatefalse)) to apply during tomographic reconstruction; falls back to uncorrected reconstruction with a printed notice if the requested matrix isn't present. |
+| `save_qasm_path` | `str`, default `f'BellStateTomography{{q1}}{{q2}}.qasm'` | Where the generated tomography QASM script is written. |
+| `coordinate_system` | `str`, default `'RH'` | Must be `'LH'` or `'RH'`; forwarded to `DataDensityMatrix.generate_tomography_qasm`. |
+
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIBellStateFidelity import ExpZIBellStateFidelity
+
+exp = ExpZIBellStateFidelity('bellState_Q0Q2', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0', 'Q2'], update=True)
+exp.run(lab)
+exp.post_process()
+```
+
+#### Methods
+
+##### `run(lab)`
+
+Builds a full two-qubit tomography QASM script from the fixed Bell-state
+preparation circuit (via `DataDensityMatrix.generate_tomography_qasm`), then
+runs it via [`ExpZIQASM`](#expziqasm) across every qubit on the QPU (mapping
+the QASM's `q[0]`/`q[1]` registers onto `qubit_ids[1]`/`qubit_ids[0]`
+respectively), forcing `AcquisitionMode='DISCRIMINATION'`,
+`AveragingOrder='SingleShot'`.
+
+##### `post_process(use_abs_phase=False, readout_correction=None)`
+
+Reads back the QASM run's output via
+[`ExpZIQASMDataViewer`](#expziqasmdataviewer), reconstructs the two-qubit
+density matrix (with readout correction applied if configured/available),
+computes the fidelity against the ideal Bell state `[1,0,0,1]/√2` (as a
+percentage, stored in `self._fidelity`) and the state purity (stored in
+`self._purity`), plots a 3D density-matrix visualisation, and — if `update`
+was `True` — writes the fidelity to the coupler's `FidelityBell` property. An
+explicit `readout_correction` argument here overrides the one set at
+construction.
+
+#### Outputs
+
+- **Plot**: A 3D density-matrix visualisation, saved as `BellState.png` in the
+  QASM run's output folder.
+- No `.npy` fit-data file is saved; `self._fidelity` and `self._purity` are
+  kept on the instance.
+
+___
+
+### ExpZICryoscope
+
+`class ExpZICryoscope`
+
+#### Description
+
+`ExpZICryoscope` performs a cryoscope measurement to characterise (and
+compensate) the impulse response of a fixed coupler's flux line. For a range
+of flux-pulse amplitudes, it measures the second qubit's phase accumulation
+($\langle X\rangle$/$\langle Y\rangle$ via two 90°-rotated Ramsey-like
+sequences) as a function of time after the flux pulse, demodulates and
+converts the resulting phase evolution into an instantaneous frequency shift,
+converts that into an equivalent normalised flux via the qubit's spectrum
+($f_{max}$, $E_C/h$), and fits a step-response model to that flux trace,
+producing a digital pre-distortion (precompensation) filter kernel that can be
+loaded onto the coupler's pulse.
+
+#### Arguments
+
+##### Positional
+
+| Argument | Type | Description |
+|---|---|---|
+| `name` | `str` | Name used to group the two sub-experiments (`lab.group_open`/`group_close`). |
+| `expt_config` | — | Experiment configuration object passed through to the sub-experiments. |
+| `hal_QPU` | — | The QPU HAL object; used to look up the qubit and coupler objects. |
+| `qubit_ids` | `list[str]` | Must contain more than one qubit (the constructor asserts `len(qubit_ids) > 1`) — the first qubit is the one measured, and a coupler is looked up between it and the second. |
+
+##### Keyword arguments
+
+| Argument | Type / Default | Description |
+|---|---|---|
+| `nyquist_order` | `int`, default `0` | Compensates for aliasing when the true frequency shift lies above the Nyquist frequency set by the sampling rate implied by `lengths`; adds `0.5·nyquist_order/dt` to the demodulated frequency. |
+| `amplitudes` | array-like, default `np.linspace(0.3, 0.3, 1)` | The coupler flux-pulse amplitudes to characterise (a single amplitude by default). |
+| `lengths` | array-like, default `np.arange(0, 300e-9, 0.5e-9)` | The post-flux-pulse wait times ($\tau$) at which phase is sampled. |
+| `transition` | `str`, default `'ge'` | The transition used for calibration-based normalisation. |
+| `normalise_data` | `bool`, default `True` | If `True`, normalises the raw IQ traces into $\langle X\rangle$/$\langle Y\rangle$ expectation values using calibration data; required for the reconstruction and fitting steps to run. |
+| `f_max` | `float`, default `qubit.FluxConversionParams['f_max']` (if available) | The qubit's maximum (flux-insensitive) transition frequency, used to convert frequency shift into normalised flux. |
+| `Ec_over_h` | `float`, **required** | The qubit's charging energy divided by Planck's constant, used in the same flux conversion. The constructor asserts this is provided. |
+| `norm_window` | `tuple(int, int)`, default `(0.8·n, n)` | The index range (into the time-trace array of length `n`) used to normalise the reconstructed flux trace to its long-time value; defaults to the last 20% of the trace. |
+
+Any other keyword argument is stored in `self._kwargs` and forwarded through
+to each underlying `ExpZIqubit`/`cryo_scope` sub-experiment call (as well as
+into `lab.run_single`).
+
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZICryoscope import ExpZICryoscope
+
+exp = ExpZICryoscope('cryoscope_Q0Q2', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0', 'Q2'],
+  amplitudes=np.linspace(0.2, 0.4, 5), lengths=np.arange(0, 300e-9, 0.5e-9), Ec_over_h=200e6)
+exp.run(lab)
+```
+
+#### Methods
+
+##### `run(lab)`
+
+Runs two `cryo_scope` sub-experiments back-to-back (`y90=False` then
+`y90=True`, measuring $\langle Y\rangle$ and $\langle X\rangle$ respectively)
+over `lengths`/`amplitudes`, then calls `post_process()`, `plot_summary()`,
+and `fit_step_response()` in turn.
+
+##### `post_process(filter_window_length=7, polyorder=2)`
+
+Normalises the raw $X$/$Y$ traces into expectation values (if
+`normalise_data`), forms the complex signal $C = X + iY$ for each amplitude,
+demodulates it via its dominant FFT frequency, extracts the phase derivative
+(both a raw finite-difference version and a Savitzky-Golay-filtered version),
+converts the resulting frequency shift into a normalised flux
+$\Phi_R/\Phi_0$ via the qubit's spectrum ($f_{max}$, $E_C/h$), and normalises
+each amplitude's flux trace by its value within `norm_window` to produce the
+final normalised step response `s(t)`. Warns if a trace's normalisation value
+is close to zero (a symptom of Nyquist aliasing in the demodulation).
+
+##### `plot_calibrated_traces()` / `plot_fft_grid(...)` / `plot_amplitude_grid(...)` / `plot_summary()`
+
+Diagnostic plotting helpers: the calibrated $X$/$Y$/phase traces per
+amplitude; a grid of FFT spectra (showing the chosen demodulation frequency
+and the Nyquist band) for a subset of amplitudes; a grid of per-amplitude
+detuning/flux/normalised-step-response traces; and (`plot_summary`) all
+three in sequence.
+
+##### `fit_step_response(amplitude_index=0, update_coupler=True)`
+
+Fits a pole-zero model to the normalised step response at the given
+amplitude index (via `Flattenator.fit_step_response`, 5 poles/5 zeros) and, if
+`update_coupler` is `True`, writes the resulting compensation kernel onto the
+coupler's `Pulse['precomp_kernel']`.
+
+##### `fit_step_response_from_s_data(normalised_step_response)` *(static)*
+
+Lower-level helper: fits the pole-zero model directly to a given normalised
+step-response array and returns the compensation kernel.
+
+#### Outputs
+
+Three diagnostic figures (calibrated traces, FFT grid, amplitude grid) plus
+the `Flattenator` fit's own response plot, all left open for interactive
+display; this class does not expose a `dont_show_plot` option, and does not
+save any of its figures to disk itself (though the underlying `cryo_scope`
+sub-experiments' own outputs are saved as usual). The fitted compensation
+kernel is returned by `fit_step_response_from_s_data` and (if requested)
+written directly onto the coupler object rather than saved to a file.
+
+___
+
+### ExpZIDailyTuneup
+
+`class ExpZIDailyTuneup`
+
+#### Description
+
+`ExpZIDailyTuneup` is the top-level orchestration class (not an `ExpZIqubit`
+subclass) that runs a full daily maintenance/tuneup routine on a single
+qubit: fine $X$-gate tuneup, readout resonator + integration-weight
+optimisation, $T_1$, two-qubit gate fine-tuning (chevron amplitude/length) if
+a coupled qubit is found, single-qubit randomised benchmarking, and two-qubit
+Bell-state fidelity — printing a running summary and (optionally) saving the
+QPU configuration to disk.
+
+#### Arguments
+
+##### Positional
+
+| Argument | Type | Description |
+|---|---|---|
+| `name` | `str` | Stored as `self._name` but not currently used by `run()` — every sub-experiment's name is built from the hardcoded literal `'DailyTuneup'` (e.g. `f'DailyTuneup_{qubit_id}_FinetuneX'`), not from this argument. |
+| `expt_config` | — | Experiment configuration object passed through to every sub-experiment. |
+| `hal_QPU` | — | The QPU HAL object; used to look up the qubit (and any coupled qubit/coupler) objects. |
+| `qubit_id` | `str` | A single qubit ID, as a string (the constructor asserts `isinstance(qubit_id, str)`). |
+
+##### Keyword arguments
+
+| Argument | Type / Default | Description |
+|---|---|---|
+| `tune_readout` | `bool`, default `True` | If `True`, runs the readout-resonator optimisation ([`ExpZIResOptimal`](#expziresoptimal)), integration-weight optimisation, and (if `update_params_live`) an [`ExpZIBlobs`](#expziblobs) fidelity check. |
+| `individual_plots` | `bool`, default `False` | Passed through to sub-experiments as `dont_show_plot=not individual_plots`/`ZI_plot=individual_plots` (whichever each sub-experiment exposes). |
+| `update_params_live` | `bool`, default `True` | Gates whether each step's fitted result is actually committed to the qubit/coupler as the routine proceeds (readout frequency, $T_1$, two-qubit gate amplitude/length, randomised-benchmarking fidelity, Bell-state fidelity). |
+| `enable_ZI_log_messages` | `bool`, default `False` | Stored but not directly referenced in `run()` (each sub-experiment manages its own ZI logging). |
+| `save_config` | `bool`, default `False` | If `True`, saves the QPU configuration to a timestamped JSON file at the end of the routine (backing up any existing file of the same generated name first). |
+| `print_summary` | `bool`, default `True` | If `True`, calls `hal_QPU.print_summary_ZIQubits()` at the end of the routine. |
+| `save_summary_config_from_json` | `bool`, default `True` | If `True` (and `save_config` is also `True` — forced to `False` otherwise), also generates a summary JSON (via `SOFTqpu.create_summary_config_from_json`) intended for a website/dashboard update. |
+| `summary_json_file` | `str`, default `f'{today:%Y%m%d}_QPUsummary.json'` | Output path for the summary JSON described above. |
+| `skip_2qg` | `bool`, default `False` | If `True`, skips both the two-qubit gate fine-tuning and the Bell-state fidelity steps entirely. |
+| `states` | `str`, default `'gef'` | Must be `'ge'`, `'ef'`, or `'gef'`; used for the readout-fidelity update rule and passed through where relevant. |
+| `res_is_trough` | `bool`, default `True` | Stored (`self._res_trough`) but not directly referenced in the provided `run()` body. |
+| `update_qubits_by_fidelity` | `str`, default `'mean'` | Which state's fidelity to prioritise (`'g'`/`'e'`/`'f'`/`'mean'`, case-insensitive) when calling [`ExpZIResOptimal.update_qubits_by_fidelity`](#update_qubits_by_fidelitystate_fidelitygef) for the readout step. |
+| `res_freq_range` / `res_freq_span` / `res_freq_points` | array-like / `float` (default `10e6`) / `int` (default `101`) | Either supply the full `res_freq_range` array, or let it be built as `linspace(ReadoutFrequency − 2·span/3, ReadoutFrequency + span/3, points)`. |
+| `chevron_amp_pts` | `int`, default `17` | Passed as `flux_amp_points` to the [`ExpZIFixedCouplerTuneup`](#expzifixedcouplertuneup) sub-experiment during the two-qubit gate step. |
+| `chevron_amp_span` | `float`, default `0.03` | Passed as `flux_amp_span` to the same sub-experiment. |
+| `skip_benchmarking` | `bool`, default `False` | If `True`, skips both the single-qubit randomised-benchmarking and (as a consequence) the Bell-state fidelity steps, since the latter is nested inside the former's `if` block in the source. |
+| `rb_sequence_lengths` | `list[int]`, default `[4, 8, 16, 32, 64, 128]` | Passed as `sequence_lengths` to [`ExpZIRandomisedBenchmarking`](#expzirandomisedbenchmarking). |
+| `rb_num_trials` | `int`, default `6` | Passed as `num_trials` to the same sub-experiment. |
+
+All other keyword arguments are stored in `self._kwargs` and forwarded to the
+fine-$X$-tuneup step ([`ExpZISingleQubitTuneup.run_fine_tuneup`](ZI_SingleQubitTuneup.md)).
+
+#### Example snippet
+```python
+from sqdtoolz.Experiments.Experimental.ExpZIDailyTuneup import ExpZIDailyTuneup
+
+exp = ExpZIDailyTuneup('DailyTuneup', lab.CONFIG('ZI'), lab.HAL('QPU'), 'Q0',
+  save_config=True, rb_sequence_lengths=[4, 8, 16, 32, 64])
+exp.run(lab)
+```
+
+#### Methods
+
+##### `run(lab)`
+
+Runs, in order: fine $X$-gate tuneup
+([`ExpZISingleQubitTuneup.run_fine_tuneup`](ZI_SingleQubitTuneup.md)); (if
+`tune_readout`) readout-resonator optimisation
+([`ExpZIResOptimal`](#expziresoptimal)) plus integration-weight optimisation
+(a `time_traces` `ExpZIqubit` run) plus (if `update_params_live`) an
+[`ExpZIBlobs`](#expziblobs) fidelity check; $T_1$
+([`ExpZIT1`](#expzit1)); (unless `skip_2qg`, and only if a coupled qubit is
+found on the QPU) two-qubit gate fine-tuning
+([`ExpZIFixedCouplerTuneup`](#expzifixedcouplertuneup)); (unless
+`skip_benchmarking`) single-qubit randomised benchmarking
+([`ExpZIRandomisedBenchmarking`](#expzirandomisedbenchmarking)) followed by
+(unless `skip_2qg`, and only if a coupled qubit was found) Bell-state fidelity
+([`ExpZIBellStateFidelity`](#expzibellstatefidelity)); and finally the
+summary-printing/config-saving steps described above. Progress and
+before/after values for each step are printed to the console throughout.
+
+#### Outputs
+
+Each step's own plots/`.npy` files are produced as usual by the sub-experiment
+it runs; `ExpZIDailyTuneup` itself does not generate any additional plot. If
+`save_config` is `True`, a timestamped `{YYYYMMDD_HHMM}_QPU_config.json` is
+written (with any pre-existing file of that name backed up to
+`/Config_backups/` first), and — if `save_summary_config_from_json` is also
+`True` — a summary JSON is written to `summary_json_file`.

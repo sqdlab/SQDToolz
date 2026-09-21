@@ -60,7 +60,7 @@ exp = ExpZICryoscope(
 **Requirements:**
 - `qubit_ids` must contain **at least two entries** — the second is used to identify the associated coupler (`TunableTransmonCouplerFixed`) whose pulse gets updated later.
 - `Ec_over_h` is **required** (no default) — the constructor will assert if it's missing.
-- `f_max` is required either as a kwarg or via the qubit's `FluxConversionParams`.
+- `f_max` should be supplied either as a kwarg or via the qubit's `FluxConversionParams`, but this is *not* actually enforced with an assert (unlike `Ec_over_h`) — if it's left unset and unavailable from `FluxConversionParams`, `f_max` will silently remain `None` and the flux-reconstruction step will fail later rather than at construction time.
 
 ---
 

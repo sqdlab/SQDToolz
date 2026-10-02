@@ -44,10 +44,11 @@ class ExpZIDispersive(ExpZIqubit):
                 g_data_y, e_data_y  = np.sqrt(g_arr[:,self._iq_indices[0]]**2 + g_arr[:,self._iq_indices[1]]**2),np.sqrt(e_arr[:,self._iq_indices[0]]**2 + e_arr[:,self._iq_indices[1]]**2)
                 #
                 pwr = self._hal_QPU.get_qubit_obj(qubit).ReadoutLineAttenuation_dB
-                g_dpkt = ResonatorPowerSweep.single_circlefit(g_data_x, g_data_i, g_data_q, power_dBm=pwr, dont_plot=True, pass_fits=True)
-                e_dpkt = ResonatorPowerSweep.single_circlefit(e_data_x, e_data_i, e_data_q, power_dBm=pwr, dont_plot=True, pass_fits=True)
                 #
+                chi = 0
                 if self._fit_type == "Circlefit":
+                    g_dpkt = ResonatorPowerSweep.single_circlefit(g_data_x, g_data_i, g_data_q, power_dBm=pwr, dont_plot=True, pass_fits=True)
+                    e_dpkt = ResonatorPowerSweep.single_circlefit(e_data_x, e_data_i, e_data_q, power_dBm=pwr, dont_plot=True, pass_fits=True)
                     if e_dpkt and g_dpkt:
                         chi = (e_dpkt['fr'] - g_dpkt['fr'])/2
                         target_f = e_dpkt['fr'] + chi
@@ -76,9 +77,9 @@ class ExpZIDispersive(ExpZIqubit):
                     # print(f"Estimate thermal photons: {solution}")
                 if self._update_params:
                     cur_qubit = self._hal_QPU.get_qubit_obj(qubit)
-                    if target_f:
-                        cur_qubit.ReadoutFrequency = target_f
-                    if e_dpkt and g_dpkt:
+                    # if target_f:
+                    #     cur_qubit.ReadoutFrequency 
+                    if chi != 0:
                         cur_qubit.ChiGE = chi
                     if self._calc_thermal_photons:
                         cur_qubit.ReadoutKappa = kappa
@@ -86,14 +87,13 @@ class ExpZIDispersive(ExpZIqubit):
                 if not self._dont_plot:
                     fig, ax = plt.subplots()
                     fig.set_figwidth(15)
-                    ax.plot(g_data_x*1e-9, g_data_y, 'x', label=f"g ({g_dpkt['fr']*1e-9:.4f} GHz)", c='tab:blue')
-                    ax.plot(e_data_x*1e-9, e_data_y, 'x', label=f"e ({e_dpkt['fr']*1e-9:.4f} GHz)", c='tab:orange')                
-                    if e_dpkt and g_dpkt:
-                        ax.plot(g_data_x*1e-9, np.absolute(g_dpkt['fit_data']), c='tab:blue', alpha=1)
-                        ax.plot(e_data_x*1e-9, np.absolute(e_dpkt['fit_data']), c='tab:orange', alpha=1)
-                        if self._fit_type == 'Circlefit':
-                            ax.axvline(g_dpkt['fr']*1e-9, lw=2, ls='dashed', alpha=1, c='tab:blue')
-                            ax.axvline(e_dpkt['fr']*1e-9, lw=2, ls='dashed', alpha=1, c='tab:orange')
+                    ax.plot(g_data_x*1e-9, g_data_y, 'x', c='tab:blue')
+                    ax.plot(e_data_x*1e-9, e_data_y, 'x', c='tab:orange')                
+                    if self._fit_type == 'Circlefit':
+                        ax.plot(g_data_x*1e-9, np.absolute(g_dpkt['fit_data']), label=f"g ({g_dpkt['fr']*1e-9:.4f} GHz)", c='tab:blue', alpha=1)
+                        ax.plot(e_data_x*1e-9, np.absolute(e_dpkt['fit_data']), label=f"e ({e_dpkt['fr']*1e-9:.4f} GHz)", c='tab:orange', alpha=1)
+                        ax.axvline(g_dpkt['fr']*1e-9, lw=2, ls='dashed', alpha=1, c='tab:blue')
+                        ax.axvline(e_dpkt['fr']*1e-9, lw=2, ls='dashed', alpha=1, c='tab:orange')
                     if self._fit_type == "Minimum":
                         ax.axvline(g_min_f*1e-9, lw=2, ls='dashed', c='tab:blue', alpha=1)
                         ax.axvline(e_min_f*1e-9, lw=2, ls='dashed', c='tab:orange', alpha=1)

@@ -77,18 +77,24 @@ class ExpZITWPATuneup(ExpZIqubit):
                 self._optimum_twpa_point['Power'] = powers[opt_indicies[1]]
                 XX, YY = np.meshgrid(freqs,powers)
                 ZZ = snr_db_total.T
-                fig, ax = plt.subplots()
+                fig, ax = plt.subplots(figsize=(8, 6))
                 cmap = ax.pcolormesh(XX,YY,ZZ)
-                ax.plot(freqs[opt_indicies[0]], powers[opt_indicies[1]], 'o', color = 'red', label = f'$f_p=${freqs[opt_indicies[0]]/1e9} GHz, $P=${powers[opt_indicies[1]]} dB')
-                cbar = fig.colorbar(cmap)
+                try:
+                    ax.plot(freqs[opt_indicies[0]], powers[opt_indicies[1]], 'o', color = 'red', label = f'$f_p=${float(freqs[opt_indicies[0]])/1e9:.4f} GHz, $P=${float(powers[opt_indicies[1]]):.4f} dB')
+                except:
+                    ax.plot(freqs[opt_indicies[0]], powers[opt_indicies[1]], 'o', color = 'red')
+                cbar = fig.colorbar(cmap, label='SNR (dB)')
                 ax.legend(loc=0)
+                ax.set_ylabel("Power (dBm)")
+                ax.set_xlabel("Frequency (Hz)")
                 plt.show()
+                plt.savefig("fitted_plot.png")
                 
                 if self._plot_all_qubits:#Plot of all qubits individually
                     n = len(self._qubit_ids)
                     cols = int(np.ceil(np.sqrt(n)))
                     rows = int(np.ceil(n / cols))
-                    fig, axes = plt.subplots(rows, cols, figsize=(cols * 3, rows * 3))
+                    fig, axes = plt.subplots(rows, cols, figsize=(cols * 5, rows * 3))
                     if n == 1:
                         axes_flat = [axes]
                     else:
@@ -98,16 +104,19 @@ class ExpZITWPATuneup(ExpZIqubit):
                         ZZ = (self._iq_blob_data[qubit]).T
                         if i < n:
                             cmap = axes_flat[i].pcolormesh(XX,YY,ZZ)
-                            axes_flat[i].plot(freqs[opt_indicies[0]], powers[opt_indicies[1]], 'o', color = 'red', 
-                                    label = f'$f_p=${freqs[opt_indicies[0]]/1e9} GHz, $P=${powers[opt_indicies[1]]} dB'
-                                )
-                            cbar = fig.colorbar(cmap)
+                            axes_flat[i].plot(float(freqs[opt_indicies[0]]), float(powers[opt_indicies[1]]), 'o', color = 'red', label = f'$f_p=${float(freqs[opt_indicies[0]]/1e9):.4f} GHz, $P=${float(powers[opt_indicies[1]]):.4f} dB')
+                            cbar = fig.colorbar(cmap, label='SNR (dB)')
                             axes_flat[i].legend(loc=0)
                             axes_flat[i].set_title(f'{qubit}')
+                            axes_flat[i].set_ylabel(f'Power (dBm)')
+                            axes_flat[i].set_xlabel(f'Frequency (Hz)')
                         else:
-                            axes_flat[i].axis('off')
+                            # axes_flat[i].axis('off')
+                            # axes_flat[i].set_visible(False)
+                            axes_flat[i].remove()
                     plt.tight_layout()
                     plt.show()
+                    plt.savefig("individual_qubits.png")
 
             else: #1D sweep TWPA parameter, repititions
                 fig, ax = plt.subplots()
@@ -118,13 +127,13 @@ class ExpZITWPATuneup(ExpZIqubit):
                     for qubit in self._qubit_ids:
                         snr = self._iq_blob_data[qubit]
                         ax.plot(freqs, snr[0,:], label=f'{qubit}')
-                    ax.vline(freqs[opt_indicies[0]], color = 'black', label = f'$f_p=${freqs[opt_indicies[0]]/1e9} GHz, $P=${powers[opt_indicies[1]]} dB')
+                    ax.vline(float(freqs[opt_indicies[0]]), color = 'black', label = f'$f_p=${float(freqs[opt_indicies[0]]/1e9)} GHz, $P=${float(powers[opt_indicies[1]])} dB')
                 else:
                     ax.plot(powers, snr_db_total[0, :], label='mean SNR')
                     for qubit in self._qubit_ids:
                         snr = self._iq_blob_data[qubit]
                         ax.plot(powers, snr[0,:], label=f'{qubit}')
-                    ax.vline(powers[opt_indicies[1]], color = 'black', label = f'$f_p=${freqs[opt_indicies[0]]/1e9} GHz, $P=${powers[opt_indicies[1]]} dB')
+                    ax.vline(float(powers[opt_indicies[1]]), color = 'black', label = f'$f_p=${float(freqs[opt_indicies[0]]/1e9)} GHz, $P=${float(powers[opt_indicies[1]])} dB')
 
         if self._update_qubit:
             self._hal_twpa.Frequency = self._optimum_twpa_point['Frequency'][0] 

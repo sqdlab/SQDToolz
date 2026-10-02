@@ -17,8 +17,6 @@ class ExpZIBellStateFidelity(ExpZIqubit):
 
         self._dont_show_plot = kwargs.pop('dont_show_plot', False)
         self._update_coupler = kwargs.pop('update', True)
-        self._readout_correction = kwargs.pop('readout_correction', 'ge')
-        assert self._readout_correction in ['ge', 'gef', None], "Provide readout_correction as 'ge', 'gef' or None."
 
         self._q1_object = self._hal_QPU.get_qubit_obj(qubit_ids[0])
         self._q2_object = self._hal_QPU.get_qubit_obj(qubit_ids[1])
@@ -53,16 +51,23 @@ h q[1];
         lab.run_single(exp, override_ACQ_params={'AcquisitionMode': 'DISCRIMINATION', 'AveragingOrder': 'SingleShot'})
         self._file_path = exp._file_path
 
-    def post_process(self, use_abs_phase=False, readout_correction=None):
-        if readout_correction != None:
-            self._readout_correction = readout_correction
+    def post_process(self, use_abs_phase=False, readout_correction=True, state='ge'):
+        # if readout_correction != None:
+        #     self._readout_correction = readout_correction
+
+        #TODO: need to check this for the new readout configs
 
         ledv = ExpZIQASMDataViewer(self._file_path)
         ledv.get_inner_slicing_vars()
         #
-        if self._readout_correction is not None and self._q1_object.CorrectionMatrix[self._readout_correction] is not None and self._q2_object.CorrectionMatrix[self._readout_correction] is not None:
-            leRho = DataDensityMatrix.fromDataViewer(ledv, readout_correction_matrices=[self._q1_object.CorrectionMatrix[self._readout_correction], self._q2_object.CorrectionMatrix[self._readout_correction]])
-        elif self._readout_correction is not None:
+        if readout_correction is True and self._q1_object.CorrectionMatrix is not None and self._q2_object.CorrectionMatrix is not None:
+            try:
+                leRho = DataDensityMatrix.fromDataViewer(ledv, readout_correction_matrices=[self._q1_object.CorrectionMatrix, self._q2_object.CorrectionMatrix])
+            except:
+                leRho = DataDensityMatrix.fromDataViewer(ledv, readout_correction_matrices=[self._q1_object.CorrectionMatrix, self._q2_object.CorrectionMatrix])
+            else:
+                pass
+        elif readout_correction:
             print("Unable to apply readout correction as CorrectionMatrix was not found in qubit attributes. Please check the selected correction matrix (i.e. 'ge' or 'gef') is present. Continuing without readout correction.")
             leRho = DataDensityMatrix.fromDataViewer(ledv)
         else:

@@ -142,6 +142,7 @@ class ExpZIResOptimal(ExpZIqubit):
 
             maxFidInds = []
             axFirst = None
+            fidelities = []
             for m in range(len(fidData)):
                 axFids.plot(freqs/norm_fac, fidData[m], color = leCols[m])
                 maxFidInds.append(np.argmax(fidData[m]))
@@ -168,6 +169,7 @@ class ExpZIResOptimal(ExpZIqubit):
                 else:
                     leIQDiscsAll[m][maxFidInds[-1]].plot_assignment_matrix(axA, sigFigs=2, labels=[leStates[combs[m][0]].lower(), leStates[combs[m][1]].lower()])
                 self._readout_fidelity = (leIQDiscsAll[m][maxFidInds[-1]].get_average_fidelity()*100)
+                fidelities.append(self._readout_fidelity)
                 axA.set_title(f"Mean: {self._readout_fidelity:.4g}%")
                 if m > 0:
                     ax.set_ylabel('')
@@ -179,7 +181,7 @@ class ExpZIResOptimal(ExpZIqubit):
             else:
                 axFids.legend(['ge','ef','gf','gef'], loc='lower right')
 
-            self._fit_data = {'freqs':freqs, 'maxSepIndices':maxSepInds, 'maxFidIndices':maxFidInds, 'discriminators':leIQDiscs}
+            self._fit_data = {'freqs':freqs, 'maxSepIndices':maxSepInds, 'maxFidIndices':maxFidInds, 'discriminators':leIQDiscs, 'fidelities': fidelities}
         else:
             self._fit_data = {'freqs':freqs, 'maxSepIndices':maxSepInds}
 
@@ -223,7 +225,7 @@ class ExpZIResOptimal(ExpZIqubit):
             assert state_fidelity in ['ge', 'ef', 'gf', 'gef'], "Invalid state (must be either 'ge', 'ef', 'gf' or 'gef')"
             ind = ['ge', 'ef', 'gf', 'gef'].index(state_fidelity)
         qubit_obj.ReadoutFrequency = float( self._fit_data['freqs'][ self._fit_data['maxFidIndices'][ind] ] )
-        qubit_obj.FidelityReadout = self._readout_fidelity
+        qubit_obj.FidelityReadout = float(self._fit_data['fidelities'][ind])
 
     def print_best_frequencies_by_separation(self):
         assert len(self._fit_data) > 0, "Must run experiment first."

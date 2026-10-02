@@ -76,10 +76,15 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
                     #An additional headache where it seems to leave behind a residual threshold that breaks due to validation checks...
                     self._instr_zi.device_setup.logical_signal_groups[self.Name].logical_signals['acquire'].calibration.threshold = None
                 elif value == 'optimal':
+                    setattr(self._zi_qubit.parameters, self._param_mappings[name], value)
                     if self.ReadoutKernelThresholds is None:
                         self.ReadoutKernelThresholds = self._temp_readout_params.get('ReadoutKernelThresholds', None)
                     if self.ReadoutKernelWeights is None:
                         self.ReadoutKernelWeights = self._temp_readout_params.get('ReadoutKernelWeights', None)
+            if name == 'ReadoutKernelThresholds' or name == 'ReadoutKernelWeights':
+                if self.ReadoutKernelType == 'default':
+                    self._temp_readout_params[name] = value
+                    return
             if name == 'FluxDC':
                 self._flux_dc = value
                 if self._zi_instr_phys_flux != "":
@@ -151,7 +156,7 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
                 'ReadoutQc': 1,
                 'ReadoutQl': 1,
                 'ReadoutKappa': 0,
-                'CorrectionMatrix': {}, 
+                'CorrectionMatrix': None, 
                 'ThermalPhotonNum': 0,
                 'ReadoutLineAttenuation_dB': -70, 
                 'FluxConversionParams': None,

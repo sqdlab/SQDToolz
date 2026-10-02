@@ -49,15 +49,15 @@ class ExpZIRabi(ExpZIqubit):
 
             dpkt['fit_data'] = {'amplitude': dpkt['fit_data'], 'amplitude_raw': data_y}
 
+            if self._normalise_data:
+                #Find X and X/2 amplitudes...
+                n = np.ceil( dpkt['phase']/(2*np.pi) )
+                amp_X = ( 2*n*np.pi - dpkt['phase'] ) / ( 2*np.pi * dpkt['frequency'] )
+                amp_Xon2 = amp_X - 0.25 / dpkt['frequency']
+                dpkt['fit_data']['amp_X'] = amp_X
+                dpkt['fit_data']['amp_Xon2'] = amp_Xon2
+                dpkt['fit_data']['transition'] = self._transition
             if self._update_params:
-                if self._normalise_data:
-                    #Find X and X/2 amplitudes...
-                    n = np.ceil( dpkt['phase']/(2*np.pi) )
-                    amp_X = ( 2*n*np.pi - dpkt['phase'] ) / ( 2*np.pi * dpkt['frequency'] )
-                    amp_Xon2 = amp_X - 0.25 / dpkt['frequency']
-                    dpkt['fit_data']['amp_X'] = amp_X
-                    dpkt['fit_data']['amp_Xon2'] = amp_Xon2
-                    dpkt['fit_data']['transition'] = self._transition
                 cur_qubit = self._hal_QPU.get_qubit_obj(qubit_dataset)
                 if self._transition == 'ge':
                     if self._normalise_data:

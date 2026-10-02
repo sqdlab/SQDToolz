@@ -17,6 +17,7 @@ class ExpZIChevrons2QFixedCoupler(ExpZIqubit):
         self._fit_freq = None
         assert 'amplitudes' in kwargs, "Must supply the array of flux amplitudes to sweep on the coupler."
         self._amplitudes = kwargs.pop('amplitudes')
+        assert np.min(self._amplitudes) >= -1 and np.max(self._amplitudes) <= 1, f"Magnitude of a value in the amplitude sweep is above unity ({np.min(self._amplitudes):.2f} t0 {np.max(self._amplitudes):.2f})."
         self._plot_with_frequency = kwargs.pop('plot_with_frequency', True)
         
         self.cur_coupler_obj = hal_QPU.get_coupler_obj_from_qubits(qubit_ids[0],qubit_ids[1], TunableTransmonCouplerFixed)

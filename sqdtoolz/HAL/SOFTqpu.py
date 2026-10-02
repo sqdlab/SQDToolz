@@ -221,7 +221,7 @@ class SOFTqpu(HALbase, ZIbase):
                 r'$T_2^{\text{Hahn}}$ (μs)':        [f'{x.T2GE*1e6:.4g}' for x in leQubits],
                 r'$\Delta$ (GHz)':                  [f'{(x.DriveGE - x.ReadoutFrequency)/1e9:.4g}' for x in leQubits],
                 r'$\alpha$ (MHz)':                  [f'{(x.DriveEF - x.DriveGE)/1e6:.4g}' for x in leQubits],
-                r'$\chi$ (MHz)':                    [f'{x.ChiGE/1e6:.4g}' for x in leQubits],
+                r'$\chi_{ge}$ (MHz)':               [f'{x.ChiGE/1e6:.4g}' for x in leQubits],
                 r'$\tau_X^{ge}$ (ns)':              [f'{x.DriveGETime*1e9:.4g}' for x in leQubits],
                 r'$V_{\Phi}$ (V)':                  [f'{x.FluxDC:.4g}' for x in leQubits],
                 r'$\Delta V_{\Phi}$ (V)':           [f'{x.FluxConversionParams  ["period"]:.4g}' if x.FluxConversionParams else 'N/A' for x in leQubits],

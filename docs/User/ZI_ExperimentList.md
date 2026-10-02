@@ -2655,7 +2655,6 @@ coupler's `FidelityBell` property.
 |---|---|---|
 | `dont_show_plot` | `bool`, default `False` | Popped and stored (`self._dont_show_plot`), though not directly referenced by the provided `run`/`post_process` methods (the 3D density-matrix plot is always saved via `leRho.plot3D`). |
 | `update` | `bool`, default `True` | If `True`, writes the measured Bell-state fidelity to the coupler's `FidelityBell` property when `post_process()` is called. |
-| `readout_correction` | `'ge'`/`'gef'`/`None`, default `'ge'` | Which readout-correction matrix (from each qubit's `CorrectionMatrix` dict — see [`ExpZIBlobs.get_correction_matrices`](#get_correction_matricesupdatefalse)) to apply during tomographic reconstruction; falls back to uncorrected reconstruction with a printed notice if the requested matrix isn't present. |
 | `save_qasm_path` | `str`, default `f'BellStateTomography{{q1}}{{q2}}.qasm'` | Where the generated tomography QASM script is written. |
 | `coordinate_system` | `str`, default `'RH'` | Must be `'LH'` or `'RH'`; forwarded to `DataDensityMatrix.generate_tomography_qasm`. |
 

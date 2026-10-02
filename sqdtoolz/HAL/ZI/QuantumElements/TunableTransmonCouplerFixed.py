@@ -22,7 +22,7 @@ def filtered_pulse(x, main_function, filter_taps, filter_delay=0, **kwargs):
         pulse = pulse_library.pulse_sampler(main_function)(x,**kwargs)
     else:
         pulse = kwargs["samples"]*1.0
-    filtered = np.convolve(np.real(pulse)*0.5, np.asarray(filter_taps), mode="full")[:pulse.shape[0]]
+    filtered = np.convolve(np.real(pulse)*0.9, np.asarray(filter_taps), mode="full")[:pulse.shape[0]]
     return filtered
 
 @attrs.define(kw_only=True)
@@ -66,7 +66,10 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
         pulse_params = q.parameters.Pulse
         if pulse_params.get("precomp_kernel") is not None:
             flux_pulse = dsl.create_pulse({"function": "filtered_pulse", "main_function": pulse_params["function"], "filter_taps": pulse_params["precomp_kernel"], "filter_delay": pulse_params.get("filter_delay", 0)}, name="flux_pulse")
-            amp_fac = 2.0
+            #So this is required as the compensated pulse could go above 1 when convolved. This shouldn't be an issue but the pulse library
+            #ranodmly clips it to [-1,1]. So we shrink it, convolve it and then blow it back up...
+            #But this has a different issue as Amplitude is capped within [0,1]. So let's give the convolution a 10% overshoot margin...
+            amp_fac = 1/0.9
         else:
             amp_fac = 1.0
             if pulse_params.get("samples") is None:
@@ -108,7 +111,7 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
         pulse_params = q.parameters.Pulse
         if pulse_params.get("precomp_kernel") is not None:
             flux_pulse = dsl.create_pulse({"function": "filtered_pulse", "main_function": pulse_params["function"], "filter_taps": pulse_params["precomp_kernel"], "filter_delay": pulse_params.get("filter_delay", 0)}, name="flux_pulse")
-            amp_fac = 2.0
+            amp_fac = 1/0.9
         else:
             amp_fac = 1.0
             if pulse_params.get("samples") is None:

@@ -44,6 +44,16 @@ class ExpZIFixedCouplerTuneup:
             max_wait_points = kwargs.pop('wait_time_points', 30)
             self._wait_times = np.linspace(1e-9,max_wait_time, max_wait_points)
 
+        if np.max(self._flux_amp_range) > 1.0:
+            new_flux_range = np.linspace(np.min(self._flux_amp_range), 1.0, amp_points)
+            print(f"WARNING: flux amplitude > 1, reducing maximum amplitude from {np.max(self._flux_amp_range):.2f} to 1.")
+            self._flux_amp_range = new_flux_range
+        elif np.min(self._flux_amp_range) < -1.0:
+            new_flux_range = np.linspace(-1.0, np.max(self._flux_amp_range), amp_points)
+            print(f"WARNING: flux amplitude < -1, increasing minimum amplitude from {np.min(self._flux_amp_range):.2f} to -1.")
+            self._flux_amp_range = new_flux_range
+        
+
     def run(self, lab):
         fig = plt.figure(figsize=(12, 7.5))
         fig.suptitle(f"Coupler tuneup: {self._qubit_ids[0]}{self._qubit_ids[1]}")
@@ -65,7 +75,8 @@ class ExpZIFixedCouplerTuneup:
         exp = ExpZIChevrons2QFixedCoupler(f'flux_pulse_{self._qubit_ids[0]}_{self._qubit_ids[1]}', self._expt_config, self._qpu, self._qubit_ids,
                                           amplitudes=self._flux_amp_range, wait_times=self._wait_times,
                                           single_shot=True, dont_show_plot=not self._individual_plots)
-        lab.run_single(exp, raw_pulse_sheet_duration=1e-3)
+        # lab.run_single(exp, raw_pulse_sheet_duration=1e-3)
+        lab.run_single(exp)
         #
         #
         fitted_data = np.load(exp._file_path + f'fitted_data.npy', allow_pickle=True).item()

@@ -72,7 +72,7 @@ class ExpZICalibX(ExpZIqubit):
             corr_bounds = (-10.0, 0.0)
         else:
             corr_bounds = (-10.0, 10.0)
-        decay_bounds = (0.1, 50.0)
+        decay_bounds = (0.1, 20.0) #TODO: check this bound
 
         # initial guess
         corr_grid = np.linspace(*corr_bounds, 801)

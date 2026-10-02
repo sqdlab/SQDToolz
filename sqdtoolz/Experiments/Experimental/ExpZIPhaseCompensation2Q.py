@@ -60,6 +60,16 @@ class ExpZIPhaseCompensation2Q(Experiment):
         main_qubit = self._main_qubit
         aux_qubit = self._aux_qubit
         stationary_qubit = self._stationary_qubit
+
+        # check parameters
+        acq_changed = False
+        if self._expt_config._hal_ACQ.AveragingOrder != "SingleShot" or self._expt_config._hal_ACQ.AcquisitionMode != "DISCRIMINATION":
+            prev_averaging = self._expt_config._hal_ACQ.AveragingOrder
+            prev_order = self._expt_config._hal_ACQ.AcquisitionMode
+            print(f"WARNING: changing AveragingOrder='SingleShot' and AcquisitionMode='DISCRIMINATION'.")
+            self._expt_config._hal_ACQ.AveragingOrder = 'SingleShot'
+            self._expt_config._hal_ACQ.AcquisitionMode = 'DISCRIMINATION'
+            acq_changed = True
         
         lab.group_open(self._name)
         print(f"Sweeping phase compensation on {main_qubit} (main)...")
@@ -87,6 +97,7 @@ class ExpZIPhaseCompensation2Q(Experiment):
                             main_or_aux='aux',
                             **self._kwargs
                             )
+            # self._kwargs['override_ACQ_params'] = {'AveragingOrder': "SingleShot", 'AcquisitionMode': "DISCRIMINATION"}
             lab.run_single(exp_aux, **self._kwargs)
             #
             data_aux = exp_aux.retrieve_last_dataset(aux_qubit)
@@ -110,7 +121,10 @@ class ExpZIPhaseCompensation2Q(Experiment):
         
         lab.group_close()
         self._file_path = str(Path(exp_main._file_path).parent)
-        
+
+        if acq_changed:
+            self._expt_config._hal_ACQ.AveragingOrder = prev_averaging
+            self._expt_config._hal_ACQ.AcquisitionMode = prev_order
 
     def post_process(self):
         fit_angles = ExpZIPhaseCompensation2Q.plot_fitted_data(self.data, main_qubit_id=self._main_qubit, coupler_id=self._coupler_name, aux_qubit_id=self._aux_qubit, stationary_qubit_id=self._stationary_qubit, save_path=self._file_path)

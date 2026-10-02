@@ -24,7 +24,7 @@ class ExpZISingleQubitTuneup:
         
         self._qubit = self._qpu.get_qubit_obj(self._qubit_id)
 
-        self._qubit_spec_LO_power = kwargs.pop('qubit_spec_LO_power', -20)
+        self._qubit_spec_LO_power = kwargs.pop('qubit_spec_LO_power', -25)
         self._qubit_time_domain_LO_power = kwargs.pop('qubit_time_domain_LO_power', 10)
 
         self._res_trough = kwargs.pop('res_is_trough', True)
@@ -196,6 +196,7 @@ class ExpZISingleQubitTuneup:
         data_x = leData.param_vals[0]
         ExpZIRabi.plot_fitted_results(ax, data_x, fitted_data['amplitude_raw'], fitted_data, True)
         sigFigs = 4
+        assert fitted_data['amp_X'], "Tuneup failed: could not fit Rabi. Please inspect and try again."
         ax.set_title(f"Rabi amplitudes: X={fitted_data['amp_X']:.{sigFigs}g}, X/2={fitted_data['amp_Xon2']:.{sigFigs}g}")
         ##############################
         #

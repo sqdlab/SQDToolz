@@ -4,6 +4,7 @@ import shutil
 from sqdtoolz.Utilities.FileIO import FileIOReader
 import json
 import numpy as np
+from sqdtoolz.Utilities.FileJSON import SerialiseJSON
 
 class ExpZIQASMDataViewer:
     def __init__(self, expziqasm_data_folder_path):
@@ -12,8 +13,25 @@ class ExpZIQASMDataViewer:
             meas_mapping = json.load(f)
         self._cregs = meas_mapping['declaredregs']
         self._creg_to_meas_mapping = {(x['creg'],x['cindex']):x['measureid'] for x in meas_mapping['measuremaps']}
+        self._creg_to_qubit_mapping = {(x['creg'],x['cindex']):x['qubit'] for x in meas_mapping['measuremaps']}
         with open(self._data_folder / 'measurement_params.json', 'r') as f:
             self._meas_params = json.load(f)
+        with open(self._data_folder / 'laboratory_configuration.txt') as json_file:
+            lab_config = json.loads(json_file.read(), object_hook=SerialiseJSON.decode_hook)
+        #Extract readout correction matrices if and only if it's in DISCRIMINATION mode...
+        if self._meas_params['acq_type'] == 'DISCRIMINATION':
+            self._corr_matrices = {}
+            for cur_hal in lab_config['HALs']:
+                # if Type
+                if cur_hal['Type'] == 'ZIQubit':
+                    if 'CorrectionMatrix' in cur_hal:
+                        self._corr_matrices[cur_hal['Name']] = cur_hal['CorrectionMatrix']
+            self._corr_matrices_regs = {}
+            for cur_meas_mapping in meas_mapping['measuremaps']:
+                if cur_meas_mapping['qubit'] in self._corr_matrices:
+                    self._corr_matrices_regs[(cur_meas_mapping['creg'],cur_meas_mapping['cindex'])] = self._corr_matrices[cur_meas_mapping['qubit']]
+                else:
+                    self._corr_matrices_regs[(cur_meas_mapping['creg'],cur_meas_mapping['cindex'])] = None
 
     def _get_data(self, meas_id):
         file_path = self._data_folder / f'data/{meas_id}.h5'
@@ -64,4 +82,36 @@ class ExpZIQASMDataViewer:
                 if cur_meas[0] != classical_register_name:
                     continue
                 cur_data[cur_meas[1]] = self._get_data(self._creg_to_meas_mapping[cur_meas])
+        return cur_data
+
+    def get_readout_correction_matrices(self, classical_register_name:str, classical_register_index:int|None=None):
+        """
+        Returns the matrices that will correct the vector of population counts/probabilities (0,1,(2)) when premultiplied.
+        """
+        assert self._meas_params['acq_type'] == 'DISCRIMINATION', "Can only get readout correction matrices if using readout DISCRIMINATION mode."
+        assert classical_register_name in self._cregs, f"The classical register {classical_register_name} is not declared in the QASM script."
+        if classical_register_index != None:
+            assert classical_register_index >= 0 and classical_register_index < self._cregs[classical_register_name], f"Index {classical_register_index} out of range for register '{classical_register_name}' declared of size {self._cregs[classical_register_name]}."
+            assert (classical_register_name, classical_register_index) in self._creg_to_meas_mapping, f"No measurement stored in register {classical_register_name}[{classical_register_index}]."
+            cur_data = self._corr_matrices_regs[(classical_register_name, classical_register_index)]
+        else:
+            cur_data = [None]*self._cregs[classical_register_name]
+            for cur_meas in self._creg_to_meas_mapping:
+                if cur_meas[0] != classical_register_name:
+                    continue
+                cur_data[cur_meas[1]] = self._corr_matrices_regs[cur_meas]
+        return cur_data
+
+    def get_data_qubits(self, classical_register_name:str, classical_register_index:int|None=None):
+        assert classical_register_name in self._cregs, f"The classical register {classical_register_name} is not declared in the QASM script."
+        if classical_register_index != None:
+            assert classical_register_index >= 0 and classical_register_index < self._cregs[classical_register_name], f"Index {classical_register_index} out of range for register '{classical_register_name}' declared of size {self._cregs[classical_register_name]}."
+            assert (classical_register_name, classical_register_index) in self._creg_to_meas_mapping, f"No measurement stored in register {classical_register_name}[{classical_register_index}]."
+            cur_data = self._creg_to_qubit_mapping[(classical_register_name, classical_register_index)]
+        else:
+            cur_data = [None]*self._cregs[classical_register_name]
+            for cur_meas in self._creg_to_meas_mapping:
+                if cur_meas[0] != classical_register_name:
+                    continue
+                cur_data[cur_meas[1]] = self._creg_to_qubit_mapping[cur_meas]
         return cur_data

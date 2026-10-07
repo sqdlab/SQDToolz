@@ -3,15 +3,18 @@ import numpy as np
 import scipy.optimize
 import matplotlib.pyplot as plt
 import functools
+import matplotlib.patches as patches
 
 class DataDensityMatrix:
-    def __init__(self, density_matrix):
+    def __init__(self, density_matrix, qubit_names=[]):
         self._rho = density_matrix
         self._num_qubits = int(np.log2(density_matrix.shape[0]))
         self._eigs = np.linalg.eigvalsh(density_matrix)
+        assert len(qubit_names) == 0 or len(qubit_names) == self._num_qubits, "If supplying qubit_names, it must match the number of qubits."
+        self._qubit_names = qubit_names
 
     @classmethod
-    def fromDataViewer(cls, dataviewer, dataviewer_reg='c', readout_correction_matrices=[]):
+    def fromDataViewer(cls, dataviewer, dataviewer_reg='c', use_readout_correction=True):
         """
         This assumes that the data was taken with ExpZIQASM and that the data in register
         dataviewer_reg is structured as the Pauli ordering of measurements. For example, for
@@ -21,17 +24,29 @@ class DataDensityMatrix:
         so it may be None.
         """
         data = dataviewer.get_data(dataviewer_reg)
-        return cls(DataDensityMatrix.generate_rho_from_shot_data(data, dataviewer.get_number_of_shots(), readout_correction_matrices))
+        readout_correction_matrices = []
+        if use_readout_correction:
+            readout_correction_matrices = dataviewer.get_readout_correction_matrices(dataviewer_reg)
+            for m in range(len(data)):
+                if not (data[m] is None):
+                    if readout_correction_matrices[m] is None:
+                        print('Warning: Not implementing readout correction as not all qubits have their correction matrices set.')
+                        use_readout_correction = []
+                        break
+        cur_rho = DataDensityMatrix.generate_rho_from_shot_data(data, dataviewer.get_number_of_shots(), readout_correction_matrices)
+        num_qubits = int(np.log2(cur_rho.shape[0]))
+        all_qubit_names = dataviewer.get_data_qubits(dataviewer_reg)
+        return cls(cur_rho, all_qubit_names[-num_qubits:])  #The last set of measurements are ZZZ... and thus, will have valid qubit names/measurements...
 
     @classmethod
-    def fromShotData(cls, shot_data, num_shots, readout_correction_matrices=[]):
+    def fromShotData(cls, shot_data, num_shots, readout_correction_matrices=[], qubit_names = []):
         """
         Given N qubits, this function takes in a list divided into groups of N where each group corresponds
         to the measurements taken in the Pauli-ordering of measurements (for example, for two qubits, it'd
         be II, IX, IY, IZ, XI, XX etc.). Each group of N has arrays of size given by the number of shots
         (optionally can be None if it is an I-measurement...) with the values being 0,1,2.
         """
-        return cls(DataDensityMatrix.generate_rho_from_shot_data(shot_data, num_shots, readout_correction_matrices))
+        return cls(DataDensityMatrix.generate_rho_from_shot_data(shot_data, num_shots, readout_correction_matrices), qubit_names)
 
     @staticmethod
     def _project_vector_to_probability_simplex(vec:np.ndarray):
@@ -60,6 +75,8 @@ class DataDensityMatrix:
         two entries correspond to an array of qubit shots for the first and second qubit
         respectively. If it is an I measurement, the array slot will be ignored in this analysis,
         so it may be None.
+
+        readout_correction_matrices is a list corresponding to each measurement in the list data.
         """
         num_measurements = len(data)
         N = 0
@@ -67,7 +84,7 @@ class DataDensityMatrix:
             N += 1
         assert N*4**N==num_measurements, "The number of measurements/qubits do not correspond. For N qubits, there should be N*4^N measurements..."
         if len(readout_correction_matrices) > 0:
-            assert len(readout_correction_matrices) == N, "When supplying 'readout_correction_matrices', the number of matrices must match the number of qubits."
+            assert len(readout_correction_matrices) == num_measurements, "When supplying 'readout_correction_matrices', the number of matrices must match the number of measurements (N*4^N)."
         #Assuming that data is divided into groups of N (for N qubits) for each measurement type (e.g. IXZI etc.)
         #Also assuming that measurement of 1-state gives -1 eigenvalue for X/Y/Z...
         measurements = [''.join(item) for item in itertools.product(['I','X','Y','Z'], repeat=N)]
@@ -90,7 +107,8 @@ class DataDensityMatrix:
             leProbs = np.array([np.sum(cur_dataset_non_id==x)/num_shots for x in range(2**len(non_id_inds))])
 
             if len(readout_correction_matrices) > 0:
-                ro_corr = [readout_correction_matrices[x] for x in non_id_inds]
+                cur_ro_corrs = readout_correction_matrices[m*N:(m+1)*N]
+                ro_corr = [cur_ro_corrs[x] for x in non_id_inds]
                 if len(ro_corr) == 1:
                     ro_corr = ro_corr[0]
                 else:
@@ -193,6 +211,95 @@ class DataDensityMatrix:
         F = float(np.real_if_close(F))
         return float(np.clip(F, 0.0, 1.0))
 
+    def plot2D(self, target_state=None, use_abs_phase=False, extra_title='', save_path=None):
+        """
+        Plot the real part of the density matrix as a 3D bar plot.
+
+        The reconstructed density matrix is taken from self._rho and the
+        number of qubits from self._num_qubits.
+
+        Parameters
+        ----------
+        target_state : array-like, optional
+            Target pure state vector |psi>. If provided, its density matrix
+            |psi><psi| is shown as transparent red bars underneath the
+            reconstructed state.
+        use_abs_phase : bool
+            If True, then the two plots will be magnitude/phase instead of
+            real/imag...
+
+        Notes
+        -----
+        Computational basis states are shown on both axes.
+
+        Colors:
+            Blue  = reconstructed state
+            Red   = target state
+            Purple = overlap between target and reconstructed state
+        """
+
+        # ------------------------------------------------------------------
+        # Validate reconstructed density matrix
+        # ------------------------------------------------------------------
+        rho = np.asarray(self._rho, dtype=complex)
+        n_qubits = self._num_qubits
+        dim = 2 ** n_qubits
+
+        z_max = np.max(np.abs(rho))
+        #
+        target_rho = None
+        if target_state is not None:
+            psi = np.asarray(target_state, dtype=complex).reshape(-1)
+            assert self._rho.shape[0] == len(psi), "Target_state dimension must match density matrix size."
+            psi_norm = np.linalg.norm(psi)
+            assert psi_norm > 0, "Target_state must be non-zero in magnitude."
+            psi = psi / psi_norm
+            target_rho = np.outer(psi, psi.conj())
+            z_max = max(z_max, np.max(np.abs(target_rho)))
+
+        basis_labels = [rf"$|{i:0{n_qubits}b}\rangle$" for i in range(dim)]
+       
+        N = rho.shape[1]
+        
+        fig, ax = plt.subplots(ncols=2, constrained_layout=True)
+        fig.set_constrained_layout_pads(h_pad=0.02,hspace=0.02)
+
+        # Normalise values linearly from [-z_max, z_max] to map directly to [0, 1] for coolwarm
+        cmap = plt.cm.coolwarm
+        norm = lambda val: (val + z_max) / (2 * z_max)
+
+        for (y, x), val_m in np.ndenumerate(rho):
+            ax[0].add_patch(patches.Rectangle((x - 0.45, y - 0.45), 0.9, 0.9, 
+                                        facecolor=cmap(norm(np.real(val_m))), edgecolor='none'))
+            ax[1].add_patch(patches.Rectangle((x - 0.45, y - 0.45), 0.9, 0.9, 
+                                        facecolor=cmap(norm(np.imag(val_m))), edgecolor='none'))
+            if not(target_rho is None):
+                val_e = target_rho[y, x]
+                ax[0].add_patch(patches.Rectangle((x - 0.2, y - 0.2), 0.4, 0.4, 
+                                            facecolor=cmap(norm(np.real(val_e))), edgecolor='none'))
+                ax[1].add_patch(patches.Rectangle((x - 0.2, y - 0.2), 0.4, 0.4, 
+                                            facecolor=cmap(norm(np.imag(val_e))), edgecolor='none'))
+
+        for m in range(2):
+            ax[m].set_aspect('equal')
+            ax[m].set_facecolor('white') 
+            ax[m].set_xlim(-0.5, N - 0.5); ax[m].set_ylim(-0.5, N - 0.5); ax[m].invert_yaxis()
+            ax[m].set_xticks(range(N)); ax[m].set_yticks(range(N))
+            ax[m].set_xticks(range(N), labels=basis_labels); ax[m].set_yticks(range(N), labels=basis_labels)
+        
+        ax[0].set_title('Real')
+        ax[1].set_title('Imag')
+
+        if len(self._qubit_names) > 0:
+            extra_title = f" ({'-'.join(self._qubit_names)}) " + extra_title
+        fig.suptitle("Density matrix\n" + extra_title)
+        
+        # Add colorbar mapped to the correct scale limits
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(-z_max, z_max))
+        legend_title = "" if target_state is None else "Outer = reconstructed, Inner = target"
+        fig.colorbar(sm, ax=ax, orientation="horizontal",location="bottom", label=legend_title)
+        if save_path is not None:
+            fig.savefig(save_path)
 
     def plot3D(self, target_state=None, use_abs_phase=False, extra_title='', save_path=None):
         """
@@ -258,7 +365,7 @@ class DataDensityMatrix:
             else:
                 target_vals = [np.real(target_rho).flatten(), np.imag(target_rho).flatten()]
 
-        fig = plt.figure(); fig.set_figwidth(12); fig.set_figheight(10)
+        fig = plt.figure(figsize=(12, 10), constrained_layout=True)
         axs = [None, None]
         axs[0] = fig.add_subplot(1, 2, 1, projection="3d")
         axs[1] = fig.add_subplot(1, 2, 2, projection="3d")
@@ -291,7 +398,7 @@ class DataDensityMatrix:
             else:
                 ax.set_zlim(-1.1 * max_val, 1.1 * max_val)
             ax.view_init(elev=25, azim=-55)
-        fig.tight_layout()
+        # fig.tight_layout()
         if save_path is not None:
             fig.savefig(save_path)
 

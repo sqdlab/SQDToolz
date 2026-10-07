@@ -4,6 +4,7 @@ import scipy.optimize
 import matplotlib.pyplot as plt
 import functools
 import matplotlib.patches as patches
+from sqdtoolz.Utilities.Miscellaneous import Miscellaneous
 
 class DataDensityMatrix:
     def __init__(self, density_matrix, qubit_names=[]):
@@ -49,24 +50,6 @@ class DataDensityMatrix:
         return cls(DataDensityMatrix.generate_rho_from_shot_data(shot_data, num_shots, readout_correction_matrices), qubit_names)
 
     @staticmethod
-    def _project_vector_to_probability_simplex(vec:np.ndarray):
-        """
-        Projects a vector onto the probability simplex (sum(x) = 1, x >= 0)
-        using the projection algorithm given by Lagrange multipliers.
-        """
-        #Sort entries by descending order
-        u = np.sort(vec)[::-1]
-        #Find largest K and get lambda
-        cssv = np.cumsum(u)
-        ind = np.arange(1, vec.size + 1)
-        cond = u + (1.0 / ind) * (1.0 - cssv) > 0
-        #K is the last index where the condition is True
-        K = ind[cond][-1]
-        lambda_val = (cssv[K - 1] - 1.0) / K
-        #Calculate xi
-        return np.maximum(vec - lambda_val, 0)
-
-    @staticmethod
     def generate_rho_from_shot_data(data, num_shots, readout_correction_matrices=[]):
         """
         This assumes that the data was taken with ExpZIQASM and that the data in register
@@ -99,22 +82,13 @@ class DataDensityMatrix:
             #Gather current operators that are not identity
             non_id_inds = [x for x in range(N) if cur_measurement[x]!='I']
             cur_dataset_non_id = [cur_data_set[x] for x in non_id_inds]
-            #Convert the data subset into binary...
-            cur_dataset_non_id = [cur_dataset_non_id[x]*2**x for x in range(len(cur_dataset_non_id))]
-            #Sum across it to find out which segment it belongs to (e.g. for 2 non-identity slots, the combinations are 00,01,10,11 for the indices 0,1,2,3)
-            cur_dataset_non_id = np.sum(cur_dataset_non_id, axis=0)
-            #Gather the counts and calculate probabilities
-            leProbs = np.array([np.sum(cur_dataset_non_id==x)/num_shots for x in range(2**len(non_id_inds))])
 
+            ro_corr = []
             if len(readout_correction_matrices) > 0:
                 cur_ro_corrs = readout_correction_matrices[m*N:(m+1)*N]
                 ro_corr = [cur_ro_corrs[x] for x in non_id_inds]
-                if len(ro_corr) == 1:
-                    ro_corr = ro_corr[0]
-                else:
-                    ro_corr = functools.reduce(np.kron,ro_corr)
-                leProbs = ro_corr @ leProbs
-                leProbs = DataDensityMatrix._project_vector_to_probability_simplex(leProbs)
+            leProbs = Miscellaneous.get_probability_of_basis_states(cur_dataset_non_id, num_qubit_states=2, correction_matrices=ro_corr)
+
             #The bit_count counts the number of 1s in the binary representation of the integer. Then calculate if it's even/odd parity and map to -1/+1
             expectation_values.append(np.sum([leProbs[x] * (1-2*((x).bit_count()%2)) for x in range(leProbs.shape[0])], axis=0))
             a=0

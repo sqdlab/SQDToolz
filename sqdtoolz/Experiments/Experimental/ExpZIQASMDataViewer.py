@@ -5,20 +5,23 @@ from sqdtoolz.Utilities.FileIO import FileIOReader
 import json
 import numpy as np
 from sqdtoolz.Utilities.FileJSON import SerialiseJSON
+from sqdtoolz.Utilities.Miscellaneous import Miscellaneous
+import matplotlib.pyplot as plt
 
 class ExpZIQASMDataViewer:
-    def __init__(self, expziqasm_data_folder_path):
-        self._data_folder = Path(expziqasm_data_folder_path)
-        with open(self._data_folder / 'measurement_mapping.json', 'r') as f:
+    def __init__(self, expziqasmdata_folder_path):
+        self.data_folder = Path(expziqasmdata_folder_path)
+        with open(self.data_folder / 'measurement_mapping.json', 'r') as f:
             meas_mapping = json.load(f)
         self._cregs = meas_mapping['declaredregs']
         self._creg_to_meas_mapping = {(x['creg'],x['cindex']):x['measureid'] for x in meas_mapping['measuremaps']}
         self._creg_to_qubit_mapping = {(x['creg'],x['cindex']):x['qubit'] for x in meas_mapping['measuremaps']}
-        with open(self._data_folder / 'measurement_params.json', 'r') as f:
+        with open(self.data_folder / 'measurement_params.json', 'r') as f:
             self._meas_params = json.load(f)
-        with open(self._data_folder / 'laboratory_configuration.txt') as json_file:
+        with open(self.data_folder / 'laboratory_configuration.txt') as json_file:
             lab_config = json.loads(json_file.read(), object_hook=SerialiseJSON.decode_hook)
         #Extract readout correction matrices if and only if it's in DISCRIMINATION mode...
+        self._corr_matrices_regs = {}
         if self._meas_params['acq_type'] == 'DISCRIMINATION':
             self._corr_matrices = {}
             for cur_hal in lab_config['HALs']:
@@ -34,7 +37,7 @@ class ExpZIQASMDataViewer:
                     self._corr_matrices_regs[(cur_meas_mapping['creg'],cur_meas_mapping['cindex'])] = None
 
     def _get_data(self, meas_id):
-        file_path = self._data_folder / f'data/{meas_id}.h5'
+        file_path = self.data_folder / f'data/{meas_id}.h5'
         leData = FileIOReader(file_path)
         arr = leData.get_numpy_array()
         if self._meas_params['acq_type'] == 'DISCRIMINATION':
@@ -115,3 +118,58 @@ class ExpZIQASMDataViewer:
                     continue
                 cur_data[cur_meas[1]] = self._creg_to_qubit_mapping[cur_meas]
         return cur_data
+
+    def plot_histograms(self, classical_register_name:str, classical_register_index:int|list[int]|None=None, num_qubit_states=2, apply_readout_correction=True, plot_2D_histogram=True):
+        if classical_register_index is None:
+            cur_data = self.get_data(classical_register_name)
+            classical_register_index = np.arange(len(cur_data))
+        else:
+            if not isinstance(classical_register_index, (list,tuple)):
+                classical_register_index = [classical_register_index]
+            cur_data = []
+            for cur_ind in classical_register_index:
+                cur_data.append(self.get_data(classical_register_name, cur_ind))
+
+        #Filter out registers that don't have data...
+        final_data = []
+        labels = []
+        corr_matrices = []
+        for m in range(len(cur_data)):
+            if cur_data[m] is None:
+               continue
+            final_data.append(cur_data[m])
+            cur_reg_ind = classical_register_index[m]
+            labels.append(f"c[{cur_reg_ind}] ({self._creg_to_qubit_mapping[(classical_register_name, cur_reg_ind)]})")
+            if hasattr(self, '_corr_matrices_regs'):
+                corr_matrices.append(self._corr_matrices_regs[(classical_register_name, cur_reg_ind)])
+
+        if plot_2D_histogram and len(final_data) == 2:
+            # Count occurrences of each (a, b) pair
+            counts = np.zeros((num_qubit_states, num_qubit_states), dtype=int)
+            for x, y in zip(final_data[0], final_data[1]):
+                counts[x, y] += 1
+            fig, ax = plt.subplots(1)
+            lePlot = ax.pcolor(counts, cmap='Blues', edgecolors='black')
+            cbar = fig.colorbar(lePlot, ax=ax, label='Counts')
+            ax.set_title('Populations')
+            ax.set_xticks(np.arange(num_qubit_states) + 0.5, ['0', '1', '2'][:num_qubit_states])
+            ax.set_yticks(np.arange(num_qubit_states) + 0.5, ['0', '1', '2'][:num_qubit_states])
+            ax.set_xlabel('Second array')
+            ax.set_ylabel('First array')
+        else:
+            leProbs = []
+            for m in range(len(final_data)):
+                cur_probs = Miscellaneous.get_probability_of_basis_states([final_data[m]], num_qubit_states=num_qubit_states, correction_matrices=[corr_matrices[m]])
+                leProbs.append(np.array(cur_probs))
+            fig, axs = plt.subplots(nrows=len(leProbs)); fig.set_figheight(1*len(leProbs))
+            for m in range(len(leProbs)):
+                axs[m].bar(np.arange(num_qubit_states), leProbs[m], color='skyblue')
+                axs[m].set_ylabel(labels[m])
+                axs[m].set_xticks(np.arange(num_qubit_states))
+                axs[m].set_ylim([0,1])
+                axs[m].grid()
+                if m < len(leProbs)-1:
+                    axs[m].set_xticklabels([])
+                else:
+                    axs[m].set_xlabel("States")
+            axs[0].set_title("Probability Distribution")

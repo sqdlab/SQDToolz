@@ -1,4 +1,5 @@
 import numpy as np
+import functools
 
 class Miscellaneous:
     @staticmethod
@@ -109,3 +110,59 @@ class Miscellaneous:
         t = 1/((nx-mx)*(py-qy) - (px-qx)*(ny-my)) * ((py-qy)*(px-mx) + (qx-px)*(py-my))
         return (mx+(nx-mx)*t, my+(ny-my)*t)
 
+    @staticmethod
+    def get_probability_of_basis_states(shot_values, num_qubit_states=2, correction_matrices=[]):
+        """
+        shot_values gives a list of measurements for every qubit (e.g. for 1 qubit it could be [[0,0,0,1,1,0,0,2,...]], while
+        for 2 qubits it could be [[0,0,0,1,1,1,0,...], [1,1,1,0,0,1,2,...]])
+
+        Returned list is basically ordered as binary for 2-state and ternary ordering for 3-state
+        """
+        num_shots = len(shot_values[0])
+        num_qubits = len(shot_values)
+        for cur_list in shot_values:
+            assert len(cur_list) == num_shots, "The shot_values must have the same number of shots for each qubit."
+        shot_values = np.array(shot_values)
+        #Take out columns that have 2 in them if it's 2-state readout requested...
+        if num_qubit_states == 2:
+            shot_values = shot_values[:, ~np.any(shot_values == 2, axis=0)]
+            num_shots = shot_values.shape[1]
+
+        #Convert the data into binary/ternary...
+        cur_shots = [shot_values[x]*num_qubit_states**x for x in range(num_qubits)]
+        #Sum across it to find out which segment it belongs to (e.g. for 2 qubits, the combinations are 00,01,10,11 for the indices 0,1,2,3)
+        cur_shots = np.sum(cur_shots, axis=0)
+        #Gather the counts and calculate probabilities
+        leProbs = np.array([np.sum(cur_shots==x)/num_shots for x in range(num_qubit_states**num_qubits)])
+
+        if len(correction_matrices) > 0:
+            assert len(correction_matrices) == num_qubits, "If supplying correction matrices, they must be one for every qubit."
+            for m in range(num_qubits):
+                assert correction_matrices[m].shape[0] == num_qubit_states and correction_matrices[m].shape[1] == num_qubit_states, f"The readout matrices must be {num_qubit_states}x{num_qubit_states} to match num_qubit_states."
+            #
+            if len(correction_matrices) == 1:
+                correction_matrices = correction_matrices[0]
+            else:
+                correction_matrices = functools.reduce(np.kron,correction_matrices)
+            leProbs = correction_matrices @ leProbs
+            leProbs = Miscellaneous.project_vector_to_probability_simplex(leProbs)
+
+        return leProbs
+
+    @staticmethod
+    def project_vector_to_probability_simplex(vec:np.ndarray):
+        """
+        Projects a vector onto the probability simplex (sum(x) = 1, x >= 0)
+        using the projection algorithm given by Lagrange multipliers.
+        """
+        #Sort entries by descending order
+        u = np.sort(vec)[::-1]
+        #Find largest K and get lambda
+        cssv = np.cumsum(u)
+        ind = np.arange(1, vec.size + 1)
+        cond = u + (1.0 / ind) * (1.0 - cssv) > 0
+        #K is the last index where the condition is True
+        K = ind[cond][-1]
+        lambda_val = (cssv[K - 1] - 1.0) / K
+        #Calculate xi
+        return np.maximum(vec - lambda_val, 0)

@@ -150,7 +150,6 @@ class ExpZIQASMDataViewer:
                 leLabel = 'Probabilities'
                 leProbs = Miscellaneous.get_probability_of_basis_states(final_data, num_qubit_states=2, correction_matrices=corr_matrices)
                 counts = np.array(leProbs).reshape(num_qubit_states, num_qubit_states)
-                print(counts, leProbs)
             else:
                 leLabel = 'Counts'
                 # Count occurrences of each (a, b) pair

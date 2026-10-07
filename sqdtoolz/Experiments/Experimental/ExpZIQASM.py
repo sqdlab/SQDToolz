@@ -86,10 +86,10 @@ class ExpZIQASM(ExpZIqubit):
         self._poqasm.save_main_script(file_path + 'main.qasm')
         json_data = {
             'declaredregs': self._poqasm._cregs,
-            'measuremaps': [{'creg':x[0], 'cindex':x[1], 'measureid':self._leSchedule['meas_store_ids'][x]} for x in self._leSchedule['meas_store_ids']]
+            'measuremaps': [{'creg':x[0], 'cindex':x[1], 'measureid':self._leSchedule['meas_store_ids'][x][0], 'qubit':self._leSchedule['meas_store_ids'][x][1]} for x in self._leSchedule['meas_store_ids']]
             }
         with open(file_path + 'measurement_mapping.json', 'w') as f:
-            json.dump(json_data, f)
+            json.dump(json_data, f, indent=4)
 
         #Because the output heavily depends on how the shaping of the measurement parameters, force the ACQ parameters to not be DEFAULT here...
         if 'override_ACQ_params' in kwargs:

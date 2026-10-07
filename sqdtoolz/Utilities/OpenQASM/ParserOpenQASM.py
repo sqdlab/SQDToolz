@@ -820,7 +820,7 @@ class ParserOpenQASM:
                         cur_phys_qubit_index = cur_command['targets']   #Shouldn't be a list for Measure...
                         cur_meas_id = f'm{meas_index}'
                         cur_meas_cmd = ('Measure', cur_meas_id)
-                        meas_store_ids[cur_command['store']] = cur_meas_id
+                        meas_store_ids[cur_command['store']] = (cur_meas_id, cur_phys_qubit_index)
                         meas_index += 1
                         #
                         cur_meas_pos = qubit_sync_times[cur_phys_qubit_index] + self._calc_seq_len(cur_qubit_commands[cur_phys_qubit_index], params, cur_phys_qubit_index)

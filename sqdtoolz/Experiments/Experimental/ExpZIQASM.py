@@ -86,7 +86,7 @@ class ExpZIQASM(ExpZIqubit):
         self._poqasm.save_main_script(file_path + 'main.qasm')
         json_data = {
             'declaredregs': self._poqasm._cregs,
-            'measuremaps': [{'creg':x[0], 'cindex':x[1], 'measureid':self._leSchedule['meas_store_ids'][x][0], 'qubit':self._leSchedule['meas_store_ids'][x][1]} for x in self._leSchedule['meas_store_ids']]
+            'measuremaps': [{'creg':x[0], 'cindex':x[1], 'measureid':self._leSchedule['meas_store_ids'][x][0], 'qubit':leQubitNames[self._leSchedule['meas_store_ids'][x][1]]} for x in self._leSchedule['meas_store_ids']]
             }
         with open(file_path + 'measurement_mapping.json', 'w') as f:
             json.dump(json_data, f, indent=4)
@@ -118,7 +118,7 @@ class ExpZIQASM(ExpZIqubit):
             json.dump({'acq_type':acq_type, 'avg_type':avg_type, 'NumRepetitions':self._expt_config._hal_ACQ.NumRepetitions, 'Sweeps':[(x[0].Name, x[1].size) for x in sweep_vars]}, f)
         self.qasm_output = {}
         for cur_meas_output in self._leSchedule['meas_store_ids']:
-            cur_fileioread = self.retrieve_last_aux_dataset(self._leSchedule['meas_store_ids'][cur_meas_output])
+            cur_fileioread = self.retrieve_last_aux_dataset(self._leSchedule['meas_store_ids'][cur_meas_output][0])
             arr = cur_fileioread.get_numpy_array()
             if acq_type == 'DISCRIMINATION' and avg_type == 'SweepBeforeAverage':
                 self.qasm_output[cur_meas_output] = float(arr[0])

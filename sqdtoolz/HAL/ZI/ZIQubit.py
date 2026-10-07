@@ -71,16 +71,16 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
                     if self.ReadoutKernelType == 'optimal':
                         self._temp_readout_params['ReadoutKernelThresholds'] = self.ReadoutKernelThresholds
                         self._temp_readout_params['ReadoutKernelWeights'] = self.ReadoutKernelWeights
-                    self.ReadoutKernelThresholds = None
-                    self.ReadoutKernelWeights = None
+                    self.ReadoutKernelThresholds = []
+                    self.ReadoutKernelWeights = []
                     #An additional headache where it seems to leave behind a residual threshold that breaks due to validation checks...
                     self._instr_zi.device_setup.logical_signal_groups[self.Name].logical_signals['acquire'].calibration.threshold = None
                 elif value == 'optimal':
                     setattr(self._zi_qubit.parameters, self._param_mappings[name], value)
-                    if self.ReadoutKernelThresholds is None:
-                        self.ReadoutKernelThresholds = self._temp_readout_params.get('ReadoutKernelThresholds', None)
-                    if self.ReadoutKernelWeights is None:
-                        self.ReadoutKernelWeights = self._temp_readout_params.get('ReadoutKernelWeights', None)
+                    if self.ReadoutKernelThresholds is None or len(self.ReadoutKernelThresholds) == 0:
+                        self.ReadoutKernelThresholds = self._temp_readout_params.get('ReadoutKernelThresholds', [])
+                    if self.ReadoutKernelWeights is None or len(self.ReadoutKernelWeights) == 0:
+                        self.ReadoutKernelWeights = self._temp_readout_params.get('ReadoutKernelWeights', [])
             if name == 'ReadoutKernelThresholds' or name == 'ReadoutKernelWeights':
                 if self.ReadoutKernelType == 'default':
                     self._temp_readout_params[name] = value
@@ -290,7 +290,7 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
         if self.ReadoutKernelType == 'optimal':
             if not (isinstance(self.ReadoutKernelWeights, list) and len(self.ReadoutKernelWeights)>0):
                 self.ReadoutKernelType = 'default'
-                self.ReadoutKernelThresholds = None
+                self.ReadoutKernelThresholds = []
         self._temp_readout_params['ReadoutKernelThresholds'] = self.ReadoutKernelThresholds
         self._temp_readout_params['ReadoutKernelWeights'] = self.ReadoutKernelWeights
 

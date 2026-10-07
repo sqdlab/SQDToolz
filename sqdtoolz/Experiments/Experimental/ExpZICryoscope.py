@@ -32,6 +32,7 @@ class ExpZICryoscope:
         self._amplitudes = kwargs.pop('amplitudes', np.linspace(0.3, 0.3, 1))
         self._lengths = kwargs.pop('lengths', np.arange(0.0, 300e-9, (1/2.0)*1e-9))
         self._transition = kwargs.pop('transition', 'ge')
+        self._update_coupler = kwargs.pop("update_coupler", True)
 
         self._normalise_data = kwargs.pop('normalise_data', True)
         self.data = {}

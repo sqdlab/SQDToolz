@@ -161,7 +161,7 @@ class ExpZISingleQubitTuneup:
         #TODO: Second -30dBm smaller spanned qubit spec.
         self._qubit.DrivePower = self._qubit_spec_LO_power
         exp = ExpZIQubitSpec(f'qubit_spec_{self._qubit_id}', self._expt_config, self._qpu, self._qubit_id,
-                             is_trough = not self._res_trough,  #TODO: Think about whether this is true in general...
+                             is_trough = self._kwargs.pop("qubit_trough", False),
                              frequencies=[self._qubit_freq_range], ZI_plot=self._individual_plots, update=self._update_live, dont_plot=True, dont_show_plot=not self._individual_plots)
         lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages)
         #

@@ -10,6 +10,7 @@ class ExpZIBlobs(ExpZIqubit):
         self._dont_show_plot = kwargs.pop('dont_show_plot', False)
         self._states = kwargs.get('states', "ge")
         self._iq_blob_data = {}
+        self._hal_QPU = hal_QPU
         assert (not 'update' in kwargs) or ('update' in kwargs and not kwargs['update']), "Don't set 'update=True'. This is just a diagnostic experiment."
         kwargs['update'] = False
         # self._fit_vals = []
@@ -24,7 +25,7 @@ class ExpZIBlobs(ExpZIqubit):
             leDIQD = DataIQDiscriminate.fromZIcalibFileIOReader(leDataCalib)
             self._leDIQDs.append(leDIQD)
             #
-            fig = ExpZIBlobs.plot_fitted_results(leDIQD)
+            fig = ExpZIBlobs.plot_fitted_results(leDIQD, extra_title=f' (Frequency = {self._hal_QPU.get_qubit_obj(qubit_dataset).ReadoutFrequency/1e9:.6f} GHz)')
             fig.savefig(self._file_path + f'fitted_plot_{qubit_dataset}.png')
             if not self._dont_show_plot:
                 fig.show()

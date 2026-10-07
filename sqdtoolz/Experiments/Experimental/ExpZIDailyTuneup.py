@@ -33,7 +33,7 @@ class ExpZIDailyTuneup:
         self._update_live = kwargs.get('update_params_live', True)
         self._enable_ZI_log_messages = kwargs.get('enable_ZI_log_messages', False)
         self._save_config = kwargs.pop('save_config', False)
-        self._print_summary = kwargs.pop('print_summary', True)
+        self._print_summary = kwargs.pop('print_summary', False)
         # self._config_file_name = kwargs.pop('config_file_name', '')
         self._save_summary_config_from_json = kwargs.pop('save_summary_config_from_json', True)
         self._summary_json_file = kwargs.pop('summary_json_file', f'{datetime.date.today():%Y%m%d}_QPUsummary.json')
@@ -64,10 +64,12 @@ class ExpZIDailyTuneup:
         print(f"# - TUNEUP {self._qubit_id} - #")
         print(f"#################")   
 
-        self._expt_config._hal_ACQ.NumRepetitions = 1024; 
+        # self._expt_config._hal_ACQ.NumRepetitions = 1024; 
         self._expt_config._hal_ACQ.AveragingOrder = "DEFAULT"; 
         self._expt_config._hal_ACQ.AcquisitionMode = "DEFAULT"; 
         self._expt_config.commit()
+
+        self._qubit.ReadoutKernelType = "default"
 
         ##############################
         #
@@ -83,6 +85,7 @@ class ExpZIDailyTuneup:
         #READOUT RESONATOR
         #
         if self._tune_readout:
+            self._qubit.ReadoutKernelType = "default"
             print(f'\nOptimising readout...')
             self._expt_config.update_SPECs([self._spec_name_ROGE])
             exp = ExpZIResOptimal(f'DailyTuneup_{self._qubit_id}_Readout', self._expt_config, self._qpu, [self._qubit_id], states='gef', frequencies=self._res_freq_range, ZI_plot=self._individual_plots, calc_single_shot_fidelities=True)
@@ -105,15 +108,23 @@ class ExpZIDailyTuneup:
             #OPTIMISE INTEGRATION WEIGHTS
             #
             print(f'\nOptimising integration weights...')
+            # self._expt_config._hal_ACQ.NumRepetitions = 1024*4  
+            # self._expt_config.commit()
+            #
+            self._qubit.ReadoutKernelType = "default"
             self._expt_config.update_SPECs([self._spec_name_ROGEF])
             exp = ExpZIqubit(f'DailyTuneup_{self._qubit_id}_TimeTraces', self._expt_config, time_traces, self._qpu, [self._qubit_id], states='gef', update=self._update_live, skip_ZI_analysis=False, ZI_plot=self._individual_plots)
             lab.run_single(exp)
             lab.SPEC(self._spec_name_ROGEF).update_entries()
             #
+            self._qubit.ReadoutKernelType = "default"
             self._expt_config.update_SPECs([self._spec_name_ROGE])
             exp = ExpZIqubit(f'DailyTuneup_{self._qubit_id}_TimeTraces', self._expt_config, time_traces, self._qpu, [self._qubit_id], states='ge', update=self._update_live, skip_ZI_analysis=False, ZI_plot=self._individual_plots)
             lab.run_single(exp)
             lab.SPEC(self._spec_name_ROGE).update_entries()
+            #
+            # self._expt_config._hal_ACQ.NumRepetitions = 1024; 
+            # self._expt_config.commit()
 
             ##############################
             #
@@ -174,7 +185,7 @@ class ExpZIDailyTuneup:
                         continue
             if coupled_qubit is not None:
                 print(f'\nTuning two qubit gates ({self._qubit_id}, {coupled_qubit})...')
-                exp = ExpZIFixedCouplerTuneup(f'DailyTuneup_{self._qubit_id}{coupled_qubit}_2QG', self._expt_config, self._qpu, [self._qubit_id, coupled_qubit], fit_qubit=self._qubit_id, flux_amp_points=self._kwargs.get('chevron_amp_pts', 17), flux_amp_span=self._kwargs.get('chevron_amp_span', 0.03), update_params_live=self._update_live, variance_fit_type=self._kwargs.get('variance_fit_type_chevrons', 'default'))
+                exp = ExpZIFixedCouplerTuneup(f'DailyTuneup_{self._qubit_id}{coupled_qubit}_2QG', self._expt_config, self._qpu, [self._qubit_id, coupled_qubit], fit_qubit=self._qubit_id, flux_amp_points=self._kwargs.get('chevron_amp_pts', 17), flux_amp_span=self._kwargs.get('chevron_amp_span', 0.025), update_params_live=self._update_live, variance_fit_type=self._kwargs.get('variance_fit_type_chevrons', 'default'))
                 exp.run(lab)
                 newA = c.Amplitude
                 newL = c.Length
@@ -228,7 +239,7 @@ class ExpZIDailyTuneup:
         #Leave it in 2-State Mode, default acquisition
         self._expt_config.update_SPECs([self._spec_name_ROGE])
         #
-        self._expt_config._hal_ACQ.NumRepetitions = 1024; 
+        # self._expt_config._hal_ACQ.NumRepetitions = 1024; 
         self._expt_config._hal_ACQ.AveragingOrder = "DEFAULT"; 
         self._expt_config._hal_ACQ.AcquisitionMode = "DEFAULT"; 
         self._expt_config.commit()

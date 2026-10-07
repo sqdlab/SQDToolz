@@ -154,8 +154,8 @@ class ExpZIQASMDataViewer:
             ax.set_title('Populations')
             ax.set_xticks(np.arange(num_qubit_states) + 0.5, ['0', '1', '2'][:num_qubit_states])
             ax.set_yticks(np.arange(num_qubit_states) + 0.5, ['0', '1', '2'][:num_qubit_states])
-            ax.set_xlabel('Second array')
-            ax.set_ylabel('First array')
+            ax.set_xlabel(labels[1])
+            ax.set_ylabel(labels[0])
         else:
             leProbs = []
             for m in range(len(final_data)):

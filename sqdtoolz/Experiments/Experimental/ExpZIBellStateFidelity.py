@@ -48,10 +48,10 @@ h q[1];
         exp.set_qubit_reg_to_ZI_mappings({('q',0): self._qubit_ids[1],('q',1): self._qubit_ids[0]})
         assert len(qregs) <= len(self._qubit_ids), f"The QASM script needs {len(qregs)} while only {len(self._qubit_ids)} qubits have been specified."
 
-        lab.run_single(exp, override_ACQ_params={'AcquisitionMode': 'DISCRIMINATION', 'AveragingOrder': 'SingleShot'})
+        lab.run_single(exp, override_ACQ_params={'AcquisitionMode': 'DISCRIMINATION', 'AveragingOrder': 'SingleShot'}, raw_pulse_sheet_duration=1e-3)
         self._file_path = exp._file_path
 
-    def post_process(self, use_abs_phase=False, readout_correction=True, state='ge'):
+    def post_process(self, use_abs_phase=False, readout_correction=True, state='ge', plot='3d'):
         # if readout_correction != None:
         #     self._readout_correction = readout_correction
 
@@ -62,7 +62,10 @@ h q[1];
         #
         leRho = DataDensityMatrix.fromDataViewer(ledv, use_readout_correction=True)
         self._fidelity = leRho.get_fidelity_pure_state([1,0,0,1])*100
-        leRho.plot3D([1,0,0,1], use_abs_phase=use_abs_phase, extra_title=f', $F={self._fidelity:.4f}$', save_path=self._file_path + 'BellState.png')
+        if plot.lower()=='3d':
+            leRho.plot3D([1,0,0,1], use_abs_phase=use_abs_phase, extra_title=f', $F={self._fidelity:.4f}$', save_path=self._file_path + 'BellState.png')
+        elif plot.lower()=='2d':
+            leRho.plot2D([1,0,0,1], use_abs_phase=use_abs_phase, extra_title=f', $F={self._fidelity:.4f}$', save_path=self._file_path + 'BellState.png')
         self._purity = leRho.get_purity() 
         if self._update_coupler:
             cpl = self._hal_QPU.get_coupler_obj_from_qubits(self._qubit_ids[0], self._qubit_ids[1], TunableTransmonCouplerFixed)

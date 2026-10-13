@@ -185,6 +185,9 @@ class DataDensityMatrix:
         F = float(np.real_if_close(F))
         return float(np.clip(F, 0.0, 1.0))
 
+    def get_matrix_element(self, row, col):
+        return self._rho[row][col]
+
     def plot2D(self, target_state=None, use_abs_phase=False, extra_title='', save_path=None):
         """
         Plot the real part of the density matrix as a 3D bar plot.
@@ -260,6 +263,7 @@ class DataDensityMatrix:
             ax[m].set_xlim(-0.5, N - 0.5); ax[m].set_ylim(-0.5, N - 0.5); ax[m].invert_yaxis()
             ax[m].set_xticks(range(N)); ax[m].set_yticks(range(N))
             ax[m].set_xticks(range(N), labels=basis_labels); ax[m].set_yticks(range(N), labels=basis_labels)
+            ax[m].tick_params(axis='x', labelrotation=90)
         
         ax[0].set_title('Real')
         ax[1].set_title('Imag')

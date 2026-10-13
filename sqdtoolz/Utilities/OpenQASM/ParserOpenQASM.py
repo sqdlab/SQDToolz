@@ -383,7 +383,7 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
             return [(bit_arg.name, x) for x in range(self._bits[bit_arg.name])]   #THIS MEANS IT IS FULL REG SIZE AND MUST BE MAPPED AS THUS!
         elif isinstance(bit_arg, openqasm3.ast.IndexedIdentifier):
             assert bit_arg.name.name in self._bits, f"The register '{bit_arg.name.name}' is undefined."
-            return [(bit_arg.name.name, self._eval_arg(bit_arg.indices[0][0]))]
+            return [(bit_arg.name.name, int(self._eval_arg(bit_arg.indices[0][0])))]    #TODO: Check that it is truly an integer as error checking instead of blindly rounding.
 
     def _eval_arg(self, argument, search_global_scope=False):
         if isinstance(argument, (int, float)):    #More just here for safety...

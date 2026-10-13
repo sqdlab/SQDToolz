@@ -56,6 +56,8 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
             return getattr(self._zi_qubit.parameters, self._param_mappings[name])
         elif '_param_mappings_local' in self.__dict__ and name in self._param_mappings_local:
             return self._param_mappings_local[name]
+        elif '_param_mappings_custom' in self.__dict__ and name in self._param_mappings_custom:
+            return getattr(self._zi_qubit.parameters.custom, self._param_mappings_custom[name])
         else:
             raise AttributeError(f"The ZIQubit object does not have an attribute/property '{name}'")
 
@@ -97,6 +99,8 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
             setattr(self._zi_qubit.parameters, self._param_mappings[name], value)
         elif '_param_mappings_local' in self.__dict__ and name in self._param_mappings_local:
             self._param_mappings_local[name] = value
+        elif '_param_mappings_custom' in self.__dict__ and name in self._param_mappings_custom:
+            setattr(self._zi_qubit.parameters.custom, self._param_mappings_custom[name], value)
         else:
             self.__dict__[name] = value
 
@@ -158,7 +162,7 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
                 'ReadoutKappa': 0,
                 'CorrectionMatrix': None, 
                 'ThermalPhotonNum': 0,
-                'ReadoutLineAttenuation_dB': -70, 
+                'ReadoutLineAttenuation_dB': -70,
                 'FluxConversionParams': None,
                 'QubitQiGE': 0,
                 'QubitQiEF': 0,
@@ -204,6 +208,14 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
                 'QubitSpecAmplitude': 'spectroscopy_amplitude',
                 'QubitSpecTime': 'spectroscopy_length'
             }
+            #There are custom parameters that need to be accessed from the DSL level - create them in runtime as opposed to modifying the main class...
+            self._param_mappings_custom = {
+                'FluxCompensationKernel': 'flux_compensation_kernel'
+            }
+            #
+            for cur_custom_param in self._param_mappings_custom:
+                #Put in custom so that the parameters are properly copied/serialised by ZI...
+                setattr(self._zi_qubit.parameters.custom, self._param_mappings_custom[cur_custom_param], None)
 
             #Setup some default values
             #TODO: Review if this even needs to be done?
@@ -260,6 +272,8 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
         for cur_param in self._param_mappings:
             ret_dict[cur_param] = getattr(self, cur_param)
         for cur_param in self._param_mappings_local:
+            ret_dict[cur_param] = getattr(self, cur_param)
+        for cur_param in self._param_mappings_custom:
             ret_dict[cur_param] = getattr(self, cur_param)
         #
         #This is the workaround highlighted in the initialiser...

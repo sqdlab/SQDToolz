@@ -243,18 +243,6 @@ def create_experiment(
             "with calibration traces because the calibration traces are added "
             "outside the sweep."
         )
-    if coupler_name == None:
-        cpl_cands = qpu.topology[:, qubits[0], qubits[1]] + qpu.topology[:, qubits[1], qubits[0]]
-        the_coupler = None
-        for cur_cpl in cpl_cands:
-            cur_qelem = cur_cpl.quantum_element
-            if isinstance(cur_qelem, TunableTransmonCouplerFixed):
-                the_coupler = cur_qelem
-        assert the_coupler != None, f"Could not find a suitable \'TunableTransmonCouplerFixed\' coupler for qubits \'{qubits[0]}\' and \'{qubits[1]}\'. Maybe provide coupler_name explicitly."
-    else:
-        the_coupler = qpu[coupler_name]
-        assert isinstance(the_coupler, TunableTransmonCouplerFixed), f"The coupler \'{coupler_name}\' is not a \'TunableTransmonCouplerFixed\' type."
-
     flux_amp_sweep = SweepParameter(f"amplitude", amplitudes, axis_name=f"flux_frequency")
     flux_length_sweep = SweepParameter(f"length", lengths, axis_name=f"flux_length")
 
@@ -269,7 +257,8 @@ def create_experiment(
 
     target_qubit = qubits[0]
     #first qubit in a two qubit pair will always be the target qubit
-    drive_line, params = target_qubit.transition_parameters("ge")     
+    drive_line, params = target_qubit.transition_parameters("ge")
+    flux_pulse = dsl.create_pulse({'function': 'const'}, name="step_flux_pulse")  
     with dsl.acquire_loop_rt(
         uid="shots",
         count=opts.count,
@@ -304,11 +293,7 @@ def create_experiment(
                     # delay while first Ramsey pulse is played
                     dsl.delay(signal=target_qubit.signals['flux'], time = params["length"])
                     # flux pulse
-                    qop.fixed_coupler_flux_pulse.omit_section(
-                        the_coupler,
-                        flux_length_sweep, 
-                        amplitude=flux_amp_sweep, 
-                        amplitude_aux=amplitude_aux)
+                    dsl.play(target_qubit.signals['flux'], amplitude=flux_amp_sweep, length=flux_length_sweep, pulse=flux_pulse)
 
                 # readout and data acquisition
                 with dsl.section(name="main_measure"):

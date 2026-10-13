@@ -106,7 +106,7 @@ class ExpZIPhaseCompensation2Q(Experiment):
 
         # stationary qubit
         print(f"Sweeping phase compensation on {stationary_qubit} (stationary)...")
-        self.cur_coupler_obj.CompZAngle = None
+        self.cur_coupler_obj.CompZAngleStationary = None
         exp_stationary = ExpZIqubit(f'PhaseComp_{self.cur_coupler_obj.Name}_{main_qubit}_Stationary', self._expt_config, phase_compensation_cz, self._hal_QPU, self._all_qubits, 
                         rz_angles=self._angles, 
                         coupler_name=self._coupler_name,

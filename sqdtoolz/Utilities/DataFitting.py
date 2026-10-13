@@ -239,7 +239,7 @@ class DFitSinusoid:
         #Calculate with decay
         popt, pcov = scipy.optimize.curve_fit(func, data_x, data_y, [a0, gamma0, f0, phi0, c0],
                                             bounds=([0.1*a0, -5/(xMax-xMin), 0.5/(xMax-xMin),       -np.pi, yMin],
-                                                    [1.2*a0,  5/(xMax-xMin), 0.5/np.abs(np.min(dx)), np.pi, yMax]))
+                                                    [1.2*a0,  5/(xMax-xMin), 0.5/np.min(np.abs(dx)), np.pi, yMax]))
 
         fit_data = func(data_x, *popt)
         fig = None

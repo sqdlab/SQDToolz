@@ -231,26 +231,27 @@ def create_experiment(
 
         # sweep over rz angles
         with dsl.sweep(name="rz_angle_sweep", parameter=zangle_sweep_pars):
-            if main_or_aux.lower() == 'aux':
-                with dsl.section(name="pre_drive_and_cz", alignment=SectionAlignment.LEFT):
-                    with dsl.section(name="pre_drive", alignment=SectionAlignment.LEFT, length=l_flux):
-                        # [ h ]
-                        qop.rz.omit_section(q_comp, angle=np.pi)
-                        qop.ry.omit_section(q_comp, angle=np.pi/2)
+            # if main_or_aux.lower() == 'aux':
+            with dsl.section(name="pre_drive_and_cz", alignment=SectionAlignment.LEFT, length=l_flux):
+                with dsl.section(name="pre_drive", alignment=SectionAlignment.LEFT):
+                    # [ h ]
+                    qop.rz.omit_section(q_comp, angle=np.pi)
+                    qop.ry.omit_section(q_comp, angle=np.pi/2)
+                    pre_drive_uid = dsl.active_section().uid
 
-                    with dsl.section(name="flux_pulse", alignment=SectionAlignment.RIGHT, length=l_flux):
-                        # [ cz ]
-                        qop.CZ.omit_section(the_coupler)
-            else:
-                with dsl.section(name="pre_drive_and_cz", alignment=SectionAlignment.LEFT):
-                    with dsl.section(name="pre_drive", alignment=SectionAlignment.LEFT, length=l_flux):
-                        # [ h ]
-                        qop.rz.omit_section(q_comp, angle=np.pi)
-                        qop.ry.omit_section(q_comp, angle=np.pi/2)
+                with dsl.section(name="flux_pulse", alignment=SectionAlignment.RIGHT, play_after=pre_drive_uid):
+                    # [ cz ]
+                    qop.CZ.omit_section(the_coupler)
+            # else:
+            #     with dsl.section(name="pre_drive_and_cz", alignment=SectionAlignment.LEFT, length=l_flux):
+            #         with dsl.section(name="pre_drive", alignment=SectionAlignment.LEFT):
+            #             # [ h ]
+            #             qop.rz.omit_section(q_comp, angle=np.pi)
+            #             qop.ry.omit_section(q_comp, angle=np.pi/2)
 
-                    with dsl.section(name="flux_pulse", alignment=SectionAlignment.RIGHT, length=l_flux):
-                        # [ cz ]
-                        qop.CZ.omit_section(the_coupler)
+            #         with dsl.section(name="flux_pulse", alignment=SectionAlignment.RIGHT):
+            #             # [ cz ]
+            #             qop.CZ.omit_section(the_coupler)
 
             with dsl.section(name="main_phase_comp", alignment=SectionAlignment.RIGHT):
                 # [ rz(theta) ]

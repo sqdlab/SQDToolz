@@ -2706,7 +2706,7 @@ ___
 #### Description
 
 `ExpZICryoscope` performs a cryoscope measurement to characterise (and
-compensate) the impulse response of a fixed coupler's flux line. For a range
+compensate) the impulse response of a qubit's flux line. For a range
 of flux-pulse amplitudes, it measures the second qubit's phase accumulation
 ($\langle X\rangle$/$\langle Y\rangle$ via two 90°-rotated Ramsey-like
 sequences) as a function of time after the flux pulse, demodulates and
@@ -2725,7 +2725,7 @@ loaded onto the coupler's pulse.
 | `name` | `str` | Name used to group the two sub-experiments (`lab.group_open`/`group_close`). |
 | `expt_config` | — | Experiment configuration object passed through to the sub-experiments. |
 | `hal_QPU` | — | The QPU HAL object; used to look up the qubit and coupler objects. |
-| `qubit_ids` | `list[str]` | Must contain more than one qubit (the constructor asserts `len(qubit_ids) > 1`) — the first qubit is the one measured, and a coupler is looked up between it and the second. |
+| `qubit_id` | `str` | String ID of the qubit to interrogate |
 
 ##### Keyword arguments
 
@@ -2748,8 +2748,9 @@ into `lab.run_single`).
 ```python
 from sqdtoolz.Experiments.Experimental.ExpZICryoscope import ExpZICryoscope
 
-exp = ExpZICryoscope('cryoscope_Q0Q2', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0', 'Q2'],
-  amplitudes=np.linspace(0.2, 0.4, 5), lengths=np.arange(0, 300e-9, 0.5e-9), Ec_over_h=200e6)
+exp = ExpZICryoscope(f'Cryoscope_Q0', lab.CONFIG('ZI'), lab.HAL('QPU'), 'Q0', amplitudes=np.array([0.4]), 
+                        lengths=np.arange(0.0, 300e-9, dt), Ec_over_h=194.7e6, f_max=lab.HAL('Q0').DriveGE,
+                        fixed_delay_length=300e-9, nyquist_order=0, update_qubit=True)
 exp.run(lab)
 ```
 
@@ -2782,12 +2783,12 @@ and the Nyquist band) for a subset of amplitudes; a grid of per-amplitude
 detuning/flux/normalised-step-response traces; and (`plot_summary`) all
 three in sequence.
 
-##### `fit_step_response(amplitude_index=0, update_coupler=True)`
+##### `fit_step_response(amplitude_index=0, update_qinot=True)`
 
 Fits a pole-zero model to the normalised step response at the given
 amplitude index (via `Flattenator.fit_step_response`, 5 poles/5 zeros) and, if
-`update_coupler` is `True`, writes the resulting compensation kernel onto the
-coupler's `Pulse['precomp_kernel']`.
+`update_qinot` is `True`, writes the resulting compensation kernel onto the
+qubit's `FluxCompensationKernel` attribute.
 
 ##### `fit_step_response_from_s_data(normalised_step_response)` *(static)*
 

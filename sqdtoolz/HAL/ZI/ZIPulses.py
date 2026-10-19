@@ -82,9 +82,13 @@ def impulse(x, relative_location=0.0, num_samples=1, **_):
     return res
 
 @pulse_library.register_pulse_functional
-def square(x, **_):
+def square(x, duty_cycle=0.5, **_):
     x = np.asarray(x, dtype=float)
-    return np.ones(len(x))
+    num_samples = len(x)
+    pulse_on = int(duty_cycle*num_samples) 
+    pulse = [1] * pulse_on + [0] * (num_samples - pulse_on)
+    assert len(pulse) == len(x)
+    return np.asarray(pulse)
 
 @pulse_library.register_pulse_functional
 def flattop_gaussian_buffer_asymmetric(x, relative_length_flat=0.7, relative_length_buffer=0.1, buffer_amp_proportion=0.8, **_ ):

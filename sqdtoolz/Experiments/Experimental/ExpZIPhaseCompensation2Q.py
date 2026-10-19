@@ -80,7 +80,7 @@ class ExpZIPhaseCompensation2Q(Experiment):
                         main_or_aux='main',
                         **self._kwargs
                         )
-        lab.run_single(exp_main, **self._kwargs)
+        lab.run_single(exp_main, raw_pulse_sheet_duration=1e-3, **self._kwargs)
         #
         data_main = exp_main.retrieve_last_dataset(main_qubit)
         self.data['main_shots'] = data_main.get_numpy_array()[:,:,0]
@@ -98,7 +98,7 @@ class ExpZIPhaseCompensation2Q(Experiment):
                             **self._kwargs
                             )
             # self._kwargs['override_ACQ_params'] = {'AveragingOrder': "SingleShot", 'AcquisitionMode': "DISCRIMINATION"}
-            lab.run_single(exp_aux, **self._kwargs)
+            lab.run_single(exp_aux, raw_pulse_sheet_duration=1e-3, **self._kwargs)
             #
             data_aux = exp_aux.retrieve_last_dataset(aux_qubit)
             self.data['aux_shots'] = data_aux.get_numpy_array()[:,:,0]
@@ -106,14 +106,14 @@ class ExpZIPhaseCompensation2Q(Experiment):
 
         # stationary qubit
         print(f"Sweeping phase compensation on {stationary_qubit} (stationary)...")
-        self.cur_coupler_obj.CompZAngle = None
+        self.cur_coupler_obj.CompZAngleStationary = None
         exp_stationary = ExpZIqubit(f'PhaseComp_{self.cur_coupler_obj.Name}_{main_qubit}_Stationary', self._expt_config, phase_compensation_cz, self._hal_QPU, self._all_qubits, 
                         rz_angles=self._angles, 
                         coupler_name=self._coupler_name,
                         main_or_aux='stationary',
                         **self._kwargs
                         )
-        lab.run_single(exp_stationary, **self._kwargs)
+        lab.run_single(exp_stationary, raw_pulse_sheet_duration=1e-3, **self._kwargs)
         #
         data_stationary = exp_stationary.retrieve_last_dataset(stationary_qubit)
         self.data['stationary_shots'] = data_stationary.get_numpy_array()[:,:,0]

@@ -18,29 +18,28 @@ import numpy as np
 import warnings
 
 class ExpZICryoscope:
-    def __init__(self, name, expt_config, hal_QPU, qubit_ids, **kwargs):
+    def __init__(self, name, expt_config, hal_QPU, qubit_id:str, **kwargs):
         self._name = name
         self._expt_config = expt_config
         self._hal_QPU = hal_QPU
         self._isY = 0
-        self._qubit_ids = qubit_ids
-        self.cur_coupler_obj = hal_QPU.get_coupler_obj_from_qubits(qubit_ids[0], qubit_ids[1], TunableTransmonCouplerFixed)
+        self._qubit_ids = [qubit_id]
+        self._cur_qubit_obj = self._hal_QPU.get_qubit_obj(self._qubit_ids[0])
         self._kwargs = kwargs
         self.nyquist_oder = kwargs.pop('nyquist_order', 0)
-        assert len(self._qubit_ids) >1 , "Also must define a second qubit as it will attempt to optimise a pulse specific to each coupler element"
 
         self._amplitudes = kwargs.pop('amplitudes', np.linspace(0.3, 0.3, 1))
         self._lengths = kwargs.pop('lengths', np.arange(0.0, 300e-9, (1/2.0)*1e-9))
         self._transition = kwargs.pop('transition', 'ge')
-        self._update_coupler = kwargs.pop("update_coupler", True)
+        self._update_qubit = kwargs.pop("update_qubit", True)
 
         self._normalise_data = kwargs.pop('normalise_data', True)
         self.data = {}
         self.temp = 0
 
         self.f_max = kwargs.pop('f_max', None)
-        if self.f_max is None and self._hal_QPU.get_qubit_obj(qubit_ids[0]).FluxConversionParams is not None:
-            self.f_max = self._hal_QPU.get_qubit_obj(qubit_ids[0]).FluxConversionParams['f_max']
+        if self.f_max is None and self._cur_qubit_obj.FluxConversionParams is not None:
+            self.f_max = self._cur_qubit_obj.FluxConversionParams['f_max']
         self.Ec_over_h = kwargs.pop('Ec_over_h', None)
         assert self.Ec_over_h is not None, "Must provide Ec_over_h for the qubit to convert frequency shift to flux for pulse reconstruction."
         self.norm_window = kwargs.pop('norm_window', None)
@@ -85,7 +84,7 @@ class ExpZICryoscope:
 
         self.post_process()
         self.plot_summary()
-        self.fit_step_response()
+        self.fit_step_response(update_qubit=self._update_qubit)
 
     def post_process(self, filter_window_length=7, polyorder=2):
         assert isinstance(filter_window_length, int) and filter_window_length > 0, "filter_window_length must be a positive integer"
@@ -297,23 +296,21 @@ class ExpZICryoscope:
         self.plot_fft_grid()
         self.plot_amplitude_grid()
 
-    def fit_step_response(self, amplitude_index=0, update_coupler=True):
+    def fit_step_response(self, amplitude_index=0, update_qubit=True, num_poles=5, num_zeros=5, num_samples_missing=1):
         if len(self._amplitudes) > 1:
             normalised_step_response = self.data['s'][amplitude_index, :]
         else:
             normalised_step_response = self.data['s'][0,:]
-        compensation_kernel = ExpZICryoscope.fit_step_response_from_s_data(normalised_step_response)
+        compensation_kernel = ExpZICryoscope.fit_step_response_from_s_data(normalised_step_response, num_poles, num_zeros, num_samples_missing)
 
-        if update_coupler:
-            self.cur_coupler_obj.Pulse['precomp_kernel'] = compensation_kernel
-            print(f"Updated lab.HAL({self.cur_coupler_obj}).Pulse['precomp_kernel'] with fitted step response.")
+        if update_qubit:
+            self._cur_qubit_obj.FluxCompensationKernel = np.array(compensation_kernel)
+            print(f"Updated FluxCompensationKernel for {self._qubit_ids[0]} with fitted step response.")
 
     @staticmethod
-    def fit_step_response_from_s_data(normalised_step_response):
+    def fit_step_response_from_s_data(normalised_step_response, num_poles=5, num_zeros=5, num_samples_missing=1):
         raw_step_response = (normalised_step_response-1)*1+1 #Rescale it to see if it helps...
         pc = Flattenator()
-        pc.fit_step_response(raw_step_response, num_poles=5, num_zeros=5, num_samples_missing=1, plot_response=True)
+        pc.fit_step_response(raw_step_response, num_poles=num_poles, num_zeros=num_zeros, num_samples_missing=num_samples_missing, plot_response=True)
         return pc.get_compensation_kernel()*1.0
-    
 
-        

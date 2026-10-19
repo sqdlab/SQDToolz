@@ -89,13 +89,15 @@ class ExpZIDailyTuneup:
             print(f'\nOptimising readout...')
             self._expt_config.update_SPECs([self._spec_name_ROGE])
             exp = ExpZIResOptimal(f'DailyTuneup_{self._qubit_id}_Readout', self._expt_config, self._qpu, [self._qubit_id], states='gef', frequencies=self._res_freq_range, ZI_plot=self._individual_plots, calc_single_shot_fidelities=True)
-            lab.run_single(exp)
+            lab.run_single(exp, raw_pulse_sheet_duration=1e-3)
             prev_ge = self._qubit.FidelityReadout
             prev_freq_ge = self._qubit.ReadoutFrequency
             if self._update_live:
+                lab.SPEC(self._spec_name_ROGEF).commit_entries()
                 exp.update_qubits_by_fidelity(state_fidelity='gef')
                 lab.SPEC(self._spec_name_ROGEF).update_entries()
                 #
+                lab.SPEC(self._spec_name_ROGE).commit_entries()
                 exp.update_qubits_by_fidelity(state_fidelity='ge')
                 lab.SPEC(self._spec_name_ROGE).update_entries()
                 new_ge = self._qubit.FidelityReadout
@@ -114,13 +116,13 @@ class ExpZIDailyTuneup:
             self._qubit.ReadoutKernelType = "default"
             self._expt_config.update_SPECs([self._spec_name_ROGEF])
             exp = ExpZIqubit(f'DailyTuneup_{self._qubit_id}_TimeTraces', self._expt_config, time_traces, self._qpu, [self._qubit_id], states='gef', update=self._update_live, skip_ZI_analysis=False, ZI_plot=self._individual_plots)
-            lab.run_single(exp)
+            lab.run_single(exp, raw_pulse_sheet_duration=1e-3)
             lab.SPEC(self._spec_name_ROGEF).update_entries()
             #
             self._qubit.ReadoutKernelType = "default"
             self._expt_config.update_SPECs([self._spec_name_ROGE])
             exp = ExpZIqubit(f'DailyTuneup_{self._qubit_id}_TimeTraces', self._expt_config, time_traces, self._qpu, [self._qubit_id], states='ge', update=self._update_live, skip_ZI_analysis=False, ZI_plot=self._individual_plots)
-            lab.run_single(exp)
+            lab.run_single(exp, raw_pulse_sheet_duration=1e-3)
             lab.SPEC(self._spec_name_ROGE).update_entries()
             #
             # self._expt_config._hal_ACQ.NumRepetitions = 1024; 
@@ -137,7 +139,7 @@ class ExpZIDailyTuneup:
                 lab.SPEC(self._spec_name_ROGE).commit_entries()     #Needed as ZI compilation checks are run before SPECs are committed...
                 self._qubit.ReadoutKernelType = 'default'
                 exp = ExpZIBlobs(f'DailyTuneup_{self._qubit_id}_BlobsGE', self._expt_config, self._qpu, [self._qubit_id], states='ge', ZI_plot=self._individual_plots)
-                lab.run_single(exp)
+                lab.run_single(exp, raw_pulse_sheet_duration=1e-3)
                 self._qubit.ReadoutKernelType = 'optimal'       
                 exp.get_correction_matrices(update=self._update_live)
                 lab.SPEC(self._spec_name_ROGE).update_entries()
@@ -146,7 +148,7 @@ class ExpZIDailyTuneup:
                 lab.SPEC(self._spec_name_ROGEF).commit_entries()     #Needed as ZI compilation checks are run before SPECs are committed...
                 self._qubit.ReadoutKernelType = 'default'
                 exp = ExpZIBlobs(f'DailyTuneup_{self._qubit_id}_BlobsGEF', self._expt_config, self._qpu, [self._qubit_id], states='gef', ZI_plot=self._individual_plots)
-                lab.run_single(exp)
+                lab.run_single(exp, raw_pulse_sheet_duration=1e-3)
                 self._qubit.ReadoutKernelType = 'optimal'
                 exp.get_correction_matrices(update=self._update_live)
                 lab.SPEC(self._spec_name_ROGEF).update_entries()    
@@ -159,7 +161,7 @@ class ExpZIDailyTuneup:
         prev = self._qubit.T1GE
         self._expt_config.update_SPECs([self._spec_name_ROGE])
         exp = ExpZIT1(f'DailyTuneup_{self._qubit_id}_T1', self._expt_config, self._qpu, [self._qubit_id], ZI_plot=self._individual_plots)
-        lab.run_single(exp)
+        lab.run_single(exp, raw_pulse_sheet_duration=1e-3)
         if self._update_live:
             exp.update_qubits()
             new = self._qubit.T1GE

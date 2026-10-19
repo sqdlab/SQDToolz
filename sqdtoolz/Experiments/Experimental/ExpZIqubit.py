@@ -235,7 +235,7 @@ class ExpZIqubit(Experiment):
                 wheel_zoom = WheelZoomTool(dimensions="width")
                 wheel_zoom.modifiers = {"ctrl": True}
                 p = figure(
-                    title=name, x_axis_label="Time (s)", y_axis_label="Value",
+                    title=name, x_axis_label="Time (μs)", y_axis_label="Value",
                     tools="",
                     active_scroll=wheel_zoom,
                     sizing_mode="stretch_width", height=200,
@@ -247,14 +247,14 @@ class ExpZIqubit(Experiment):
                     ResetTool())
                 if 'value' in data:
                     mask = find_non_constant_areas(data["value"])
-                    source = ColumnDataSource({"time": data["time"][mask],"value": data["value"][mask]})
+                    source = ColumnDataSource({"time": data['time'][mask]*1e6,"value": data["value"][mask]})
                     p.line(x="time", y="value", source=source,
                         line_width=2, color='black', legend_label="value")
                 else:
                     mask = find_non_constant_areas(data["real"])
-                    source_real = ColumnDataSource({'time': data['time'][mask], 'real': data['real'][mask]})
+                    source_real = ColumnDataSource({'time': data['time'][mask]*1e6, 'real': data['real'][mask]})
                     mask = find_non_constant_areas(data["imag"])
-                    source_imag = ColumnDataSource({'time': data['time'][mask], 'imag': data['imag'][mask]})
+                    source_imag = ColumnDataSource({'time': data['time'][mask]*1e6, 'imag': data['imag'][mask]})
                     p.line(x="time", y="real", source=source_real,
                         line_width=2, color='red', legend_label="real")
                     p.line(x="time", y="imag", source=source_imag,

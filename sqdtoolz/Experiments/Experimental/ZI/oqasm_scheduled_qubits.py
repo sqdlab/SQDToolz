@@ -201,6 +201,12 @@ def create_experiment(
                                 amplitude=cur_pulse['waveform_var']['amplitude'],
                                 sigma=cur_pulse['waveform_var'].get('sigma', 0.25)
                             )
+                        case "constant":
+                            new_pulse = lbeqs.pulse_library.const(
+                                uid=new_uid,
+                                length=cur_pulse['waveform_var']['length'],
+                                amplitude=cur_pulse['waveform_var']['amplitude']
+                            )
                         #####
                         case "sampled":
                             if cur_pulse['waveform_var']['samples'].dtype == np.complex128:
@@ -208,11 +214,13 @@ def create_experiment(
                             else:
                                 new_pulse = lbeqs.pulse_library.sampled_pulse_real(uid=new_uid, samples=cur_pulse['waveform_var']['samples'])
                     found = False
-                    for cur_cached_pulse in lePulses:
-                        new_pulse.uid = lePulses[cur_cached_pulse].uid  #This is just to make the comparison == work...
-                        if lePulses[cur_cached_pulse] == new_pulse:
-                            found = True
-                            new_uid = cur_cached_pulse
+                    if cur_pulse['waveform_var']['type'] != 'measure':  #Measure pulses must each have their own pulse object...
+                        for cur_cached_pulse in lePulses:
+                            new_pulse.uid = lePulses[cur_cached_pulse].uid  #This is just to make the comparison == work...
+                            if lePulses[cur_cached_pulse] == new_pulse:
+                                found = True
+                                new_uid = cur_cached_pulse
+                                break
                     if not found:
                         new_pulse.uid = new_uid
                         lePulses[new_uid] = new_pulse

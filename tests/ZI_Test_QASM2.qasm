@@ -12,7 +12,10 @@ qubit[2] q;
 
 defcal cz $0, $1
 {
-play(flux($1), wfm_flux);
+	play(drive($0), gaussian(20ns, 0.358));
+	play(flux($1), wfm_flux);
+	delay[0] $0, $1;
+	// play(meas($1), constant(2us, 0.358));
 }
 
 z q[0];

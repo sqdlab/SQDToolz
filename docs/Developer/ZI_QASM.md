@@ -46,10 +46,10 @@ The idea is to use *OpenPulse* but with heavy abuse of its `extern` commaand to 
 ```cpp
 extern drive(qubit) -> frame;
 extern flux(qubit) -> frame;
-extern measure(qubit) -> frame;
+extern meas(qubit) -> frame;
 ```
 
-That is, for any qubit, one may query the drive, flux or measure lines by using these three functions. After that, the `play` functions can be used in a straightforward manner. Note that `play` functions in `cal` blocks are ignored (it will technically require ports/frames to even call `play`; there are not supported in this parser).
+That is, for any qubit, one may query the drive, flux or measure lines by using these three functions (using `meas` here as `measure` is an *OpenQASM* construct). After that, the `play` functions can be used in a straightforward manner. Note that `play` functions in `cal` blocks are ignored (it will technically require ports/frames to even call `play`; there are not supported in this parser).
 
 Note that `gatedef` must only use logical qubits while `defcal` only uses physical qubits. Thus, the execution is as follows in this example:
 1. Parse the statement: `x q[1];`
@@ -68,6 +68,8 @@ To make ease of timing, the following alignment rules shall be enforced:
 - All `play` functions from different `defcal` blocks must play sequentially.
 
 Thus, if there was a `rx` on a drive line on a given qubit, and `cpl` on its flux line, these pulses must appear sequentially. If they were wrapped in the same `defcal` block then they play concurrently. The compiler implicitly adds a synchronisation point for the given qubit upon playing the custom pulses in the `defcal` block.
+
+The policy after playing a pulse is to return to zero. This is in strict enforcement of *OpenPulse* grammar and the behaviour in the ZI DSL.
 
 ## Variable scoping
 

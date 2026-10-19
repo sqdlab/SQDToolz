@@ -12,6 +12,10 @@ from sqdtoolz.Utilities.Miscellaneous import Miscellaneous
 import bokeh
 import bokeh.plotting
 from bokeh.models import PanTool
+import bokeh.models
+import bokeh.plotting
+import bokeh.palettes
+import json
 from sqdtoolz.Utilities.FileJSON import SerialiseJSON
 from enum import Enum, auto
 from pathlib import Path
@@ -418,6 +422,11 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
                     cur_qubit = (argument.arguments[0].name,0)
                     assert cur_qubit in self._qarg_stack[-1], f"The physical qubit {argument.arguments[0].name} is not defined here in the defcal function signature?"
                     return ('drive', self._qarg_stack[-1][cur_qubit])
+                case 'meas':
+                    assert len(argument.arguments) == 1 and argument.arguments[0].name[0]=='$', "Must give a single physical qubit (i.e. starts with $) to extract the line for the 'meas' function."
+                    cur_qubit = (argument.arguments[0].name,0)
+                    assert cur_qubit in self._qarg_stack[-1], f"The physical qubit {argument.arguments[0].name} is not defined here in the defcal function signature?"
+                    return ('measure', self._qarg_stack[-1][cur_qubit])
                 case 'flux':
                     assert len(argument.arguments) == 1 and argument.arguments[0].name[0]=='$', "Must give a single physical qubit (i.e. starts with $) to extract the line for the 'drive' function."
                     cur_qubit = (argument.arguments[0].name,0)
@@ -430,6 +439,12 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
                     ret_dict['amplitude'] = self._eval_arg(argument.arguments[1])
                     if len(argument.arguments) > 2:
                         ret_dict['sigma'] = argument.arguments[2]
+                    return ret_dict
+                case 'constant':
+                    assert len(argument.arguments) >= 2, "Must provide at least, the duration and amplitude for 'constant'."
+                    ret_dict = {'type': 'constant'}
+                    ret_dict['length'] = self._eval_arg(argument.arguments[0])
+                    ret_dict['amplitude'] = self._eval_arg(argument.arguments[1])
                     return ret_dict
                 case 'set_phase':
                     assert len(argument.arguments) == 2, "Must give 2 arguments: the frame (i.e. drive/flux/measure etc.) of the signal line and the phase in radians."
@@ -947,7 +962,7 @@ class ParserOpenQASM:
             dt_time = params.dt(cur_cmd['frame_var'][0])
             if cur_cmd['type'] == 'pulse_attribute':
                 cur_len = 0
-            elif cur_cmd['waveform_var']['type'] in ['gaussian']:
+            elif cur_cmd['waveform_var']['type'] in ['gaussian', 'constant']:
                 cur_len = self._process_delay(cur_cmd['waveform_var']['length'],dt_time)
             elif cur_cmd['waveform_var']['type'] == 'sampled':  #Shouldn't be anything else given how everything so far is hard-coded...
                 assert len(cur_cmd['waveform_var']['samples'].shape) == 1, "Must be 1D array. There is a custom sampled waveform that is not 1D..."
@@ -1036,7 +1051,40 @@ class ParserOpenQASM:
     def _plot_ctrl(self, ax, x,y, col):
         ax.add_artist(mpatch.Circle((x,y), 0.2, facecolor=col))
 
-    def tabulate_schedule(self, gate_schedule, qubit_params:ScheduleParametersBase):
+    def _process_custom_waveform(self, qubit_params, wfm_sequence:list):
+        cur_sequences = {}
+        for cur_cmd in wfm_sequence:
+            if cur_cmd['type'] == 'play':
+                cur_target = f"Q{cur_cmd['frame_var'][1]}|{cur_cmd['frame_var'][0]}"
+                if not cur_target in cur_sequences:
+                    cur_sequences[cur_target] = []
+                match cur_cmd['waveform_var']['type']:
+                    case "gaussian":
+                        length=cur_cmd['waveform_var']['length']
+                        amplitude=cur_cmd['waveform_var']['amplitude']
+                        sigma=cur_cmd['waveform_var'].get('sigma', 0.25)
+                        t = np.arange(0, length, qubit_params.dt(cur_cmd['frame_var'][0]))
+                        x = 2 * t / length - 1  # Map [0, length) to [-1, 1]
+                        y = amplitude * np.exp(-0.5 * (x / sigma) ** 2)
+                        if cur_cmd['frame_var'][0] != 'flux':
+                            y = y + 0j
+                        cur_sequences[cur_target].append((t,y))
+                    case "constant":
+                        length=cur_cmd['waveform_var']['length']
+                        amplitude=cur_cmd['waveform_var']['amplitude']
+                        t = np.arange(0, length, qubit_params.dt(cur_cmd['frame_var'][0]))
+                        y = 0*t+amplitude
+                        if cur_cmd['frame_var'][0] != 'flux':
+                            y = y + 0j
+                        cur_sequences[cur_target].append((t,y))
+                    case "sampled":
+                        cur_data = cur_cmd['waveform_var']['samples']
+                        cur_sequences[cur_target].append((np.arange(cur_data.size)*qubit_params.dt(cur_cmd['frame_var'][0]), cur_data))
+        for cur_line in cur_sequences:
+            cur_sequences[cur_line] = np.concatenate(cur_sequences[cur_line])
+        return cur_sequences
+
+    def tabulate_schedule(self, gate_schedule, qubit_params:ScheduleParametersBase, custom_waveforms={}):
         phys_qubit_ids = qubit_params.get_phys_qubit_ids()
         cur_qubit_gate_time_indices = {x:0.0 for x in phys_qubit_ids}
         #
@@ -1053,7 +1101,9 @@ class ParserOpenQASM:
             cur_qubit = cur_sec_ops['qubit_index']
             if cur_sec_ops['custom_waveform']:
                 cur_gate_time = cur_sec_ops['length']
-                cur_name = f'Wfm ({Miscellaneous.get_units(cur_gate_time)}s)'
+                cur_wfm_name = f'Wfm{len(custom_waveforms)+1}'
+                custom_waveforms[cur_wfm_name] = self._process_custom_waveform(qubit_params, cur_sec_ops['sequence'])
+                cur_name = f'{cur_wfm_name} ({Miscellaneous.get_units(cur_gate_time)}s)'
                 #
                 if not isinstance(cur_qubit, (list,tuple)):
                     cur_qubit = [cur_qubit]
@@ -1131,7 +1181,8 @@ class ParserOpenQASM:
         Generates an interactive Bokeh timeline plot using a simplified data model.
         """
 
-        df = self.tabulate_schedule(gate_schedule, qubit_params)
+        custom_waveforms = {}
+        df = self.tabulate_schedule(gate_schedule, qubit_params, custom_waveforms=custom_waveforms)
         
         end_times = df['end_time'].to_numpy()
         norm_fac, norm_prefix = Miscellaneous.get_metric_multiplier(end_times)
@@ -1167,7 +1218,7 @@ class ParserOpenQASM:
             gate_types = ['X', 'Y', 'Z', 'M', 'D', 'W', 'R']
             gate_colors = ['#0077BB', '#33BBEE', '#009988', '#CC3311', '#BBBBBB', '#EE3377', '#BBBBBB']
             mapper = bokeh.transform.factor_cmap('operation', palette=gate_colors, factors=gate_types)
-        rect_renderer = p.rect(
+        rect_renderer_1q = p.rect(
             x='centre', 
             y='qubits', 
             width='duration', 
@@ -1188,7 +1239,7 @@ class ParserOpenQASM:
         rect_renderer = p.rect( x='centre',  y='qubitsAux',  width='durationBy4', height=0.6,
             border_radius=15, source=source_2q,  line_color="black", fill_color="black", alpha=0.9
         )
-        rect_renderer = p.rect(x='centre', y='qubits', width='duration', height=0.8, 
+        rect_renderer_2q = p.rect(x='centre', y='qubits', width='duration', height=0.8, 
             source=source_2q, line_color="black", fill_color=mapper, alpha=1.0,
         )
         p.text(x='centre', y='qubits', text='gate_type', source=source_2q, text_align='center', text_baseline='middle', text_color="black")
@@ -1209,7 +1260,415 @@ class ParserOpenQASM:
         )
 
         p.legend.click_policy = "hide"
-        bokeh.io.save(p, output_file_path)
+
+        # ---------------------------------------------------------
+        # Detail panel
+        # ---------------------------------------------------------
+
+        detail_panel = bokeh.models.Div(
+            text="",
+            visible=False,
+            sizing_mode="stretch_width",
+            styles={
+                "padding": "12px",
+                "border": "1px solid #cccccc",
+                "border-radius": "5px",
+                "background-color": "#f8f8f8",
+            },
+        )
+
+        # ---------------------------------------------------------
+        # Prepare waveform data for embedding in standalone HTML
+        # ---------------------------------------------------------
+
+        waveform_data = {}
+
+        for waveform_id, signals in custom_waveforms.items():
+            waveform_data[str(waveform_id)] = {}
+
+            for label, (x, y) in signals.items():
+                x = np.asarray(x, dtype=float).ravel()
+                y = np.asarray(y).ravel()
+
+                if len(x) != len(y):
+                    raise ValueError(
+                        f"Waveform {waveform_id!r}, signal {label!r}: "
+                        "x and y must have equal lengths."
+                    )
+
+                if not np.all(np.isfinite(x)):
+                    raise ValueError(
+                        f"Waveform {waveform_id!r}, signal {label!r}: "
+                        "x contains non-finite values."
+                    )
+
+                if not np.all(np.isfinite(y)):
+                    raise ValueError(
+                        f"Waveform {waveform_id!r}, signal {label!r}: "
+                        "y contains non-finite values."
+                    )
+
+                # Encode complex samples as [real, imag] pairs so that
+                # the waveform data can be serialised to JSON.
+                if np.iscomplexobj(y):
+                    y_serialised = [
+                        [float(v.real), float(v.imag)]
+                        for v in y
+                    ]
+                else:
+                    y_serialised = [float(v) for v in y]
+
+                waveform_data[str(waveform_id)][str(label)] = {
+                    "x": [float(v) for v in x],
+                    "y": y_serialised,
+                }
+
+        # ---------------------------------------------------------
+        # Create one subplot per unique signal label
+        # ---------------------------------------------------------
+
+        all_signal_labels = list(dict.fromkeys(
+            label
+            for signals in waveform_data.values()
+            for label in signals
+        ))
+
+        # All subplots share this range, so zooming and panning
+        # one subplot synchronises the time axis of every subplot.
+        waveform_x_range = bokeh.models.Range1d(0, 1)
+
+        waveform_plots = {}
+        waveform_sources = {}
+        waveform_renderers = {}
+
+        for label in all_signal_labels:
+            wheel_zoom = bokeh.models.WheelZoomTool(
+                dimensions="width",
+                modifiers={"ctrl": True},
+            )
+
+            signal_plot = bokeh.plotting.figure(
+                width=1000,
+                height=150,
+                title=None,
+                x_axis_label=None,
+                x_range=waveform_x_range,
+                tools="",
+                active_scroll=wheel_zoom,
+                sizing_mode="stretch_width",
+            )
+
+            signal_plot.yaxis.axis_label = label
+            signal_plot.yaxis.ticker = bokeh.models.BasicTicker()
+            signal_plot.yaxis.major_label_overrides = {}
+
+            signal_plot.ygrid.grid_line_color = "#dddddd"
+            signal_plot.xgrid.grid_line_color = "#eeeeee"
+
+            # Hide the x-axis on all but the last subplot.
+            signal_plot.xaxis.visible = False
+
+            signal_plot.add_tools(
+                wheel_zoom,
+                bokeh.models.PanTool(dimensions="width"),
+                bokeh.models.ResetTool(),
+            )
+
+
+            # Real component: black for real-valued signals,
+            # red for complex-valued signals.
+            source_real = bokeh.models.ColumnDataSource(
+                data={"x": [], "y": []}
+            )
+
+            renderer_real = signal_plot.line(
+                x="x",
+                y="y",
+                source=source_real,
+                line_width=2,
+                color="black",
+                visible=False,
+            )
+
+            # Imaginary component: shown only for complex signals.
+            source_imag = bokeh.models.ColumnDataSource(
+                data={"x": [], "y": []}
+            )
+
+            renderer_imag = signal_plot.line(
+                x="x",
+                y="y",
+                source=source_imag,
+                line_width=2,
+                color="blue",
+                visible=False,
+            )
+
+            waveform_plots[label] = signal_plot
+
+            waveform_sources[label] = {
+                "real": source_real,
+                "imag": source_imag,
+            }
+
+            waveform_renderers[label] = {
+                "real": renderer_real,
+                "imag": renderer_imag,
+            }
+
+        # Show time labels only on the bottom subplot.
+        if all_signal_labels:
+            waveform_plots[all_signal_labels[-1]].xaxis.visible = True
+            waveform_plots[all_signal_labels[-1]].xaxis.axis_label = "Time"
+
+        # Assemble the waveform subplots into one panel.
+        waveform_plot = bokeh.layouts.column(
+            *[waveform_plots[label] for label in all_signal_labels],
+            sizing_mode="stretch_width",
+            visible=False,
+        )
+
+        # ---------------------------------------------------------
+        # Click callback
+        # ---------------------------------------------------------
+
+        callback_code = """
+            const x = cb_obj.x;
+            const y = cb_obj.y;
+
+            // Find the rectangle containing the click.
+            function find_gate(source, is_two_qubit) {
+                const d = source.data;
+
+                for (let i = 0; i < source.get_length(); i++) {
+                    const left = d.centre[i] - d.duration[i] / 2;
+                    const right = d.centre[i] + d.duration[i] / 2;
+                    const gate_y = d.qubits[i];
+
+                    if (
+                        x >= left && x <= right &&
+                        Math.abs(y - gate_y) <= 0.4
+                    ) {
+                        return {
+                            source: source,
+                            index: i,
+                            is_two_qubit: is_two_qubit
+                        };
+                    }
+                }
+
+                return null;
+            }
+
+            let hit = find_gate(source_1q, false);
+
+            if (hit === null) {
+                hit = find_gate(source_2q, true);
+            }
+
+            // Clicking outside a gate closes both panels.
+            if (hit === null) {
+                detail_panel.visible = false;
+                detail_panel.text = "";
+                detail_panel.tags = [];
+
+                waveform_plot.visible = false;
+                return;
+            }
+
+            const d = hit.source.data;
+            const i = hit.index;
+
+            const gate_id =
+                (hit.is_two_qubit ? "2q-" : "1q-") + i;
+
+            // Clicking the currently selected gate toggles it off.
+            if (
+                detail_panel.visible &&
+                detail_panel.tags &&
+                detail_panel.tags[0] === gate_id
+            ) {
+                detail_panel.visible = false;
+                detail_panel.text = "";
+                detail_panel.tags = [];
+
+                waveform_plot.visible = false;
+                return;
+            }
+
+            const gate_type = d.gate_type[i];
+            const operation = d.operation[i];
+            const qubit = d.qubits[i];
+            const start = d.start_time[i];
+            const end = d.end_time[i];
+            const duration = d.duration[i];
+
+            // Update metadata.
+            detail_panel.text = `
+                <h3>${gate_type}</h3>
+                <p>
+                    <b>Qubit:</b> ${qubit}<br>
+                    <b>Start:</b> ${start}<br>
+                    <b>End:</b> ${end}<br>
+                    <b>Duration:</b> ${duration}
+                </p>
+            `;
+
+            detail_panel.tags = [gate_id];
+            detail_panel.visible = true;
+
+            // Only custom waveform gates have waveform data.
+            if (operation !== "W") {
+                waveform_plot.visible = false;
+                return;
+            }
+
+            // The waveform ID is the first token in gate_type.
+            const waveform_id = String(gate_type).trim().split(/\\s+/)[0];
+            const signals = all_waveforms[waveform_id];
+
+            if (!signals) {
+                waveform_plot.visible = false;
+                return;
+            }
+
+            const labels = Object.keys(signals);
+
+            if (labels.length === 0) {
+                waveform_plot.visible = false;
+                return;
+            }
+
+            // Hide every signal subplot and both of its renderers.
+            for (const label of Object.keys(waveform_plots)) {
+                waveform_plots[label].visible = false;
+
+                waveform_renderers[label].real.visible = false;
+                waveform_renderers[label].imag.visible = false;
+            }
+
+            let xmin = Infinity;
+            let xmax = -Infinity;
+
+            // Update the subplots for this waveform.
+            for (let j = 0; j < labels.length; j++) {
+                const label = labels[j];
+
+                if (!(label in waveform_plots)) {
+                    continue;
+                }
+
+                const signal = signals[label];
+                const x_values = signal.x;
+                const y_values = signal.y;
+
+                // Complex values are encoded as [real, imag].
+                const is_complex =
+                    y_values.length > 0 &&
+                    Array.isArray(y_values[0]);
+
+                let y_real;
+                let y_imag;
+
+                if (is_complex) {
+                    y_real = y_values.map(v => v[0]);
+                    y_imag = y_values.map(v => v[1]);
+                } else {
+                    y_real = y_values;
+                    y_imag = [];
+                }
+
+                // Update real component.
+                const source_real = waveform_sources[label].real;
+                const renderer_real = waveform_renderers[label].real;
+
+                source_real.data = {
+                    x: x_values,
+                    y: y_real
+                };
+
+                source_real.change.emit();
+
+                renderer_real.glyph.line_color =
+                    is_complex ? "red" : "black";
+
+                renderer_real.visible = true;
+
+                // Update imaginary component when applicable.
+                const source_imag = waveform_sources[label].imag;
+                const renderer_imag = waveform_renderers[label].imag;
+
+                if (is_complex) {
+                    source_imag.data = {
+                        x: x_values,
+                        y: y_imag
+                    };
+
+                    source_imag.change.emit();
+                    renderer_imag.visible = true;
+                } else {
+                    renderer_imag.visible = false;
+                }
+
+                waveform_plots[label].visible = true;
+
+                if (x_values.length > 0) {
+                    xmin = Math.min(xmin, Math.min(...x_values));
+                    xmax = Math.max(xmax, Math.max(...x_values));
+                }
+            }
+
+            // All subplots use the same time range.
+            if (xmin !== Infinity) {
+                if (xmin === xmax) {
+                    xmax = xmin + 1;
+                }
+
+                waveform_x_range.start = xmin;
+                waveform_x_range.end = xmax;
+            }
+
+            waveform_plot.visible = true;
+        """
+
+        # Embed waveform data in the standalone HTML.
+        callback_code = (
+            "const all_waveforms = "
+            + json.dumps(waveform_data)
+            + ";\n"
+            + callback_code
+        )
+
+        callback = bokeh.models.CustomJS(
+            args={
+                "source_1q": source_1q,
+                "source_2q": source_2q,
+                "detail_panel": detail_panel,
+                "waveform_plot": waveform_plot,
+                "waveform_x_range": waveform_x_range,
+                "waveform_plots": waveform_plots,
+                "waveform_sources": waveform_sources,
+                "waveform_renderers": waveform_renderers,
+            },
+            code=callback_code,
+        )
+
+        # Listen for clicks on the schedule.
+        p.js_on_event(bokeh.events.Tap, callback)
+
+        # ---------------------------------------------------------
+        # Save standalone HTML
+        # ---------------------------------------------------------
+
+        layout = bokeh.layouts.column(
+            p,
+            detail_panel,
+            waveform_plot,
+            sizing_mode="stretch_width",
+        )
+
+        bokeh.io.save(layout, output_file_path)
+
 
     def check_ZI_compatibility(self, timing_schedule, qasm_qubit_params:ScheduleParametersBase, **kwargs):
         #Perform simple checks before compilation

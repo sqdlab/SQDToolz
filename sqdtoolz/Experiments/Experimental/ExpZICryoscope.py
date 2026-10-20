@@ -34,6 +34,8 @@ class ExpZICryoscope:
         self._update_qubit = kwargs.pop("update_qubit", True)
 
         self._normalise_data = kwargs.pop('normalise_data', True)
+        self._filter_window_length = kwargs.pop('filter_window_length', 7)
+        self._polyorder = kwargs.pop('polyorder', 2)
         self.data = {}
         self.temp = 0
 
@@ -82,7 +84,7 @@ class ExpZICryoscope:
         self.data['tau'] = dataX90.param_vals[1]
         self.data['amplitude'] = dataX90.param_vals[0]
 
-        self.post_process()
+        self.post_process(filter_window_length=self._filter_window_length, polyorder=self._polyorder)
         self.plot_summary()
         self.fit_step_response(update_qubit=self._update_qubit)
 

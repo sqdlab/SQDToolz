@@ -51,7 +51,7 @@ h q[1];
         lab.run_single(exp, override_ACQ_params={'AcquisitionMode': 'DISCRIMINATION', 'AveragingOrder': 'SingleShot'}, raw_pulse_sheet_duration=1e-3)
         self._file_path = exp._file_path
 
-    def post_process(self, use_abs_phase=False, readout_correction=True, state='ge', plot='3d'):
+    def post_process(self, use_abs_phase=False, readout_correction=True, plot='3d'):
         # if readout_correction != None:
         #     self._readout_correction = readout_correction
 
@@ -60,7 +60,7 @@ h q[1];
         ledv = ExpZIQASMDataViewer(self._file_path)
         ledv.get_inner_slicing_vars()
         #
-        leRho = DataDensityMatrix.fromDataViewer(ledv, use_readout_correction=True)
+        leRho = DataDensityMatrix.fromDataViewer(ledv, use_readout_correction=readout_correction)
         self._fidelity = leRho.get_fidelity_pure_state([1,0,0,1])*100
         if plot.lower()=='3d':
             leRho.plot3D([1,0,0,1], use_abs_phase=use_abs_phase, extra_title=f', $F={self._fidelity:.4f}$', save_path=self._file_path + 'BellState.png')

@@ -41,7 +41,7 @@ class ExpZIRandomisedBenchmarking(ExpZIqubit):
     
         self._all_seqs = {}
         kwargs['gate_lists'] = []
-        print("Generating gate sequences...")
+        print(f"Generating RB gate sequences up to length {self._sequence_lengths[-1]}.")
         for seq_len in self._sequence_lengths:
             self._all_seqs[int(seq_len)] = {}
             for trial in range(self._num_trials):
@@ -49,7 +49,7 @@ class ExpZIRandomisedBenchmarking(ExpZIqubit):
                 kwargs['gate_lists'].append([cur_seq]*len(qubit_ids))
                 self._all_seqs[int(seq_len)][int(trial)] = [cur_seq]*len(qubit_ids)
         self._all_seqs_list = kwargs['gate_lists']
-        print("Done.")
+        # print("Done.")
         super().__init__(name, expt_config, single_qubit_gates_sweep_chunking, hal_QPU, qubit_ids, **kwargs)
 
     def _generate_sequence(self, seq_len):

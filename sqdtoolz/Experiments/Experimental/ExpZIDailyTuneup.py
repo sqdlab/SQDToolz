@@ -56,7 +56,11 @@ class ExpZIDailyTuneup:
         self._spec_name_ROGE = kwargs.pop('SPEC_Readout_GE', 'Readout_GE')
         self._spec_name_ROGEF = kwargs.pop('SPEC_Readout_GEF', 'Readout_GEF')
 
+        self._bell_pass_threshold = kwargs.pop('bell_fidelity_threshold', 0.92)
+        self._1qg_pass_threshold = kwargs.pop('rb_fidelity_threshold', 0.998)
+
         self._kwargs = kwargs
+        self._config_filename = None
     
     def run(self, lab):
         # TODO: parallelise for multiple qubits
@@ -70,6 +74,10 @@ class ExpZIDailyTuneup:
         self._expt_config.commit()
 
         self._qubit.ReadoutKernelType = "default"
+
+        # pass/fail flags
+        bell_fidelity = None
+        single_qubit_fidelity = None
 
         ##############################
         #
@@ -214,14 +222,19 @@ class ExpZIDailyTuneup:
         #
         #1QG RANDOMISED BENCHMARKING
         #
+        rb = False
+        bell = False
         if not self._kwargs.get('skip_benchmarking', False):
             print(f'\nSingle qubit randomised benchmarking...')
             prev = self._qubit.Fidelity1QRB
             self._expt_config.update_SPECs([self._spec_name_ROGE])
+            lab.SPEC(self._spec_name_ROGE).commit_entries()
             exp = ExpZIRandomisedBenchmarking(f'DailyTuneup_{self._qubit_id}_RB', self._expt_config, self._qpu, [self._qubit_id], sequence_lengths=self._kwargs.pop('rb_sequence_lengths', [2**2, 2**3, 2**4, 2**5, 2**6, 2**7]), num_trials=self._kwargs.pop('rb_num_trials', 6), update=self._update_live)
             lab.run_single(exp)
             new = self._qubit.Fidelity1QRB
             print(f"\tF_1QRB = {prev:.6g}% -> {new:.6g}%")
+            single_qubit_fidelity = new
+            rb = True
 
         ##############################
         #
@@ -231,11 +244,14 @@ class ExpZIDailyTuneup:
                 print(f'\nBell state fidelity...')
                 prev = c.FidelityBell
                 self._expt_config.update_SPECs([self._spec_name_ROGE])
+                lab.SPEC(self._spec_name_ROGE).commit_entries()
                 exp = ExpZIBellStateFidelity(f'DailyTuneup_{self._qubit_id}{coupled_qubit}_BellState', self._expt_config, self._qpu, [self._qubit_id, coupled_qubit], update=self._update_live)
                 exp.run(lab)
                 exp.post_process()
                 new = c.FidelityBell
                 print(f"\tF_2QBell = {prev:.6g}% -> {new:.6g}%")
+                bell_fidelity = new
+                bell = True
 
 
         #Leave it in 2-State Mode, default acquisition
@@ -246,26 +262,60 @@ class ExpZIDailyTuneup:
         self._expt_config._hal_ACQ.AcquisitionMode = "DEFAULT"; 
         self._expt_config.commit()
 
+
+
         ##############################
         #
-        #SAVE CONFIG, PRINT SUMMARY
+        #PASS/FAIL, SAVE CONFIG, PRINT SUMMARY
         #
         # markdown summary
         if self._print_summary:
             print(f" ")
             self._qpu.print_summary_ZIQubits()
+
+        # check if tuneup passed thresholds
+        tuneup_pass = None
+        # RB and bell state
+        if not self._skip_2qg and coupled_qubit is not None and rb and bell:
+            if (bell_fidelity >= 100*self._bell_pass_threshold) and (single_qubit_fidelity >= 100*self._1qg_pass_threshold):
+                tuneup_pass = True
+            elif (bell_fidelity < 100*self._bell_pass_threshold) and (single_qubit_fidelity < 100*self._1qg_pass_threshold):
+                tuneup_pass = False
+                print(f"Tuneup failed - fidelities under threshold\n  Bell state: {bell_fidelity:.6g} < {100*self._bell_pass_threshold:.6g}\n  RB: {single_qubit_fidelity:.6g} < {100*self._1qg_pass_threshold:.6g}")
+            elif (bell_fidelity < 100*self._bell_pass_threshold):
+                tuneup_pass = False
+                print(f"Tuneup failed - Bell fidelity under threshold\n  Bell state: {bell_fidelity:.6g} < {100*self._bell_pass_threshold:.6g}")
+            elif (single_qubit_fidelity < 100*self._1qg_pass_threshold):
+                tuneup_pass = False
+                print(f"Tuneup failed - single qubit gate fidelity under threshold\n  RB: {single_qubit_fidelity:.6g} < {100*self._1qg_pass_threshold:.6g}")
+        # RB only
+        elif self._skip_2qg and rb:
+            if single_qubit_fidelity >= 100*self._1qg_pass_threshold:
+                tuneup_pass = True
+            else:
+                print(f"Tuneup failed - single qubit gate fidelity under threshold\n  RB: {single_qubit_fidelity:.6g} < {100*self._1qg_pass_threshold:.6g}")
+                tuneup_pass = False
+        else:
+            print(f"No fidelity metrics to benchmark; denoting tuneup as 'passed'.")
+            tuneup_pass = True
+
         # if the config file already exists, back it up to /config_backups/
-        if self._save_config:
-            config_datestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M')
-            config_filename = str(config_datestamp) + '_QPU_config.json'
-            config_filepath = Path(config_filename)
-            if config_filepath.exists():
-                Path('/Config_backups').mkdir(parents=True, exist_ok=True)
-                shutil.copy2(config_filepath, Path('/Config_backups') / config_filename)
-            self._qpu.save_config(lab, file_name=config_filename, additional_specs=[self._spec_name_ROGE, self._spec_name_ROGEF])
-            print(f'\nSaved new config to {config_filename}.')
-        # summary json for website update
-        if self._save_summary_config_from_json:
-            SOFTqpu.create_summary_config_from_json(json_file_path=config_filename, summary_output_json_file_path=self._summary_json_file)
-            print(f'Saved summary .json to {self._summary_json_file}.')
+        config_datestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M')
+        if tuneup_pass==True:
+            print(f'{self._qubit_id}: Tuneup passed!')
+            if self._save_config:
+                config_filename = str(config_datestamp) + '_QPU_config.json'
+                config_filepath = Path(config_filename)
+                if config_filepath.exists():
+                    Path('/Config_backups').mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(config_filepath, Path('/Config_backups') / config_filename)
+                self._qpu.save_config(lab, file_name=config_filename, additional_specs=[self._spec_name_ROGE, self._spec_name_ROGEF])
+                print(f'\nSaved QPU configuration to {config_filename} - updated {self._qubit_id}.')
+                self._config_filename = config_filename
+            # summary json for website update
+            if self._save_summary_config_from_json:
+                SOFTqpu.create_summary_config_from_json(json_file_path=config_filename, summary_output_json_file_path=self._summary_json_file)
+                print(f'Saved cloud summary to {self._summary_json_file} - updated {self._qubit_id}.')
+        else:
+            print(f"WARNING: {self._qubit_id} Tuneup fail - no config saved.")
         print(f"##############################\n\n")

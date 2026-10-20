@@ -844,8 +844,7 @@ the `ramsey` `experiment_workflow` call).
 ```python
 from sqdtoolz.Experiments.Experimental.ExpZIRamsey import ExpZIRamsey
 
-exp = ExpZIRamsey('ramsey_Q0', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0'], 
-  delays=[np.linspace(0, 6e-6, 100)], detunings=[1e6], update=False)
+exp = ExpZIRamsey('ramsey_Q0', lab.CONFIG('ZI'), lab.HAL('QPU'), ['Q0'], delays=[np.linspace(0, 6e-6, 100)], detunings=[1e6])
 lab.run_single(exp)
 #
 exp.update_qubits()

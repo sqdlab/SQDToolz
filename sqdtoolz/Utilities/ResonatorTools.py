@@ -19,7 +19,6 @@ warnings.filterwarnings("ignore", "Covariance of the parameters could not be est
 plot_backend = None
 try:
     from bokeh.models import Whisker, ColumnDataSource, TeeHead, Band, Range1d
-    from bokeh.models.formatters import FuncTickFormatter, NumeralTickFormatter
     from bokeh.plotting import figure, show
     from bokeh.io import output_notebook, export
     from bokeh.palettes import Viridis256, Category10, Category20

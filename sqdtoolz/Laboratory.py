@@ -398,7 +398,9 @@ class Laboratory:
                 self._group_dir['InitDir'] = datetime.now().strftime(f"%Y-%m-%d/%H%M%S-{self._group_dir['Dir']}/")
             folder_time_stamp = self._group_dir['InitDir'] + datetime.now().strftime(f"%H%M%S-" + expt_obj.Name + "/")
         #Create the nested directory structure if it does not exist...
-        cur_exp_path = self._save_dir + folder_time_stamp
+        parent_folder = kwargs.pop("temp_parent_folder",self._save_dir)
+        parent_folder = parent_folder if parent_folder[-1] == '/' else parent_folder + '/'
+        cur_exp_path = parent_folder + folder_time_stamp
         Path(cur_exp_path).mkdir(parents=True, exist_ok=True)
 
         #Reset kill-switch state

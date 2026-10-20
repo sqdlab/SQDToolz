@@ -27,6 +27,10 @@ class ExpZIFixedCouplerTuneup:
 
         cur_coupler = hal_QPU.get_coupler_obj_from_qubits(qubit_ids[0],qubit_ids[1], TunableTransmonCouplerFixed)
 
+        self._file_path_args = {}
+        if 'temp_parent_folder' in kwargs:
+            self._file_path_args = {'temp_parent_folder':kwargs.pop('temp_parent_folder')}
+
         if 'flux_amp_range' in kwargs:
             self._flux_amp_range = kwargs.pop('flux_amp_range')
             assert not 'flux_amp_span' in kwargs, "Do not supply 'flux_amp_span' if supplying 'flux_amp_range'"
@@ -76,7 +80,7 @@ class ExpZIFixedCouplerTuneup:
                                           amplitudes=self._flux_amp_range, wait_times=self._wait_times,
                                           single_shot=True, dont_show_plot=not self._individual_plots)
         # lab.run_single(exp, raw_pulse_sheet_duration=1e-3)
-        lab.run_single(exp)
+        lab.run_single(exp, **self._file_path_args)
         #
         #
         fitted_data = np.load(exp._file_path + f'fitted_data.npy', allow_pickle=True).item()
@@ -112,7 +116,7 @@ class ExpZIFixedCouplerTuneup:
         exp2 = ExpZIChevrons2QFixedCoupler(f'flux_pulse_{self._qubit_ids[0]}_{self._qubit_ids[1]}_single', lab.CONFIG('ZI'), lab.HAL('QPU'), self._qubit_ids,
                                            amplitudes=np.array([exp.cur_coupler_obj.Amplitude]), wait_times=self._wait_times,
                                            single_shot=True, dont_show_plot=not self._individual_plots)
-        lab.run_single(exp2, raw_pulse_sheet_duration=1e-3)
+        lab.run_single(exp2, raw_pulse_sheet_duration=1e-3, **self._file_path_args)
         #
         fitted_data2 = np.load(exp2._file_path + f'fitted_data.npy', allow_pickle=True).item()
         leCounts = fitted_data2['pop_qubit_amps_times'][qubit_ind,state_ind][0] #Slice out the single amplitude...

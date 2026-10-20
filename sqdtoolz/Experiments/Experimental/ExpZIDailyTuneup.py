@@ -59,8 +59,13 @@ class ExpZIDailyTuneup:
         self._bell_pass_threshold = kwargs.pop('bell_fidelity_threshold', 0.92)
         self._1qg_pass_threshold = kwargs.pop('rb_fidelity_threshold', 0.998)
 
+        self._file_path_args = {}
+        if 'temp_parent_folder' in kwargs:
+            self._file_path_args = {'temp_parent_folder':kwargs.pop('temp_parent_folder')}
+
         self._kwargs = kwargs
         self._config_filename = None
+        self._config_summary = None
     
     def run(self, lab):
         # TODO: parallelise for multiple qubits
@@ -85,7 +90,7 @@ class ExpZIDailyTuneup:
         #
         if self._fine_tuneup:
             self._expt_config.update_SPECs([self._spec_name_ROGE])
-            exp = ExpZISingleQubitTuneup(f'DailyTuneup_{self._qubit_id}_FinetuneX', self._expt_config, self._qpu, self._qubit_id, **self._kwargs)
+            exp = ExpZISingleQubitTuneup(f'DailyTuneup_{self._qubit_id}_FinetuneX', self._expt_config, self._qpu, self._qubit_id, **self._kwargs, **self._file_path_args)
             exp.run_fine_tuneup(lab)
 
         ##############################
@@ -97,7 +102,7 @@ class ExpZIDailyTuneup:
             print(f'\nOptimising readout...')
             self._expt_config.update_SPECs([self._spec_name_ROGE])
             exp = ExpZIResOptimal(f'DailyTuneup_{self._qubit_id}_Readout', self._expt_config, self._qpu, [self._qubit_id], states='gef', frequencies=self._res_freq_range, ZI_plot=self._individual_plots, calc_single_shot_fidelities=True)
-            lab.run_single(exp, raw_pulse_sheet_duration=1e-3)
+            lab.run_single(exp, raw_pulse_sheet_duration=1e-3, **self._file_path_args)
             prev_ge = self._qubit.FidelityReadout
             prev_freq_ge = self._qubit.ReadoutFrequency
             if self._update_live:
@@ -124,13 +129,13 @@ class ExpZIDailyTuneup:
             self._qubit.ReadoutKernelType = "default"
             self._expt_config.update_SPECs([self._spec_name_ROGEF])
             exp = ExpZIqubit(f'DailyTuneup_{self._qubit_id}_TimeTraces', self._expt_config, time_traces, self._qpu, [self._qubit_id], states='gef', update=self._update_live, skip_ZI_analysis=False, ZI_plot=self._individual_plots)
-            lab.run_single(exp, raw_pulse_sheet_duration=1e-3)
+            lab.run_single(exp, raw_pulse_sheet_duration=1e-3, **self._file_path_args)
             lab.SPEC(self._spec_name_ROGEF).update_entries()
             #
             self._qubit.ReadoutKernelType = "default"
             self._expt_config.update_SPECs([self._spec_name_ROGE])
             exp = ExpZIqubit(f'DailyTuneup_{self._qubit_id}_TimeTraces', self._expt_config, time_traces, self._qpu, [self._qubit_id], states='ge', update=self._update_live, skip_ZI_analysis=False, ZI_plot=self._individual_plots)
-            lab.run_single(exp, raw_pulse_sheet_duration=1e-3)
+            lab.run_single(exp, raw_pulse_sheet_duration=1e-3, **self._file_path_args)
             lab.SPEC(self._spec_name_ROGE).update_entries()
             #
             # self._expt_config._hal_ACQ.NumRepetitions = 1024; 
@@ -147,7 +152,7 @@ class ExpZIDailyTuneup:
                 lab.SPEC(self._spec_name_ROGE).commit_entries()     #Needed as ZI compilation checks are run before SPECs are committed...
                 self._qubit.ReadoutKernelType = 'default'
                 exp = ExpZIBlobs(f'DailyTuneup_{self._qubit_id}_BlobsGE', self._expt_config, self._qpu, [self._qubit_id], states='ge', ZI_plot=self._individual_plots)
-                lab.run_single(exp, raw_pulse_sheet_duration=1e-3)
+                lab.run_single(exp, raw_pulse_sheet_duration=1e-3, **self._file_path_args)
                 self._qubit.ReadoutKernelType = 'optimal'       
                 exp.get_correction_matrices(update=self._update_live)
                 lab.SPEC(self._spec_name_ROGE).update_entries()
@@ -156,7 +161,7 @@ class ExpZIDailyTuneup:
                 lab.SPEC(self._spec_name_ROGEF).commit_entries()     #Needed as ZI compilation checks are run before SPECs are committed...
                 self._qubit.ReadoutKernelType = 'default'
                 exp = ExpZIBlobs(f'DailyTuneup_{self._qubit_id}_BlobsGEF', self._expt_config, self._qpu, [self._qubit_id], states='gef', ZI_plot=self._individual_plots)
-                lab.run_single(exp, raw_pulse_sheet_duration=1e-3)
+                lab.run_single(exp, raw_pulse_sheet_duration=1e-3, **self._file_path_args)
                 self._qubit.ReadoutKernelType = 'optimal'
                 exp.get_correction_matrices(update=self._update_live)
                 lab.SPEC(self._spec_name_ROGEF).update_entries()    
@@ -169,7 +174,7 @@ class ExpZIDailyTuneup:
         prev = self._qubit.T1GE
         self._expt_config.update_SPECs([self._spec_name_ROGE])
         exp = ExpZIT1(f'DailyTuneup_{self._qubit_id}_T1', self._expt_config, self._qpu, [self._qubit_id], ZI_plot=self._individual_plots)
-        lab.run_single(exp, raw_pulse_sheet_duration=1e-3)
+        lab.run_single(exp, raw_pulse_sheet_duration=1e-3, **self._file_path_args)
         if self._update_live:
             exp.update_qubits()
             new = self._qubit.T1GE
@@ -195,7 +200,7 @@ class ExpZIDailyTuneup:
                         continue
             if coupled_qubit is not None:
                 print(f'\nTuning two qubit gates ({self._qubit_id}, {coupled_qubit})...')
-                exp = ExpZIFixedCouplerTuneup(f'DailyTuneup_{self._qubit_id}{coupled_qubit}_2QG', self._expt_config, self._qpu, [self._qubit_id, coupled_qubit], fit_qubit=self._qubit_id, flux_amp_points=self._kwargs.get('chevron_amp_pts', 17), flux_amp_span=self._kwargs.get('chevron_amp_span', 0.025), update_params_live=self._update_live, variance_fit_type=self._kwargs.get('variance_fit_type_chevrons', 'default'))
+                exp = ExpZIFixedCouplerTuneup(f'DailyTuneup_{self._qubit_id}{coupled_qubit}_2QG', self._expt_config, self._qpu, [self._qubit_id, coupled_qubit], fit_qubit=self._qubit_id, flux_amp_points=self._kwargs.get('chevron_amp_pts', 17), flux_amp_span=self._kwargs.get('chevron_amp_span', 0.025), update_params_live=self._update_live, variance_fit_type=self._kwargs.get('variance_fit_type_chevrons', 'default'), **self._file_path_args)
                 exp.run(lab)
                 newA = c.Amplitude
                 newL = c.Length
@@ -209,7 +214,7 @@ class ExpZIDailyTuneup:
                 self._expt_config.commit()
                 self._expt_config.update_SPECs([self._spec_name_ROGE])
                 #
-                exp = ExpZIPhaseCompensation2Q(f'czCompExpZI_{self._qubit_id}{coupled_qubit}', self._expt_config, self._qpu, [self._qubit_id, coupled_qubit], rz_angles=np.linspace(0, 2*np.pi, self._kwargs.pop('phase_comp_num_points', 51)), update_coupler=self._update_live)
+                exp = ExpZIPhaseCompensation2Q(f'czCompExpZI_{self._qubit_id}{coupled_qubit}', self._expt_config, self._qpu, [self._qubit_id, coupled_qubit], rz_angles=np.linspace(0, 2*np.pi, self._kwargs.pop('phase_comp_num_points', 51)), update_coupler=self._update_live, **self._file_path_args)
                 exp.run(lab)
                 exp.post_process()
                 #
@@ -230,7 +235,7 @@ class ExpZIDailyTuneup:
             self._expt_config.update_SPECs([self._spec_name_ROGE])
             lab.SPEC(self._spec_name_ROGE).commit_entries()
             exp = ExpZIRandomisedBenchmarking(f'DailyTuneup_{self._qubit_id}_RB', self._expt_config, self._qpu, [self._qubit_id], sequence_lengths=self._kwargs.pop('rb_sequence_lengths', [2**2, 2**3, 2**4, 2**5, 2**6, 2**7]), num_trials=self._kwargs.pop('rb_num_trials', 6), update=self._update_live)
-            lab.run_single(exp)
+            lab.run_single(exp, **self._file_path_args)
             new = self._qubit.Fidelity1QRB
             print(f"\tF_1QRB = {prev:.6g}% -> {new:.6g}%")
             single_qubit_fidelity = new
@@ -245,7 +250,7 @@ class ExpZIDailyTuneup:
                 prev = c.FidelityBell
                 self._expt_config.update_SPECs([self._spec_name_ROGE])
                 lab.SPEC(self._spec_name_ROGE).commit_entries()
-                exp = ExpZIBellStateFidelity(f'DailyTuneup_{self._qubit_id}{coupled_qubit}_BellState', self._expt_config, self._qpu, [self._qubit_id, coupled_qubit], update=self._update_live)
+                exp = ExpZIBellStateFidelity(f'DailyTuneup_{self._qubit_id}{coupled_qubit}_BellState', self._expt_config, self._qpu, [self._qubit_id, coupled_qubit], update=self._update_live, **self._file_path_args)
                 exp.run(lab)
                 exp.post_process()
                 new = c.FidelityBell
@@ -314,7 +319,12 @@ class ExpZIDailyTuneup:
                 self._config_filename = config_filename
             # summary json for website update
             if self._save_summary_config_from_json:
-                SOFTqpu.create_summary_config_from_json(json_file_path=config_filename, summary_output_json_file_path=self._summary_json_file)
+                if 'temp_parent_folder' in self._file_path_args:
+                    self._config_summary = self._file_path_args['temp_parent_folder'] + 'QPU_Config_Summary.json'
+                    SOFTqpu.create_summary_config_from_json(json_file_path=self._config_filename, summary_output_json_file_path=self._config_summary)
+                else:
+                    self._config_summary = self._summary_json_file
+                    SOFTqpu.create_summary_config_from_json(json_file_path=config_filename, summary_output_json_file_path=self._config_summary)                
                 print(f'Saved cloud summary to {self._summary_json_file} - updated {self._qubit_id}.')
         else:
             print(f"WARNING: {self._qubit_id} Tuneup fail - no config saved.")

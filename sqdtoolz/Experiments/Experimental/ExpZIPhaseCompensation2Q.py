@@ -53,6 +53,10 @@ class ExpZIPhaseCompensation2Q(Experiment):
         assert stationary_qubit is not None, "Stationary qubit not found (matching signal 'drive_comp_stationary')."
         self._stationary_qubit = stationary_qubit
 
+        self._file_path_args = {}
+        if 'temp_parent_folder' in kwargs:
+            self._file_path_args = {'temp_parent_folder':kwargs.pop('temp_parent_folder')}
+
         self._kwargs = kwargs
         self.data = {}
 
@@ -80,7 +84,7 @@ class ExpZIPhaseCompensation2Q(Experiment):
                         main_or_aux='main',
                         **self._kwargs
                         )
-        lab.run_single(exp_main, raw_pulse_sheet_duration=1e-3, **self._kwargs)
+        lab.run_single(exp_main, raw_pulse_sheet_duration=1e-3, **self._kwargs, **self._file_path_args)
         #
         data_main = exp_main.retrieve_last_dataset(main_qubit)
         self.data['main_shots'] = data_main.get_numpy_array()[:,:,0]
@@ -98,7 +102,7 @@ class ExpZIPhaseCompensation2Q(Experiment):
                             **self._kwargs
                             )
             # self._kwargs['override_ACQ_params'] = {'AveragingOrder': "SingleShot", 'AcquisitionMode': "DISCRIMINATION"}
-            lab.run_single(exp_aux, raw_pulse_sheet_duration=1e-3, **self._kwargs)
+            lab.run_single(exp_aux, raw_pulse_sheet_duration=1e-3, **self._kwargs, **self._file_path_args)
             #
             data_aux = exp_aux.retrieve_last_dataset(aux_qubit)
             self.data['aux_shots'] = data_aux.get_numpy_array()[:,:,0]
@@ -113,7 +117,7 @@ class ExpZIPhaseCompensation2Q(Experiment):
                         main_or_aux='stationary',
                         **self._kwargs
                         )
-        lab.run_single(exp_stationary, raw_pulse_sheet_duration=1e-3, **self._kwargs)
+        lab.run_single(exp_stationary, raw_pulse_sheet_duration=1e-3, **self._kwargs, **self._file_path_args)
         #
         data_stationary = exp_stationary.retrieve_last_dataset(stationary_qubit)
         self.data['stationary_shots'] = data_stationary.get_numpy_array()[:,:,0]

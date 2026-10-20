@@ -108,6 +108,10 @@ class ExpZISingleQubitTuneup:
         self._threshold_X = kwargs.get('X_gate_threshold', 0.01)
         self._threshold_Xon2 = kwargs.get('Xon2_gate_threshold', 0.01)
 
+        self._file_path_args = {}
+        if 'temp_parent_folder' in kwargs:
+            self._file_path_args = {'temp_parent_folder':kwargs.pop('temp_parent_folder')}
+
         self._kwargs = kwargs
 
     def run(self, lab):
@@ -121,7 +125,7 @@ class ExpZISingleQubitTuneup:
         #
         if not self._flux_range is None:
             exp = ExpZIResFluxSweep(f'res_flux_sweep_{self._qubit_id}', self._expt_config, self._qpu, self._qubit_id,  frequencies=self._res_freq_range, flux_range=self._flux_range, is_trough=self._res_trough, dont_show_plot=not self._individual_plots)
-            lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages)
+            lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages, **self._file_path_args)
             exp.update_qubit()
             #
             leData = exp.retrieve_last_aux_dataset(self._qubit_id)
@@ -140,7 +144,7 @@ class ExpZISingleQubitTuneup:
         else:
             ax = fig.add_subplot(gs[0:2, 0])
         exp = ExpZIRes(f'res_spec_{self._qubit_id}', self._expt_config, self._qpu, self._qubit_id, frequencies=self._res_freq_range, is_trough=self._res_trough, fit_type="Default", dont_show_plot=not self._individual_plots)
-        lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages)
+        lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages, **self._file_path_args)
         assert self._qubit.ReadoutFrequency < np.max(self._res_freq_range) and self._qubit.ReadoutFrequency > np.min(self._res_freq_range), "The fitted readout frequency was outside the scanned frequency range."
         #
         leData = exp.retrieve_last_aux_dataset(self._qubit_id)
@@ -163,7 +167,7 @@ class ExpZISingleQubitTuneup:
         exp = ExpZIQubitSpec(f'qubit_spec_{self._qubit_id}', self._expt_config, self._qpu, self._qubit_id,
                              is_trough = self._kwargs.pop("qubit_trough", False),
                              frequencies=[self._qubit_freq_range], ZI_plot=self._individual_plots, update=self._update_live, dont_plot=True, dont_show_plot=not self._individual_plots)
-        lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages)
+        lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages, **self._file_path_args)
         #
         leData = exp.retrieve_last_aux_dataset(self._qubit_id)
         ax = fig.add_subplot(gs[0:2, 1]); ax.grid()
@@ -185,9 +189,9 @@ class ExpZISingleQubitTuneup:
         self._qubit.DriveGEAmplitudeX = 1.0
         self._qubit.DriveGEAmplitudeXon2 = 0.5  
         exp = ExpZIRabi(f'rabi_pre_cal_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], amplitudes=[self._rabi_ampls], update=self._update_live, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots, use_cal_traces=False)
-        lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages)
+        lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages, **self._file_path_args)
         exp = ExpZIRabi(f'rabi_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], amplitudes=[self._rabi_ampls], update=self._update_live, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
-        lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages)
+        lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages, **self._file_path_args)
         #
         leData = exp.retrieve_last_aux_dataset(self._qubit_id)
         ax = fig.add_subplot(gs[2, :])
@@ -204,7 +208,7 @@ class ExpZISingleQubitTuneup:
         #
         #Fast
         exp = ExpZIRamsey(f'ramsey_fast_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], delays=[self._ramsey_fast_times], detunings=[self._ramsey_fast_detuning], ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
-        lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages)
+        lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages, **self._file_path_args)
         #
         leData = exp.retrieve_last_aux_dataset(self._qubit_id)
         ax = fig.add_subplot(gs[3, 0])
@@ -218,7 +222,7 @@ class ExpZISingleQubitTuneup:
         #
         #Slow
         exp = ExpZIRamsey(f'ramsey_slow_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], delays=[self._ramsey_slow_times], detunings=[self._ramsey_slow_detuning], ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
-        lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages)
+        lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages, **self._file_path_args)
         #
         leData = exp.retrieve_last_aux_dataset(self._qubit_id)
         ax = fig.add_subplot(gs[3, 1])
@@ -234,7 +238,7 @@ class ExpZISingleQubitTuneup:
         #T1
         #
         exp = ExpZIT1(f'T1_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], delays=[self._t1_times], ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
-        lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages)
+        lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages, **self._file_path_args)
         #
         leData = exp.retrieve_last_aux_dataset(self._qubit_id)
         ax = fig.add_subplot(gs[4, :])
@@ -264,7 +268,7 @@ class ExpZISingleQubitTuneup:
         print("Re-tuning Ramsey...")
         prev = self._qubit.DriveGE
         exp = ExpZIRamsey(f'ramsey_fine_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], delays=[self._ramsey_fine_times], detunings=[self._ramsey_fine_detuning], ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
-        lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages)
+        lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages, **self._file_path_args)
         #
         leData = exp.retrieve_last_aux_dataset(self._qubit_id)
         ax = fig.add_subplot(gs[0, 0:3])
@@ -295,7 +299,7 @@ class ExpZISingleQubitTuneup:
                 self._qubit.DriveGEPulse['function'] = 'drag'
                 prev_pulse = None
             exp = ExpZIDragScaling(f'drag_scaling_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], q_scalings=[self._q_scalings], update=self._update_live, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
-            lab.run_single(exp)
+            lab.run_single(exp, **self._file_path_args)
             best_q = ExpZIDragScaling.plot_fitted_results(ax, exp._data['beta'], exp._data)
 
             # fine tuning...
@@ -303,7 +307,7 @@ class ExpZISingleQubitTuneup:
             self._expt_config._hal_ACQ.NumRepetitions = self._kwargs.get('num_repetitions_fine', 1024*4); self._expt_config.commit()
             q_scalings_fine = np.linspace(-0.01, 0.01, 15) + best_q
             exp = ExpZIDragScaling(f'drag_scaling_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], q_scalings=[q_scalings_fine], update=self._update_live, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
-            lab.run_single(exp)
+            lab.run_single(exp, **self._file_path_args)
             ax.clear()
             ExpZIDragScaling.plot_fitted_results(ax, exp._data['beta'], exp._data)
 
@@ -325,7 +329,7 @@ class ExpZISingleQubitTuneup:
         # print("\nRe-tuning Rabi...")
         # self._expt_config._hal_ACQ.NumRepetitions = num_reps; self._expt_config.commit()
         # exp = ExpZIRabi(f'rabi_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], amplitudes=[self._rabi_ampls], update=self._update_live, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
-        # lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages)
+        # lab.run_single(exp, disable_ZI_logging=not self._enable_ZI_log_messages, **self._file_path_args)
 
         ##############################
         # 
@@ -343,7 +347,7 @@ class ExpZISingleQubitTuneup:
         exp = ExpZICalibX(f'CalibX_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=1, only_every_n=self._only_every_n_short, num_gates=self._num_gates_calibX_short, dont_show_plot=not self._individual_plots)
         for iter in range(max_iterations):
             # run iteration
-            lab.run_single(exp, skip_timing_diagrams=True)
+            lab.run_single(exp, skip_timing_diagrams=True, **self._file_path_args)
 
             if iter == 0:
                 # plot first iteration
@@ -388,7 +392,7 @@ class ExpZISingleQubitTuneup:
                     self._qubit.DriveGEAmplitudeX = 1
 
         # final check
-        lab.run_single(exp, skip_timing_diagrams=True)
+        lab.run_single(exp, skip_timing_diagrams=True, **self._file_path_args)
         ax2 = fig.add_subplot(gs[2, 1:3])
         ax2.clear()
         ExpZICalibX.plot_fitted_results(ax2, exp._fit_data[0]['data'], 'Final outcome ' + exp._fit_data[0]['qubit_name'])
@@ -416,7 +420,7 @@ class ExpZISingleQubitTuneup:
         exp = ExpZICalibX(f'CalibXon2_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], calib_denominator=2, only_every_n=self._only_every_n_short, num_gates=self._num_gates_calibX_short, dont_show_plot=not self._individual_plots)
         for iter in range(max_iterations):
             # run iteration
-            lab.run_single(exp, skip_timing_diagrams=True)
+            lab.run_single(exp, skip_timing_diagrams=True, **self._file_path_args)
 
             if iter == 0:
                 # plot first iteration
@@ -460,7 +464,7 @@ class ExpZISingleQubitTuneup:
                     self._qubit.DriveGEAmplitudeXon2 = 1
 
         # final check
-        lab.run_single(exp, skip_timing_diagrams=True)
+        lab.run_single(exp, skip_timing_diagrams=True, **self._file_path_args)
         ax2 = fig.add_subplot(gs[3, 1:3])
         ax2.clear()
         ExpZICalibX.plot_fitted_results(ax2, exp._fit_data[0]['data'], 'Final outcome ' + exp._fit_data[0]['qubit_name'])

@@ -5,6 +5,7 @@ from sqdtoolz.Experiments.Experimental.ExpZIQASMDataViewer import ExpZIQASMDataV
 from sqdtoolz.Utilities.DataDensityMatrix import DataDensityMatrix
 from sqdtoolz.HAL.ZI.QuantumElements import TunableTransmonCouplerFixed
 
+#TODO: Investigate why this breaks the pattern?! Why isn't this just using _run and _post_process?!
 class ExpZIBellStateFidelity(ExpZIqubit):   
     def __init__(self, name, expt_config, hal_QPU, qubit_ids, **kwargs):
 
@@ -26,6 +27,10 @@ class ExpZIBellStateFidelity(ExpZIqubit):
         kwargs['coordinate_system'] = kwargs.get('coordinate_system', 'RH')
         assert kwargs['coordinate_system'] in ['LH', 'RH'], "The 'coordinate_system' must be either LH or RH for left/right handed."
 
+        self._file_path_args = {}
+        if 'temp_parent_folder' in kwargs:
+            self._file_path_args = {'temp_parent_folder':kwargs.pop('temp_parent_folder')}
+
         state_prep = """reset q[0];
 reset q[1];
 h q[0]; 
@@ -39,6 +44,12 @@ h q[1];
         self._file_path = None
         self._purity = None
         self._fidelity = None
+
+        #TODO: Delete this if the top TODO is resolved to change it as recommended...
+        self._file_path_args = {}
+        if 'temp_parent_folder' in kwargs:
+            self._file_path_args = {'temp_parent_folder':kwargs.pop('temp_parent_folder')}
+
         
     def run(self, lab):
         all_qubits = [i[0][0] for i in self._hal_QPU._qubits]
@@ -48,7 +59,8 @@ h q[1];
         exp.set_qubit_reg_to_ZI_mappings({('q',0): self._qubit_ids[1],('q',1): self._qubit_ids[0]})
         assert len(qregs) <= len(self._qubit_ids), f"The QASM script needs {len(qregs)} while only {len(self._qubit_ids)} qubits have been specified."
 
-        lab.run_single(exp, override_ACQ_params={'AcquisitionMode': 'DISCRIMINATION', 'AveragingOrder': 'SingleShot'}, raw_pulse_sheet_duration=1e-3)
+        #TODO: Delete **self._file_path_args if the top TODO is resolved to change it as recommended...
+        lab.run_single(exp, override_ACQ_params={'AcquisitionMode': 'DISCRIMINATION', 'AveragingOrder': 'SingleShot'}, raw_pulse_sheet_duration=1e-3, **self._file_path_args)
         self._file_path = exp._file_path
 
     def post_process(self, use_abs_phase=False, readout_correction=True, plot='3d'):

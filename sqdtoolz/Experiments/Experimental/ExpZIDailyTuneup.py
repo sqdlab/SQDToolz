@@ -319,12 +319,7 @@ class ExpZIDailyTuneup:
                 self._config_filename = config_filename
             # summary json for website update
             if self._save_summary_config_from_json:
-                if 'temp_parent_folder' in self._file_path_args:
-                    self._config_summary = self._file_path_args['temp_parent_folder'] + 'QPU_Config_Summary.json'
-                    SOFTqpu.create_summary_config_from_json(json_file_path=self._config_filename, summary_output_json_file_path=self._config_summary)
-                else:
-                    self._config_summary = self._summary_json_file
-                    SOFTqpu.create_summary_config_from_json(json_file_path=config_filename, summary_output_json_file_path=self._config_summary)                
+                SOFTqpu.create_summary_config_from_json(json_file_path=config_filename, summary_output_json_file_path=self._summary_json_file)
                 print(f'Saved cloud summary to {self._summary_json_file} - updated {self._qubit_id}.')
         else:
             print(f"WARNING: {self._qubit_id} Tuneup fail - no config saved.")

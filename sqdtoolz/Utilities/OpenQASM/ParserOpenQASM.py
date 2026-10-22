@@ -21,6 +21,7 @@ from enum import Enum, auto
 from pathlib import Path
 from sqdtoolz.Utilities.Miscellaneous import Miscellaneous
 from dataclasses import dataclass
+from typing import Any
 
 class SQDQasmCommandType(Enum):
     GATE = auto()
@@ -104,6 +105,13 @@ class SQDDefcalFrame:
     line_id:  str
     qubit_id: str
 
+@dataclass
+class SQDVariable:
+    var_type: str
+    var_value: Any
+    var_const: bool
+    
+
 class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
     def __init__(self, qreg_phys_mapping:dict, total_physical_qubits):
         super().__init__()
@@ -124,14 +132,15 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
         self._commands = []
         self._qubits = {}
         self._bits = {}
-        self._in_cal_blk = False
-        self._in_defcal_blk = False
+        self._in_defcal_blk = False #TODO: Look into whether this is even required?
         self._qreg_phys_mapping = qreg_phys_mapping
         #
         self._total_physical_qubits = total_physical_qubits
+        self._in_cal_blk = True
         for m in range(self._total_physical_qubits):
             for line_id in ['drive', 'flux', 'meas']:
-                self._variables_cal_stack[0][f'{line_id}{m}'] = ['frame', SQDDefcalFrame(f'{line_id}', m)]
+                self.add_var_in_cur_scope(f'{line_id}{m}', 'frame', SQDDefcalFrame(f'{line_id}', m))
+        self._in_cal_blk = False
 
     #Not required as includes are handled separately...
     # def visit_Include(self, node):
@@ -167,11 +176,11 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
         ret_val = self._commands
         self._commands = []
         return ret_val
-    def add_var_in_cur_scope(self, var_name, var_type, var_value = None):
+    def add_var_in_cur_scope(self, var_name, var_type, var_value = None, is_const = False):
         if self._in_cal_blk:
-            self._variables_cal_stack[-1][var_name] = [var_type, var_value]
+            self._variables_cal_stack[-1][var_name] = SQDVariable(var_type, var_value, is_const)
         else:
-            self._variables_stack[-1][var_name] = [var_type, var_value]
+            self._variables_stack[-1][var_name] = SQDVariable(var_type, var_value, is_const)
     def set_var_in_cur_scope(self, var_name, var_value):
         #Check the scoping variable stack...
         if self._in_cal_blk:
@@ -185,8 +194,9 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
                 else:
                     continue
             if var_name in cur_vars[m]:
-                cur_vars[m][var_name][1] = var_value   #TODO: Consider type-checking on index 0 somehow here or elsewhere?
-    def get_var_in_cur_scope(self, var_name, search_global_scope=False):
+                assert not cur_vars[m][var_name].var_const, f"Cannot set variable {var_name} as it is declared as a const type."
+                cur_vars[m][var_name].var_value = var_value   #TODO: Consider type-checking on index 0 somehow here or elsewhere?
+    def get_var_in_cur_scope(self, var_name, search_global_scope=False, require_const=False):
         #Check the scoping variable stack...
         if self._in_cal_blk:
             cur_vars = self._variables_cal_stack
@@ -199,8 +209,12 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
                 else:
                     continue
             if var_name in cur_vars[m]:
-                return cur_vars[m][var_name][1]   #TODO: Consider type-checking on index 0 somehow here or elsewhere?
-        assert False, f"The identifier {var_name} is undefined in this scope!"
+                assert require_const == cur_vars[m][var_name].var_const, "Cannot use a non-const variable in this expression."
+                return cur_vars[m][var_name].var_value   #TODO: Consider type-checking on index 0 somehow here or elsewhere?
+        if require_const:
+            assert False, f"The identifier {var_name} is not defined as a const variable!"
+        else:
+            assert False, f"The identifier {var_name} is undefined in this scope!"
 
     def visit_QuantumGateDefinition(self, node):
         self._gate_defs[node.name.name] = node
@@ -209,7 +223,8 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
         if node.size == None:
             reg_size = 1
         else:
-            reg_size = node.size.value
+            reg_size = self._eval_arg(node.size.value, search_global_scope=True, require_const=True) #search_global_scope=True is technically redundant here...
+            assert isinstance(reg_size, int) and reg_size > 0, f"The size of the qubit register {node.qubit.name} must be a positive integer."
         self._qubits[node.qubit.name] = reg_size
 
     def visit_ClassicalAssignment(self, node):
@@ -232,39 +247,43 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
             case '**=':
                 self.set_var_in_cur_scope(node.lvalue.name,  self._eval_binary_expression(cur_val, new_val, '**'))
 
-
-    def visit_ClassicalDeclaration(self, node):
+    def _process_variable_declaration(self, node, is_const=False):
         if isinstance(node.type, openqasm3.ast.BitType):
             if node.type.size == None:
                 reg_size = 1
             else:
-                reg_size = node.type.size.value
+                reg_size = self._eval_arg(node.type.size, search_global_scope=True, require_const=True)
+                assert isinstance(reg_size, int) and reg_size > 0, f"The size of the classical-bit register {node.identifier.name} must be a positive integer."
             self._bits[node.identifier.name] = reg_size
         elif isinstance(node.type, (openqasm3.ast.FloatType, openqasm3.ast.AngleType)):
             print("Warning: Treating angle variable as a float.")
             assert not (node.identifier.name in self._variables_stack[-1]), f"Variable {node.identifier.name} already defined in this scope."
-            val = self._eval_arg(node.init_expression) if node.init_expression != None else 0.0
-            self.add_var_in_cur_scope(node.identifier.name, node.type, float(val))    #TODO: Look into not ignoring the bit-size and use numpy for that?
+            val = self._eval_arg(node.init_expression, require_const=is_const) if node.init_expression != None else 0.0
+            self.add_var_in_cur_scope(node.identifier.name, node.type, float(val), is_const)    #TODO: Look into not ignoring the bit-size and use numpy for that?
         elif isinstance(node.type, (openqasm3.ast.IntType, openqasm3.ast.UintType)):
             print("Warning: Treating angle variable as a float.")
             assert not (node.identifier.name in self._variables_stack[-1]), f"Variable {node.identifier.name} already defined in this scope."
-            val = self._eval_arg(node.init_expression) if node.init_expression != None else 0.0
-            self.add_var_in_cur_scope(node.identifier.name, node.type, float(val))    #TODO: Look into not ignoring the bit-size and use numpy for that?
+            val = self._eval_arg(node.init_expression, require_const=is_const) if node.init_expression != None else 0.0
+            self.add_var_in_cur_scope(node.identifier.name, node.type, int(val), is_const)    #TODO: Look into not ignoring the bit-size and use numpy for that?
         elif isinstance(node.type, (openqasm3.ast.ComplexType)):
             print("Warning: Treating angle variable as a float.")
             assert not (node.identifier.name in self._variables_stack[-1]), f"Variable {node.identifier.name} already defined in this scope."
-            val = self._eval_arg(node.init_expression) if node.init_expression != None else 0.0+0.0j
-            self.add_var_in_cur_scope(node.identifier.name, node.type, val)    #TODO: Look into not ignoring the bit-size and use numpy for that?
+            val = self._eval_arg(node.init_expression, require_const=is_const) if node.init_expression != None else 0.0+0.0j
+            self.add_var_in_cur_scope(node.identifier.name, node.type, val, is_const)    #TODO: Look into not ignoring the bit-size and use numpy for that?
         elif isinstance(node.type, openpulse.ast.WaveformType):
             assert not (node.identifier.name in self._variables_cal_stack[-1]), f"Variable {node.identifier.name} already defined in this pulse-calibration scope."
-            val = self._eval_arg(node.init_expression) if node.init_expression != None else []
-            self._variables_cal_stack[-1][node.identifier.name] = ['waveform_literal',val]
+            val = self._eval_arg(node.init_expression, require_const=is_const) if node.init_expression != None else []
+            self.add_var_in_cur_scope(node.identifier.name,'waveform_literal',val, is_const)
         elif isinstance(node.type, openpulse.ast.DurationType):
             assert not (node.identifier.name in self._variables_stack[-1]), f"Variable {node.identifier.name} already defined in this scope."
-            val = self._eval_arg(node.init_expression) if node.init_expression != None else []
-            self.add_var_in_cur_scope(node.identifier.name, node.type, val)    #TODO: Look into not ignoring the bit-size and use numpy for that?
+            val = self._eval_arg(node.init_expression, require_const=is_const) if node.init_expression != None else []
+            self.add_var_in_cur_scope(node.identifier.name, node.type, val, is_const)    #TODO: Look into not ignoring the bit-size and use numpy for that?
 
+    def visit_ConstantDeclaration(self, node):
+        self._process_variable_declaration(node, True)
 
+    def visit_ClassicalDeclaration(self, node):
+        self._process_variable_declaration(node)
     
     def visit_QuantumGate(self, node):
         #TODO: Support broadcast invocations here by just calling visit_QuantumGate n times for each qubit in the qreg...
@@ -403,10 +422,13 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
             assert bit_arg.name in self._bits, f"The register '{bit_arg.name}' is undefined."
             return [(bit_arg.name, x) for x in range(self._bits[bit_arg.name])]   #THIS MEANS IT IS FULL REG SIZE AND MUST BE MAPPED AS THUS!
         elif isinstance(bit_arg, openqasm3.ast.IndexedIdentifier):
-            assert bit_arg.name.name in self._bits, f"The register '{bit_arg.name.name}' is undefined."
-            return [(bit_arg.name.name, int(self._eval_arg(bit_arg.indices[0][0])))]    #TODO: Check that it is truly an integer as error checking instead of blindly rounding.
+            cur_name = bit_arg.name.name
+            assert cur_name in self._bits, f"The register '{cur_name}' is undefined."
+            cur_index = int(self._eval_arg(bit_arg.indices[0][0]))    #TODO: Check that it is truly an integer as error checking instead of blindly rounding.
+            assert cur_index >= 0 and cur_index < self._bits[cur_name], f"Index {cur_index} is out of range for classical register {cur_name} which is declared to be of size {self._bits[cur_name]}"
+            return [(cur_name, cur_index)]
 
-    def _eval_arg(self, argument, search_global_scope=False):
+    def _eval_arg(self, argument, search_global_scope=False, require_const=False):
         if isinstance(argument, (int, float)):    #More just here for safety...
             return argument
         elif isinstance(argument, (openqasm3.ast.IntegerLiteral, openqasm3.ast.FloatLiteral)):
@@ -417,16 +439,16 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
             if argument.name == 'π' or argument.name == 'pi':
                 return np.pi
             else:
-                return self.get_var_in_cur_scope(argument.name, search_global_scope)
+                return self.get_var_in_cur_scope(argument.name, search_global_scope, require_const)
         elif isinstance(argument, openqasm3.ast.DurationLiteral):
             return SQDDurationLiteral(argument)
         elif isinstance(argument, openqasm3.ast.UnaryExpression):
             if argument.op.name == '-':
-                return -self._eval_arg(argument.expression)
+                return -self._eval_arg(argument.expression, require_const=require_const)
             assert False, f"Unsupported unary operation {argument.op.name}."
         elif isinstance(argument, openqasm3.ast.BinaryExpression):
-            lhs = self._eval_arg(argument.lhs)
-            rhs = self._eval_arg(argument.rhs)
+            lhs = self._eval_arg(argument.lhs, require_const=require_const)
+            rhs = self._eval_arg(argument.rhs, require_const=require_const)
             return self._eval_binary_expression(lhs, rhs, argument.op.name)
         elif isinstance(argument, openqasm3.ast.FunctionCall):
             match argument.name.name:
@@ -452,28 +474,28 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
                 case 'gaussian':
                     assert len(argument.arguments) >= 2, "Must provide at least, the duration and amplitude for 'gaussian'."
                     ret_dict = {'type': 'gaussian'}
-                    ret_dict['length'] = self._eval_arg(argument.arguments[0])
-                    ret_dict['amplitude'] = self._eval_arg(argument.arguments[1])
+                    ret_dict['length'] = self._eval_arg(argument.arguments[0], require_const=require_const)
+                    ret_dict['amplitude'] = self._eval_arg(argument.arguments[1], require_const=require_const)
                     if len(argument.arguments) > 2:
                         ret_dict['sigma'] = argument.arguments[2]
                     return ret_dict
                 case 'constant':
                     assert len(argument.arguments) >= 2, "Must provide at least, the duration and amplitude for 'constant'."
                     ret_dict = {'type': 'constant'}
-                    ret_dict['length'] = self._eval_arg(argument.arguments[0])
-                    ret_dict['amplitude'] = self._eval_arg(argument.arguments[1])
+                    ret_dict['length'] = self._eval_arg(argument.arguments[0], require_const=require_const)
+                    ret_dict['amplitude'] = self._eval_arg(argument.arguments[1], require_const=require_const)
                     return ret_dict
                 case 'set_phase':
                     assert len(argument.arguments) == 2, "Must give 2 arguments: the frame (i.e. drive/flux/measure etc.) of the signal line and the phase in radians."
-                    frame_var = self._eval_arg(argument.arguments[0])
+                    frame_var = self._eval_arg(argument.arguments[0], require_const=require_const)
                     assert isinstance(frame_var, SQDDefcalFrame), "The first argument in the play command must be a frame type - e.g. drive($1), flux($2) etc."
-                    angle_var = self._eval_arg(argument.arguments[1])
+                    angle_var = self._eval_arg(argument.arguments[1], require_const=require_const)
                     self._cur_defcal.append( {'type': 'pulse_attribute', 'frame_var':  frame_var, 'set_phase_val':angle_var} )
                 case 'shift_phase':
                     assert len(argument.arguments) == 2, "Must give 2 arguments: the frame (i.e. drive/flux/measure etc.) of the signal line and the phase in radians."
-                    frame_var = self._eval_arg(argument.arguments[0])
+                    frame_var = self._eval_arg(argument.arguments[0], require_const=require_const)
                     assert isinstance(frame_var, SQDDefcalFrame), "The first argument in the play command must be a frame type - e.g. drive($1), flux($2) etc."
-                    angle_var = self._eval_arg(argument.arguments[1])
+                    angle_var = self._eval_arg(argument.arguments[1], require_const=require_const)
                     self._cur_defcal.append( {'type': 'pulse_attribute', 'frame_var':  frame_var, 'shift_phase_val':angle_var} )
                 case 'set_frequency':
                     assert len(argument.arguments) == 2, "Must give 2 arguments: the frame (i.e. drive/flux/measure etc.) of the signal line and the phase in radians."
@@ -625,24 +647,6 @@ class IncludeCollector(openqasm3.visitor.QASMVisitor):
     def visit_Include(self, node):
         self.includes.append(node.filename)
 
-class QubitCollector(openqasm3.visitor.QASMVisitor):
-    def __init__(self):
-        self.qubits = {}
-    def visit_QubitDeclaration(self, node):
-        self.qubits[node.qubit.name] = 1 if node.size == None else node.size.value
-
-class BitCollector(openqasm3.visitor.QASMVisitor):
-    def __init__(self):
-        self.bits = {}
-    def visit_ClassicalDeclaration(self, node):
-        if isinstance(node.type, openqasm3.ast.BitType):
-            if node.type.size == None:
-                reg_size = 1
-            else:
-                reg_size = node.type.size.value
-            self.bits[node.identifier.name] = reg_size
-
-
 class ParserOpenQASM:
     def __init__(self, main_file: str, source_dirs: list[str], **kwargs):
         if 'main_qasm' in kwargs:
@@ -663,17 +667,16 @@ class ParserOpenQASM:
         #
         #Collect just the qubit declarations (don't need to go through loops or scoping brackets as they should only exist in the global scope anyway)
         #Note that this is only here for the purpose of the get_qubit_registers function...
-        collectorQ = QubitCollector()
-        collectorC = BitCollector()
+        self._qregs = {}
         for m, cur_file in enumerate(self._overall_includes):
             if cur_file[0] == 'file':
                 ast = openqasm3.parser.parse(self._open_file_strip_comments(cur_file[1]))
             else:
                 ast = openqasm3.parser.parse(cur_file[1])
-            collectorQ.visit(ast)
-            collectorC.visit(ast)
-        self._qregs = collectorQ.qubits
-        self._cregs = collectorC.bits
+            ast.statements = [x for x in ast.statements if isinstance(x, (openqasm3.ast.ConstantDeclaration, openqasm3.ast.QubitDeclaration))]
+            temp_visitor = SQDQasmVisitor(None, 0)
+            temp_visitor.visit(ast)
+            self._qregs |= temp_visitor._qubits
         #
         if 'mapping' in kwargs:
             self._qreg_phys_mapping = kwargs.pop('mapping')
@@ -709,6 +712,7 @@ class ParserOpenQASM:
         self._qreg_phys_mapping = mapping
 
     def perform_parsing(self):
+        self._cregs = {}
         self._visitor = SQDQasmVisitor(self._qreg_phys_mapping, self._total_physical_qubits)
         self._command_blocks = []
         for m, cur_file in enumerate(self._overall_includes):
@@ -717,7 +721,7 @@ class ParserOpenQASM:
             else:
                 ast = openqasm3.parser.parse(cur_file[1])
             self._process_block(ast.statements)
-        pass
+        self._cregs |= self._visitor._bits
 
     def _find_file(self, file_path, source_dirs):
         if not os.path.exists(file_path):

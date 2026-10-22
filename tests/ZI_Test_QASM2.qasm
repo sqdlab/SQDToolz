@@ -7,17 +7,21 @@ cal {
 
 include 'stdgates_transmon_fixed_coupler.inc';
 
-bit[2] c;
+const int n = 3;
+const int m = n-1;
+
+bit[m] c;
 qubit[2] q;
+
 
 defcal cz $0, $1
 {
 	play(drive($0), gaussian(20ns, 0.358));
 	delay[100ns] flux0;
 	play(flux($0), wfm_flux);
-	play(meas($1), constant(2us, 0.358));
-	// delay[1us] $0;
-	play(meas($0), gaussian(2us, 0.358));
+	// play(meas($1), constant(2us, 0.358));
+	// // delay[1us] $0;
+	// play(meas($0), gaussian(2us, 0.358));
 }
 
 z q[0];
@@ -32,5 +36,5 @@ z q[1];
 ry(pi/2) q[1];
 
 delay[0]  q[0], q[1];
-// c[0] = measure q[0];
-// c[1] = measure q[1];
+c[0] = measure q[0];
+c[1] = measure q[1];

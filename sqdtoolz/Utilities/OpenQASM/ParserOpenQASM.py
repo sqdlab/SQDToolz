@@ -139,7 +139,7 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
         self._in_cal_blk = True
         for m in range(self._total_physical_qubits):
             for line_id in ['drive', 'flux', 'meas']:
-                self.add_var_in_cur_scope(f'{line_id}{m}', 'frame', SQDDefcalFrame(f'{line_id}', m))
+                self.add_var_in_cur_scope(f'{line_id}{m}', 'frame', SQDDefcalFrame(f'{line_id}', m), is_const=True)
         self._in_cal_blk = False
 
     #Not required as includes are handled separately...

@@ -35,9 +35,9 @@ class ExpZIQASM(ExpZIqubit):
         assert (qasm_file_path!='') ^ (('qasm_string' in kwargs) and kwargs['qasm_string'] != ''), "Either supply the path to the QASM file ('qasm_file_path') or provide it as a string via the 'qasm_string' parameter."
         main_qasm = kwargs.pop('qasm_string', '')
         if main_qasm != '':
-            self._poqasm = ParserOpenQASM(qasm_file_path, kwargs.pop('source_dirs', []), measure_label='QMEAS', main_qasm=main_qasm)
+            self._poqasm = ParserOpenQASM(qasm_file_path, kwargs.pop('source_dirs', []), measure_label='QMEAS', total_physical_qubits=len(qubit_ids), main_qasm=main_qasm)
         else:
-            self._poqasm = ParserOpenQASM(qasm_file_path, kwargs.pop('source_dirs', []), measure_label='QMEAS')
+            self._poqasm = ParserOpenQASM(qasm_file_path, kwargs.pop('source_dirs', []), measure_label='QMEAS', total_physical_qubits=len(qubit_ids))
         self._final_qreg_phys_mapping = self._poqasm._qreg_phys_mapping #Copy over the default qreg to physical qubit mapping
 
         self._qregs = self._poqasm.get_qubit_registers()

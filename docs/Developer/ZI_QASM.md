@@ -31,6 +31,8 @@ There is one other requirement regarding the [timing grids](https://docs.zhinst.
 
 The schedule parameters object takes care of this as a provision to align to such time-steps. That is, a delay bubble is introduced to ensure that the measurement pulses align properly...
 
+**NOTE: For OpenPulse sections (i.e. inside `defcal` blocks), `delay` operates on frames. Multi-frame delays are NOT alignment instructions here and will just add the delays individually to each frame.**
+
 ## For Loops
 
 So *OpenQASM3* specifies that `for` loops are to be executed as a sequential instruction. That is, there cannot be two parallel `for` loops; this aligns with the hardware restriction on *LabOneQ* as well. Thus, a `for` loop will be considered as a single section that slots in sequentially with the other instructions. However, there cannot be two such `for` loops being a child of the outer `for` loop. That is, in summary:
@@ -49,7 +51,19 @@ extern flux(qubit) -> frame;
 extern meas(qubit) -> frame;
 ```
 
-That is, for any qubit, one may query the drive, flux or measure lines by using these three functions (using `meas` here as `measure` is an *OpenQASM* construct). After that, the `play` functions can be used in a straightforward manner. Note that `play` functions in `cal` blocks are ignored (it will technically require ports/frames to even call `play`; there are not supported in this parser).
+That is, for any qubit, one may query the drive, flux or measure lines by using these three functions (using `meas` here as `measure` is an *OpenQASM* construct). After that, the `play` functions can be used in a straightforward manner. Note that `play` functions in `cal` blocks are ignored (it will technically require ports/frames to even call `play`; there are not supported in this parser). To cater for the literal-only requirement in delay instructions, the same frames are by default declared as frame objects for every physical qubit (they can technically be overwritten):
+
+```cpp
+drive0 = drive($0)
+flux0 = flux($0)
+meas0 = meas($0)
+//
+drive1 = drive($1)
+flux1 = flux($1)
+meas1 = meas($1)
+//
+//etc.
+```
 
 Note that `gatedef` must only use logical qubits while `defcal` only uses physical qubits. Thus, the execution is as follows in this example:
 1. Parse the statement: `x q[1];`

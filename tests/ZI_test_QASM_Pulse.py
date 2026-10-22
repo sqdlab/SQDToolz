@@ -18,6 +18,7 @@ ZIQubit('Qubit4', lab, 'zi_boxes', ('shfqc0', 'SGCHANNELS/3/OUTPUT'), ('shfqc0',
 ZIQuantumElement('Cpl12', lab, TunableTransmonCouplerFixed, flux='Qubit1/flux', drive_comp='Qubit1/drive', drive_comp_stationary='Qubit2/drive')
 ZIQuantumElement('Cpl34', lab, TunableTransmonCouplerFixed, flux='Qubit3/flux', drive_comp='Qubit3/drive', drive_comp_stationary='Qubit4/drive')
 ZIQuantumElement('Cpl24', lab, TunableTransmonCouplerFixed, flux='Qubit4/flux', drive_comp='Qubit4/drive', drive_comp_stationary='Qubit2/drive')
+lab.HAL('Qubit4').ReadoutFrequency = 7.01e9
 # lab.HAL('Cpl12').QubitFlux = 'Qubit1'
 
 SOFTqpu('QPU', lab)

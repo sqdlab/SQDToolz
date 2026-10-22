@@ -193,6 +193,8 @@ def create_experiment(
             for cur_pulse in cur_section['sequence']:
                 if cur_pulse['type'] == 'play':
                     new_uid = f'uid_pulse_{len(lePulses)}'
+                    if 'delay' in cur_pulse:
+                        continue
                     match cur_pulse['waveform_var']['type']:
                         case "gaussian":
                             new_pulse = lbeqs.pulse_library.gaussian(
@@ -267,14 +269,19 @@ def create_experiment(
                     if cur_section['custom_waveform']:
                         for cur_pulse in cur_section['sequence']:
                             cur_signal_line = cur_pulse['frame_var']
-                            cur_signal_line = f'{qubits[cur_signal_line[1]].uid}/{cur_signal_line[0]}'
+                            cur_signal_line = f'{qubits[cur_signal_line.qubit_id].uid}/{cur_signal_line.line_id}'
                             if cur_pulse['type'] == 'play':
-                                dsl.play(signal=cur_signal_line, pulse=cur_pulse['zi_pulse'])
+                                if 'delay' in cur_pulse:
+                                    dsl.delay(signal=cur_signal_line, time=cur_pulse['delay'])
+                                else:
+                                    dsl.play(signal=cur_signal_line, pulse=cur_pulse['zi_pulse'])
                             elif cur_pulse['type'] == 'pulse_attribute':
                                 if 'set_phase_val' in cur_pulse:
                                     dsl.play(signal=cur_signal_line,pulse=None, set_oscillator_phase=cur_pulse['set_phase_val'])
                                 elif 'shift_phase_val' in cur_pulse:
                                     dsl.play(signal=cur_signal_line,pulse=None, increment_oscillator_phase=cur_pulse['shift_phase_val'])
+                                elif 'set_frequency_val' in cur_pulse:
+                                    qop.set_frequency(qubits[cur_signal_line], cur_pulse['set_frequency_val'])
                     elif isinstance(cur_section['qubit_index'], (list,tuple)):
                         cur_qinds = [x for x in cur_section['qubit_index']]
                         cur_qubits = [qubits[x] for x in cur_qinds]
@@ -315,14 +322,14 @@ def create_experiment(
                                 qop.passive_reset(cur_qubit)
                 pass
 
-        for q in qubits:
-            qop.passive_reset(q)
-        if opts.use_cal_traces:
-            qop.calibration_traces.omit_section(
-                qubits=qubits,
-                states=opts.cal_states,
-                active_reset=opts.active_reset,
-                active_reset_states=opts.active_reset_states,
-                active_reset_repetitions=opts.active_reset_repetitions,
-                measure_section_length=max_measure_section_length,
-            )
+        # for q in qubits:
+        #     qop.passive_reset(q)
+        # if opts.use_cal_traces:
+        #     qop.calibration_traces.omit_section(
+        #         qubits=qubits,
+        #         states=opts.cal_states,
+        #         active_reset=opts.active_reset,
+        #         active_reset_states=opts.active_reset_states,
+        #         active_reset_repetitions=opts.active_reset_repetitions,
+        #         measure_section_length=max_measure_section_length,
+        #     )

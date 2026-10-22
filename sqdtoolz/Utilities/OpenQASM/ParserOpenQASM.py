@@ -20,6 +20,7 @@ from sqdtoolz.Utilities.FileJSON import SerialiseJSON
 from enum import Enum, auto
 from pathlib import Path
 from sqdtoolz.Utilities.Miscellaneous import Miscellaneous
+from dataclasses import dataclass
 
 class SQDQasmCommandType(Enum):
     GATE = auto()
@@ -98,9 +99,13 @@ class SQDDurationLiteral:
         assert scalar != 0, "Cannot divide by zero."
         return self._from_expr(("/", self._expr, scalar))
 
+@dataclass
+class SQDDefcalFrame:
+    line_id:  str
+    qubit_id: str
 
 class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
-    def __init__(self, qreg_phys_mapping:dict):
+    def __init__(self, qreg_phys_mapping:dict, total_physical_qubits):
         super().__init__()
         #The variables are stored as a stack for the scoping/shadowing. Idea is that it's a list of
         #dictionaries for each scoping level. Each dictionary has keys corresponding to the variable
@@ -122,6 +127,11 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
         self._in_cal_blk = False
         self._in_defcal_blk = False
         self._qreg_phys_mapping = qreg_phys_mapping
+        #
+        self._total_physical_qubits = total_physical_qubits
+        for m in range(self._total_physical_qubits):
+            for line_id in ['drive', 'flux', 'meas']:
+                self._variables_cal_stack[0][f'{line_id}{m}'] = ['frame', SQDDefcalFrame(f'{line_id}', m)]
 
     #Not required as includes are handled separately...
     # def visit_Include(self, node):
@@ -337,10 +347,17 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
 
     def visit_DelayInstruction(self, node):
         cur_delay = self._eval_arg(node.duration)
-        qargs = []
-        for cur_qubits in node.qubits:
-            qargs += self._eval_qarg(cur_qubits, allow_entire_regs=True)
-        self._commands.append({'type':SQDQasmCommandType.DELAY, 'targets':qargs, 'length':cur_delay})
+        if self._in_cal_blk:
+            for cur_frame_id in node.qubits:
+                cur_farg = self._eval_arg(cur_frame_id, search_global_scope=True)
+                assert isinstance(cur_farg, SQDDefcalFrame), f"The identifier {cur_frame_id.name} is not a valid frame."
+                #Delays in OpenPulse defcal blocks do not synchronise. So just add them in separately...
+                self._cur_defcal.append( {'type': 'play', 'frame_var':  cur_farg, 'delay':cur_delay} )
+        else:
+            qargs = []
+            for cur_qubits in node.qubits:
+                qargs += self._eval_qarg(cur_qubits, allow_entire_regs=True)
+            self._commands.append({'type':SQDQasmCommandType.DELAY, 'targets':qargs, 'length':cur_delay})
 
     def visit_QuantumMeasurementStatement(self, node):
         qargs = self._eval_qarg(node.measure.qubit, allow_entire_regs=True)   #TODO: Expand to support registers expanding...
@@ -421,17 +438,17 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
                     assert len(argument.arguments) == 1 and argument.arguments[0].name[0]=='$', "Must give a single physical qubit (i.e. starts with $) to extract the line for the 'drive' function."
                     cur_qubit = (argument.arguments[0].name,0)
                     assert cur_qubit in self._qarg_stack[-1], f"The physical qubit {argument.arguments[0].name} is not defined here in the defcal function signature?"
-                    return ('drive', self._qarg_stack[-1][cur_qubit])
+                    return SQDDefcalFrame('drive', self._qarg_stack[-1][cur_qubit])
                 case 'meas':
                     assert len(argument.arguments) == 1 and argument.arguments[0].name[0]=='$', "Must give a single physical qubit (i.e. starts with $) to extract the line for the 'meas' function."
                     cur_qubit = (argument.arguments[0].name,0)
                     assert cur_qubit in self._qarg_stack[-1], f"The physical qubit {argument.arguments[0].name} is not defined here in the defcal function signature?"
-                    return ('measure', self._qarg_stack[-1][cur_qubit])
+                    return SQDDefcalFrame('measure', self._qarg_stack[-1][cur_qubit])
                 case 'flux':
                     assert len(argument.arguments) == 1 and argument.arguments[0].name[0]=='$', "Must give a single physical qubit (i.e. starts with $) to extract the line for the 'drive' function."
                     cur_qubit = (argument.arguments[0].name,0)
                     assert cur_qubit in self._qarg_stack[-1], f"The physical qubit {argument.arguments[0].name} is not defined here in the defcal function signature?"
-                    return ('flux', self._qarg_stack[-1][cur_qubit])
+                    return SQDDefcalFrame('flux', self._qarg_stack[-1][cur_qubit])
                 case 'gaussian':
                     assert len(argument.arguments) >= 2, "Must provide at least, the duration and amplitude for 'gaussian'."
                     ret_dict = {'type': 'gaussian'}
@@ -449,17 +466,26 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
                 case 'set_phase':
                     assert len(argument.arguments) == 2, "Must give 2 arguments: the frame (i.e. drive/flux/measure etc.) of the signal line and the phase in radians."
                     frame_var = self._eval_arg(argument.arguments[0])
+                    assert isinstance(frame_var, SQDDefcalFrame), "The first argument in the play command must be a frame type - e.g. drive($1), flux($2) etc."
                     angle_var = self._eval_arg(argument.arguments[1])
                     self._cur_defcal.append( {'type': 'pulse_attribute', 'frame_var':  frame_var, 'set_phase_val':angle_var} )
                 case 'shift_phase':
                     assert len(argument.arguments) == 2, "Must give 2 arguments: the frame (i.e. drive/flux/measure etc.) of the signal line and the phase in radians."
                     frame_var = self._eval_arg(argument.arguments[0])
+                    assert isinstance(frame_var, SQDDefcalFrame), "The first argument in the play command must be a frame type - e.g. drive($1), flux($2) etc."
                     angle_var = self._eval_arg(argument.arguments[1])
                     self._cur_defcal.append( {'type': 'pulse_attribute', 'frame_var':  frame_var, 'shift_phase_val':angle_var} )
+                case 'set_frequency':
+                    assert len(argument.arguments) == 2, "Must give 2 arguments: the frame (i.e. drive/flux/measure etc.) of the signal line and the phase in radians."
+                    frame_var = self._eval_arg(argument.arguments[0])
+                    assert isinstance(frame_var, SQDDefcalFrame), "The first argument in the play command must be a frame type - e.g. drive($1), flux($2) etc."
+                    freq_var = self._eval_arg(argument.arguments[1])
+                    self._cur_defcal.append( {'type': 'pulse_attribute', 'frame_var':  frame_var, 'set_frequency_val':freq_var} )
                 case 'play':
                     # assert self._in_defcal_blk, "The play function is reserved for defcal blocks only."
                     assert len(argument.arguments) == 2, "Must give 2 arguments: the frame (i.e. drive/flux/measure etc.) of the signal line and the waveform."
                     frame_var = self._eval_arg(argument.arguments[0])
+                    assert isinstance(frame_var, SQDDefcalFrame), "The first argument in the play command must be a frame type - e.g. drive($1), flux($2) etc."
                     waveform_var = self._eval_arg(argument.arguments[1], search_global_scope=True)
                     if isinstance(waveform_var, np.ndarray):
                         waveform_var = {'type': 'sampled', 'samples': waveform_var}
@@ -627,6 +653,8 @@ class ParserOpenQASM:
             main_file = ('file', main_file)
         self._main_file = (main_file[0], main_file[1])
 
+        self._total_physical_qubits = kwargs.get('total_physical_qubits',5)
+
         source_dirs = source_dirs + [str(Path(__file__).parent) + "/includes/"]
         self._overall_includes = []
         self._get_include_tree([main_file], self._overall_includes, source_dirs)
@@ -681,7 +709,7 @@ class ParserOpenQASM:
         self._qreg_phys_mapping = mapping
 
     def perform_parsing(self):
-        self._visitor = SQDQasmVisitor(self._qreg_phys_mapping)
+        self._visitor = SQDQasmVisitor(self._qreg_phys_mapping, self._total_physical_qubits)
         self._command_blocks = []
         for m, cur_file in enumerate(self._overall_includes):
             if cur_file[0] == 'file':
@@ -959,9 +987,12 @@ class ParserOpenQASM:
             pulse_lengths[('measure', cur_target)] = 0
         #Process the lengths based on the waveforms...
         for cur_cmd in dict_command['play_commands']:
-            dt_time = params.dt(cur_cmd['frame_var'][0])
+            dt_time = params.dt(cur_cmd['frame_var'].line_id)
             if cur_cmd['type'] == 'pulse_attribute':
                 cur_len = 0
+            elif 'delay' in cur_cmd:
+                cur_len = self._process_delay(cur_cmd['delay'], dt_time)
+                cur_cmd['delay'] = cur_len
             elif cur_cmd['waveform_var']['type'] in ['gaussian', 'constant']:
                 cur_len = self._process_delay(cur_cmd['waveform_var']['length'],dt_time)
             elif cur_cmd['waveform_var']['type'] == 'sampled':  #Shouldn't be anything else given how everything so far is hard-coded...
@@ -969,10 +1000,10 @@ class ParserOpenQASM:
                 cur_len = cur_cmd['waveform_var']['samples'].shape[0]*dt_time
             else:
                 assert False, f"Cannot process waveform type {cur_cmd['waveform_var']['type']}" #Shouldn't happen given how everything preceding this is hard-coded...
-            if cur_cmd['type'] == 'play':
+            if cur_cmd['type'] == 'play' and 'waveform_var' in cur_cmd:
                 cur_cmd['waveform_var']['length'] = cur_len
             #
-            pulse_lengths[cur_cmd['frame_var']] += cur_len
+            pulse_lengths[(cur_cmd['frame_var'].line_id, cur_cmd['frame_var'].qubit_id)] += cur_len
         dict_command['length'] = max([pulse_lengths[x] for x in pulse_lengths])
         return dict_command
 
@@ -1055,33 +1086,44 @@ class ParserOpenQASM:
         cur_sequences = {}
         for cur_cmd in wfm_sequence:
             if cur_cmd['type'] == 'play':
-                cur_target = f"Q{cur_cmd['frame_var'][1]}|{cur_cmd['frame_var'][0]}"
+                cur_target = f"Q{cur_cmd['frame_var'].qubit_id}|{cur_cmd['frame_var'].line_id}"
                 if not cur_target in cur_sequences:
                     cur_sequences[cur_target] = []
+                #####
+                if 'delay' in cur_cmd:
+                    t = np.arange(0, cur_cmd['delay'], qubit_params.dt(cur_cmd['frame_var'].line_id))
+                    cur_sequences[cur_target].append((t,t*0))
+                    continue
                 match cur_cmd['waveform_var']['type']:
                     case "gaussian":
                         length=cur_cmd['waveform_var']['length']
                         amplitude=cur_cmd['waveform_var']['amplitude']
                         sigma=cur_cmd['waveform_var'].get('sigma', 0.25)
-                        t = np.arange(0, length, qubit_params.dt(cur_cmd['frame_var'][0]))
+                        t = np.arange(0, length, qubit_params.dt(cur_cmd['frame_var'].line_id))
                         x = 2 * t / length - 1  # Map [0, length) to [-1, 1]
                         y = amplitude * np.exp(-0.5 * (x / sigma) ** 2)
-                        if cur_cmd['frame_var'][0] != 'flux':
+                        if cur_cmd['frame_var'].line_id != 'flux':
                             y = y + 0j
                         cur_sequences[cur_target].append((t,y))
                     case "constant":
                         length=cur_cmd['waveform_var']['length']
                         amplitude=cur_cmd['waveform_var']['amplitude']
-                        t = np.arange(0, length, qubit_params.dt(cur_cmd['frame_var'][0]))
+                        t = np.arange(0, length, qubit_params.dt(cur_cmd['frame_var'].line_id))
                         y = 0*t+amplitude
-                        if cur_cmd['frame_var'][0] != 'flux':
+                        if cur_cmd['frame_var'].line_id != 'flux':
                             y = y + 0j
                         cur_sequences[cur_target].append((t,y))
                     case "sampled":
                         cur_data = cur_cmd['waveform_var']['samples']
-                        cur_sequences[cur_target].append((np.arange(cur_data.size)*qubit_params.dt(cur_cmd['frame_var'][0]), cur_data))
+                        cur_sequences[cur_target].append((np.arange(cur_data.size)*qubit_params.dt(cur_cmd['frame_var'].line_id), cur_data))
         for cur_line in cur_sequences:
-            cur_sequences[cur_line] = np.concatenate(cur_sequences[cur_line])
+            cur_time = 0
+            #The times are local to the pulse. Thus, the overall time needs to be offset from the previous pulse's last value...
+            offsetted_list = []
+            for x in cur_sequences[cur_line]:
+                offsetted_list.append((x[0]+cur_time, x[1]))
+                cur_time += x[0][-1]
+            cur_sequences[cur_line] = np.hstack(offsetted_list)
         return cur_sequences
 
     def tabulate_schedule(self, gate_schedule, qubit_params:ScheduleParametersBase, custom_waveforms={}):

@@ -20,8 +20,13 @@ defcal cz $0, $1
 	delay[100ns] flux0;
 	play(flux($0), wfm_flux);
 	// play(meas($1), constant(2us, 0.358));
-	// // delay[1us] $0;
-	// play(meas($0), gaussian(2us, 0.358));
+	// delay[1us] $0;
+	play(meas($0), gaussian(2us, 0.358));
+	// play(meas($1), wfm_flux);
+	delay[1us] meas0, meas1;
+	play(meas($0), gaussian(2us, 0.358));
+	play(aux_0_0, gaussian(2us, 0.358));
+	// play(meas($1), 0.5*wfm_flux);
 }
 
 z q[0];
@@ -36,5 +41,5 @@ z q[1];
 ry(pi/2) q[1];
 
 delay[0]  q[0], q[1];
-c[0] = measure q[0];
-c[1] = measure q[1];
+// c[0] = measure q[0];
+// c[1] = measure q[1];

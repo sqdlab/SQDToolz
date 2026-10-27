@@ -32,6 +32,15 @@ class ExpZIQASM(ExpZIqubit):
         kwargs['coordinate_system'] = kwargs.get('coordinate_system', 'RH')
         assert kwargs['coordinate_system'] in ['LH', 'RH'], "The 'coordinate_system' must be either LH or RH for left/right handed."
 
+        #Figure out how many free RF readout tones are present
+        tempQ = self._hal_QPU.get_qubit_obj(qubit_ids[0])
+        avail_shfqcs = tempQ._instr_zi.get_shfqcs()
+        taken_shfqcs = {x:0 for x in avail_shfqcs}
+        for cur_qubit in qubit_ids:
+            cur_shfqc = self._hal_QPU.get_qubit_obj(cur_qubit)._zi_instr_phys_measure[0]
+            taken_shfqcs[cur_shfqc] += 1
+        kwargs['avail_aux_lines'] = tempQ._instr_zi.get_free_aux_readout_lines(taken_shfqcs)
+
         assert (qasm_file_path!='') ^ (('qasm_string' in kwargs) and kwargs['qasm_string'] != ''), "Either supply the path to the QASM file ('qasm_file_path') or provide it as a string via the 'qasm_string' parameter."
         main_qasm = kwargs.pop('qasm_string', '')
         if main_qasm != '':

@@ -139,7 +139,12 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
         self._in_cal_blk = True
         for m in range(self._total_physical_qubits):
             for line_id in ['drive', 'flux', 'meas']:
-                self.add_var_in_cur_scope(f'{line_id}{m}', 'frame', SQDDefcalFrame(f'{line_id}', m), is_const=True)
+                self.add_var_in_cur_scope(f'{line_id}{m}', 'frame', SQDDefcalFrame(f"{line_id if line_id != 'meas' else 'measure'}", m), is_const=True)
+        #Hard-coded as 3 SHFQCs! Idea is that the H/W level will have to be the validation layer here to see if there are enough
+        #readout tones in reserve...
+        for feedline in range(3):
+            for m in range(8):
+                self.add_var_in_cur_scope(f'aux_{feedline}_{m}', 'frame', SQDDefcalFrame("aux", f"aux_{feedline}_{m}"), is_const=True)
         self._in_cal_blk = False
 
     #Not required as includes are handled separately...
@@ -209,7 +214,7 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
                 else:
                     continue
             if var_name in cur_vars[m]:
-                assert require_const == cur_vars[m][var_name].var_const, "Cannot use a non-const variable in this expression."
+                assert not require_const or cur_vars[m][var_name].var_const, "Cannot use a non-const variable in this expression."
                 return cur_vars[m][var_name].var_value   #TODO: Consider type-checking on index 0 somehow here or elsewhere?
         if require_const:
             assert False, f"The identifier {var_name} is not defined as a const variable!"
@@ -447,8 +452,8 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
                 return -self._eval_arg(argument.expression, require_const=require_const)
             assert False, f"Unsupported unary operation {argument.op.name}."
         elif isinstance(argument, openqasm3.ast.BinaryExpression):
-            lhs = self._eval_arg(argument.lhs, require_const=require_const)
-            rhs = self._eval_arg(argument.rhs, require_const=require_const)
+            lhs = self._eval_arg(argument.lhs, search_global_scope, require_const=require_const)
+            rhs = self._eval_arg(argument.rhs, search_global_scope, require_const=require_const)
             return self._eval_binary_expression(lhs, rhs, argument.op.name)
         elif isinstance(argument, openqasm3.ast.FunctionCall):
             match argument.name.name:
@@ -506,7 +511,7 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
                 case 'play':
                     # assert self._in_defcal_blk, "The play function is reserved for defcal blocks only."
                     assert len(argument.arguments) == 2, "Must give 2 arguments: the frame (i.e. drive/flux/measure etc.) of the signal line and the waveform."
-                    frame_var = self._eval_arg(argument.arguments[0])
+                    frame_var = self._eval_arg(argument.arguments[0], search_global_scope=True)
                     assert isinstance(frame_var, SQDDefcalFrame), "The first argument in the play command must be a frame type - e.g. drive($1), flux($2) etc."
                     waveform_var = self._eval_arg(argument.arguments[1], search_global_scope=True)
                     if isinstance(waveform_var, np.ndarray):
@@ -1007,7 +1012,10 @@ class ParserOpenQASM:
             if cur_cmd['type'] == 'play' and 'waveform_var' in cur_cmd:
                 cur_cmd['waveform_var']['length'] = cur_len
             #
-            pulse_lengths[(cur_cmd['frame_var'].line_id, cur_cmd['frame_var'].qubit_id)] += cur_len
+            if not (cur_cmd['frame_var'].line_id, cur_cmd['frame_var'].qubit_id) in pulse_lengths:
+                pulse_lengths[(cur_cmd['frame_var'].line_id, cur_cmd['frame_var'].qubit_id)] = cur_len    #In cases of auxiliary readout pulses...
+            else:
+                pulse_lengths[(cur_cmd['frame_var'].line_id, cur_cmd['frame_var'].qubit_id)] += cur_len
         dict_command['length'] = max([pulse_lengths[x] for x in pulse_lengths])
         return dict_command
 

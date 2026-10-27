@@ -16,6 +16,7 @@ class ZIQubit(HALbase, ZIbase, QASMCompatibleQubitSingle):
         self._zi_instr_phys_drive = zi_instr_phys_drive
         self._zi_instr_phys_measure = zi_instr_phys_measure
         self._zi_instr_phys_acquire = zi_instr_phys_acquire
+        assert zi_instr_phys_measure[0] == zi_instr_phys_acquire[0], f"Why is the measure and acquire instruments even different for this qubit {qubit_name}?"
         self._zi_instr_phys_flux = zi_phys_flux
 
         allowed_qubit_types = ["TunableTransmonQubit"]

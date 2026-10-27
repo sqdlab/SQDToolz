@@ -65,6 +65,22 @@ meas1 = meas($1)
 //etc.
 ```
 
+Each feedline in the ZI SHFQC stack allows up to 8-16 demodulated tones and measurement pulse envelopes. These are fixed over the duration of a single experiment. However, the user may modify the unused tones (i.e. not used by the qubits). The frame references to these tones are given as:
+
+```cpp
+extern aux_0_0 -> frame;
+extern aux_0_1 -> frame;
+extern aux_0_2 -> frame;
+...
+extern aux_1_0 -> frame;
+extern aux_1_1 -> frame;
+extern aux_1_2 -> frame;
+...
+```
+
+where `aux_m_n` is the tone on feedline `m` and tone `n`. Note that the hardware-level compilation will restrict maximum `n` (i.e. `n` enumerates from 0) on each feedline `m` depending on how many tones are taken for the qubits assigned to that feedline.
+
+
 Note that `gatedef` must only use logical qubits while `defcal` only uses physical qubits. Thus, the execution is as follows in this example:
 1. Parse the statement: `x q[1];`
 2. Have a mapping external to the script: `q[1] → $1`

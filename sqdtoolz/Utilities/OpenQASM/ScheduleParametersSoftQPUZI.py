@@ -36,7 +36,7 @@ class ScheduleParametersSoftQPUZI(ScheduleParametersBase):
         }
     
     def dt(self, signal_type='drive'):
-        if signal_type == 'drive' or signal_type == 'measure':  #TODO: If it ever becomes channel-dependent, just make signal_type hold said information etc...
+        if signal_type in ['drive', 'measure', 'aux']:  #TODO: If it ever becomes channel-dependent, just make signal_type hold said information etc...
             return 1.0/2e9
         elif signal_type == 'flux':
             return 1.0/2.0e9    #TODO: Should this be a Python fraction object instead as it's a recurring decimal?

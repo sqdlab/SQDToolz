@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING
 import laboneq.simple as lbeqs
 from laboneq.core.types.enums import section_timing_mode
 
+import laboneq
 from laboneq import workflow
 from laboneq.simple import (
     AveragingMode,
@@ -28,6 +29,7 @@ from laboneq.simple import (
     SectionAlignment,
     SweepParameter,
     dsl,
+    Calibration, Oscillator, SignalCalibration
 )
 from laboneq.workflow.tasks import (
     compile_experiment,
@@ -64,6 +66,7 @@ def experiment_workflow(
     qubits: QuantumElements | list[str] | str,
     openqasm_schedule,
     coordinate_system: str = 'RH',
+    avail_aux_lines:dict = {},
     # TODO: Update the type hint for the temporary_parameters argument when the new
     # qubit class is available. Same for other experiment workflows.
     temporary_parameters: dict[str | tuple[str, str, str], dict | QuantumParameters]
@@ -120,7 +123,8 @@ def experiment_workflow(
         temp_qpu,
         qubits,
         openqasm_schedule,
-        coordinate_system
+        coordinate_system,
+        avail_aux_lines
         # quarter_time=quarter_time,
     )
     compiled_exp = compile_experiment(session, exp)
@@ -140,6 +144,7 @@ def create_experiment(
     qubits: QuantumElements,
     openqasm_schedule,
     coordinate_system: str = 'RH',
+    avail_aux_lines:dict = {},
     options: TuneupExperimentOptions | None = None,
 ) -> Experiment:
     """Creates an Amplitude Rabi experiment Workflow.
@@ -187,6 +192,12 @@ def create_experiment(
         )
 
     #Process custom pulses (if any)
+    #For readout pulses, there is a restriction on the SHFQC that it can only be of one shape throughout the entire experiment run.
+    #Thus, track and ensure that only one is used.
+    #And it turns out to be in vain... It'll be kept here in case it changes in the future...
+    readout_pulses = {}
+    #Strategy is to scale the amplitudes of the pulses as required. However, ZI caps amplitudes in [0,1]. So cache and adjust accordingly in end...
+    readout_cache = []
     lePulses = {}
     for cur_section in openqasm_schedule['commands']:
         if cur_section['custom_waveform']:
@@ -216,18 +227,67 @@ def create_experiment(
                             else:
                                 new_pulse = lbeqs.pulse_library.sampled_pulse_real(uid=new_uid, samples=cur_pulse['waveform_var']['samples'])
                     found = False
-                    if cur_pulse['waveform_var']['type'] != 'measure':  #Measure pulses must each have their own pulse object...
+                    cur_pulse['zi_pulse_params'] = {}
+                    if not cur_pulse['frame_var'].line_id in ['aux', 'measure']:  #Measure pulses must each have their own pulse object...
                         for cur_cached_pulse in lePulses:
                             new_pulse.uid = lePulses[cur_cached_pulse].uid  #This is just to make the comparison == work...
                             if lePulses[cur_cached_pulse] == new_pulse:
                                 found = True
                                 new_uid = cur_cached_pulse
                                 break
+                    else:
+                        cur_qind = cur_pulse['frame_var'].qubit_id
+                        if cur_qind in readout_pulses:
+                            #Check if it's matching constant/gaussian etc.
+                            if cur_pulse['waveform_var']['type'] != 'sampled':
+                                assert readout_pulses[cur_qind].function == cur_pulse['waveform_var']['type'], f"Cannot change the pulse shape (from {readout_pulses[cur_qind].function} to {cur_pulse['waveform_var']['type']}) of readout during an experiment run for a given readout channel (qubit ${cur_qind})."
+                                assert readout_pulses[cur_qind].length == cur_pulse['waveform_var']['length'], f"Cannot change the pulse length (from {readout_pulses[cur_qind].length} to {cur_pulse['waveform_var']['length']}) of readout during an experiment run for a given readout channel (qubit ${cur_qind})."
+                                assert readout_pulses[cur_qind].amplitude == cur_pulse['waveform_var']['amplitude'], f"For now, one cannot change the pulse amplitude (from {readout_pulses[cur_qind].amplitude} to {cur_pulse['waveform_var']['amplitude']}) of readout during an experiment run for a given readout channel (qubit ${cur_qind})."
+                                # cur_pulse['zi_pulse_params']['amplitude'] = cur_pulse['waveform_var']['amplitude']
+                            else:
+                                cur_ratios = cur_pulse['waveform_var']['samples'] / readout_pulses[cur_qind].samples
+                                assert np.nanmax(cur_ratios)-np.nanmin(cur_ratios) < 1e-12, f"Cannot change the pulse shape of readout during an experiment run for a given readout channel (qubit ${cur_qind})."
+                                assert np.nanmax(cur_ratios) >= 0, f"Cannot scale the pulse shape by a negative amplitude for a given readout channel (qubit ${cur_qind})."
+                                assert np.nanmax(cur_ratios) == 1.0, f"For now, even the amplitudes must remain constant over multiple measurement pulses for a given readout channel (qubit ${cur_qind})."
+                                cur_pulse['zi_pulse_params']['amplitude'] = np.nanmax(cur_ratios)
+                                readout_cache.append(cur_pulse)
+                            found = True
+                            new_uid = readout_pulses[cur_qind].uid
+                        else:
+                            if cur_pulse['waveform_var']['type'] == 'sampled':
+                                cur_pulse['zi_pulse_params']['amplitude'] = 1.0
+                            readout_pulses[cur_qind] = new_pulse
                     if not found:
                         new_pulse.uid = new_uid
                         lePulses[new_uid] = new_pulse
                     cur_pulse['zi_pulse'] = lePulses[new_uid]
             pass
+    #Only uncomment this block if multiple pulses with different amplitudes on the same readout line is ever allowed...
+    # max_ampls = [0]*len(qubits)
+    # for cur_cached_pulse in readout_cache:
+    #     cur_qind = cur_cached_pulse['frame_var'].qubit_id
+    #     max_ampls[cur_qind] = max(max_ampls[cur_qind], cur_cached_pulse['zi_pulse_params']['amplitude'])
+    # for cur_cached_pulse in readout_cache:
+    #     cur_qind = cur_cached_pulse['frame_var'].qubit_id
+    #     cur_cached_pulse['zi_pulse_params']['amplitude'] /= max_ampls[cur_qind]
+    for m in range(len(qubits)):
+        if not m in readout_pulses:
+            readout_pulses[m] = qubits[m].parameters.readout_pulse
+        #Only uncomment this block if multiple pulses with different amplitudes on the same readout line is ever allowed...
+        # else:
+        #     if isinstance(readout_pulses[m], laboneq.dsl.experiment.pulse.PulseSampled):
+        #         readout_pulses[m].samples = readout_pulses[m].samples / max_ampls[m]
+    #
+    #So now collate all non-qubit reserved readout pulses and look into adding the logical signal mapping to the SHFQC...
+    calib = dsl.experiment_calibration()
+    for cur_id in readout_pulses:
+        if not isinstance(cur_id, str):
+            continue    #It's a qubit reservation
+        assert cur_id in avail_aux_lines, f"The auxiliary readout line {cur_id} (feedline and tone reservation) is not available in this hardware setup/arrangement. Available ones are: {[x for x in avail_aux_lines]}."
+        dsl.add_signal(f"{cur_id}_measure", connect_to=f"/logical_signal_groups/{avail_aux_lines[cur_id]}/measure")
+        dsl.add_signal(f"{cur_id}_acquire", connect_to=f"/logical_signal_groups/{avail_aux_lines[cur_id]}/acquire")
+        calib[f"{cur_id}_measure"] = SignalCalibration(oscillator=Oscillator(uid=f"{cur_id}_osc", frequency=0.01e9))
+        calib[f"{cur_id}_acquire"] = SignalCalibration(oscillator=Oscillator(uid=f"{cur_id}_osc", frequency=0.01e9))
 
     # We will fix the length of the measure section to the longest section among
     # the qubits to allow the qubits to have different readout and/or
@@ -269,12 +329,15 @@ def create_experiment(
                     if cur_section['custom_waveform']:
                         for cur_pulse in cur_section['sequence']:
                             cur_signal_line = cur_pulse['frame_var']
-                            cur_signal_line = f'{qubits[cur_signal_line.qubit_id].uid}/{cur_signal_line.line_id}'
+                            if cur_signal_line.line_id == 'aux':
+                                cur_signal_line = f'{cur_signal_line.qubit_id}_measure'
+                            else:
+                                cur_signal_line = f'{qubits[cur_signal_line.qubit_id].uid}/{cur_signal_line.line_id}'
                             if cur_pulse['type'] == 'play':
                                 if 'delay' in cur_pulse:
                                     dsl.delay(signal=cur_signal_line, time=cur_pulse['delay'])
                                 else:
-                                    dsl.play(signal=cur_signal_line, pulse=cur_pulse['zi_pulse'])
+                                    dsl.play(signal=cur_signal_line, pulse=cur_pulse['zi_pulse'], **cur_pulse['zi_pulse_params'])
                             elif cur_pulse['type'] == 'pulse_attribute':
                                 if 'set_phase_val' in cur_pulse:
                                     dsl.play(signal=cur_signal_line,pulse=None, set_oscillator_phase=cur_pulse['set_phase_val'])

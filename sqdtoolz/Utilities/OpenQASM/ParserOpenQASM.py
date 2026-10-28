@@ -482,41 +482,41 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
                 case 'gaussian':
                     assert len(argument.arguments) >= 2, "Must provide at least, the duration and amplitude for 'gaussian'."
                     ret_dict = {'type': 'gaussian'}
-                    ret_dict['length'] = self._eval_arg(argument.arguments[0], require_const=require_const)
-                    ret_dict['amplitude'] = self._eval_arg(argument.arguments[1], require_const=require_const)
+                    ret_dict['length'] = self._eval_arg(argument.arguments[0], search_global_scope, require_const=require_const)
+                    ret_dict['amplitude'] = self._eval_arg(argument.arguments[1], search_global_scope, require_const=require_const)
                     if len(argument.arguments) > 2:
                         ret_dict['sigma'] = argument.arguments[2]
                     return ret_dict
                 case 'constant':
                     assert len(argument.arguments) >= 2, "Must provide at least, the duration and amplitude for 'constant'."
                     ret_dict = {'type': 'constant'}
-                    ret_dict['length'] = self._eval_arg(argument.arguments[0], require_const=require_const)
-                    ret_dict['amplitude'] = self._eval_arg(argument.arguments[1], require_const=require_const)
+                    ret_dict['length'] = self._eval_arg(argument.arguments[0], search_global_scope, require_const=require_const)
+                    ret_dict['amplitude'] = self._eval_arg(argument.arguments[1], search_global_scope, require_const=require_const)
                     return ret_dict
                 case 'set_phase':
                     assert len(argument.arguments) == 2, "Must give 2 arguments: the frame (i.e. drive/flux/measure etc.) of the signal line and the phase in radians."
-                    frame_var = self._eval_arg(argument.arguments[0], require_const=require_const)
+                    frame_var = self._eval_arg(argument.arguments[0], search_global_scope, require_const=require_const)
                     assert isinstance(frame_var, SQDDefcalFrame), "The first argument in the play command must be a frame type - e.g. drive($1), flux($2) etc."
-                    angle_var = self._eval_arg(argument.arguments[1], require_const=require_const)
+                    angle_var = self._eval_arg(argument.arguments[1], search_global_scope, require_const=require_const)
                     self._cur_defcal.append( {'type': 'pulse_attribute', 'frame_var':  frame_var, 'set_phase_val':angle_var, 'open_pulse_cmd': 'set_phase'} )
                 case 'shift_phase':
                     assert len(argument.arguments) == 2, "Must give 2 arguments: the frame (i.e. drive/flux/measure etc.) of the signal line and the phase in radians."
-                    frame_var = self._eval_arg(argument.arguments[0], require_const=require_const)
+                    frame_var = self._eval_arg(argument.arguments[0], search_global_scope, require_const=require_const)
                     assert isinstance(frame_var, SQDDefcalFrame), "The first argument in the play command must be a frame type - e.g. drive($1), flux($2) etc."
-                    angle_var = self._eval_arg(argument.arguments[1], require_const=require_const)
+                    angle_var = self._eval_arg(argument.arguments[1], search_global_scope, require_const=require_const)
                     self._cur_defcal.append( {'type': 'pulse_attribute', 'frame_var':  frame_var, 'shift_phase_val':angle_var, 'open_pulse_cmd': 'shift_phase'} )
                 case 'set_frequency':
                     assert len(argument.arguments) == 2, "Must give 2 arguments: the frame (i.e. drive/flux/measure etc.) of the signal line and the phase in radians."
-                    frame_var = self._eval_arg(argument.arguments[0])
+                    frame_var = self._eval_arg(argument.arguments[0], search_global_scope, require_const=require_const)
                     assert isinstance(frame_var, SQDDefcalFrame), "The first argument in the play command must be a frame type - e.g. drive($1), flux($2) etc."
-                    freq_var = self._eval_arg(argument.arguments[1])
+                    freq_var = self._eval_arg(argument.arguments[1], search_global_scope, require_const=require_const)
                     self._cur_defcal.append( {'type': 'pulse_attribute', 'frame_var':  frame_var, 'set_frequency_val':freq_var, 'open_pulse_cmd': 'set_frequency'} )
                 case 'play':
                     # assert self._in_defcal_blk, "The play function is reserved for defcal blocks only."
                     assert len(argument.arguments) == 2, "Must give 2 arguments: the frame (i.e. drive/flux/measure etc.) of the signal line and the waveform."
-                    frame_var = self._eval_arg(argument.arguments[0], search_global_scope=True)
+                    frame_var = self._eval_arg(argument.arguments[0], search_global_scope=True, require_const=require_const)
                     assert isinstance(frame_var, SQDDefcalFrame), "The first argument in the play command must be a frame type - e.g. drive($1), flux($2) etc."
-                    waveform_var = self._eval_arg(argument.arguments[1], search_global_scope=True)
+                    waveform_var = self._eval_arg(argument.arguments[1], search_global_scope=True, require_const=require_const)
                     if isinstance(waveform_var, np.ndarray):
                         waveform_var = {'type': 'sampled', 'samples': waveform_var}
                     self._cur_defcal.append( {'type': 'play', 'frame_var':  frame_var, 'waveform_var':waveform_var} )
@@ -1125,7 +1125,8 @@ class ParserOpenQASM:
                 #####
                 if 'delay' in cur_cmd:
                     t = np.arange(0, cur_cmd['delay'], qubit_params.dt(cur_cmd['frame_var'].line_id))
-                    cur_sequences[cur_target].append((t,t*0))
+                    if t.size > 0:
+                        cur_sequences[cur_target].append((t,t*0))
                     continue
                 match cur_cmd['waveform_var']['type']:
                     case "gaussian":

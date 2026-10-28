@@ -19,6 +19,9 @@ class ScheduleParametersBase:
     
     def get_measurement_params(self, phys_qubit_index:int) -> dict:
         return NotImplementedError()
+    
+    def get_openpulse_restrictions(self) -> dict:
+        return {}
 
     def get_duration2QG(self, qubit1_phys_index:int, qubit2_phys_index:int, gate_type:list) -> dict:
         raise NotImplementedError()

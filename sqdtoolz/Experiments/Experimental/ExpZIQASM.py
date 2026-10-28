@@ -36,10 +36,19 @@ class ExpZIQASM(ExpZIqubit):
         tempQ = self._hal_QPU.get_qubit_obj(qubit_ids[0])
         avail_shfqcs = tempQ._instr_zi.get_shfqcs()
         taken_shfqcs = {x:0 for x in avail_shfqcs}
+        shfqc_LOs = {}
         for cur_qubit in qubit_ids:
-            cur_shfqc = self._hal_QPU.get_qubit_obj(cur_qubit)._zi_instr_phys_measure[0]
+            cur_qubit_obj = self._hal_QPU.get_qubit_obj(cur_qubit)
+            cur_shfqc = cur_qubit_obj._zi_instr_phys_measure[0]
             taken_shfqcs[cur_shfqc] += 1
+            if cur_shfqc in shfqc_LOs:
+                assert shfqc_LOs[cur_shfqc] == cur_qubit_obj.ReadoutLO, "The feedline Readout LOs on multiplexed qubits must all be the same."
+            shfqc_LOs[cur_shfqc] = cur_qubit_obj.ReadoutLO
         kwargs['avail_aux_lines'] = tempQ._instr_zi.get_free_aux_readout_lines(taken_shfqcs)
+        for cur_aux_line in kwargs['avail_aux_lines']:
+            cur_shfqc = kwargs['avail_aux_lines'][cur_aux_line]['shfqc']
+            if cur_shfqc in shfqc_LOs:
+                kwargs['avail_aux_lines'][cur_aux_line]['f_LO'] = shfqc_LOs[cur_shfqc]
 
         assert (qasm_file_path!='') ^ (('qasm_string' in kwargs) and kwargs['qasm_string'] != ''), "Either supply the path to the QASM file ('qasm_file_path') or provide it as a string via the 'qasm_string' parameter."
         main_qasm = kwargs.pop('qasm_string', '')

@@ -284,10 +284,41 @@ def create_experiment(
         if not isinstance(cur_id, str):
             continue    #It's a qubit reservation
         assert cur_id in avail_aux_lines, f"The auxiliary readout line {cur_id} (feedline and tone reservation) is not available in this hardware setup/arrangement. Available ones are: {[x for x in avail_aux_lines]}."
-        dsl.add_signal(f"{cur_id}_measure", connect_to=f"/logical_signal_groups/{avail_aux_lines[cur_id]}/measure")
-        dsl.add_signal(f"{cur_id}_acquire", connect_to=f"/logical_signal_groups/{avail_aux_lines[cur_id]}/acquire")
-        calib[f"{cur_id}_measure"] = SignalCalibration(oscillator=Oscillator(uid=f"{cur_id}_osc", frequency=0.01e9))
-        calib[f"{cur_id}_acquire"] = SignalCalibration(oscillator=Oscillator(uid=f"{cur_id}_osc", frequency=0.01e9))
+        dsl.add_signal(f"{cur_id}_measure", connect_to=f"/logical_signal_groups/{avail_aux_lines[cur_id]['log_conn']}/measure")
+        dsl.add_signal(f"{cur_id}_acquire", connect_to=f"/logical_signal_groups/{avail_aux_lines[cur_id]['log_conn']}/acquire")
+        calib[f"{cur_id}_measure"] = SignalCalibration(oscillator=Oscillator(uid=f"{cur_id}_osc_meas", frequency=0.0e9), local_oscillator=Oscillator(uid=f"{cur_id}_osc_lo", frequency=avail_aux_lines[cur_id]['f_LO']))
+        calib[f"{cur_id}_acquire"] = SignalCalibration(oscillator=Oscillator(uid=f"{cur_id}_osc_acq", frequency=0.0e9), local_oscillator=Oscillator(uid=f"{cur_id}_osc_lo", frequency=avail_aux_lines[cur_id]['f_LO']))
+
+    def process_pulse(cur_pulse, main_blk, freq_sets = {}):
+        cur_signal_line = cur_pulse['frame_var']
+        if cur_signal_line.line_id == 'aux':
+            cur_signal_line = f'{cur_signal_line.qubit_id}_measure'
+        else:
+            cur_signal_line = f'{qubits[cur_signal_line.qubit_id].uid}/{cur_signal_line.line_id}'
+        if cur_pulse['type'] == 'play':
+            if 'delay' in cur_pulse:
+                dsl.delay(signal=cur_signal_line, time=cur_pulse['delay'])
+            else:
+                dsl.play(signal=cur_signal_line, pulse=cur_pulse['zi_pulse'], **cur_pulse['zi_pulse_params'])
+        elif cur_pulse['type'] == 'pulse_attribute':
+            if 'set_phase_val' in cur_pulse:
+                dsl.play(signal=cur_signal_line,pulse=None, set_oscillator_phase=cur_pulse['set_phase_val'])
+            elif 'shift_phase_val' in cur_pulse:
+                dsl.play(signal=cur_signal_line,pulse=None, increment_oscillator_phase=cur_pulse['shift_phase_val'])
+            elif 'set_frequency_val' in cur_pulse:
+                assert not main_blk, "HW limitation: cannot set_frequency outside a normal cal-block. It can only be run once in the beginning for a given signal line."
+                freq_sets[cur_signal_line] = cur_pulse['set_frequency_val']
+
+    #Process initial commands to be run before the acquire loop (i.e. cal block commands)
+    set_frequencies = {}
+    for cur_section in openqasm_schedule['commands']:
+        if cur_section['custom_waveform'] and cur_section['is_cal_blk']:
+            for cur_pulse in cur_section['sequence']:
+                process_pulse(cur_pulse, False, set_frequencies)
+    for cur_freq_set in set_frequencies:
+        cur_lo = calib.calibration_items[cur_freq_set].local_oscillator.frequency
+        cur_if = set_frequencies[cur_freq_set] - cur_lo
+        calib.calibration_items[cur_freq_set].oscillator.frequency = cur_if
 
     # We will fix the length of the measure section to the longest section among
     # the qubits to allow the qubits to have different readout and/or
@@ -327,24 +358,9 @@ def create_experiment(
                     current_section_uid = dsl.active_section().uid
                     le_UIDs.append(current_section_uid)
                     if cur_section['custom_waveform']:
-                        for cur_pulse in cur_section['sequence']:
-                            cur_signal_line = cur_pulse['frame_var']
-                            if cur_signal_line.line_id == 'aux':
-                                cur_signal_line = f'{cur_signal_line.qubit_id}_measure'
-                            else:
-                                cur_signal_line = f'{qubits[cur_signal_line.qubit_id].uid}/{cur_signal_line.line_id}'
-                            if cur_pulse['type'] == 'play':
-                                if 'delay' in cur_pulse:
-                                    dsl.delay(signal=cur_signal_line, time=cur_pulse['delay'])
-                                else:
-                                    dsl.play(signal=cur_signal_line, pulse=cur_pulse['zi_pulse'], **cur_pulse['zi_pulse_params'])
-                            elif cur_pulse['type'] == 'pulse_attribute':
-                                if 'set_phase_val' in cur_pulse:
-                                    dsl.play(signal=cur_signal_line,pulse=None, set_oscillator_phase=cur_pulse['set_phase_val'])
-                                elif 'shift_phase_val' in cur_pulse:
-                                    dsl.play(signal=cur_signal_line,pulse=None, increment_oscillator_phase=cur_pulse['shift_phase_val'])
-                                elif 'set_frequency_val' in cur_pulse:
-                                    qop.set_frequency(qubits[cur_signal_line], cur_pulse['set_frequency_val'])
+                        if not cur_section['is_cal_blk']:   #Don't run if it's already processed as an initial cal block...
+                            for cur_pulse in cur_section['sequence']:
+                                process_pulse(cur_pulse, main_blk=True)
                     elif isinstance(cur_section['qubit_index'], (list,tuple)):
                         cur_qinds = [x for x in cur_section['qubit_index']]
                         cur_qubits = [qubits[x] for x in cur_qinds]

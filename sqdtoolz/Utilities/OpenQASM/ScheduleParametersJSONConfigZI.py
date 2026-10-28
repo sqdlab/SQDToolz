@@ -42,6 +42,9 @@ class ScheduleParametersJSONConfigZI(ScheduleParametersBase):
     def get_measurement_params(self, phys_qubit_index:int):
         return {'duration': self.config_data['Qubits'][phys_qubit_index]['ReadoutTime'], 'align_step': 8e-9}    #Assuming 2Gs/s
 
+    def get_openpulse_restrictions(self) -> dict:
+        return {'set_frequency':'only_cal'}
+
     def get_duration2QG(self, qubit1_phys_index:int, qubit2_phys_index:int, gate_type:list) -> dict:
         #Find the coupler...
         found = False

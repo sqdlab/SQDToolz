@@ -21,6 +21,9 @@ class ScheduleParametersSoftQPUZI(ScheduleParametersBase):
     def get_measurement_params(self, phys_qubit_index:int):
         return {'duration': self._qpu.get_qubit_obj(self.mapping[phys_qubit_index]).get_measure_duration(), 'align_step': 8e-9}    #Assuming 2Gs/s
 
+    def get_openpulse_restrictions(self) -> dict:
+        return {'set_frequency':'only_cal'}
+
     def get_duration2QG(self, qubit1_phys_index:int, qubit2_phys_index:int, gate_type:list) -> dict:
         cur_cplrs = self._qpu.get_qubit_coupling_objs(self.mapping[qubit1_phys_index], self.mapping[qubit2_phys_index])
         assert len(cur_cplrs) != 0, f"There is no 2-qubit coupling between physical qubits {qubit1_phys_index} and {qubit2_phys_index}"

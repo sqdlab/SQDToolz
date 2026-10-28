@@ -53,9 +53,8 @@ class ZILabOneQ(Instrument):
         #TODO: Check if it is SHFQC-16W to unlock 16 demodulations?
         for sid,cur_shfqc in enumerate(self._shfqcs):
             for m in range(8-shfqc_taken_counts[cur_shfqc]):
-                avail_lines[f"aux_{sid}_{m}"] = f"aux_{cur_shfqc}_{m}"
+                avail_lines[f"aux_{sid}_{m}"] = {'log_conn': f"aux_{cur_shfqc}_{m}", 'shfqc': cur_shfqc, 'f_LO': 7e9}
         return avail_lines
-
 
     def get_idn(self):
         return {'vendor': 'Zurich Instruments', 'model': 'everything', 'serial': None, 'firmware': None}

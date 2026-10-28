@@ -13,6 +13,10 @@ const int m = n-1;
 bit[m] c;
 qubit[2] q;
 
+cal
+{
+	set_frequency(aux_0_0, 7.02e9);
+}
 
 defcal cz $0, $1
 {

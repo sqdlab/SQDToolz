@@ -134,6 +134,7 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
         self._bits = {}
         self._in_defcal_blk = False #TODO: Look into whether this is even required?
         self._qreg_phys_mapping = qreg_phys_mapping
+        self._init_cal_cmds = []
         #
         self._total_physical_qubits = total_physical_qubits
         self._in_cal_blk = True
@@ -178,9 +179,11 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
             if self._variables_stack[-1] == None:   #Remove any scoping barriers...
                 self._variables_stack.pop()
     def extract_commands(self):
-        ret_val = self._commands
+        cmds = self._commands
+        init_cal_cmds = self._init_cal_cmds
         self._commands = []
-        return ret_val
+        self._init_cal_cmds = []
+        return cmds, init_cal_cmds
     def add_var_in_cur_scope(self, var_name, var_type, var_value = None, is_const = False):
         if self._in_cal_blk:
             self._variables_cal_stack[-1][var_name] = SQDVariable(var_type, var_value, is_const)
@@ -495,19 +498,19 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
                     frame_var = self._eval_arg(argument.arguments[0], require_const=require_const)
                     assert isinstance(frame_var, SQDDefcalFrame), "The first argument in the play command must be a frame type - e.g. drive($1), flux($2) etc."
                     angle_var = self._eval_arg(argument.arguments[1], require_const=require_const)
-                    self._cur_defcal.append( {'type': 'pulse_attribute', 'frame_var':  frame_var, 'set_phase_val':angle_var} )
+                    self._cur_defcal.append( {'type': 'pulse_attribute', 'frame_var':  frame_var, 'set_phase_val':angle_var, 'open_pulse_cmd': 'set_phase'} )
                 case 'shift_phase':
                     assert len(argument.arguments) == 2, "Must give 2 arguments: the frame (i.e. drive/flux/measure etc.) of the signal line and the phase in radians."
                     frame_var = self._eval_arg(argument.arguments[0], require_const=require_const)
                     assert isinstance(frame_var, SQDDefcalFrame), "The first argument in the play command must be a frame type - e.g. drive($1), flux($2) etc."
                     angle_var = self._eval_arg(argument.arguments[1], require_const=require_const)
-                    self._cur_defcal.append( {'type': 'pulse_attribute', 'frame_var':  frame_var, 'shift_phase_val':angle_var} )
+                    self._cur_defcal.append( {'type': 'pulse_attribute', 'frame_var':  frame_var, 'shift_phase_val':angle_var, 'open_pulse_cmd': 'shift_phase'} )
                 case 'set_frequency':
                     assert len(argument.arguments) == 2, "Must give 2 arguments: the frame (i.e. drive/flux/measure etc.) of the signal line and the phase in radians."
                     frame_var = self._eval_arg(argument.arguments[0])
                     assert isinstance(frame_var, SQDDefcalFrame), "The first argument in the play command must be a frame type - e.g. drive($1), flux($2) etc."
                     freq_var = self._eval_arg(argument.arguments[1])
-                    self._cur_defcal.append( {'type': 'pulse_attribute', 'frame_var':  frame_var, 'set_frequency_val':freq_var} )
+                    self._cur_defcal.append( {'type': 'pulse_attribute', 'frame_var':  frame_var, 'set_frequency_val':freq_var, 'open_pulse_cmd': 'set_frequency'} )
                 case 'play':
                     # assert self._in_defcal_blk, "The play function is reserved for defcal blocks only."
                     assert len(argument.arguments) == 2, "Must give 2 arguments: the frame (i.e. drive/flux/measure etc.) of the signal line and the waveform."
@@ -630,8 +633,11 @@ class SQDQasmVisitor(openqasm3.visitor.QASMVisitor):
         cal_ast = openpulse.parse(f"cal{{{new_source}}}")
         assert not self._in_cal_blk, "Cannot declare a cal statement while already in a defcal/cal block..."
         self._in_cal_blk = True
+        self._cur_defcal = []
         for cur_stmt in cal_ast.statements[0].body:
             self.visit(cur_stmt)
+        if len(self._cur_defcal) > 0:
+            self._init_cal_cmds.append({'type':SQDQasmCommandType.DEF_CAL, 'targets':[], 'play_commands':self._cur_defcal})
         self._in_cal_blk = False
         pass
 
@@ -719,7 +725,7 @@ class ParserOpenQASM:
     def perform_parsing(self):
         self._cregs = {}
         self._visitor = SQDQasmVisitor(self._qreg_phys_mapping, self._total_physical_qubits)
-        self._command_blocks = []
+        self._command_blocks = [[]] #Initial block is for calibration commands...
         for m, cur_file in enumerate(self._overall_includes):
             if cur_file[0] == 'file':
                 ast = openqasm3.parser.parse(self._open_file_strip_comments(cur_file[1]))
@@ -788,9 +794,11 @@ class ParserOpenQASM:
             if isinstance(cur_sub_block, list):
                 for cur_stmt in cur_sub_block:
                     self._visitor.visit(cur_stmt)
-                cur_cmds = self._visitor.extract_commands()
+                cur_cmds, init_cal_cmds = self._visitor.extract_commands()
                 if len(cur_cmds) > 0:
                     self._command_blocks.append(cur_cmds)
+                if len(init_cal_cmds) > 0:
+                    self._command_blocks[0] += init_cal_cmds
             elif isinstance(cur_sub_block, openqasm3.ast.ForInLoop):
                 used_ids = IdentifierCollector().get_identifiers(cur_sub_block.block)
                 #Unroll loop if the looping variable exists within the loop
@@ -844,7 +852,9 @@ class ParserOpenQASM:
         meas_store_ids = {}
         meas_index = 0
         final_blocks = []
-        for cur_block in self._command_blocks:
+        for block_no, cur_block in enumerate(self._command_blocks): #Initial block (block_no=0) is the calibration commands block
+            if len(cur_block) == 0:
+                continue
             final_commands = []
             cur_qubit_commands = {x:[] for x in phys_qubit_ids}
             qubit_sync_times = {x:0 for x in phys_qubit_ids}
@@ -911,7 +921,10 @@ class ParserOpenQASM:
                     cur_seq_lens = {x:0 for x in cur_targ_phys_indices}
                     for cur_phys_qubit_index in cur_targ_phys_indices:
                         cur_seq_lens[cur_phys_qubit_index] = self._calc_seq_len(cur_qubit_commands[cur_phys_qubit_index], params, cur_phys_qubit_index)
-                    new_sync_point = np.max([qubit_sync_times[x]+cur_seq_lens[x] for x in cur_targ_phys_indices])
+                    if len(cur_seq_lens) > 0:
+                        new_sync_point = np.max([qubit_sync_times[x]+cur_seq_lens[x] for x in cur_targ_phys_indices])
+                    else:
+                        new_sync_point = 0
                     ####
                     #Pad/sequence Delays on qubits and add qubit sequences to final command list
                     #
@@ -949,10 +962,11 @@ class ParserOpenQASM:
                                 qubit_sync_times[cur_phys_qubit_index] += cur_delay_cmd[1]
                                 last_sync_command_indices[cur_phys_qubit_index] = len(final_commands)-1
                     elif cur_command['type'] == SQDQasmCommandType.DEF_CAL:
-                        cur_pulse_seq = self._process_defcal_command(cur_command, params)
+                        is_cal_blk = block_no==0    #i.e. only plays in the beginning once
+                        cur_pulse_seq = self._process_defcal_command(cur_command, params, is_cal_blk=is_cal_blk)
                         cur_play_after_index = None if len(final_commands) == 0 else len(final_commands)-1
                         gate_duration = cur_pulse_seq['length']
-                        final_commands.append({'qubit_index': cur_targ_phys_indices, 'custom_waveform':True, 'sequence': cur_pulse_seq['play_commands'], 'after':cur_play_after_index, 'length':gate_duration})
+                        final_commands.append({'qubit_index': cur_targ_phys_indices, 'custom_waveform':True, 'sequence': cur_pulse_seq['play_commands'], 'after':cur_play_after_index, 'length':gate_duration, 'is_cal_blk':is_cal_blk})
                         #Set all gate-sequences on these qubits to be synchronised to come after this new multi-qubit gate...
                         for cur_phys_qubit_index in cur_targ_phys_indices:
                             qubit_sync_times[cur_phys_qubit_index] += gate_duration   #TODO: Must add 2QG time and pass this in - perhaps by a graph?
@@ -988,8 +1002,9 @@ class ParserOpenQASM:
         else:
             assert False, f"A gate is required on axis {axis}. Convert it into equivalent rotations about the basis axes X/Y/Z."
 
-    def _process_defcal_command(self, dict_command:dict, params:ScheduleParametersBase):
+    def _process_defcal_command(self, dict_command:dict, params:ScheduleParametersBase, is_cal_blk:bool):
         pulse_lengths = {}
+        oplsrest = params.get_openpulse_restrictions()
         for cur_target in dict_command['targets']:
             pulse_lengths[('drive', cur_target)] = 0
             pulse_lengths[('flux', cur_target)] = 0
@@ -998,6 +1013,9 @@ class ParserOpenQASM:
         for cur_cmd in dict_command['play_commands']:
             dt_time = params.dt(cur_cmd['frame_var'].line_id)
             if cur_cmd['type'] == 'pulse_attribute':
+                if cur_cmd['open_pulse_cmd'] in oplsrest:
+                    if oplsrest[cur_cmd['open_pulse_cmd']] == 'only_cal':
+                        assert is_cal_blk, f"The {cur_cmd['open_pulse_cmd']} command can only appear in cal blocks to be run once on initialisation."
                 cur_len = 0
             elif 'delay' in cur_cmd:
                 cur_len = self._process_delay(cur_cmd['delay'], dt_time)
@@ -1016,7 +1034,10 @@ class ParserOpenQASM:
                 pulse_lengths[(cur_cmd['frame_var'].line_id, cur_cmd['frame_var'].qubit_id)] = cur_len    #In cases of auxiliary readout pulses...
             else:
                 pulse_lengths[(cur_cmd['frame_var'].line_id, cur_cmd['frame_var'].qubit_id)] += cur_len
-        dict_command['length'] = max([pulse_lengths[x] for x in pulse_lengths])
+        if len(pulse_lengths) > 0:  #It's zero if it's just a cal block without play functions...
+            dict_command['length'] = max([pulse_lengths[x] for x in pulse_lengths])
+        else:
+            dict_command['length'] = 0
         return dict_command
 
     def get_axis_angle_from_unitary(self, unitary_angles):

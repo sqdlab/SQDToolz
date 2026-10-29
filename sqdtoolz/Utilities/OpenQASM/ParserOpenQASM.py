@@ -1800,10 +1800,10 @@ class ParserOpenQASM:
                 return 2**16
         elif acq_mode == 'discrimination':
             if avg_mode == 'singleshotcounts':
-                assert len(leTableMeas) <= 2**16, f"Cannot take this many measurements in a single cycle of acquisition ({len(leTableMeas)} samples cannot fit in 64k)."
-                return int(2**16 / len(leTableMeas))
+                assert len(leTableMeas) <= 2**19, f"Cannot take this many measurements in a single cycle of acquisition ({len(leTableMeas)} samples cannot fit in memory of size 2^19)."
+                return int(2**19 / len(leTableMeas))
             else:
-                return 2**16
+                return 2**16    #TODO: Check this?!
         else:
             return 2**16
 

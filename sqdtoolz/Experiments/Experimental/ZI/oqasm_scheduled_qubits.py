@@ -334,21 +334,21 @@ def create_experiment(
         reset_oscillator_phase=opts.reset_oscillator_phase,
     ):
         ###################
-        with dsl.section(name="init"):
-            init_section_uid = dsl.active_section().uid
-            if opts.active_reset:
-                qop.active_reset(
-                    qubits,
-                    active_reset_states=opts.active_reset_states,
-                    number_resets=opts.active_reset_repetitions,
-                    measure_section_length=max_measure_section_length,
-                )
-            else:
-                for q in qubits:
-                    qop.passive_reset(q)
+        # with dsl.section(name="init"):
+        #     init_section_uid = dsl.active_section().uid
+        #     if opts.active_reset:
+        #         qop.active_reset(
+        #             qubits,
+        #             active_reset_states=opts.active_reset_states,
+        #             number_resets=opts.active_reset_repetitions,
+        #             measure_section_length=max_measure_section_length,
+        #         )
+        #     else:
+        #         for q in qubits:
+        #             qop.passive_reset(q)
         ###################
         le_UIDs = []
-        with dsl.section(name="Main", play_after=init_section_uid):
+        with dsl.section(name="Main"):
             for m,cur_section in enumerate(openqasm_schedule['commands']):
                 if cur_section['after'] != None:
                     after = le_UIDs[cur_section['after']]

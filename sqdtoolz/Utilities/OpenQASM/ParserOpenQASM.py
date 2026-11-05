@@ -1261,6 +1261,7 @@ class ParserOpenQASM:
         df = self.tabulate_schedule(gate_schedule, qubit_params, custom_waveforms=custom_waveforms)
         
         end_times = df['end_time'].to_numpy()
+        repetition_time = np.max(end_times)
         norm_fac, norm_prefix = Miscellaneous.get_metric_multiplier(end_times)
         df['start_time'] /= norm_fac
         df['end_time'] /= norm_fac
@@ -1744,6 +1745,8 @@ class ParserOpenQASM:
         )
 
         bokeh.io.save(layout, output_file_path)
+
+        return repetition_time
 
 
     def check_ZI_compatibility(self, timing_schedule, qasm_qubit_params:ScheduleParametersBase, **kwargs):

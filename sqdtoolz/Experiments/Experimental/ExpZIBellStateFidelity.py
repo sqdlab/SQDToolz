@@ -27,10 +27,6 @@ class ExpZIBellStateFidelity(ExpZIqubit):
         kwargs['coordinate_system'] = kwargs.get('coordinate_system', 'RH')
         assert kwargs['coordinate_system'] in ['LH', 'RH'], "The 'coordinate_system' must be either LH or RH for left/right handed."
 
-        self._file_path_args = {}
-        if 'temp_parent_folder' in kwargs:
-            self._file_path_args = {'temp_parent_folder':kwargs.pop('temp_parent_folder')}
-
         state_prep = """reset q[0];
 reset q[1];
 h q[0]; 

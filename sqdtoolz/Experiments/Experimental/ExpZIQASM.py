@@ -96,9 +96,11 @@ class ExpZIQASM(ExpZIqubit):
 
         # leTable = self._poqasm.tabulate_schedule(self._leSchedule, qasm_qubit_params)
         # for m in range(len(self._leScheduleBlocks['commands'])):
-        self._poqasm.plot_schedule(self._leSchedule, qasm_qubit_params, file_path + 'compiled_qasm_schedule.html')
+        repetition_time = self._poqasm.plot_schedule(self._leSchedule, qasm_qubit_params, file_path + 'compiled_qasm_schedule.html')
 
         self._poqasm.check_ZI_compatibility(self._leSchedule, qasm_qubit_params, **kwargs)
+
+        kwargs['raw_pulse_sheet_duration'] = min(repetition_time*3.5, kwargs.get('raw_pulse_sheet_duration', 1e-3))
 
         #Store the script and the register/measurement mappings
         self._poqasm.save_main_script(file_path + 'main.qasm')

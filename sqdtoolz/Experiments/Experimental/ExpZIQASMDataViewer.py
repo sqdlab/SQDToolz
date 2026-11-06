@@ -87,6 +87,21 @@ class ExpZIQASMDataViewer:
                 cur_data[cur_meas[1]] = self._get_data(self._creg_to_meas_mapping[cur_meas])
         return cur_data
 
+    def get_time_stamps_over_sweeps(self):
+        init_folder = self.data_folder / 'data/m0.h5'
+        assert os.path.exists(init_folder), "This experiment had no active measurements."
+        
+        leData = FileIOReader(init_folder)
+        leTs = leData.get_time_stamps()
+
+        if len(self._meas_params['Sweeps']) > 0:
+            num_slicing_dims = len(self._meas_params['Sweeps'])
+        else:
+            print('Warning: This experiment had no sweeps like shot_repeat etc. So there is only one hardware time-stamp.')
+            return [0]
+        idx = tuple(slice(None) if i < num_slicing_dims else 0 for i in range(leTs.ndim))
+        return (leTs[idx] - np.ndarray.flatten(leTs[idx])[0]) / np.timedelta64(1, 's')
+
     def get_readout_correction_matrices(self, classical_register_name:str, classical_register_index:int|None=None):
         """
         Returns the matrices that will correct the vector of population counts/probabilities (0,1,(2)) when premultiplied.

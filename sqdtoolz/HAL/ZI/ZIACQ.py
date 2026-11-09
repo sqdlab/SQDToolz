@@ -3,6 +3,8 @@ from sqdtoolz.HAL.ZI.ZIbase import ZIbase
 import laboneq.simple as lbeqs
 from laboneq_applications.qpu_types.tunable_transmon import TunableTransmonQubit
 import numpy as np
+import time
+from laboneq.workflow.tasks import compile_experiment, run_experiment
 
 class ZIACQ(HALbase, ZIbase):
     def __init__(self, qubit_name, lab, instr_zi_boxes):
@@ -22,6 +24,7 @@ class ZIACQ(HALbase, ZIbase):
                 'repetition_time': 5e-6
             }
         self._cur_workflow = None
+        self._cur_compiled_expt = None
         if not hasattr(self, '_leSession'):
             self._leSession = lbeqs.Session(self._instr_zi.device_setup)
 
@@ -131,6 +134,7 @@ class ZIACQ(HALbase, ZIbase):
         self.AcquisitionMode = dict_config['AcquisitionMode']
 
         self._cur_workflow = None   #This will be called in init_instruments
+        self._cur_compiled_expt = None
 
     def _process_data_dict(self, data_array, dest_dict, prefix=""):
         if data_array.dtype == np.complex128:
@@ -140,13 +144,23 @@ class ZIACQ(HALbase, ZIbase):
             dest_dict[prefix+'values'] = data_array
 
     def get_data(self):
-        assert self._cur_workflow != None, "ZIACQ must not be in a CONFIG run in a non-ZI compatible experiment. For example, ExpZIqubit would be fine."
-        workflow_results = self._cur_workflow.run()
-        self._temp = workflow_results
+        assert self._cur_workflow != None or self._cur_compiled_expt != None, "ZIACQ must not be in a CONFIG run in a non-ZI compatible experiment. For example, ExpZIqubit would be fine."
+        start_time = time.perf_counter()  # High-resolution start time
+        if self._cur_compiled_expt is None:
+            workflow_results = self._cur_workflow.run()
+            self._temp = workflow_results
+            workflow_results = workflow_results.output
+        else:
+            workflow_results = run_experiment(session=self._leSession, compiled_experiment=self._cur_compiled_expt)
+
+        end_time = time.perf_counter()    # High-resolution end time
+        elapsed_time = end_time - start_time
+        print(f'ACQ-Time: {elapsed_time}')
+        
         ##debugging###
         # print(workflow_results.output)
         ############
-        datasets = [x for x in workflow_results.output.data._prefixes]
+        datasets = [x for x in workflow_results.data._prefixes]
         #Basically store in secondary datasets while leaving data.h5 blank...
         ret_val = {'data': {
                     'parameters' : ['r'],
@@ -155,11 +169,11 @@ class ZIACQ(HALbase, ZIbase):
                 }}
         for cur_dataset in datasets:
             #NOTE: The names cannot have slashes as that will induce a subdataset in HDF5!
-            if hasattr(workflow_results.output.data[cur_dataset], 'result'):
-                if not hasattr(workflow_results.output.data[cur_dataset].result, 'data'):   #i.e. there are sub-datasets like with Dispersive experiment which has g,e,f etc...
-                    cur_sub_datasets = workflow_results.output.data[cur_dataset].result._attr_keys()
+            if hasattr(workflow_results.data[cur_dataset], 'result'):
+                if not hasattr(workflow_results.data[cur_dataset].result, 'data'):   #i.e. there are sub-datasets like with Dispersive experiment which has g,e,f etc...
+                    cur_sub_datasets = workflow_results.data[cur_dataset].result._attr_keys()
                     for cur_subdata in cur_sub_datasets:
-                        cur_res = workflow_results.output.data[cur_dataset].result[cur_subdata]
+                        cur_res = workflow_results.data[cur_dataset].result[cur_subdata]
                         ret_val[str(cur_dataset) + '_' + cur_subdata] = {
                                 #TODO: They allow multiple mappings to a given axis; this is a bit of a hack...
                                 'parameters' : [(x[0].replace('/','_') if isinstance(x, list) else x.replace('/','_')) for x in cur_res.axis_name],
@@ -175,7 +189,7 @@ class ZIACQ(HALbase, ZIbase):
                             ret_val[str(cur_dataset) + '_' + cur_subdata]['parameter_values'][cur_axis_name] = (cur_res.axis[m][0] if isinstance(cur_res.axis[m], list) else cur_res.axis[m])
                         self._process_data_dict(cur_res.data, ret_val[str(cur_dataset) + '_' + cur_subdata]['data'])
                 else:
-                    cur_res = workflow_results.output.data[cur_dataset].result
+                    cur_res = workflow_results.data[cur_dataset].result
                     ret_val[cur_dataset] = {
                             #TODO: They allow multiple mappings to a given axis; this is a bit of a hack...
                             'parameters' : [(x[0].replace('/','_') if isinstance(x, list) else x.replace('/','_')) for x in cur_res.axis_name],
@@ -191,8 +205,8 @@ class ZIACQ(HALbase, ZIbase):
                         ret_val[cur_dataset]['parameter_values'][cur_axis_name] = (cur_res.axis[m][0] if isinstance(cur_res.axis[m], list) else cur_res.axis[m])
                     self._process_data_dict(cur_res.data, ret_val[cur_dataset]['data'])
                     
-            if 'cal_trace' in workflow_results.output.data[cur_dataset]:
-                cur_cal_traces = workflow_results.output.data[cur_dataset].cal_trace
+            if 'cal_trace' in workflow_results.data[cur_dataset]:
+                cur_cal_traces = workflow_results.data[cur_dataset].cal_trace
                 ret_val[cur_dataset + '_calib'] = {
                         'parameters' : ['count'],
                         'data' : {},

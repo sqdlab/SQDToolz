@@ -325,90 +325,94 @@ def create_experiment(
     # integration lengths.
     max_measure_section_length = qpu.measure_section_length(qubits)
     qop = qpu.quantum_operations
-    with dsl.acquire_loop_rt(
-        count=opts.count,
-        averaging_mode=opts.averaging_mode,
-        acquisition_type=opts.acquisition_type,
-        repetition_mode=opts.repetition_mode,
-        repetition_time=opts.repetition_time,
-        reset_oscillator_phase=opts.reset_oscillator_phase,
-    ):
-        ###################
-        # with dsl.section(name="init"):
-        #     init_section_uid = dsl.active_section().uid
-        #     if opts.active_reset:
-        #         qop.active_reset(
-        #             qubits,
-        #             active_reset_states=opts.active_reset_states,
-        #             number_resets=opts.active_reset_repetitions,
-        #             measure_section_length=max_measure_section_length,
-        #         )
-        #     else:
-        #         for q in qubits:
-        #             qop.passive_reset(q)
-        ###################
-        le_UIDs = []
-        with dsl.section(name="Main"):
-            for m,cur_section in enumerate(openqasm_schedule['commands']):
-                if cur_section['after'] != None:
-                    after = le_UIDs[cur_section['after']]
-                else:
-                    after = None
-                with dsl.section(name=f"sec{m}", alignment=SectionAlignment.LEFT, play_after=after, section_timing_mode=section_timing_mode.SectionTimingMode.STRICT):
-                    current_section_uid = dsl.active_section().uid
-                    le_UIDs.append(current_section_uid)
-                    if cur_section['custom_waveform']:
-                        if not cur_section['is_cal_blk']:   #Don't run if it's already processed as an initial cal block...
-                            for cur_pulse in cur_section['sequence']:
-                                process_pulse(cur_pulse, main_blk=True)
-                    elif isinstance(cur_section['qubit_index'], (list,tuple)):
-                        cur_qinds = [x for x in cur_section['qubit_index']]
-                        cur_qubits = [qubits[x] for x in cur_qinds]
-                        edges = [edge for edge in qpu.topology.edges() if {edge.source_node.uid, edge.target_node.uid}=={cur_qubits[0].uid, cur_qubits[1].uid}]
-                        assert len(edges) == 1, "QPU with multiple couplers unsupported for now..."
-                        # edges = [edge for edge in edges if isinstance(edge.quantum_element, TunableTransmonCouplerFixed)]
-                        cur_coupler = edges[0].quantum_element
-                        assert cur_section['sequence'][0] == 'ctrl', "Non ctrl-A 2QGs not supported for now..."
-                        assert cur_section['sequence'][1][0] == 'Z', "Only CZ gates supported natively for now..."
-                        assert np.abs(cur_section['sequence'][1][1]-np.pi) < 1e-7, "Only CZ gates supported natively for now..."
-                        qop.CZ(cur_coupler)
-                    else:
-                        #Process Single-Qubit operations
-                        cur_qubit = qubits[cur_section['qubit_index']]
-                        for cur_gate in cur_section['sequence']:
-                            if cur_gate[0] == 'X' or cur_gate[0] == 'Y':
-                                if (np.abs(cur_gate[1]-np.pi/2) < 1e-7):
-                                    ampl = cur_qubit.parameters.ge_drive_amplitude_pi2
-                                elif (np.abs(cur_gate[1]+np.pi/2) < 1e-7):
-                                    ampl = -cur_qubit.parameters.ge_drive_amplitude_pi2
-                                else:
-                                    ampl = None
-                            if cur_gate[0] == 'X':
-                                qop.rx(cur_qubit, cur_gate[1], amplitude=ampl)
-                            elif cur_gate[0] == 'Y':
-                                qop.ry(cur_qubit, cur_gate[1], amplitude=ampl)
-                            elif cur_gate[0] == 'Z':
-                                if coordinate_system == 'RH':
-                                    qop.rz(cur_qubit, -cur_gate[1])
-                                else:
-                                    qop.rz(cur_qubit, cur_gate[1])
-                            elif cur_gate[0] == 'D':
-                                if cur_gate[1] > 0:
-                                    qop.delay(cur_qubit, cur_gate[1])
-                            elif cur_gate[0] == 'Measure':
-                                qop.measure(cur_qubit, dsl.handles.result_handle(cur_gate[1]))
-                            elif cur_gate[0] == 'Reset':
-                                qop.passive_reset(cur_qubit)
-                pass
+    from laboneq.simple import LinearSweepParameter
+    outer_nt_param = LinearSweepParameter(uid="outer_nt", start=0.1, stop=1.0, count=10)
+    with dsl.sweep(uid="outer_nt_sweep", parameter=outer_nt_param):
 
-        # for q in qubits:
-        #     qop.passive_reset(q)
-        # if opts.use_cal_traces:
-        #     qop.calibration_traces.omit_section(
-        #         qubits=qubits,
-        #         states=opts.cal_states,
-        #         active_reset=opts.active_reset,
-        #         active_reset_states=opts.active_reset_states,
-        #         active_reset_repetitions=opts.active_reset_repetitions,
-        #         measure_section_length=max_measure_section_length,
-        #     )
+        with dsl.acquire_loop_rt(
+            count=opts.count,
+            averaging_mode=opts.averaging_mode,
+            acquisition_type=opts.acquisition_type,
+            repetition_mode=opts.repetition_mode,
+            repetition_time=opts.repetition_time,
+            reset_oscillator_phase=opts.reset_oscillator_phase,
+        ):
+            ###################
+            # with dsl.section(name="init"):
+            #     init_section_uid = dsl.active_section().uid
+            #     if opts.active_reset:
+            #         qop.active_reset(
+            #             qubits,
+            #             active_reset_states=opts.active_reset_states,
+            #             number_resets=opts.active_reset_repetitions,
+            #             measure_section_length=max_measure_section_length,
+            #         )
+            #     else:
+            #         for q in qubits:
+            #             qop.passive_reset(q)
+            ###################
+            le_UIDs = []
+            with dsl.section(name="Main"):
+                for m,cur_section in enumerate(openqasm_schedule['commands']):
+                    if cur_section['after'] != None:
+                        after = le_UIDs[cur_section['after']]
+                    else:
+                        after = None
+                    with dsl.section(name=f"sec{m}", alignment=SectionAlignment.LEFT, play_after=after, section_timing_mode=section_timing_mode.SectionTimingMode.STRICT):
+                        current_section_uid = dsl.active_section().uid
+                        le_UIDs.append(current_section_uid)
+                        if cur_section['custom_waveform']:
+                            if not cur_section['is_cal_blk']:   #Don't run if it's already processed as an initial cal block...
+                                for cur_pulse in cur_section['sequence']:
+                                    process_pulse(cur_pulse, main_blk=True)
+                        elif isinstance(cur_section['qubit_index'], (list,tuple)):
+                            cur_qinds = [x for x in cur_section['qubit_index']]
+                            cur_qubits = [qubits[x] for x in cur_qinds]
+                            edges = [edge for edge in qpu.topology.edges() if {edge.source_node.uid, edge.target_node.uid}=={cur_qubits[0].uid, cur_qubits[1].uid}]
+                            assert len(edges) == 1, "QPU with multiple couplers unsupported for now..."
+                            # edges = [edge for edge in edges if isinstance(edge.quantum_element, TunableTransmonCouplerFixed)]
+                            cur_coupler = edges[0].quantum_element
+                            assert cur_section['sequence'][0] == 'ctrl', "Non ctrl-A 2QGs not supported for now..."
+                            assert cur_section['sequence'][1][0] == 'Z', "Only CZ gates supported natively for now..."
+                            assert np.abs(cur_section['sequence'][1][1]-np.pi) < 1e-7, "Only CZ gates supported natively for now..."
+                            qop.CZ(cur_coupler)
+                        else:
+                            #Process Single-Qubit operations
+                            cur_qubit = qubits[cur_section['qubit_index']]
+                            for cur_gate in cur_section['sequence']:
+                                if cur_gate[0] == 'X' or cur_gate[0] == 'Y':
+                                    if (np.abs(cur_gate[1]-np.pi/2) < 1e-7):
+                                        ampl = cur_qubit.parameters.ge_drive_amplitude_pi2
+                                    elif (np.abs(cur_gate[1]+np.pi/2) < 1e-7):
+                                        ampl = -cur_qubit.parameters.ge_drive_amplitude_pi2
+                                    else:
+                                        ampl = None
+                                if cur_gate[0] == 'X':
+                                    qop.rx(cur_qubit, cur_gate[1], amplitude=ampl)
+                                elif cur_gate[0] == 'Y':
+                                    qop.ry(cur_qubit, cur_gate[1], amplitude=ampl)
+                                elif cur_gate[0] == 'Z':
+                                    if coordinate_system == 'RH':
+                                        qop.rz(cur_qubit, -cur_gate[1])
+                                    else:
+                                        qop.rz(cur_qubit, cur_gate[1])
+                                elif cur_gate[0] == 'D':
+                                    if cur_gate[1] > 0:
+                                        qop.delay(cur_qubit, cur_gate[1])
+                                elif cur_gate[0] == 'Measure':
+                                    qop.measure(cur_qubit, dsl.handles.result_handle(cur_gate[1]))
+                                elif cur_gate[0] == 'Reset':
+                                    qop.passive_reset(cur_qubit)
+                    pass
+
+            # for q in qubits:
+            #     qop.passive_reset(q)
+            # if opts.use_cal_traces:
+            #     qop.calibration_traces.omit_section(
+            #         qubits=qubits,
+            #         states=opts.cal_states,
+            #         active_reset=opts.active_reset,
+            #         active_reset_states=opts.active_reset_states,
+            #         active_reset_repetitions=opts.active_reset_repetitions,
+            #         measure_section_length=max_measure_section_length,
+            #     )

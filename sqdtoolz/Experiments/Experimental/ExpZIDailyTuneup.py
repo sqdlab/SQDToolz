@@ -17,6 +17,7 @@ import matplotlib.gridspec
 from pathlib import Path
 import datetime
 import shutil
+import os
 
 class ExpZIDailyTuneup:
     def __init__(self, name, expt_config, hal_QPU, qubit_id, **kwargs):
@@ -64,7 +65,12 @@ class ExpZIDailyTuneup:
             self._file_path_args = {'temp_parent_folder':kwargs.pop('temp_parent_folder')}
 
         self._kwargs = kwargs
-        self._config_filename = None
+
+        #Master config file - for reload in the case of a failed calibration. If it is not provided, it will
+        #simply create a temporary configuration of the current state to which it will revert...
+        self._save_init_state_config = 'master_config_json' in kwargs
+        self._config_filename = kwargs.pop('master_config_json', 'temp.json')
+        
         self._config_summary = None
     
     def run(self, lab):
@@ -72,6 +78,13 @@ class ExpZIDailyTuneup:
         print(f"#################")   
         print(f"# - TUNEUP {self._qubit_id} - #")
         print(f"#################")   
+
+        # check for existing master config, or write one if necessary
+        if self._save_init_state_config:
+            print(f"Using pre-existing master config ({self._config_filename}).")
+        else:
+           self._qpu.save_config(lab, self._config_filename, additional_specs=['Readout_GE', 'Readout_GEF'])
+           print(f"Saved QPU configuration to master config file ({self._config_filename}).")
 
         # self._expt_config._hal_ACQ.NumRepetitions = 1024; 
         self._expt_config._hal_ACQ.AveragingOrder = "DEFAULT"; 
@@ -108,11 +121,11 @@ class ExpZIDailyTuneup:
             if self._update_live:
                 lab.SPEC(self._spec_name_ROGEF).commit_entries()
                 exp.update_qubits_by_fidelity(state_fidelity='gef')
-                lab.SPEC(self._spec_name_ROGEF).update_entries()
+                lab.SPEC(self._spec_name_ROGEF).update_entries(filter_only_prefix=self._qubit_id)
                 #
                 lab.SPEC(self._spec_name_ROGE).commit_entries()
                 exp.update_qubits_by_fidelity(state_fidelity='ge')
-                lab.SPEC(self._spec_name_ROGE).update_entries()
+                lab.SPEC(self._spec_name_ROGE).update_entries(filter_only_prefix=self._qubit_id)
                 new_ge = self._qubit.FidelityReadout
                 new_freq_ge = self._qubit.ReadoutFrequency
                 print(f"\t(ge) f_r = {prev_freq_ge*1e-9:.6f} GHz -> {new_freq_ge*1e-9:.6f} GHz")
@@ -130,13 +143,15 @@ class ExpZIDailyTuneup:
             self._expt_config.update_SPECs([self._spec_name_ROGEF])
             exp = ExpZIqubit(f'DailyTuneup_{self._qubit_id}_TimeTraces', self._expt_config, time_traces, self._qpu, [self._qubit_id], states='gef', update=self._update_live, skip_ZI_analysis=False, ZI_plot=self._individual_plots)
             lab.run_single(exp, raw_pulse_sheet_duration=1e-3, **self._file_path_args)
-            lab.SPEC(self._spec_name_ROGEF).update_entries()
+            self._qubit.ReadoutKernelType = "optimal"
+            lab.SPEC(self._spec_name_ROGEF).update_entries(filter_only_prefix=self._qubit_id)
             #
             self._qubit.ReadoutKernelType = "default"
             self._expt_config.update_SPECs([self._spec_name_ROGE])
             exp = ExpZIqubit(f'DailyTuneup_{self._qubit_id}_TimeTraces', self._expt_config, time_traces, self._qpu, [self._qubit_id], states='ge', update=self._update_live, skip_ZI_analysis=False, ZI_plot=self._individual_plots)
             lab.run_single(exp, raw_pulse_sheet_duration=1e-3, **self._file_path_args)
-            lab.SPEC(self._spec_name_ROGE).update_entries()
+            self._qubit.ReadoutKernelType = "optimal"
+            lab.SPEC(self._spec_name_ROGE).update_entries(filter_only_prefix=self._qubit_id)
             #
             # self._expt_config._hal_ACQ.NumRepetitions = 1024; 
             # self._expt_config.commit()
@@ -155,7 +170,7 @@ class ExpZIDailyTuneup:
                 lab.run_single(exp, raw_pulse_sheet_duration=1e-3, **self._file_path_args)
                 self._qubit.ReadoutKernelType = 'optimal'       
                 exp.get_correction_matrices(update=self._update_live)
-                lab.SPEC(self._spec_name_ROGE).update_entries()
+                lab.SPEC(self._spec_name_ROGE).update_entries(filter_only_prefix=self._qubit_id)
                 #
                 self._expt_config.update_SPECs([self._spec_name_ROGEF])
                 lab.SPEC(self._spec_name_ROGEF).commit_entries()     #Needed as ZI compilation checks are run before SPECs are committed...
@@ -164,7 +179,7 @@ class ExpZIDailyTuneup:
                 lab.run_single(exp, raw_pulse_sheet_duration=1e-3, **self._file_path_args)
                 self._qubit.ReadoutKernelType = 'optimal'
                 exp.get_correction_matrices(update=self._update_live)
-                lab.SPEC(self._spec_name_ROGEF).update_entries()    
+                lab.SPEC(self._spec_name_ROGEF).update_entries(filter_only_prefix=self._qubit_id)    
 
         ##############################
         #
@@ -307,20 +322,17 @@ class ExpZIDailyTuneup:
         # if the config file already exists, back it up to /config_backups/
         config_datestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M')
         if tuneup_pass==True:
+            # TODO: figure out archiving etc.
             print(f'{self._qubit_id}: Tuneup passed!')
             if self._save_config:
-                config_filename = str(config_datestamp) + '_QPU_config.json'
-                config_filepath = Path(config_filename)
-                if config_filepath.exists():
-                    Path('/Config_backups').mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(config_filepath, Path('/Config_backups') / config_filename)
-                self._qpu.save_config(lab, file_name=config_filename, additional_specs=[self._spec_name_ROGE, self._spec_name_ROGEF])
-                print(f'\nSaved QPU configuration to {config_filename} - updated {self._qubit_id}.')
-                self._config_filename = config_filename
+                self._qpu.save_config(lab, file_name=self._config_filename, additional_specs=[self._spec_name_ROGE, self._spec_name_ROGEF])
+                print(f'\nUpdated QPU configuration at {self._config_filename} for {self._qubit_id}.')
             # summary json for website update
             if self._save_summary_config_from_json:
-                SOFTqpu.create_summary_config_from_json(json_file_path=config_filename, summary_output_json_file_path=self._summary_json_file)
+                SOFTqpu.create_summary_config_from_json(json_file_path=self._config_filename, summary_output_json_file_path=self._summary_json_file)
                 print(f'Saved cloud summary to {self._summary_json_file} - updated {self._qubit_id}.')
         else:
-            print(f"WARNING: {self._qubit_id} Tuneup fail - no config saved.")
+            print(f"WARNING: {self._qubit_id} Tuneup fail - no config saved. Reloading QPU state according to master config file ({self._config_filename}).")
+            self._qpu.load_config(lab, file_path=self._config_filename)
+
         print(f"##############################\n\n")

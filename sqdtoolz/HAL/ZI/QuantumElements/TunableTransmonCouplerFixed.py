@@ -31,7 +31,8 @@ class TunableTransmonCouplerFixedParameters(QuantumParameters):
     Amplitude: float = 0.5
     AmplitudeAux: float = 0.0
     Length: float = 250e-9
-    Pulse: dict = attrs.field(factory=lambda: {"function": "gaussian_square", "sigma": 0.5, "samples": None, "precomp_kernel" : None})
+    Pulse: dict = attrs.field(factory=lambda: {"function": "gaussian_square", "sigma": 0.5})
+    PulseAux: dict = attrs.field(factory=lambda: {"function": "square", "duty_cycle": 0.75, "mit_pad": 0.0})
     CompZAngle: float = None
     CompZAngleAux: float = None
     CompZAngleStationary: float = None
@@ -95,7 +96,7 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
         aux_signal = q.signals.get("flux_aux")
         if aux_signal is not None:
             pulse_parameters = {"function": "gaussian_square", "sigma": 0.5}
-            flux_pulse_aux, aux_amp_Fac = TunableTransmonCouplerFixedOperations._process_pulse(self, q, 'flux_aux', q.parameters.Pulse)
+            flux_pulse_aux, aux_amp_Fac = TunableTransmonCouplerFixedOperations._process_pulse(self, q, 'flux_aux', q.parameters.PulseAux)
             aux_amp = amplitude_aux if amplitude_aux is not None else q.parameters.AmplitudeAux
             dsl.play(
                 aux_signal,
@@ -116,6 +117,8 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
         leAmplitude = amplitude if amplitude != None else q.parameters.Amplitude
         if length is None:
             length = q.parameters.Length
+
+        # play the main pulse
         dsl.play(
             q.signals['flux'],
             amplitude=leAmplitude*amp_fac,
@@ -132,9 +135,10 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
                 increment_oscillator_phase=q.parameters.CompZAngle,
             )
 
+        # play auxiliary pulse (if compatible) 
         aux_signal = q.signals.get("flux_aux")
         if aux_signal is not None:
-            flux_pulse_aux, aux_amp_Fac = TunableTransmonCouplerFixedOperations._process_pulse(self, q, 'flux_aux', q.parameters.Pulse)
+            flux_pulse_aux, aux_amp_Fac = TunableTransmonCouplerFixedOperations._process_pulse(self, q, 'flux_aux', q.parameters.PulseAux)
             amplitude_aux = q.parameters.AmplitudeAux
             dsl.play(
                 aux_signal,

@@ -43,6 +43,13 @@ class Flattenator:
             num_samples_missing - If the step response is given later with a few samples dropped, the optimiser accounts for this and only looks after num_samples_missing points
             plot_response - Plot the model fitting if True.            
         """
+        step_resp = np.asarray(step_resp, dtype=float)
+
+        # Fail early with a clear message if the data itself is bad
+        if not np.all(np.isfinite(step_resp)):
+            n_bad = np.count_nonzero(~np.isfinite(step_resp))
+            raise ValueError(f"step_resp contains {n_bad} non-finite value(s) (NaN/inf); clean or interpolate the data before fitting.")
+
         N = step_resp.shape[0] + num_samples_missing
         num_zeros = num_poles - 1 if num_zeros is None else num_zeros
         assert num_zeros <= num_poles, "A causal BIBO stable system cannot have zeroes exceeding the number of poles (within the unit-circle)."
@@ -59,8 +66,16 @@ class Flattenator:
             x0 += [0.8, 0.5]
         if num_zeros % 2:  #Real Pole if odd order
             x0 += [0.0]
-        #Gain
-        x0 += [step_resp[-1]]   #Take the steady-state value as the estimated gain
+            
+        # Gain: steady-state estimate, averaged over the last few samples for robustness
+        tail = step_resp[-max(1, min(10, step_resp.shape[0] // 10)):]
+        gain0 = float(np.mean(tail))
+        if not np.isfinite(gain0) or gain0 == 0.0:
+            gain0 = 1.0
+        x0 += [gain0]
+
+        # #Gain
+        # x0 += [step_resp[-1]]   #Take the steady-state value as the estimated gain
 
         #Bounds: poles must be strictly within unit circle while zeroes can live anywhere.
         lbs, hbs = [], []
@@ -81,6 +96,14 @@ class Flattenator:
         #Gain
         lbs += [-np.inf]
         hbs += [np.inf]
+
+        # Force the initial guess strictly inside the bounds
+        x0 = np.asarray(x0, dtype=float)
+        lbs = np.asarray(lbs, dtype=float)
+        hbs = np.asarray(hbs, dtype=float)
+        span = np.where(np.isfinite(hbs - lbs), hbs - lbs, 1.0)   # fall back to 1.0 if a bound is infinite
+        margin = 1e-3 * span
+        x0 = np.clip(x0, lbs + margin, hbs - margin)
 
         def step_resp_sim_zpk(x):
             z, p, k = Flattenator._pack_poles_zeroes_gain(x, num_poles, num_zeros)

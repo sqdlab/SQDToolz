@@ -24,6 +24,7 @@ class ExpZIFixedCouplerTuneup:
         self._individual_plots = kwargs.pop('individual_plots', False)
         self._update_live = kwargs.pop('update_params_live', True)
         self._enable_ZI_log_messages = kwargs.pop('enable_ZI_log_messages', False)
+        self._time_fit_type = kwargs.pop('time_fit_type', 'spline')
 
         cur_coupler = hal_QPU.get_coupler_obj_from_qubits(qubit_ids[0],qubit_ids[1], TunableTransmonCouplerFixed)
 
@@ -36,7 +37,7 @@ class ExpZIFixedCouplerTuneup:
             assert not 'flux_amp_span' in kwargs, "Do not supply 'flux_amp_span' if supplying 'flux_amp_range'"
             assert not 'flux_amp_points' in kwargs, "Do not supply 'flux_amp_points' if supplying 'flux_amp_range'"
         else:
-            amp_span = kwargs.pop('flux_amp_span', 0.05)
+            amp_span = kwargs.pop('flux_amp_span', 0.02)
             amp_points = kwargs.pop('flux_amp_points', 11)
             self._flux_amp_range = cur_coupler.Amplitude + np.linspace(-amp_span/2, amp_span/2, amp_points)
         if 'wait_times' in kwargs:
@@ -44,8 +45,8 @@ class ExpZIFixedCouplerTuneup:
             assert not 'wait_time_max' in kwargs, "Do not supply 'wait_time_max' if supplying 'wait_times'"
             assert not 'wait_time_points' in kwargs, "Do not supply 'wait_time_points' if supplying 'wait_times'"
         else:
-            max_wait_time = kwargs.pop('wait_time_max', 250e-9)
-            max_wait_points = kwargs.pop('wait_time_points', 30)
+            max_wait_time = kwargs.pop('wait_time_max', 150e-9)
+            max_wait_points = kwargs.pop('wait_time_points', 31)
             self._wait_times = np.linspace(1e-9,max_wait_time, max_wait_points)
 
         if np.max(self._flux_amp_range) > 1.0:
@@ -133,15 +134,15 @@ class ExpZIFixedCouplerTuneup:
         # dPkt = dFit.get_fitted_plot(data_x*1e9,data_y, dontplot=True)
         # ax11.plot(data_x_fine, dFit.get_plot_data_from_dpkt(data_x_fine*1e9, dPkt))
         #Run a spline fit
-        leSpline = scipy.interpolate.CubicSpline(data_x , data_y)
+        leSpline = scipy.interpolate.make_smoothing_spline(data_x , data_y, lam=None)   #lam=None -> Finds smoothing parameter automatically via generalised cross-validation (GCV)?
         data_x_fine = np.linspace(np.min(data_x), np.max(data_x), data_x.size*3)
         ax11.plot(data_x_fine, leSpline(data_x_fine))
         #Use the spline fit to find the extremum
         cs_der = leSpline.derivative()
         cs_der2 = leSpline.derivative(2)
-        roots = cs_der.roots()
+        cs_der_pp = scipy.interpolate.PPoly.from_spline(cs_der)
         peaks_x = []
-        for r in roots:
+        for r in cs_der_pp.roots():
             if data_x_fine[0] <= r <= data_x_fine[-1]:
                 if cs_der2(r) < 0 and self._extremum_type=='max':
                     peaks_x.append(r)

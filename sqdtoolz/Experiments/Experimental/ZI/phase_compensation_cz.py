@@ -236,7 +236,7 @@ def create_experiment(
                 with dsl.section(name="pre_drive", alignment=SectionAlignment.LEFT):
                     # [ h ]
                     qop.rz.omit_section(q_comp, angle=np.pi)
-                    qop.ry.omit_section(q_comp, angle=np.pi/2)
+                    qop.ry.omit_section(q_comp, angle=-np.pi/2)
                     pre_drive_uid = dsl.active_section().uid
 
                 with dsl.section(name="flux_pulse", alignment=SectionAlignment.RIGHT, play_after=pre_drive_uid):
@@ -253,14 +253,14 @@ def create_experiment(
             #             # [ cz ]
             #             qop.CZ.omit_section(the_coupler)
 
-            with dsl.section(name="main_phase_comp", alignment=SectionAlignment.RIGHT):
+            with dsl.section(name="main_phase_comp", alignment=SectionAlignment.RIGHT, length=1e-9):
                 # [ rz(theta) ]
                 qop.rz.omit_section(q_comp, angle=zangle_sweep_pars)
 
             with dsl.section(name="post_drive", alignment=SectionAlignment.LEFT):
                 # [ h ]
                 qop.rz.omit_section(q_comp, angle=np.pi)
-                qop.ry.omit_section(q_comp, angle=np.pi/2)
+                qop.ry.omit_section(q_comp, angle=-np.pi/2)
 
             with dsl.section(name="main_measure", alignment=SectionAlignment.LEFT):
                 sec = qop.measure(q_comp, dsl.handles.result_handle(q_comp.uid))

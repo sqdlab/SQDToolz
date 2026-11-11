@@ -325,10 +325,10 @@ def create_experiment(
     # integration lengths.
     max_measure_section_length = qpu.measure_section_length(qubits)
     qop = qpu.quantum_operations
-    from laboneq.simple import LinearSweepParameter
-    outer_nt_param = LinearSweepParameter(uid="outer_nt", start=0.1, stop=1.0, count=10)
-    with dsl.sweep(uid="outer_nt_sweep", parameter=outer_nt_param):
+    from laboneq.simple import SweepParameter
+    outer_nt_param = SweepParameter(uid="outer_nt", values=np.arange(4))
 
+    with dsl.sweep(uid="outer_nt_sweep", parameter=outer_nt_param):
         with dsl.acquire_loop_rt(
             count=opts.count,
             averaging_mode=opts.averaging_mode,

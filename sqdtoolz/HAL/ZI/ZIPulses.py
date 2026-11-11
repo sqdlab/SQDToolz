@@ -82,11 +82,12 @@ def impulse(x, relative_location=0.0, num_samples=1, **_):
     return res
 
 @pulse_library.register_pulse_functional
-def square(x, duty_cycle=0.5, **_):
+def square(x, duty_cycle=0.5, mit_pad=0.0, **_):
     x = np.asarray(x, dtype=float)
     num_samples = len(x)
-    pulse_on = int(duty_cycle*num_samples) 
-    pulse = [1] * pulse_on + [0] * (num_samples - pulse_on)
+    pulse_on = int(duty_cycle*num_samples)
+    pulse_del = int(mit_pad*num_samples) 
+    pulse = [0] * pulse_del + [1] * pulse_on + [0] * (num_samples - pulse_on - pulse_del)
     assert len(pulse) == len(x)
     return np.asarray(pulse)
 

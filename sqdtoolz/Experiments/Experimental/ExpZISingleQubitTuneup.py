@@ -305,7 +305,7 @@ class ExpZISingleQubitTuneup:
             # fine tuning...
             # print("\nCalibrating Drag pulses (fine)...")
             self._expt_config._hal_ACQ.NumRepetitions = self._kwargs.get('num_repetitions_fine', 1024*4); self._expt_config.commit()
-            q_scalings_fine = np.linspace(-0.01, 0.01, 15) + best_q
+            q_scalings_fine = np.linspace(-0.02, 0.02, 15) + best_q
             exp = ExpZIDragScaling(f'drag_scaling_{self._qubit_id}', self._expt_config, self._qpu, [self._qubit_id], q_scalings=[q_scalings_fine], update=self._update_live, ZI_plot=self._individual_plots, dont_show_plot=not self._individual_plots)
             lab.run_single(exp, **self._file_path_args)
             ax.clear()
@@ -339,7 +339,6 @@ class ExpZISingleQubitTuneup:
         print("\nCalibrating X Gates...")
         max_iterations = self._kwargs.get('max_calibX_iterations', 10)
         exp = None
-        prev_angle = None
         angle_best = None
         drive_ge_best = self._qubit.DriveGEAmplitudeX
         prev = self._qubit.DriveGEAmplitudeX # save original value
@@ -357,39 +356,33 @@ class ExpZISingleQubitTuneup:
             cur_angle = exp._fit_data[0]['data']['angle']
             # print(f"Iteration {iter}: {cur_angle:.6f} degrees")
 
+            # track the best *measured* amplitude
+            improved = angle_best is None or abs(180 - cur_angle) < abs(180 - angle_best)
+            if improved:
+                angle_best = cur_angle
+                drive_ge_best = self._qubit.DriveGEAmplitudeX
+
             # exit if current angle is below threshold
             if abs(180 - cur_angle) < self._threshold_X:
-                angle_best = cur_angle
-                drive_ge_best = self._qubit.DriveGEAmplitudeX
                 print(f"Threshold reached on X gate after {iter} iterations: err = {abs(180 - cur_angle):.6f} < {self._threshold_X} ")
                 break
-            # if this iteration was worse than the previous, reinstantiate the previous DriveGEAmplitudeX and try again
-            elif prev_angle is not None and abs(180-cur_angle) > abs(180-prev_angle):
-                print(f"Iteration {iter}: setting updated amplitude to previous")
+            # final iteration: restore best measured amplitude and exit (never leave an unmeasured amplitude)
+            if iter == max_iterations - 1:
                 self._qubit.DriveGEAmplitudeX = drive_ge_best
-                # still try another update (we can revert if it's worse)
-                reverse_parity = not self._reverse_parity_calibX if iter % 2 == 0 else self._reverse_parity_calibX
-                exp.update_qubits(reverse_parity=reverse_parity)
-                if self._qubit.DriveGEAmplitudeX > 1:
-                    self._qubit.DriveGEAmplitudeX = 1
-            # print exit message if final iteration
-            elif iter == max_iterations - 1:
-                self._qubit.DriveGEAmplitudeX = drive_ge_best
-                print(f"WARNING: X gate unable to reach threshold, exiting with {angle_best:.6f} degree X gate.")
-            # otherwise, update the angle and try again
-            else:
-                print(f"Iteration {iter}: gate improved, updating to {cur_angle:.6f} ")
-                drive_ge_best = self._qubit.DriveGEAmplitudeX
-                reverse_parity = self._reverse_parity_calibX
-                if iter % 2 == 0:
-                    reverse_parity = not reverse_parity
-                exp.update_qubits(reverse_parity=reverse_parity)
-                angle_best = cur_angle
-                prev_angle = cur_angle
+                print(f"WARNING: X gate unable to reach threshold after {iter} iterations, exiting with {angle_best:.6f} degree X gate.")
+                break
 
-                # safety check if amplitude goes over 1
-                if self._qubit.DriveGEAmplitudeX > 1:
-                    self._qubit.DriveGEAmplitudeX = 1
+            # if improved:
+            #     print(f"Iteration {iter}: gate improved, updating to {cur_angle:.6f} ")
+            # else:
+            #     print(f"Iteration {iter}: worse than best ({angle_best:.6f}), updating from current measurement")
+            # update from the amplitude that was actually measured
+            reverse_parity = not self._reverse_parity_calibX if iter % 2 == 0 else self._reverse_parity_calibX
+            exp.update_qubits(reverse_parity=reverse_parity)
+
+            # safety check if amplitude goes over 1
+            if self._qubit.DriveGEAmplitudeX > 1:
+                self._qubit.DriveGEAmplitudeX = 1
 
         # final check
         lab.run_single(exp, skip_timing_diagrams=True, **self._file_path_args)
@@ -412,7 +405,6 @@ class ExpZISingleQubitTuneup:
         print("\nCalibrating X/2 Gates...")
         max_iterations = self._kwargs.get('max_calibX_iterations', 10)
         exp = None
-        prev_angle = None
         angle_best = None
         drive_geOn2_best = self._qubit.DriveGEAmplitudeXon2
         prev = self._qubit.DriveGEAmplitudeXon2 # save original value
@@ -430,38 +422,33 @@ class ExpZISingleQubitTuneup:
             cur_angle = exp._fit_data[0]['data']['angle']
             print(f"Iteration {iter}: {cur_angle:.6f} degrees")
 
+            # track the best *measured* amplitude
+            improved = angle_best is None or abs(90 - cur_angle) < abs(90 - angle_best)
+            if improved:
+                angle_best = cur_angle
+                drive_geOn2_best = self._qubit.DriveGEAmplitudeXon2
+
             # exit if current angle is below threshold
             if abs(90 - cur_angle) < self._threshold_Xon2:
-                angle_best = cur_angle
-                drive_geOn2_best = self._qubit.DriveGEAmplitudeXon2
                 print(f"Threshold reached on X/2 gate after {iter} iterations: err = {abs(90 - cur_angle):.6f} < {self._threshold_Xon2} ")
                 break
-            # if this iteration was worse than the previous, reinstantiate the previous DriveGEAmplitudeXon2 and try again
-            elif prev_angle is not None and abs(90-cur_angle) > abs(90-prev_angle):
-                print(f"Iteration {iter}: setting updated amplitude to previous")
+            # final iteration: restore best measured amplitude and exit (never leave an unmeasured amplitude)
+            if iter == max_iterations - 1:
                 self._qubit.DriveGEAmplitudeXon2 = drive_geOn2_best
-                # still try another update (we can revert if it's worse)
-                reverse_parity = not self._reverse_parity_calibX if iter % 2 == 0 else self._reverse_parity_calibX
-                exp.update_qubits(reverse_parity=reverse_parity)
-                if self._qubit.DriveGEAmplitudeXon2 > 1:
-                    self._qubit.DriveGEAmplitudeXon2 = 1
-            # print exit message if final iteration
-            elif iter == max_iterations - 1:
-                self._qubit.DriveGEAmplitudeXon2 = drive_geOn2_best
-                print(f"WARNING: Xon2 gate unable to reach threshold, exiting with {angle_best:.6f} degree X/2 gate.")
-            # otherwise, update the angle and try again
-            else:
-                print(f"Iteration {iter}: gate improved, updating to {cur_angle:.6f} ")
-                drive_geOn2_best = self._qubit.DriveGEAmplitudeXon2
-                reverse_parity = self._reverse_parity_calibX
-                if iter % 2 == 0:
-                    reverse_parity = not reverse_parity
-                exp.update_qubits(reverse_parity=reverse_parity)
-                angle_best = cur_angle
-                prev_angle = cur_angle
-                # safety check if amplitude goes over 1
-                if self._qubit.DriveGEAmplitudeXon2 > 1:
-                    self._qubit.DriveGEAmplitudeXon2 = 1
+                print(f"WARNING: Xon2 gate unable to reach threshold after {iter} iterations, exiting with {angle_best:.6f} degree X/2 gate.")
+                break
+
+            # if improved:
+            #     print(f"Iteration {iter}: gate improved, updating to {cur_angle:.6f} ")
+            # else:
+            #     print(f"Iteration {iter}: worse than best ({angle_best:.6f}), updating from current measurement")
+            # update from the amplitude that was actually measured
+            reverse_parity = not self._reverse_parity_calibX if iter % 2 == 0 else self._reverse_parity_calibX
+            exp.update_qubits(reverse_parity=reverse_parity)
+
+            # safety check if amplitude goes over 1
+            if self._qubit.DriveGEAmplitudeXon2 > 1:
+                self._qubit.DriveGEAmplitudeXon2 = 1
 
         # final check
         lab.run_single(exp, skip_timing_diagrams=True, **self._file_path_args)
@@ -471,9 +458,6 @@ class ExpZISingleQubitTuneup:
 
         new = self._qubit.DriveGEAmplitudeXon2 # new updated value
         print(f"\tX/2 amplitude = {prev:.6g} -> {new:.6g}")
-
-        # if self._kwargs.get('assert_gate_calibration', False):
-        #     assert abs(90 - angle_best) < self._threshold_Xon2, f"Gate calibration did not pass error threshold: {abs(90 - angle_best):.6f} > {self._threshold_Xon2:.6f}."
 
         lab.group_close()
         fig.savefig(str(Path(exp._file_path).parent) + '/FinetuneOverview.png')

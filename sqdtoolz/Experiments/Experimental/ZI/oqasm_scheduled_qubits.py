@@ -328,15 +328,15 @@ def create_experiment(
     from laboneq.simple import SweepParameter
     outer_nt_param = SweepParameter(uid="outer_nt", values=np.arange(4))
 
-    with dsl.sweep(uid="outer_nt_sweep", parameter=outer_nt_param):
-        with dsl.acquire_loop_rt(
-            count=opts.count,
-            averaging_mode=opts.averaging_mode,
-            acquisition_type=opts.acquisition_type,
-            repetition_mode=opts.repetition_mode,
-            repetition_time=opts.repetition_time,
-            reset_oscillator_phase=opts.reset_oscillator_phase,
-        ):
+    with dsl.acquire_loop_rt(
+        count=opts.count,
+        averaging_mode=opts.averaging_mode,
+        acquisition_type=opts.acquisition_type,
+        repetition_mode=opts.repetition_mode,
+        repetition_time=opts.repetition_time,
+        reset_oscillator_phase=opts.reset_oscillator_phase,
+    ):
+        with dsl.sweep(uid="outer_nt_sweep", parameter=outer_nt_param, chunk_count=4):
             ###################
             # with dsl.section(name="init"):
             #     init_section_uid = dsl.active_section().uid

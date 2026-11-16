@@ -152,6 +152,7 @@ class ZIACQ(HALbase, ZIbase):
             workflow_results = workflow_results.output
         else:
             workflow_results = run_experiment(session=self._leSession, compiled_experiment=self._cur_compiled_expt)
+            self._temp = workflow_results
 
         end_time = time.perf_counter()    # High-resolution end time
         elapsed_time = end_time - start_time

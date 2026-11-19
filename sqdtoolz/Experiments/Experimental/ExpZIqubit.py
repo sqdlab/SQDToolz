@@ -127,16 +127,28 @@ class ExpZIqubit(Experiment):
 
             if kwargs.get('print_estimated_execution_time',True):
                 print(f"Expected Runtime: {execution_time:.3f}s")
-        
-        exp_workflow = self._workflow_module.experiment_workflow(
-            session=leSession,
-            qpu=leQPU,
-            **qubit_kwarg,
-            options=options,
-            **self._args
-        )
 
-        self._expt_config._hal_ACQ._cur_workflow = exp_workflow
+        self._expt_config._hal_ACQ._cur_compiled_expt = None
+        self._expt_config._hal_ACQ._cur_workflow = None
+        if kwargs.pop('cache_compiled_experiment', False):
+            #Should only do this if there is a single experiment to run in the workflow!
+            sig = inspect.signature(self._workflow_module.create_experiment)
+            zi_exp_params = list(sig.parameters.keys())
+            the_exp = self._workflow_module.create_experiment(
+                                    leQPU,
+                                    **qubit_kwarg_objs,
+                                    options=options.base._task_options['create_experiment'],    #TODO: Look into pitfalls here, but it needs to be converted into actual options here anyway...
+                                    **{x:self._args[x] for x in self._args if x in zi_exp_params})
+            self._expt_config._hal_ACQ._cur_compiled_expt = compile_experiment(leSession, the_exp)
+        else:
+            exp_workflow = self._workflow_module.experiment_workflow(
+                session=leSession,
+                qpu=leQPU,
+                **qubit_kwarg,
+                options=options,
+                **self._args
+            )
+            self._expt_config._hal_ACQ._cur_workflow = exp_workflow
         
         emulate = kwargs.pop('debug_skip_experiment__run', False)
         if kwargs.pop('debug_skip_experiment', False):

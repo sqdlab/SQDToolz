@@ -207,7 +207,7 @@ def create_experiment(
     # calculate_lengths
     l_flux = the_coupler.parameters.Length + q_comp.parameters.ge_drive_length
 
-    max_measure_section_length = qpu.measure_section_length(qubits)
+    max_measure_section_length = qpu.quantum_operations.measure_section_length(qubits)
     qop = qpu.quantum_operations
     with dsl.acquire_loop_rt(
         count=opts.count,

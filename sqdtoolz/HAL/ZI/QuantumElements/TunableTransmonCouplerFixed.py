@@ -59,7 +59,8 @@ class TunableTransmonCouplerFixedOperations(QuantumOperations):
         cur_qubit = qop_obj.qpu[cplr_obj.signals[flux_line].split('/')[0]]
         #
         if cur_qubit.parameters.custom.get('flux_compensation_kernel', None) is not None:
-            create_pulse_dict = {"function": "filtered_pulse", "main_function": pulse_params["function"], "filter_taps": cur_qubit.parameters.custom.flux_compensation_kernel}
+            list_filter_kernel = cur_qubit.parameters.custom.flux_compensation_kernel.tolist()  #New firmware update doesn't allow numpy arrays?
+            create_pulse_dict = {"function": "filtered_pulse", "main_function": pulse_params["function"], "filter_taps": list_filter_kernel}
             for x in pulse_params:
                 if x != 'function':
                     create_pulse_dict[x] = pulse_params[x]

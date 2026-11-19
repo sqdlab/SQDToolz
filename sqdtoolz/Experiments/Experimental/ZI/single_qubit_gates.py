@@ -185,7 +185,7 @@ def create_experiment(
     # We will fix the length of the measure section to the longest section among
     # the qubits to allow the qubits to have different readout and/or
     # integration lengths.
-    max_measure_section_length = qpu.measure_section_length(qubits)
+    max_measure_section_length = qpu.quantum_operations.measure_section_length(qubits)
     qop = qpu.quantum_operations
     with dsl.acquire_loop_rt(
         count=opts.count,

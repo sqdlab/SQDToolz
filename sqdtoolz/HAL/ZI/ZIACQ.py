@@ -27,6 +27,7 @@ class ZIACQ(HALbase, ZIbase):
         self._cur_compiled_expt = None
         if not hasattr(self, '_leSession'):
             self._leSession = lbeqs.Session(self._instr_zi.device_setup)
+        self.PrintACQTime = False
 
     @classmethod
     def fromConfigDict(cls, config_dict, lab):
@@ -155,8 +156,9 @@ class ZIACQ(HALbase, ZIbase):
             self._temp = workflow_results
 
         end_time = time.perf_counter()    # High-resolution end time
-        elapsed_time = end_time - start_time
-        print(f'ACQ-Time: {elapsed_time}')
+        self.last_elapsed_time = end_time - start_time
+        if self.PrintACQTime:
+            print(f'ACQ-Time: {self.last_elapsed_time}')
         
         ##debugging###
         # print(workflow_results.output)

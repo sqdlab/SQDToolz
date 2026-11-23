@@ -107,6 +107,7 @@ class ExpZIqubit(Experiment):
             qubit_kwarg_objs = {'qubits': leQubits}
 
         min_buffer_between_acq = kwargs.get('min_buffer_between_acquisitions', 40e-9)
+        comp_exp = None
         assert min_buffer_between_acq >= 20e-9, "The minimum buffer between acquisitions recommended by the ZI hardware team is 20ns."
         if not kwargs.get('quick_query',False) and not kwargs.get('skip_timing_diagram'):
             execution_time = 0
@@ -115,11 +116,12 @@ class ExpZIqubit(Experiment):
                 temp_states = self._args.pop('states')
                 for cur_state in temp_states:
                     self._args['state'] = cur_state
-                    execution_time += self._estimate_experiment_params(kwargs,leSession,leQPU,leQubits,qubit_kwarg_objs,options,file_path, f'_{cur_state}', min_buffer_between_acq)
+                    cur_exec_time, comp_exp = self._estimate_experiment_params(kwargs,leSession,leQPU,leQubits,qubit_kwarg_objs,options,file_path, f'_{cur_state}', min_buffer_between_acq)
+                    execution_time += cur_exec_time
                 self._args.pop('state')
                 self._args['states'] = temp_states
             else:
-                execution_time = self._estimate_experiment_params(kwargs,leSession,leQPU,leQubits,qubit_kwarg_objs,options,file_path, min_acq_buffer=min_buffer_between_acq)
+                execution_time, comp_exp = self._estimate_experiment_params(kwargs,leSession,leQPU,leQubits,qubit_kwarg_objs,options,file_path, min_acq_buffer=min_buffer_between_acq)
             #Another hack for the case where they iterate once per qubit in the experiment for a given workflow...
             if 'qubits' in zi_wfw_params and not ('qubits' in zi_exp_params) and 'qubit' in zi_exp_params:
                 execution_time *= len(leQubits)
@@ -135,12 +137,14 @@ class ExpZIqubit(Experiment):
             #Should only do this if there is a single experiment to run in the workflow!
             sig = inspect.signature(self._workflow_module.create_experiment)
             zi_exp_params = list(sig.parameters.keys())
-            the_exp = self._workflow_module.create_experiment(
-                                    leQPU,
-                                    **qubit_kwarg_objs,
-                                    options=options.base._task_options['create_experiment'],    #TODO: Look into pitfalls here, but it needs to be converted into actual options here anyway...
-                                    **{x:self._args[x] for x in self._args if x in zi_exp_params})
-            self._expt_config._hal_ACQ._cur_compiled_expt = compile_experiment(leSession, the_exp)
+            if comp_exp is None:
+                the_exp = self._workflow_module.create_experiment(
+                                        leQPU,
+                                        **qubit_kwarg_objs,
+                                        options=options.base._task_options['create_experiment'],    #TODO: Look into pitfalls here, but it needs to be converted into actual options here anyway...
+                                        **{x:self._args[x] for x in self._args if x in zi_exp_params})
+                comp_exp = compile_experiment(leSession, the_exp)
+            self._expt_config._hal_ACQ._cur_compiled_expt = comp_exp
             self._expt_config._hal_ACQ._time_stamp_overrides = kwargs.pop('time_stamps', None)
         else:
             exp_workflow = self._workflow_module.experiment_workflow(
@@ -295,9 +299,9 @@ class ExpZIqubit(Experiment):
                 assert len(msg) == 0, f"Acquisition triggers on Qubit '{cur_qubit['qubit'].uid}' are too close to one another (inspect the generated pulse sheets for at least a {Miscellaneous.get_units(min_acq_buffer)}s buffer between acquisitions), specifically the pairs: {msg}"
 
         if compiled_exp:
-            return compiled_exp.estimated_runtime
+            return compiled_exp.estimated_runtime, compiled_exp
         else:
-            return -1
+            return -1, None
 
     @staticmethod
     def normalise_qubit_data(fileioreader_calib, transition):

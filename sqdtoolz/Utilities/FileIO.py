@@ -144,7 +144,7 @@ class FileIOWriter:
         if self.store_timestamps:
             #TODO: When reverse-sweeping, the time-stamps are just overwritten as they don't go to the granularity of dependent variables? Fix this with some changes?
             #Trick taken from here: https://stackoverflow.com/questions/68443753/datetime-storing-in-hd5-database
-            if 'TimeStamps' in data_pkt['misc']:
+            if 'misc' in data_pkt and 'TimeStamps' in data_pkt['misc']:
                 assert data_pkt['misc']['TimeStamps'].size == cur_data.shape[0], "The TimeStamps for a given dataset must match the size of the dataset to make a 1:1 correspondence."
                 utc_strs = [str(s).encode('utf-8') for s in np.datetime_as_string(data_pkt['misc']['TimeStamps'].flatten(), timezone='UTC')]
             else:

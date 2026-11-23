@@ -61,6 +61,8 @@ class ExpZIQASM(ExpZIqubit):
         self._qregs = self._poqasm.get_qubit_registers()
         num_qasm_qubits = len(self._qregs)
         assert num_qasm_qubits <= len(qubit_ids), f"The QASM script needs {num_qasm_qubits} while only {len(qubit_ids)} qubits have been specified."
+
+        self._num_repeat = kwargs.get('num_repeat', 1)
         
         super().__init__(name, expt_config, oqasm_scheduled_qubits, hal_QPU, qubit_ids, **kwargs)
 
@@ -94,7 +96,8 @@ class ExpZIQASM(ExpZIqubit):
         #
         self._leSchedule = self._poqasm.create_schedule(qasm_qubit_params, flatten_blocks=True)
 
-        # leTable = self._poqasm.tabulate_schedule(self._leSchedule, qasm_qubit_params)
+        leTable = self._poqasm.tabulate_schedule(self._leSchedule, qasm_qubit_params)
+        self._leTable = leTable
         # for m in range(len(self._leScheduleBlocks['commands'])):
         repetition_time = self._poqasm.plot_schedule(self._leSchedule, qasm_qubit_params, file_path + 'compiled_qasm_schedule.html')
 
@@ -124,8 +127,35 @@ class ExpZIQASM(ExpZIqubit):
                     kwargs['override_ACQ_params']['AveragingOrder'] = 'SweepBeforeAverage'
             else:
                 kwargs['override_ACQ_params']['AveragingOrder'] = 'SweepBeforeAverage'
+            #####
+            if 'NumRepetitions' in kwargs['override_ACQ_params']:
+                numRepetitions = kwargs['override_ACQ_params']['NumRepetitions']
+            else:
+                numRepetitions = self._expt_config._hal_ACQ.NumRepetitions
         else:
             kwargs['override_ACQ_params'] = {'AcquisitionMode':'DISCRIMINATION', 'AveragingOrder':'SweepBeforeAverage'}
+
+        #Calculating time-stamp parameters
+        #Real repetition time aligns to the measurement timing grid to ensure remaining repetitions align to timing grid...
+        minRepTime = np.max(leTable['end_time'])
+        realRepTime = minRepTime / 8e-9
+        if realRepTime - int(realRepTime) < 1e-12:
+            realRepTime = float(minRepTime)
+        else:
+            realRepTime = float(np.ceil(realRepTime) * 8e-9)
+        #
+        df = leTable[leTable['operation'] == 'M']
+        timing_dicts = dict(zip(df['angle'], df['end_time']))
+        for cur_meas in timing_dicts:
+            timing_dicts[cur_meas] = timing_dicts[cur_meas] + realRepTime*np.arange(numRepetitions)
+            if self._num_repeat > 1:
+                #Use numpy broadcasting to create the new axis with the chunk times (#reps x rep_time) as offsets
+                timing_dicts[cur_meas] = timing_dicts[cur_meas] + (numRepetitions*realRepTime*np.arange(self._num_repeat))[:,None]
+                #Because the loop is inside the rt_loop...
+                timing_dicts[cur_meas] = timing_dicts[cur_meas].T
+        #TODO: Support IQ and RAW time-stamps as well...
+        if kwargs['override_ACQ_params'] == 'DISCRIMINATION':
+            kwargs['time_stamps'] = timing_dicts
 
         self._args['openqasm_schedule'] = self._leSchedule
         leData = super()._run(file_path, sweep_vars, **kwargs)
@@ -135,7 +165,13 @@ class ExpZIQASM(ExpZIqubit):
         acq_type = self._expt_config._hal_ACQ.AcquisitionMode
         avg_type = self._expt_config._hal_ACQ.AveragingOrder
         with open(file_path + 'measurement_params.json', 'w') as f:
-            json.dump({'acq_type':acq_type, 'avg_type':avg_type, 'NumRepetitions':self._expt_config._hal_ACQ.NumRepetitions, 'Sweeps':[(x[0].Name, x[1].size) for x in sweep_vars]}, f)
+            json.dump({'acq_type':acq_type,
+                       'avg_type':avg_type,
+                       'NumRepetitions':numRepetitions,
+                       'Sweeps':[(x[0].Name, x[1].size) for x in sweep_vars],
+                       'RepetitionTime':realRepTime,
+                       'InnerHardwareSweep':self._num_repeat
+                       }, f)
         self.qasm_output = {}
         for cur_meas_output in self._leSchedule['meas_store_ids']:
             cur_fileioread = self.retrieve_last_aux_dataset(self._leSchedule['meas_store_ids'][cur_meas_output][0])

@@ -41,7 +41,18 @@ class ExpZIQASMDataViewer:
         leData = FileIOReader(file_path)
         arr = leData.get_numpy_array()
         if self._meas_params['acq_type'] == 'DISCRIMINATION':
-            arr = np.array(arr[...,0], dtype=int)
+            if self._meas_params.get('InnerHardwareSweep', 1) > 1:
+                arr = np.array(arr[...,0,:], dtype=int)
+            else:
+                arr = np.array(arr[...,0], dtype=int)
+        if self._meas_params.get('InnerHardwareSweep', 1) > 1:
+            match self._meas_params['acq_type']:
+                case 'DISCRIMINATION':
+                    arr = np.swapaxes(arr, -1, -2)
+                case 'INTEGRATION':
+                    arr = np.transpose(arr, (*range(arr.ndim - 3), -1, -3, -2))
+                case 'RAW':
+                    arr = np.transpose(arr, (*range(arr.ndim - 4), -1, -4, -3, -2))
         if arr.size == 1:
             arr = float(arr)
         return arr
@@ -66,6 +77,8 @@ class ExpZIQASMDataViewer:
                     ret_val = ['samples','iq']
                 else:
                     ret_val = ['shot','samples','iq']
+        if self._meas_params.get('InnerHardwareSweep', 1) > 1:
+            ret_val = ['PipelinedSweep'] + ret_val
         if len(self._meas_params['Sweeps'])>0:
             ret_val = [x[0] for x in self._meas_params['Sweeps']] + ret_val
         return ret_val
@@ -87,20 +100,21 @@ class ExpZIQASMDataViewer:
                 cur_data[cur_meas[1]] = self._get_data(self._creg_to_meas_mapping[cur_meas])
         return cur_data
 
-    def get_time_stamps_over_sweeps(self):
+    def get_time_stamps(self):
         init_folder = self.data_folder / 'data/m0.h5'
         assert os.path.exists(init_folder), "This experiment had no active measurements."
         
         leData = FileIOReader(init_folder)
         leTs = leData.get_time_stamps()
-
-        if len(self._meas_params['Sweeps']) > 0:
-            num_slicing_dims = len(self._meas_params['Sweeps'])
-        else:
-            print('Warning: This experiment had no sweeps like shot_repeat etc. So there is only one hardware time-stamp.')
-            return [0]
-        idx = tuple(slice(None) if i < num_slicing_dims else 0 for i in range(leTs.ndim))
-        return (leTs[idx] - np.ndarray.flatten(leTs[idx])[0]) / np.timedelta64(1, 's')
+        if self._meas_params.get('InnerHardwareSweep', 1) > 1:
+            match self._meas_params['acq_type']:
+                case 'DISCRIMINATION':
+                    leTs = np.swapaxes(leTs, -1, -2)
+                case 'INTEGRATION':
+                    leTs = np.transpose(leTs, (*range(leTs.ndim - 3), -1, -3, -2))
+                case 'RAW':
+                    leTs = np.transpose(leTs, (*range(leTs.ndim - 4), -1, -4, -3, -2))
+        return leTs
 
     def get_readout_correction_matrices(self, classical_register_name:str, classical_register_index:int|None=None):
         """

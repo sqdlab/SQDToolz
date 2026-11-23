@@ -1222,7 +1222,7 @@ class ParserOpenQASM:
                 elif cur_gate[0] == 'Measure':
                     cur_name = self._measure_label
                     arr_operations.append('M')
-                    arr_op_angles.append(0)
+                    arr_op_angles.append(cur_gate[1])
                 else:
                     cur_name = self._get_1QG_name(*cur_gate)
                     arr_operations.append(cur_gate[0])

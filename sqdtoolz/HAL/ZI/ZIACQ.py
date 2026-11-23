@@ -5,6 +5,8 @@ from laboneq_applications.qpu_types.tunable_transmon import TunableTransmonQubit
 import numpy as np
 import time
 from laboneq.workflow.tasks import compile_experiment, run_experiment
+from laboneq.core.types.compiled_experiment import CompiledExperiment
+from laboneq.dsl.experiment import Sweep
 
 class ZIACQ(HALbase, ZIbase):
     def __init__(self, qubit_name, lab, instr_zi_boxes):
@@ -25,6 +27,7 @@ class ZIACQ(HALbase, ZIbase):
             }
         self._cur_workflow = None
         self._cur_compiled_expt = None
+        self._time_stamp_overrides = None
         if not hasattr(self, '_leSession'):
             self._leSession = lbeqs.Session(self._instr_zi.device_setup)
         self.PrintACQTime = False
@@ -137,6 +140,29 @@ class ZIACQ(HALbase, ZIbase):
         self._cur_workflow = None   #This will be called in init_instruments
         self._cur_compiled_expt = None
 
+    @staticmethod
+    def find_chunked_sweeps(compiled_exp: CompiledExperiment) -> list[dict]:
+        """Return metadata for any Sweep section configured with chunking."""
+        chunked = []
+        def _walk(sections):
+            for sec in sections:
+                if isinstance(sec, Sweep) and (sec.chunk_count > 1 or sec.auto_chunking):
+                    chunked.append({
+                        "section_uid": sec.uid,
+                        "chunk_count": sec.chunk_count,  # Note: still 1 if auto_chunking=True
+                        "auto_chunking": sec.auto_chunking,
+                        "parameters": sec.parameters,
+                        "axis_names": [p.axis_name or p.uid for p in sec.parameters],
+                    })
+                if hasattr(sec, "sections") and sec.sections:
+                    _walk(sec.sections)
+        _walk(compiled_exp.experiment.sections)
+        if len(chunked) == 0:
+            return None
+        #There should only be 1 chunked sweeping axis
+        chunked = chunked[0]['axis_names'][0]
+        return chunked
+
     def _process_data_dict(self, data_array, dest_dict, prefix=""):
         if data_array.dtype == np.complex128:
             dest_dict[prefix+'real'] = np.real(data_array)
@@ -147,6 +173,8 @@ class ZIACQ(HALbase, ZIbase):
     def get_data(self):
         assert self._cur_workflow != None or self._cur_compiled_expt != None, "ZIACQ must not be in a CONFIG run in a non-ZI compatible experiment. For example, ExpZIqubit would be fine."
         start_time = time.perf_counter()  # High-resolution start time
+
+        timing_dicts = {}   #TODO: Can this be extended to non-cache compiled experiments?
         if self._cur_compiled_expt is None:
             workflow_results = self._cur_workflow.run()
             self._temp = workflow_results
@@ -154,6 +182,11 @@ class ZIACQ(HALbase, ZIbase):
         else:
             workflow_results = run_experiment(session=self._leSession, compiled_experiment=self._cur_compiled_expt)
             self._temp = workflow_results
+            if self._time_stamp_overrides is not None:
+                timing_dicts = self._time_stamp_overrides
+                chunked_axis = ZIACQ.find_chunked_sweeps(self._cur_compiled_expt)
+                leTsOffs = next(iter(workflow_results.pipeline_jobs_timestamps.values()), None)
+
 
         end_time = time.perf_counter()    # High-resolution end time
         self.last_elapsed_time = end_time - start_time
@@ -197,8 +230,22 @@ class ZIACQ(HALbase, ZIbase):
                             #TODO: They allow multiple mappings to a given axis; this is a bit of a hack...
                             'parameters' : [(x[0].replace('/','_') if isinstance(x, list) else x.replace('/','_')) for x in cur_res.axis_name],
                             'data' : {},
-                            'parameter_values': {}
+                            'parameter_values': {},
+                            'misc': {}
                         }
+                    if cur_dataset in timing_dicts:
+                        leNow = np.datetime64('now', 'us')
+                        date_time_array = (timing_dicts[cur_dataset] - self.last_elapsed_time)*1e6
+                        date_time_array = leNow + date_time_array.astype('timedelta64[us]')
+                        if not(chunked_axis is None) and leTsOffs is not None:
+                            cur_chunked_ind = cur_res.axis_name.index(chunked_axis)
+                            #
+                            pipeline_offsets = (np.diff(leTsOffs)*1e6).astype('timedelta64[us]') - np.diff(date_time_array, axis=cur_chunked_ind)
+                            leSlice = [slice(None)] * date_time_array.ndim
+                            leSlice[cur_chunked_ind] = slice(1, None)
+                            #
+                            date_time_array[tuple(leSlice)] = date_time_array[tuple(leSlice)] + np.cumsum(pipeline_offsets, axis=cur_chunked_ind)
+                        ret_val[cur_dataset]['misc']['TimeStamps'] = date_time_array
                     for m,cur_axis in enumerate(cur_res.axis_name):
                         #TODO: Again they allow multiple mappings to a given axis; this is a bit of a hack...
                         if isinstance(cur_axis, list):

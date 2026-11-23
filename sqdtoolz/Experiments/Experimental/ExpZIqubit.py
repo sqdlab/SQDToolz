@@ -130,6 +130,7 @@ class ExpZIqubit(Experiment):
 
         self._expt_config._hal_ACQ._cur_compiled_expt = None
         self._expt_config._hal_ACQ._cur_workflow = None
+        self._expt_config._hal_ACQ._time_stamp_overrides = None
         if kwargs.pop('cache_compiled_experiment', False):
             #Should only do this if there is a single experiment to run in the workflow!
             sig = inspect.signature(self._workflow_module.create_experiment)
@@ -140,6 +141,7 @@ class ExpZIqubit(Experiment):
                                     options=options.base._task_options['create_experiment'],    #TODO: Look into pitfalls here, but it needs to be converted into actual options here anyway...
                                     **{x:self._args[x] for x in self._args if x in zi_exp_params})
             self._expt_config._hal_ACQ._cur_compiled_expt = compile_experiment(leSession, the_exp)
+            self._expt_config._hal_ACQ._time_stamp_overrides = kwargs.pop('time_stamps', None)
         else:
             exp_workflow = self._workflow_module.experiment_workflow(
                 session=leSession,

@@ -305,5 +305,14 @@ class DataTransmonFlux:
         return transmon_flux_model(total_flux, **popt)
     
     @staticmethod
+    def convert_flux_amplitude_to_frequency(flux_conversion_params:dict, flux_amplitude=None, flux_range=5, fluxDC=0):
+        assert (flux_amplitude is not None) or (fluxDC != 0), "Must pass either flux_amplitude or flux_DC as floats or arrays." 
+        popt = flux_conversion_params
+        total_flux = np.asarray(fluxDC) + np.asarray(flux_amplitude) * flux_range
+        def transmon_flux_model(x, f_max, flux0, period, offset):
+            return f_max * np.sqrt(np.abs(np.cos(np.pi * (x - flux0) / period))) + offset
+        return transmon_flux_model(total_flux, **popt)
+
+    @staticmethod
     def convert_fluxDC_to_frequency_zi(qubit_object, fluxDC):
         return DataTransmonFlux.convert_flux_amplitude_to_frequency_zi(qubit_object, flux_amplitude=0, fluxDC=fluxDC)

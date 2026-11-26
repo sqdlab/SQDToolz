@@ -143,6 +143,7 @@ class ExpZIqubit(Experiment):
                                         **qubit_kwarg_objs,
                                         options=options.base._task_options['create_experiment'],    #TODO: Look into pitfalls here, but it needs to be converted into actual options here anyway...
                                         **{x:self._args[x] for x in self._args if x in zi_exp_params})
+                self._base_exp = the_exp
                 comp_exp = compile_experiment(leSession, the_exp)
             self._expt_config._hal_ACQ._cur_compiled_expt = comp_exp
             self._expt_config._hal_ACQ._time_stamp_overrides = kwargs.pop('time_stamps', None)
@@ -156,7 +157,7 @@ class ExpZIqubit(Experiment):
             )
             self._expt_config._hal_ACQ._cur_workflow = exp_workflow
         
-        emulate = kwargs.pop('debug_skip_experiment__run', False)
+        emulate = kwargs.pop('debug_skip_experiment_run', False)
         if kwargs.pop('debug_skip_experiment', False):
             if emulate:
                 print('Not running experiment')
@@ -199,6 +200,7 @@ class ExpZIqubit(Experiment):
                         **qubit_kwarg_objs,
                         options=options.base._task_options['create_experiment'],    #TODO: Look into pitfalls here, but it needs to be converted into actual options here anyway...
                         **{x:self._args[x] for x in self._args if x in zi_exp_params})
+            self._base_exp = temp_exp
             compiled_exp = compile_experiment(leSession, temp_exp)
         if print_pulse_sheet:
             pulse_sheet_viewer.show_pulse_sheet(file_path+'timing_diagram', compiled_exp)

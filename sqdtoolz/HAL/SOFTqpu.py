@@ -181,7 +181,7 @@ class SOFTqpu(HALbase, ZIbase):
                         'ReadoutFrequency', 'ReadoutTime', 'ResetTime',
                         'T1GE', 'T2GE_star', 'T2GE', 'T1EF', 'T2EF_star', 'T2EF',
                         'ReadoutQi', 'ReadoutQc', 'ReadoutQl', 'ChiGE',
-                        'Fidelity1QRB', 'FidelityReadout']
+                        'Fidelity1QRB', 'FidelityReadout', 'FluxConversionParams', 'FluxRange']
         cur_qubit_names = [x for x in data['Qubits']]
         for cur_qubit in data['Qubits']:
             dict_cur_qubit = data['HALs'][data['Qubits'][cur_qubit]]
